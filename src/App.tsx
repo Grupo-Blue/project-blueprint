@@ -21,6 +21,7 @@ import CalculoMetricas from "./pages/CalculoMetricas";
 import Alertas from "./pages/Alertas";
 import Criativos from "./pages/Criativos";
 import Usuarios from "./pages/Usuarios";
+import Integracoes from "./pages/Integracoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
           <Route path="/alertas" element={<Alertas />} />
           <Route path="/criativos" element={<Criativos />} />
           <Route path="/usuarios" element={<Usuarios />} />
+          <Route path="/integracoes" element={<Integracoes />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
