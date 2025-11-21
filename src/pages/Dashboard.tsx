@@ -5,7 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target, Lightbulb, Eye, Activity } from "lucide-react";
+import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target, Lightbulb, Eye, Activity, Building2 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 const Dashboard = () => {
@@ -158,6 +158,12 @@ const Dashboard = () => {
                 Aprendizados
               </Button>
             </Link>
+            <Link to="/empresas">
+              <Button variant="ghost" size="sm">
+                <Building2 className="mr-2 h-4 w-4" />
+                Empresas
+              </Button>
+            </Link>
           </nav>
         </div>
       </header>
@@ -300,6 +306,12 @@ const Dashboard = () => {
                 <Button variant="outline" className="w-full justify-start">
                   <BookOpen className="mr-2 h-4 w-4" />
                   Aprendizados Semanais
+                </Button>
+              </Link>
+              <Link to="/empresas" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <Building2 className="mr-2 h-4 w-4" />
+                  Gestão de Empresas
                 </Button>
               </Link>
             </CardContent>
