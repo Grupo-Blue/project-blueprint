@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       acao: {
         Row: {
+          anexos: Json | null
           categoria: Database["public"]["Enums"]["categoria_acao"]
           created_at: string
           data_criacao: string
@@ -31,6 +32,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          anexos?: Json | null
           categoria: Database["public"]["Enums"]["categoria_acao"]
           created_at?: string
           data_criacao?: string
@@ -46,6 +48,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          anexos?: Json | null
           categoria?: Database["public"]["Enums"]["categoria_acao"]
           created_at?: string
           data_criacao?: string
