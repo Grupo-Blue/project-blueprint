@@ -125,6 +125,12 @@ const Dashboard = () => {
                 Campanhas
               </Button>
             </Link>
+            <Link to="/relatorios">
+              <Button variant="ghost" size="sm">
+                <FileText className="mr-2 h-4 w-4" />
+                Relatórios
+              </Button>
+            </Link>
           </nav>
         </div>
       </header>
@@ -235,6 +241,12 @@ const Dashboard = () => {
                 <Button variant="outline" className="w-full justify-start">
                   <Target className="mr-2 h-4 w-4" />
                   Ver Campanhas
+                </Button>
+              </Link>
+              <Link to="/relatorios" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Relatórios Semanais
                 </Button>
               </Link>
             </CardContent>
