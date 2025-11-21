@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, BarChart3, TrendingUp, Users, DollarSign } from "lucide-react";
+import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen } from "lucide-react";
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -80,17 +80,46 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">SGT - Sistema de Governança de Tráfego</h1>
-            <p className="text-sm text-muted-foreground">
-              {profile?.nome} • {profile && getPerfilLabel(profile.perfil)}
-            </p>
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <Link to="/dashboard">
+                <h1 className="text-2xl font-bold hover:text-primary transition-colors cursor-pointer">
+                  SGT - Sistema de Governança de Tráfego
+                </h1>
+              </Link>
+              <p className="text-sm text-muted-foreground">
+                {profile?.nome} • {profile && getPerfilLabel(profile.perfil)}
+              </p>
+            </div>
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair
+            </Button>
           </div>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Sair
-          </Button>
+          
+          <nav className="flex gap-2 flex-wrap">
+            <Link to="/dashboard">
+              <Button variant="ghost" size="sm">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Dashboard
+              </Button>
+            </Link>
+            <Link to="/acoes">
+              <Button variant="ghost" size="sm">
+                <ListChecks className="mr-2 h-4 w-4" />
+                Ações A/B/C
+              </Button>
+            </Link>
+            {(profile?.perfil === "DIRECAO" || profile?.perfil === "ADMIN") && (
+              <Link to="/aprovacoes">
+                <Button variant="ghost" size="sm">
+                  <CheckSquare className="mr-2 h-4 w-4" />
+                  Aprovações
+                </Button>
+              </Link>
+            )}
+          </nav>
         </div>
       </header>
 
@@ -148,36 +177,57 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Status do Sistema</CardTitle>
-            <CardDescription>Backend configurado e pronto para uso</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                <span className="text-sm">✅ Banco de dados criado (32 tabelas)</span>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Status do Sistema</CardTitle>
+              <CardDescription>Backend configurado e pronto para uso</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                  <span className="text-sm">✅ Banco de dados criado</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                  <span className="text-sm">✅ Autenticação configurada</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                  <span className="text-sm">✅ Empresas cadastradas</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                  <span className="text-sm">✅ Governança A/B/C ativa</span>
+                </div>
               </div>
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                <span className="text-sm">✅ Autenticação configurada</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                <span className="text-sm">✅ Empresas cadastradas (Blue, Tokeniza)</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></div>
-                <span className="text-sm">⏳ Aguardando configuração de integrações</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></div>
-                <span className="text-sm">⏳ Módulos de interface em desenvolvimento</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Acesso Rápido</CardTitle>
+              <CardDescription>Navegue pelos módulos do sistema</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Link to="/acoes" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <ListChecks className="mr-2 h-4 w-4" />
+                  Gerenciar Ações A/B/C
+                </Button>
+              </Link>
+              {(profile?.perfil === "DIRECAO" || profile?.perfil === "ADMIN") && (
+                <Link to="/aprovacoes" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <CheckSquare className="mr-2 h-4 w-4" />
+                    Aprovar Ações Categoria C
+                  </Button>
+                </Link>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );
