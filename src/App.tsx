@@ -19,6 +19,7 @@ import DashboardTrafego from "./pages/DashboardTrafego";
 import Empresas from "./pages/Empresas";
 import CalculoMetricas from "./pages/CalculoMetricas";
 import Alertas from "./pages/Alertas";
+import Criativos from "./pages/Criativos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
           <Route path="/empresas" element={<Empresas />} />
           <Route path="/calculo-metricas" element={<CalculoMetricas />} />
           <Route path="/alertas" element={<Alertas />} />
+          <Route path="/criativos" element={<Criativos />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
