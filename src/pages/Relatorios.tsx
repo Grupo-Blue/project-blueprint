@@ -1,0 +1,214 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, Plus, Calendar, AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+interface Relatorio {
+  id_relatorio: string;
+  id_empresa: string;
+  id_semana: string;
+  status: string;
+  texto_comparacao: string | null;
+  aprendizado_resumo: string | null;
+  data_fechamento: string | null;
+  created_at: string;
+  empresa: {
+    nome: string;
+  };
+  semana: {
+    numero_semana: number;
+    ano: number;
+    data_inicio: string;
+    data_fim: string;
+  };
+}
+
+export default function Relatorios() {
+  const navigate = useNavigate();
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [filtroEmpresa, setFiltroEmpresa] = useState<string>("todas");
+
+  const { data: empresas } = useQuery({
+    queryKey: ["empresas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("empresa")
+        .select("id_empresa, nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: relatorios, isLoading } = useQuery({
+    queryKey: ["relatorios", filtroStatus, filtroEmpresa],
+    queryFn: async () => {
+      let query = supabase
+        .from("relatorio_semanal")
+        .select(`
+          *,
+          empresa:id_empresa (nome),
+          semana:id_semana (numero_semana, ano, data_inicio, data_fim)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (filtroStatus !== "todos") {
+        query = query.eq("status", filtroStatus as any);
+      }
+
+      if (filtroEmpresa !== "todas") {
+        query = query.eq("id_empresa", filtroEmpresa);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as Relatorio[];
+    },
+  });
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { variant: "default" | "secondary" | "outline"; label: string }> = {
+      EM_EDICAO: { variant: "secondary", label: "Em Edição" },
+      PRONTO: { variant: "default", label: "Pronto" },
+      VALIDADO: { variant: "outline", label: "Validado" },
+    };
+    const config = variants[status] || variants.EM_EDICAO;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-muted rounded w-1/4"></div>
+            <div className="h-64 bg-muted rounded"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-4xl font-bold text-foreground">Relatórios Semanais</h1>
+            <p className="text-muted-foreground mt-2">
+              Gerencie e visualize os relatórios de desempenho semanais
+            </p>
+          </div>
+          <Button onClick={() => navigate("/relatorios/novo")}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Relatório
+          </Button>
+        </div>
+
+        <div className="flex gap-4">
+          <Select value={filtroEmpresa} onValueChange={setFiltroEmpresa}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Empresa" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas as Empresas</SelectItem>
+              {empresas?.map((empresa) => (
+                <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
+                  {empresa.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os Status</SelectItem>
+              <SelectItem value="EM_EDICAO">Em Edição</SelectItem>
+              <SelectItem value="PRONTO">Pronto</SelectItem>
+              <SelectItem value="VALIDADO">Validado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-6">
+          {relatorios?.map((relatorio) => (
+            <Card 
+              key={relatorio.id_relatorio} 
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => navigate(`/relatorios/${relatorio.id_relatorio}`)}
+            >
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div className="space-y-2">
+                    <CardTitle className="text-2xl flex items-center gap-3">
+                      <FileText className="h-6 w-6" />
+                      Semana {relatorio.semana.numero_semana}/{relatorio.semana.ano}
+                      {getStatusBadge(relatorio.status)}
+                    </CardTitle>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        {format(new Date(relatorio.semana.data_inicio), "dd/MM", { locale: ptBR })} - {format(new Date(relatorio.semana.data_fim), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
+                      <span className="font-medium">{relatorio.empresa.nome}</span>
+                    </div>
+                  </div>
+                  {relatorio.data_fechamento && (
+                    <div className="text-right text-sm text-muted-foreground">
+                      Fechado em<br />
+                      {format(new Date(relatorio.data_fechamento), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {relatorio.texto_comparacao && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {relatorio.texto_comparacao}
+                    </p>
+                  )}
+                  {!relatorio.texto_comparacao && relatorio.status === "EM_EDICAO" && (
+                    <div className="flex items-center gap-2 text-sm text-yellow-600">
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Relatório incompleto - Continue a edição</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {relatorios?.length === 0 && (
+          <Card className="p-12">
+            <div className="text-center space-y-4">
+              <FileText className="h-16 w-16 mx-auto text-muted-foreground" />
+              <div>
+                <h3 className="text-xl font-semibold">Nenhum relatório encontrado</h3>
+                <p className="text-muted-foreground">
+                  {filtroStatus === "todos" && filtroEmpresa === "todas"
+                    ? "Crie seu primeiro relatório semanal."
+                    : "Ajuste os filtros para ver outros relatórios."}
+                </p>
+              </div>
+              <Button onClick={() => navigate("/relatorios/novo")}>
+                <Plus className="mr-2 h-4 w-4" />
+                Criar Primeiro Relatório
+              </Button>
+            </div>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}

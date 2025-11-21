@@ -9,6 +9,9 @@ import Dashboard from "./pages/Dashboard";
 import Acoes from "./pages/Acoes";
 import Aprovacoes from "./pages/Aprovacoes";
 import Campanhas from "./pages/Campanhas";
+import Relatorios from "./pages/Relatorios";
+import RelatorioEditor from "./pages/RelatorioEditor";
+import RelatorioNovo from "./pages/RelatorioNovo";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +29,9 @@ const App = () => (
           <Route path="/acoes" element={<Acoes />} />
           <Route path="/aprovacoes" element={<Aprovacoes />} />
           <Route path="/campanhas" element={<Campanhas />} />
+          <Route path="/relatorios" element={<Relatorios />} />
+          <Route path="/relatorios/novo" element={<RelatorioNovo />} />
+          <Route path="/relatorios/:id" element={<RelatorioEditor />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
