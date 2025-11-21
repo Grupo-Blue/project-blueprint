@@ -41,7 +41,7 @@ export default function DashboardDirecao() {
         .order("ano", { ascending: false })
         .order("numero_semana", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
