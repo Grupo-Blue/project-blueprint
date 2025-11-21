@@ -5,7 +5,8 @@ import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target } from "lucide-react";
+import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target, Lightbulb } from "lucide-react";
+import { NavLink } from "@/components/NavLink";
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -131,6 +132,18 @@ const Dashboard = () => {
                 Relatórios
               </Button>
             </Link>
+            <Link to="/hipoteses">
+              <Button variant="ghost" size="sm">
+                <Lightbulb className="mr-2 h-4 w-4" />
+                Hipóteses
+              </Button>
+            </Link>
+            <Link to="/aprendizados">
+              <Button variant="ghost" size="sm">
+                <BookOpen className="mr-2 h-4 w-4" />
+                Aprendizados
+              </Button>
+            </Link>
           </nav>
         </div>
       </header>
@@ -247,6 +260,18 @@ const Dashboard = () => {
                 <Button variant="outline" className="w-full justify-start">
                   <FileText className="mr-2 h-4 w-4" />
                   Relatórios Semanais
+                </Button>
+              </Link>
+              <Link to="/hipoteses" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <Lightbulb className="mr-2 h-4 w-4" />
+                  Hipóteses de Teste
+                </Button>
+              </Link>
+              <Link to="/aprendizados" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  Aprendizados Semanais
                 </Button>
               </Link>
             </CardContent>
