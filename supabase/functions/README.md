@@ -16,6 +16,9 @@ Processa e agrega métricas semanais por campanha e empresa.
 ### 4. sincronizar-pipedrive
 Sincroniza leads e eventos de vendas do Pipedrive CRM para todas as empresas com integrações ativas.
 
+### 5. sincronizar-tokeniza
+Sincroniza pedidos (orders) da plataforma Tokeniza como leads e vendas para todas as empresas com integrações ativas.
+
 ## Como Configurar Jobs Diários (Cron)
 
 Para executar essas funções automaticamente todos os dias, você precisa configurar cron jobs no Supabase.
@@ -81,6 +84,19 @@ SELECT cron.schedule(
   $$
   SELECT net.http_post(
     url:='https://unsznbmmqhihwctguvvr.supabase.co/functions/v1/sincronizar-pipedrive',
+    headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb,
+    body:='{}'::jsonb
+  ) as request_id;
+  $$
+);
+
+-- Job para sincronizar Tokeniza (executa todo dia às 4h30 da manhã)
+SELECT cron.schedule(
+  'sincronizar-tokeniza-diario',
+  '30 4 * * *',
+  $$
+  SELECT net.http_post(
+    url:='https://unsznbmmqhihwctguvvr.supabase.co/functions/v1/sincronizar-tokeniza',
     headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb,
     body:='{}'::jsonb
   ) as request_id;

@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.sincronizar-pipedrive]
 verify_jwt = false
+
+[functions.sincronizar-tokeniza]
+verify_jwt = false

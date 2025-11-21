@@ -42,6 +42,10 @@ export default function Integracoes() {
   // Pipedrive credentials
   const [pipedriveApiToken, setPipedriveApiToken] = useState("");
   const [pipedriveDomain, setPipedriveDomain] = useState("");
+  
+  // Tokeniza credentials
+  const [tokenizaApiToken, setTokenizaApiToken] = useState("");
+  const [tokenizaBaseUrl, setTokenizaBaseUrl] = useState("https://api.tokeniza.com.br");
 
   useEffect(() => {
     fetchData();
@@ -79,6 +83,8 @@ export default function Integracoes() {
     setGoogleCustomerId("");
     setPipedriveApiToken("");
     setPipedriveDomain("");
+    setTokenizaApiToken("");
+    setTokenizaBaseUrl("https://api.tokeniza.com.br");
     setEditingId(null);
   };
 
@@ -101,6 +107,9 @@ export default function Integracoes() {
     } else if (integracao.tipo === "PIPEDRIVE") {
       setPipedriveApiToken(config.api_token || "");
       setPipedriveDomain(config.domain || "");
+    } else if (integracao.tipo === "TOKENIZA") {
+      setTokenizaApiToken(config.api_token || "");
+      setTokenizaBaseUrl(config.base_url || "https://api.tokeniza.com.br");
     }
     
     setEmpresaSelecionada(config.id_empresa || "");
@@ -163,6 +172,16 @@ export default function Integracoes() {
         api_token: pipedriveApiToken,
         domain: pipedriveDomain
       };
+    } else if (tipoIntegracao === "TOKENIZA") {
+      if (!tokenizaApiToken || !tokenizaBaseUrl) {
+        toast.error("Preencha todos os campos obrigatórios");
+        return;
+      }
+      configJson = {
+        ...configJson,
+        api_token: tokenizaApiToken,
+        base_url: tokenizaBaseUrl
+      };
     }
 
     try {
@@ -198,7 +217,7 @@ export default function Integracoes() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Integrações</h1>
-          <p className="text-muted-foreground">Gerencie as integrações com Meta Ads, Google Ads e Pipedrive por empresa</p>
+          <p className="text-muted-foreground">Gerencie as integrações com Meta Ads, Google Ads, Pipedrive e Tokeniza por empresa</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
@@ -237,6 +256,7 @@ export default function Integracoes() {
                     <SelectItem value="META_ADS">Meta Ads</SelectItem>
                     <SelectItem value="GOOGLE_ADS">Google Ads</SelectItem>
                     <SelectItem value="PIPEDRIVE">Pipedrive</SelectItem>
+                    <SelectItem value="TOKENIZA">Tokeniza</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -329,6 +349,29 @@ export default function Integracoes() {
                 </>
               )}
 
+              {tipoIntegracao === "TOKENIZA" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>API Token (x-auth-token) *</Label>
+                    <Input
+                      type="password"
+                      value={tokenizaApiToken}
+                      onChange={(e) => setTokenizaApiToken(e.target.value)}
+                      placeholder="Seu token de autenticação da Tokeniza"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Base URL *</Label>
+                    <Input
+                      value={tokenizaBaseUrl}
+                      onChange={(e) => setTokenizaBaseUrl(e.target.value)}
+                      placeholder="https://api.tokeniza.com.br"
+                    />
+                    <p className="text-xs text-muted-foreground">URL base da API Tokeniza</p>
+                  </div>
+                </>
+              )}
+
               <div className="flex items-center space-x-2">
                 <Switch checked={ativo} onCheckedChange={setAtivo} id="ativo" />
                 <Label htmlFor="ativo">Integração Ativa</Label>
@@ -352,6 +395,7 @@ export default function Integracoes() {
           <TabsTrigger value="meta">Meta Ads</TabsTrigger>
           <TabsTrigger value="google">Google Ads</TabsTrigger>
           <TabsTrigger value="pipedrive">Pipedrive</TabsTrigger>
+          <TabsTrigger value="tokeniza">Tokeniza</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meta" className="space-y-4">
@@ -456,6 +500,47 @@ export default function Integracoes() {
                         <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
                         <CardDescription>
                           Domain: {config.domain}.pipedrive.com
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                          {integracao.ativo ? 'Ativo' : 'Inativo'}
+                        </span>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })
+          )}
+        </TabsContent>
+
+        <TabsContent value="tokeniza" className="space-y-4">
+          {integracoes.filter(i => i.tipo === "TOKENIZA").length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Nenhuma integração Tokeniza configurada
+              </CardContent>
+            </Card>
+          ) : (
+            integracoes.filter(i => i.tipo === "TOKENIZA").map((integracao) => {
+              const config = integracao.config_json as any;
+              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              
+              return (
+                <Card key={integracao.id_integracao}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription>
+                          Base URL: {config.base_url}
                         </CardDescription>
                       </div>
                       <div className="flex items-center space-x-2">
