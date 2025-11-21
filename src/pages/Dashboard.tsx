@@ -5,7 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target, Lightbulb } from "lucide-react";
+import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target, Lightbulb, Eye, Activity } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 const Dashboard = () => {
@@ -104,6 +104,20 @@ const Dashboard = () => {
               <Button variant="ghost" size="sm">
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Dashboard
+              </Button>
+            </Link>
+            {(profile?.perfil === "DIRECAO" || profile?.perfil === "ADMIN") && (
+              <Link to="/dashboard-direcao">
+                <Button variant="ghost" size="sm">
+                  <Eye className="mr-2 h-4 w-4" />
+                  Dash Direção
+                </Button>
+              </Link>
+            )}
+            <Link to="/dashboard-trafego">
+              <Button variant="ghost" size="sm">
+                <Activity className="mr-2 h-4 w-4" />
+                Dash Tráfego
               </Button>
             </Link>
             <Link to="/acoes">
@@ -236,6 +250,20 @@ const Dashboard = () => {
               <CardDescription>Navegue pelos módulos do sistema</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
+              {(profile?.perfil === "DIRECAO" || profile?.perfil === "ADMIN") && (
+                <Link to="/dashboard-direcao" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <Eye className="mr-2 h-4 w-4" />
+                    Dashboard Direção
+                  </Button>
+                </Link>
+              )}
+              <Link to="/dashboard-trafego" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <Activity className="mr-2 h-4 w-4" />
+                  Dashboard Tráfego
+                </Button>
+              </Link>
               <Link to="/acoes" className="block">
                 <Button variant="outline" className="w-full justify-start">
                   <ListChecks className="mr-2 h-4 w-4" />
