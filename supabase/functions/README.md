@@ -1,6 +1,6 @@
 # Edge Functions - Jobs Diários de Coleta
 
-Este diretório contém as Edge Functions para coleta automática de métricas de Meta Ads e Google Ads.
+Este diretório contém as Edge Functions para coleta automática de métricas de Meta Ads, Google Ads e sincronização com Pipedrive.
 
 ## Funções Disponíveis
 
@@ -12,6 +12,9 @@ Coleta métricas diárias do Google Ads para todas as empresas com integrações
 
 ### 3. calcular-metricas-semanais
 Processa e agrega métricas semanais por campanha e empresa.
+
+### 4. sincronizar-pipedrive
+Sincroniza leads e eventos de vendas do Pipedrive CRM para todas as empresas com integrações ativas.
 
 ## Como Configurar Jobs Diários (Cron)
 
@@ -65,6 +68,19 @@ SELECT cron.schedule(
   $$
   SELECT net.http_post(
     url:='https://unsznbmmqhihwctguvvr.supabase.co/functions/v1/calcular-metricas-semanais',
+    headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb,
+    body:='{}'::jsonb
+  ) as request_id;
+  $$
+);
+
+-- Job para sincronizar Pipedrive (executa todo dia às 4h da manhã)
+SELECT cron.schedule(
+  'sincronizar-pipedrive-diario',
+  '0 4 * * *',
+  $$
+  SELECT net.http_post(
+    url:='https://unsznbmmqhihwctguvvr.supabase.co/functions/v1/sincronizar-pipedrive',
     headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb,
     body:='{}'::jsonb
   ) as request_id;
