@@ -5,7 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target, Lightbulb, Eye, Activity, Building2 } from "lucide-react";
+import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target, Lightbulb, Eye, Activity, Building2, Calculator } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 const Dashboard = () => {
@@ -162,6 +162,12 @@ const Dashboard = () => {
               <Button variant="ghost" size="sm">
                 <Building2 className="mr-2 h-4 w-4" />
                 Empresas
+              </Button>
+            </Link>
+            <Link to="/calculo-metricas">
+              <Button variant="ghost" size="sm">
+                <Calculator className="mr-2 h-4 w-4" />
+                Métricas
               </Button>
             </Link>
           </nav>
