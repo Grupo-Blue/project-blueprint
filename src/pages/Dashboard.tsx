@@ -5,7 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen } from "lucide-react";
+import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target } from "lucide-react";
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -119,6 +119,12 @@ const Dashboard = () => {
                 </Button>
               </Link>
             )}
+            <Link to="/campanhas">
+              <Button variant="ghost" size="sm">
+                <Target className="mr-2 h-4 w-4" />
+                Campanhas
+              </Button>
+            </Link>
           </nav>
         </div>
       </header>
@@ -225,6 +231,12 @@ const Dashboard = () => {
                   </Button>
                 </Link>
               )}
+              <Link to="/campanhas" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <Target className="mr-2 h-4 w-4" />
+                  Ver Campanhas
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         </div>
