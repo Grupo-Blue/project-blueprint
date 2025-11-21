@@ -33,6 +33,18 @@ const Dashboard = () => {
         .eq("id", session.user.id)
         .single();
 
+      // Verificar se o usuário foi aprovado
+      if (profileData && !profileData.aprovado) {
+        await supabase.auth.signOut();
+        toast({
+          title: "Acesso pendente",
+          description: "Seu cadastro ainda não foi aprovado pelo administrador",
+          variant: "destructive",
+        });
+        navigate("/auth");
+        return;
+      }
+
       setProfile(profileData);
       setLoading(false);
     };

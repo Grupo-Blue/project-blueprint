@@ -45,7 +45,7 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -61,6 +61,22 @@ const Auth = () => {
           toast({
             title: "Erro ao fazer login",
             description: error.message,
+            variant: "destructive",
+          });
+        }
+      } else if (data.user) {
+        // Verificar se o usuário foi aprovado
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("aprovado")
+          .eq("id", data.user.id)
+          .single();
+
+        if (!profile?.aprovado) {
+          await supabase.auth.signOut();
+          toast({
+            title: "Acesso pendente",
+            description: "Seu cadastro ainda não foi aprovado pelo administrador",
             variant: "destructive",
           });
         }
@@ -110,7 +126,7 @@ const Auth = () => {
       } else {
         toast({
           title: "Cadastro realizado!",
-          description: "Você já pode fazer login",
+          description: "Aguarde a aprovação do administrador para acessar o sistema",
         });
         setMode("signin");
         setPassword("");
