@@ -5,7 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target, Lightbulb, Eye, Activity, Building2, Calculator } from "lucide-react";
+import { LogOut, BarChart3, TrendingUp, Users, DollarSign, ListChecks, CheckSquare, FileText, BookOpen, Target, Lightbulb, Eye, Activity, Building2, Calculator, AlertTriangle } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 
 const Dashboard = () => {
@@ -170,6 +170,12 @@ const Dashboard = () => {
                 Métricas
               </Button>
             </Link>
+            <Link to="/alertas">
+              <Button variant="ghost" size="sm">
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Alertas
+              </Button>
+            </Link>
           </nav>
         </div>
       </header>
@@ -318,6 +324,18 @@ const Dashboard = () => {
                 <Button variant="outline" className="w-full justify-start">
                   <Building2 className="mr-2 h-4 w-4" />
                   Gestão de Empresas
+                </Button>
+              </Link>
+              <Link to="/calculo-metricas" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <Calculator className="mr-2 h-4 w-4" />
+                  Cálculo de Métricas
+                </Button>
+              </Link>
+              <Link to="/alertas" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Alertas Automáticos
                 </Button>
               </Link>
             </CardContent>
