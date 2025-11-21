@@ -18,6 +18,7 @@ interface Usuario {
   nome: string;
   perfil: string;
   ativo: boolean;
+  aprovado: boolean;
   email?: string;
   roles: string[];
 }
@@ -32,6 +33,7 @@ const Usuarios = () => {
     nome: "",
     perfil: "",
     ativo: true,
+    aprovado: true,
     roles: [] as string[],
   });
 
@@ -78,6 +80,7 @@ const Usuarios = () => {
         nome: profile.nome,
         perfil: profile.perfil,
         ativo: profile.ativo,
+        aprovado: profile.aprovado,
         roles: rolesData?.filter((r) => r.user_id === profile.id).map((r) => r.role) || [],
       }));
 
@@ -88,7 +91,7 @@ const Usuarios = () => {
 
   // Mutation para atualizar usuário
   const updateUserMutation = useMutation({
-    mutationFn: async (data: { userId: string; nome: string; perfil: string; ativo: boolean; roles: string[] }) => {
+    mutationFn: async (data: { userId: string; nome: string; perfil: string; ativo: boolean; aprovado: boolean; roles: string[] }) => {
       // Atualizar profile
       const { error: profileError } = await supabase
         .from("profiles")
@@ -96,6 +99,7 @@ const Usuarios = () => {
           nome: data.nome,
           perfil: data.perfil as "ADMIN" | "DIRECAO" | "SDR_COMERCIAL" | "TRAFEGO",
           ativo: data.ativo,
+          aprovado: data.aprovado,
         })
         .eq("id", data.userId);
 
@@ -160,6 +164,7 @@ const Usuarios = () => {
       nome: usuario.nome,
       perfil: usuario.perfil,
       ativo: usuario.ativo,
+      aprovado: usuario.aprovado,
       roles: usuario.roles,
     });
     setIsEditDialogOpen(true);
@@ -173,6 +178,7 @@ const Usuarios = () => {
       nome: editForm.nome,
       perfil: editForm.perfil,
       ativo: editForm.ativo,
+      aprovado: editForm.aprovado,
       roles: editForm.roles,
     });
   };
@@ -287,14 +293,14 @@ const Usuarios = () => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Inativos</CardTitle>
-              <UserX className="h-4 w-4 text-destructive" />
+              <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
+              <UserX className="h-4 w-4 text-amber-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">
-                {usuarios?.filter((u) => !u.ativo).length || 0}
+              <div className="text-2xl font-bold text-amber-600">
+                {usuarios?.filter((u) => !u.aprovado).length || 0}
               </div>
-              <p className="text-xs text-muted-foreground">Usuários inativos</p>
+              <p className="text-xs text-muted-foreground">Aguardando aprovação</p>
             </CardContent>
           </Card>
 
@@ -321,6 +327,11 @@ const Usuarios = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <CardTitle>{usuario.nome}</CardTitle>
+                      {!usuario.aprovado && (
+                        <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-100">
+                          Pendente Aprovação
+                        </Badge>
+                      )}
                       {!usuario.ativo && (
                         <Badge variant="destructive">Inativo</Badge>
                       )}
@@ -416,18 +427,34 @@ const Usuarios = () => {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="ativo"
-                checked={editForm.ativo}
-                onCheckedChange={(checked) => setEditForm({ ...editForm, ativo: checked as boolean })}
-              />
-              <label
-                htmlFor="ativo"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Usuário ativo
-              </label>
+            <div className="space-y-3 border-t pt-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="aprovado"
+                  checked={editForm.aprovado}
+                  onCheckedChange={(checked) => setEditForm({ ...editForm, aprovado: checked as boolean })}
+                />
+                <label
+                  htmlFor="aprovado"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Usuário aprovado
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="ativo"
+                  checked={editForm.ativo}
+                  onCheckedChange={(checked) => setEditForm({ ...editForm, ativo: checked as boolean })}
+                />
+                <label
+                  htmlFor="ativo"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Usuário ativo
+                </label>
+              </div>
             </div>
           </div>
 
