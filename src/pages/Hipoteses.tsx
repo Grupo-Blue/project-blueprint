@@ -273,7 +273,6 @@ export default function Hipoteses() {
                       <SelectValue placeholder="Nenhuma campanha específica" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Nenhuma</SelectItem>
                       {campanhas?.map((c) => (
                         <SelectItem key={c.id_campanha} value={c.id_campanha}>{c.nome}</SelectItem>
                       ))}
