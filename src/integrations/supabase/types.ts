@@ -149,6 +149,7 @@ export type Database = {
       }
       aprendizado_semana: {
         Row: {
+          anexos: Json | null
           created_at: string
           descricao: string
           id_aprendizado: string
@@ -159,6 +160,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          anexos?: Json | null
           created_at?: string
           descricao: string
           id_aprendizado?: string
@@ -169,6 +171,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          anexos?: Json | null
           created_at?: string
           descricao?: string
           id_aprendizado?: string
@@ -541,6 +544,7 @@ export type Database = {
       }
       hipotese_teste: {
         Row: {
+          anexos: Json | null
           comentario_resultado: string | null
           created_at: string
           criterio_sucesso: string
@@ -556,6 +560,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          anexos?: Json | null
           comentario_resultado?: string | null
           created_at?: string
           criterio_sucesso: string
@@ -571,6 +576,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          anexos?: Json | null
           comentario_resultado?: string | null
           created_at?: string
           criterio_sucesso?: string

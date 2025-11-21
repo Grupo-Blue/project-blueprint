@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Lightbulb, Plus, CheckCircle, XCircle, HelpCircle, Calendar } from "lucide-react";
+import { Lightbulb, Plus, CheckCircle, XCircle, HelpCircle, Calendar, Upload, Paperclip, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -21,6 +21,7 @@ interface Hipotese {
   resultado_semana_seguinte: string | null;
   comentario_resultado: string | null;
   id_campanha: string | null;
+  anexos: { nome: string; url: string }[] | null;
   semana: {
     numero_semana: number;
     ano: number;
@@ -52,6 +53,8 @@ export default function Hipoteses() {
     descricao: "",
     criterio_sucesso: "",
   });
+
+  const [arquivos, setArquivos] = useState<File[]>([]);
 
   const [resultadoData, setResultadoData] = useState({
     resultado: "",
@@ -120,7 +123,7 @@ export default function Hipoteses() {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as Hipotese[];
+      return data as any as Hipotese[];
     },
   });
 
@@ -129,12 +132,30 @@ export default function Hipoteses() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("Usuário não autenticado");
 
+      // Upload arquivos se houver
+      const anexosUrls: { nome: string; url: string }[] = [];
+      for (const arquivo of arquivos) {
+        const nomeArquivo = `${userData.user.id}/${Date.now()}_${arquivo.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("hipoteses-aprendizados-anexos")
+          .upload(nomeArquivo, arquivo);
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from("hipoteses-aprendizados-anexos")
+          .getPublicUrl(nomeArquivo);
+
+        anexosUrls.push({ nome: arquivo.name, url: urlData.publicUrl });
+      }
+
       const payload: any = {
         id_empresa: dados.id_empresa,
         id_semana: dados.id_semana,
         tipo: dados.tipo,
         descricao: dados.descricao,
         criterio_sucesso: dados.criterio_sucesso,
+        anexos: anexosUrls.length > 0 ? anexosUrls : [],
       };
 
       if (dados.id_campanha) {
@@ -155,6 +176,7 @@ export default function Hipoteses() {
         descricao: "",
         criterio_sucesso: "",
       });
+      setArquivos([]);
       toast({ title: "Hipótese cadastrada", description: "A hipótese foi registrada com sucesso." });
     },
   });
@@ -309,6 +331,54 @@ export default function Hipoteses() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Anexos (opcional)</label>
+                  <div className="border-2 border-dashed border-border rounded-lg p-4">
+                    <input
+                      type="file"
+                      id="file-upload-hipotese"
+                      className="hidden"
+                      multiple
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          setArquivos([...arquivos, ...Array.from(e.target.files)]);
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="file-upload-hipotese"
+                      className="flex flex-col items-center justify-center cursor-pointer"
+                    >
+                      <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                      <span className="text-sm text-muted-foreground">
+                        Clique para adicionar arquivos
+                      </span>
+                    </label>
+                  </div>
+                  {arquivos.length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      {arquivos.map((arquivo, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between bg-muted p-2 rounded"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Paperclip className="h-4 w-4" />
+                            <span className="text-sm">{arquivo.name}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setArquivos(arquivos.filter((_, i) => i !== index))}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <Button
                   className="w-full"
                   onClick={() => criarHipoteseMutation.mutate(formData)}
@@ -395,6 +465,25 @@ export default function Hipoteses() {
                   <div>
                     <h4 className="font-semibold text-sm mb-1">Comentário do Resultado:</h4>
                     <p className="text-sm text-muted-foreground">{hipotese.comentario_resultado}</p>
+                  </div>
+                )}
+                {hipotese.anexos && hipotese.anexos.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">Anexos:</h4>
+                    <div className="space-y-1">
+                      {hipotese.anexos.map((anexo, index) => (
+                        <a
+                          key={index}
+                          href={anexo.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-primary hover:underline"
+                        >
+                          <Paperclip className="h-3 w-3" />
+                          {anexo.nome}
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>

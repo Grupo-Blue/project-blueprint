@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, Plus, Calendar, TrendingUp } from "lucide-react";
+import { BookOpen, Plus, Calendar, TrendingUp, Upload, Paperclip, X } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -17,6 +17,7 @@ interface Aprendizado {
   tipo: string;
   descricao: string;
   metricas_suporte: string | null;
+  anexos: { nome: string; url: string }[] | null;
   created_at: string;
   semana: {
     numero_semana: number;
@@ -50,6 +51,8 @@ export default function Aprendizados() {
     descricao: "",
     metricas_suporte: "",
   });
+
+  const [arquivos, setArquivos] = useState<File[]>([]);
 
   const { data: empresas } = useQuery({
     queryKey: ["empresas"],
@@ -96,17 +99,38 @@ export default function Aprendizados() {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as Aprendizado[];
+      return data as any as Aprendizado[];
     },
   });
 
   const criarAprendizadoMutation = useMutation({
     mutationFn: async (dados: typeof formData) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Usuário não autenticado");
+
+      // Upload arquivos se houver
+      const anexosUrls: { nome: string; url: string }[] = [];
+      for (const arquivo of arquivos) {
+        const nomeArquivo = `${userData.user.id}/${Date.now()}_${arquivo.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("hipoteses-aprendizados-anexos")
+          .upload(nomeArquivo, arquivo);
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from("hipoteses-aprendizados-anexos")
+          .getPublicUrl(nomeArquivo);
+
+        anexosUrls.push({ nome: arquivo.name, url: urlData.publicUrl });
+      }
+
       const payload: any = {
         id_empresa: dados.id_empresa,
         id_semana: dados.id_semana,
         tipo: dados.tipo,
         descricao: dados.descricao,
+        anexos: anexosUrls.length > 0 ? anexosUrls : [],
       };
 
       if (dados.metricas_suporte) {
@@ -126,6 +150,7 @@ export default function Aprendizados() {
         descricao: "",
         metricas_suporte: "",
       });
+      setArquivos([]);
       toast({ title: "Aprendizado registrado", description: "O aprendizado foi cadastrado com sucesso." });
     },
   });
@@ -241,6 +266,54 @@ export default function Aprendizados() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Anexos (opcional)</label>
+                  <div className="border-2 border-dashed border-border rounded-lg p-4">
+                    <input
+                      type="file"
+                      id="file-upload-aprendizado"
+                      className="hidden"
+                      multiple
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          setArquivos([...arquivos, ...Array.from(e.target.files)]);
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor="file-upload-aprendizado"
+                      className="flex flex-col items-center justify-center cursor-pointer"
+                    >
+                      <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                      <span className="text-sm text-muted-foreground">
+                        Clique para adicionar arquivos
+                      </span>
+                    </label>
+                  </div>
+                  {arquivos.length > 0 && (
+                    <div className="space-y-2 mt-2">
+                      {arquivos.map((arquivo, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center justify-between bg-muted p-2 rounded"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Paperclip className="h-4 w-4" />
+                            <span className="text-sm">{arquivo.name}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setArquivos(arquivos.filter((_, i) => i !== index))}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <Button
                   className="w-full"
                   onClick={() => criarAprendizadoMutation.mutate(formData)}
@@ -316,6 +389,25 @@ export default function Aprendizados() {
                       <h4 className="font-semibold text-sm">Métricas de Suporte:</h4>
                     </div>
                     <p className="text-sm text-muted-foreground">{aprendizado.metricas_suporte}</p>
+                  </div>
+                )}
+                {aprendizado.anexos && aprendizado.anexos.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">Anexos:</h4>
+                    <div className="space-y-1">
+                      {aprendizado.anexos.map((anexo, index) => (
+                        <a
+                          key={index}
+                          href={anexo.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-primary hover:underline"
+                        >
+                          <Paperclip className="h-3 w-3" />
+                          {anexo.nome}
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
