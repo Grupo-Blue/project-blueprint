@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AppLayout } from "./components/AppLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -35,23 +36,23 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/acoes" element={<Acoes />} />
-          <Route path="/aprovacoes" element={<Aprovacoes />} />
-          <Route path="/campanhas" element={<Campanhas />} />
-          <Route path="/relatorios" element={<Relatorios />} />
-          <Route path="/relatorios/novo" element={<RelatorioNovo />} />
-          <Route path="/relatorios/:id" element={<RelatorioEditor />} />
-          <Route path="/hipoteses" element={<Hipoteses />} />
-          <Route path="/aprendizados" element={<Aprendizados />} />
-          <Route path="/dashboard-direcao" element={<DashboardDirecao />} />
-          <Route path="/dashboard-trafego" element={<DashboardTrafego />} />
-          <Route path="/empresas" element={<Empresas />} />
-          <Route path="/calculo-metricas" element={<CalculoMetricas />} />
-          <Route path="/alertas" element={<Alertas />} />
-          <Route path="/criativos" element={<Criativos />} />
-          <Route path="/usuarios" element={<Usuarios />} />
-          <Route path="/integracoes" element={<Integracoes />} />
+          <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
+          <Route path="/acoes" element={<AppLayout><Acoes /></AppLayout>} />
+          <Route path="/aprovacoes" element={<AppLayout><Aprovacoes /></AppLayout>} />
+          <Route path="/campanhas" element={<AppLayout><Campanhas /></AppLayout>} />
+          <Route path="/relatorios" element={<AppLayout><Relatorios /></AppLayout>} />
+          <Route path="/relatorios/novo" element={<AppLayout><RelatorioNovo /></AppLayout>} />
+          <Route path="/relatorios/:id" element={<AppLayout><RelatorioEditor /></AppLayout>} />
+          <Route path="/hipoteses" element={<AppLayout><Hipoteses /></AppLayout>} />
+          <Route path="/aprendizados" element={<AppLayout><Aprendizados /></AppLayout>} />
+          <Route path="/dashboard-direcao" element={<AppLayout><DashboardDirecao /></AppLayout>} />
+          <Route path="/dashboard-trafego" element={<AppLayout><DashboardTrafego /></AppLayout>} />
+          <Route path="/empresas" element={<AppLayout><Empresas /></AppLayout>} />
+          <Route path="/calculo-metricas" element={<AppLayout><CalculoMetricas /></AppLayout>} />
+          <Route path="/alertas" element={<AppLayout><Alertas /></AppLayout>} />
+          <Route path="/criativos" element={<AppLayout><Criativos /></AppLayout>} />
+          <Route path="/usuarios" element={<AppLayout><Usuarios /></AppLayout>} />
+          <Route path="/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
