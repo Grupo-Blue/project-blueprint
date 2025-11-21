@@ -1,0 +1,150 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    console.log("Iniciando sincronização Pipedrive...");
+
+    // Buscar todas as integrações Pipedrive ativas
+    const { data: integracoes, error: intError } = await supabase
+      .from("integracao")
+      .select("*")
+      .eq("tipo", "PIPEDRIVE")
+      .eq("ativo", true);
+
+    if (intError) throw intError;
+
+    if (!integracoes || integracoes.length === 0) {
+      console.log("Nenhuma integração Pipedrive ativa encontrada");
+      return new Response(
+        JSON.stringify({ message: "Nenhuma integração ativa" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const resultados = [];
+
+    for (const integracao of integracoes) {
+      const config = integracao.config_json as any;
+      const apiToken = config.api_token;
+      const domain = config.domain;
+      const idEmpresa = config.id_empresa;
+
+      console.log(`Processando integração para empresa ${idEmpresa}`);
+
+      try {
+        // Buscar deals recentes (últimos 30 dias)
+        const dataInicio = new Date();
+        dataInicio.setDate(dataInicio.getDate() - 30);
+        
+        const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=all_not_deleted`;
+        
+        const dealsResponse = await fetch(dealsUrl);
+        if (!dealsResponse.ok) {
+          console.error(`Erro na API Pipedrive: ${dealsResponse.status} - ${await dealsResponse.text()}`);
+          continue;
+        }
+
+        const dealsData = await dealsResponse.json();
+        
+        if (!dealsData.success || !dealsData.data) {
+          console.log("Nenhum deal encontrado");
+          continue;
+        }
+
+        // Processar cada deal como um lead
+        for (const deal of dealsData.data) {
+          try {
+            // Mapear status do deal para campos do lead
+            const isMql = deal.stage_id !== null && deal.stage_id > 1;
+            const levantouMao = deal.stage_id !== null && deal.stage_id > 2;
+            const temReuniao = deal.stage_id !== null && deal.stage_id > 3;
+            const reuniaoRealizada = deal.stage_id !== null && deal.stage_id > 4;
+            const vendaRealizada = deal.status === "won";
+            
+            const leadData = {
+              id_empresa: idEmpresa,
+              id_lead_externo: String(deal.id),
+              data_criacao: deal.add_time || new Date().toISOString(),
+              origem_canal: "OUTRO" as const,
+              origem_campanha: deal.origin || null,
+              is_mql: isMql,
+              levantou_mao: levantouMao,
+              tem_reuniao: temReuniao,
+              reuniao_realizada: reuniaoRealizada,
+              venda_realizada: vendaRealizada,
+              data_venda: vendaRealizada ? (deal.won_time || deal.update_time) : null,
+              valor_venda: vendaRealizada ? parseFloat(deal.value || "0") : null,
+            };
+
+            // Inserir ou atualizar lead
+            const { data: leadInserido, error: leadError } = await supabase
+              .from("lead")
+              .upsert(leadData, { 
+                onConflict: "id_lead_externo",
+                ignoreDuplicates: false 
+              })
+              .select()
+              .single();
+
+            if (leadError) {
+              console.error(`Erro ao salvar lead ${deal.id}:`, leadError);
+              continue;
+            }
+
+            // Registrar evento de mudança de stage se necessário
+            if (deal.stage_change_time) {
+              const eventoData = {
+                id_lead: leadInserido.id_lead,
+                etapa: `Stage ${deal.stage_id}`,
+                data_evento: deal.stage_change_time,
+                observacao: deal.stage_name || null,
+              };
+
+              const { error: eventoError } = await supabase
+                .from("lead_evento")
+                .insert(eventoData);
+
+              if (eventoError) {
+                console.error(`Erro ao registrar evento do lead ${deal.id}:`, eventoError);
+              }
+            }
+
+            resultados.push({ deal: deal.id, status: "success" });
+          } catch (error) {
+            console.error(`Erro ao processar deal ${deal.id}:`, error);
+            resultados.push({ deal: deal.id, status: "error", error: String(error) });
+          }
+        }
+      } catch (error) {
+        console.error(`Erro ao processar integração ${integracao.id_integracao}:`, error);
+        resultados.push({ integracao: integracao.id_integracao, status: "error", error: String(error) });
+      }
+    }
+
+    console.log("Sincronização Pipedrive concluída");
+    return new Response(
+      JSON.stringify({ message: "Sincronização concluída", resultados }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    console.error("Erro na função:", error);
+    return new Response(
+      JSON.stringify({ error: String(error) }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

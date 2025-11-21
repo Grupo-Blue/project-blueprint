@@ -38,6 +38,10 @@ export default function Integracoes() {
   const [googleClientSecret, setGoogleClientSecret] = useState("");
   const [googleRefreshToken, setGoogleRefreshToken] = useState("");
   const [googleCustomerId, setGoogleCustomerId] = useState("");
+  
+  // Pipedrive credentials
+  const [pipedriveApiToken, setPipedriveApiToken] = useState("");
+  const [pipedriveDomain, setPipedriveDomain] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -73,6 +77,8 @@ export default function Integracoes() {
     setGoogleClientSecret("");
     setGoogleRefreshToken("");
     setGoogleCustomerId("");
+    setPipedriveApiToken("");
+    setPipedriveDomain("");
     setEditingId(null);
   };
 
@@ -92,6 +98,9 @@ export default function Integracoes() {
       setGoogleClientSecret(config.client_secret || "");
       setGoogleRefreshToken(config.refresh_token || "");
       setGoogleCustomerId(config.customer_id || "");
+    } else if (integracao.tipo === "PIPEDRIVE") {
+      setPipedriveApiToken(config.api_token || "");
+      setPipedriveDomain(config.domain || "");
     }
     
     setEmpresaSelecionada(config.id_empresa || "");
@@ -144,6 +153,16 @@ export default function Integracoes() {
         refresh_token: googleRefreshToken,
         customer_id: googleCustomerId
       };
+    } else if (tipoIntegracao === "PIPEDRIVE") {
+      if (!pipedriveApiToken || !pipedriveDomain) {
+        toast.error("Preencha todos os campos obrigatórios");
+        return;
+      }
+      configJson = {
+        ...configJson,
+        api_token: pipedriveApiToken,
+        domain: pipedriveDomain
+      };
     }
 
     try {
@@ -179,7 +198,7 @@ export default function Integracoes() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Integrações</h1>
-          <p className="text-muted-foreground">Gerencie as integrações com Meta Ads e Google Ads por empresa</p>
+          <p className="text-muted-foreground">Gerencie as integrações com Meta Ads, Google Ads e Pipedrive por empresa</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
@@ -217,6 +236,7 @@ export default function Integracoes() {
                   <SelectContent>
                     <SelectItem value="META_ADS">Meta Ads</SelectItem>
                     <SelectItem value="GOOGLE_ADS">Google Ads</SelectItem>
+                    <SelectItem value="PIPEDRIVE">Pipedrive</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -287,6 +307,28 @@ export default function Integracoes() {
                 </>
               )}
 
+              {tipoIntegracao === "PIPEDRIVE" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>API Token *</Label>
+                    <Input
+                      type="password"
+                      value={pipedriveApiToken}
+                      onChange={(e) => setPipedriveApiToken(e.target.value)}
+                      placeholder="Seu token de API do Pipedrive"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Company Domain *</Label>
+                    <Input
+                      value={pipedriveDomain}
+                      onChange={(e) => setPipedriveDomain(e.target.value)}
+                      placeholder="suaempresa (de suaempresa.pipedrive.com)"
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="flex items-center space-x-2">
                 <Switch checked={ativo} onCheckedChange={setAtivo} id="ativo" />
                 <Label htmlFor="ativo">Integração Ativa</Label>
@@ -309,6 +351,7 @@ export default function Integracoes() {
         <TabsList>
           <TabsTrigger value="meta">Meta Ads</TabsTrigger>
           <TabsTrigger value="google">Google Ads</TabsTrigger>
+          <TabsTrigger value="pipedrive">Pipedrive</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meta" className="space-y-4">
@@ -372,6 +415,47 @@ export default function Integracoes() {
                         <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
                         <CardDescription>
                           Customer ID: {config.customer_id}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                          {integracao.ativo ? 'Ativo' : 'Inativo'}
+                        </span>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })
+          )}
+        </TabsContent>
+
+        <TabsContent value="pipedrive" className="space-y-4">
+          {integracoes.filter(i => i.tipo === "PIPEDRIVE").length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Nenhuma integração Pipedrive configurada
+              </CardContent>
+            </Card>
+          ) : (
+            integracoes.filter(i => i.tipo === "PIPEDRIVE").map((integracao) => {
+              const config = integracao.config_json as any;
+              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              
+              return (
+                <Card key={integracao.id_integracao}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription>
+                          Domain: {config.domain}.pipedrive.com
                         </CardDescription>
                       </div>
                       <div className="flex items-center space-x-2">
