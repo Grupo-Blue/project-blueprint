@@ -13,7 +13,7 @@ import { ptBR } from "date-fns/locale";
 export default function CalculoMetricas() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [semanaSelecionada, setSemanaSelecionada] = useState<string>("");
+  const [semanaSelecionada, setSemanaSelecionada] = useState<string>("latest");
 
   const { data: semanas } = useQuery({
     queryKey: ["semanas-calculo"],
@@ -74,7 +74,7 @@ export default function CalculoMetricas() {
   });
 
   const handleCalcular = () => {
-    calcularMetricasMutation.mutate(semanaSelecionada || undefined);
+    calcularMetricasMutation.mutate(semanaSelecionada === "latest" ? undefined : semanaSelecionada);
   };
 
   return (
@@ -105,7 +105,7 @@ export default function CalculoMetricas() {
                   <SelectValue placeholder="Semana mais recente" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Semana mais recente</SelectItem>
+                  <SelectItem value="latest">Semana mais recente</SelectItem>
                   {semanas?.map((s) => (
                     <SelectItem key={s.id_semana} value={s.id_semana}>
                       Semana {s.numero_semana}/{s.ano} ({format(new Date(s.data_inicio), "dd/MM", { locale: ptBR })} - {format(new Date(s.data_fim), "dd/MM", { locale: ptBR })})
