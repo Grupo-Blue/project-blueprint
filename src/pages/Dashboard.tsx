@@ -1,13 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, Users, DollarSign, TrendingUp } from "lucide-react";
-
 const Dashboard = () => {
-  return (
-    <>
+  return <>
       <div className="mb-8">
         <h2 className="text-3xl font-bold mb-2">Bem-vindo ao SGT!</h2>
         <p className="text-muted-foreground">
-          Sistema de Governança de Tráfego para Blue e Tokeniza
+          Sistema de Governança de Tráfego Pago
         </p>
       </div>
 
@@ -112,8 +110,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
-    </>
-  );
+    </>;
 };
-
 export default Dashboard;
