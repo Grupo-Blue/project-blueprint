@@ -24,6 +24,7 @@ import {
   ArrowLeft,
   TrendingUp
 } from "lucide-react";
+import sgtLogo from "@/assets/sgt-logo.png";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -118,103 +119,157 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
+      <header className="border-b bg-gradient-to-r from-card via-card to-accent/5 sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto px-6 py-3">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-6">
               {showBackButton && (
                 <Button 
                   variant="ghost" 
                   size="sm"
                   onClick={() => navigate(-1)}
+                  className="hover:bg-accent/80"
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               )}
-              <div>
-                <Link to="/dashboard">
-                  <h1 className="text-2xl font-bold hover:text-primary transition-colors cursor-pointer">
+              <Link to="/dashboard" className="flex items-center gap-3 group">
+                <img 
+                  src={sgtLogo} 
+                  alt="SGT Logo" 
+                  className="h-12 w-12 object-contain transition-transform group-hover:scale-105"
+                />
+                <div>
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent transition-all group-hover:from-primary/90 group-hover:to-primary/60">
                     SGT - Sistema de Governança de Tráfego
                   </h1>
-                </Link>
-                <p className="text-sm text-muted-foreground">
-                  {profile?.nome} • {profile && getPerfilLabel(profile.perfil)}
-                </p>
-              </div>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    {profile?.nome} • {profile && getPerfilLabel(profile.perfil)}
+                  </p>
+                </div>
+              </Link>
             </div>
-            <Button variant="outline" onClick={handleLogout}>
+            <Button 
+              variant="outline" 
+              onClick={handleLogout}
+              className="hover:bg-destructive hover:text-destructive-foreground transition-colors"
+            >
               <LogOut className="mr-2 h-4 w-4" />
               Sair
             </Button>
           </div>
           
-          <nav className="flex gap-2 flex-wrap">
+          <nav className="flex gap-1.5 flex-wrap pb-2">
             <Link to="/dashboard">
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant={location.pathname === "/dashboard" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Dashboard
               </Button>
             </Link>
             {isDirecao && (
               <Link to="/dashboard-direcao">
-                <Button variant="ghost" size="sm">
+                <Button 
+                  variant={location.pathname === "/dashboard-direcao" ? "secondary" : "ghost"} 
+                  size="sm"
+                  className="hover:bg-accent transition-all"
+                >
                   <Eye className="mr-2 h-4 w-4" />
                   Dash Direção
                 </Button>
               </Link>
             )}
             <Link to="/dashboard-trafego">
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant={location.pathname === "/dashboard-trafego" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
                 <Activity className="mr-2 h-4 w-4" />
                 Dash Tráfego
               </Button>
             </Link>
             <Link to="/acoes">
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant={location.pathname === "/acoes" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
                 <ListChecks className="mr-2 h-4 w-4" />
                 Ações A/B/C
               </Button>
             </Link>
             {isDirecao && (
               <Link to="/aprovacoes">
-                <Button variant="ghost" size="sm">
+                <Button 
+                  variant={location.pathname === "/aprovacoes" ? "secondary" : "ghost"} 
+                  size="sm"
+                  className="hover:bg-accent transition-all"
+                >
                   <CheckSquare className="mr-2 h-4 w-4" />
                   Aprovações
                 </Button>
               </Link>
             )}
             <Link to="/campanhas">
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant={location.pathname === "/campanhas" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
                 <TrendingUp className="mr-2 h-4 w-4" />
                 Campanhas
               </Button>
             </Link>
             <Link to="/criativos">
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant={location.pathname === "/criativos" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
                 <Image className="mr-2 h-4 w-4" />
                 Criativos
               </Button>
             </Link>
             <Link to="/relatorios">
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant={location.pathname === "/relatorios" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
                 <FileText className="mr-2 h-4 w-4" />
                 Relatórios
               </Button>
             </Link>
             <Link to="/hipoteses">
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant={location.pathname === "/hipoteses" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
                 <Target className="mr-2 h-4 w-4" />
                 Hipóteses
               </Button>
             </Link>
             <Link to="/aprendizados">
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant={location.pathname === "/aprendizados" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
                 <Lightbulb className="mr-2 h-4 w-4" />
                 Aprendizados
               </Button>
             </Link>
             <Link to="/alertas">
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant={location.pathname === "/alertas" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
                 <AlertTriangle className="mr-2 h-4 w-4" />
                 Alertas
               </Button>
@@ -222,25 +277,41 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             {isAdmin && (
               <>
                 <Link to="/empresas">
-                  <Button variant="ghost" size="sm">
+                  <Button 
+                    variant={location.pathname === "/empresas" ? "secondary" : "ghost"} 
+                    size="sm"
+                    className="hover:bg-accent transition-all"
+                  >
                     <Building2 className="mr-2 h-4 w-4" />
                     Empresas
                   </Button>
                 </Link>
                 <Link to="/usuarios">
-                  <Button variant="ghost" size="sm">
+                  <Button 
+                    variant={location.pathname === "/usuarios" ? "secondary" : "ghost"} 
+                    size="sm"
+                    className="hover:bg-accent transition-all"
+                  >
                     <Shield className="mr-2 h-4 w-4" />
                     Usuários
                   </Button>
                 </Link>
                 <Link to="/integracoes">
-                  <Button variant="ghost" size="sm">
+                  <Button 
+                    variant={location.pathname === "/integracoes" ? "secondary" : "ghost"} 
+                    size="sm"
+                    className="hover:bg-accent transition-all"
+                  >
                     <LinkIcon className="mr-2 h-4 w-4" />
                     Integrações
                   </Button>
                 </Link>
                 <Link to="/calculo-metricas">
-                  <Button variant="ghost" size="sm">
+                  <Button 
+                    variant={location.pathname === "/calculo-metricas" ? "secondary" : "ghost"} 
+                    size="sm"
+                    className="hover:bg-accent transition-all"
+                  >
                     <Calculator className="mr-2 h-4 w-4" />
                     Métricas
                   </Button>
