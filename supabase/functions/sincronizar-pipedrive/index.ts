@@ -96,7 +96,7 @@ serve(async (req) => {
             const { data: leadInserido, error: leadError } = await supabase
               .from("lead")
               .upsert(leadData, { 
-                onConflict: "id_lead_externo,id_empresa",
+                onConflict: "lead_id_externo_empresa_unique",
                 ignoreDuplicates: false 
               })
               .select()
