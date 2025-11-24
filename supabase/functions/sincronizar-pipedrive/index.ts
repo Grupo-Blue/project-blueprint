@@ -40,7 +40,9 @@ serve(async (req) => {
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
       const apiToken = config.api_token;
-      const domain = config.domain;
+      let domain = config.domain;
+      // Remove .pipedrive.com se o usuário incluiu no domínio
+      domain = domain.replace('.pipedrive.com', '');
       const idEmpresa = config.id_empresa;
 
       console.log(`Processando integração para empresa ${idEmpresa}`);

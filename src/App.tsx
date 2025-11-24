@@ -23,6 +23,8 @@ import Alertas from "./pages/Alertas";
 import Criativos from "./pages/Criativos";
 import Usuarios from "./pages/Usuarios";
 import Integracoes from "./pages/Integracoes";
+import ContasAnuncio from "./pages/ContasAnuncio";
+import CampanhasCadastro from "./pages/CampanhasCadastro";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -53,6 +55,8 @@ const App = () => (
           <Route path="/criativos" element={<AppLayout><Criativos /></AppLayout>} />
           <Route path="/usuarios" element={<AppLayout><Usuarios /></AppLayout>} />
           <Route path="/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
+          <Route path="/contas-anuncio" element={<AppLayout><ContasAnuncio /></AppLayout>} />
+          <Route path="/campanhas-cadastro" element={<AppLayout><CampanhasCadastro /></AppLayout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
