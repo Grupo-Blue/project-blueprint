@@ -92,12 +92,11 @@ serve(async (req) => {
               valor_venda: vendaRealizada ? parseFloat(deal.value || "0") : null,
             };
 
-            // Inserir ou atualizar lead usando o índice único
+            // Inserir ou atualizar lead usando as colunas do constraint único
             const { data: leadInserido, error: leadError } = await supabase
               .from("lead")
               .upsert(leadData, { 
-                onConflict: "lead_id_externo_empresa_unique",
-                ignoreDuplicates: false 
+                onConflict: "id_lead_externo,id_empresa"
               })
               .select()
               .single();
