@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, TestTube2 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
@@ -22,6 +22,7 @@ export default function Integracoes() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [testingIntegracoes, setTestingIntegracoes] = useState<Set<string>>(new Set());
 
   // Form state
   const [tipoIntegracao, setTipoIntegracao] = useState<TipoIntegracao>("META_ADS");
@@ -126,6 +127,54 @@ export default function Integracoes() {
       fetchData();
     } catch (error: any) {
       toast.error("Erro ao excluir integração: " + error.message);
+    }
+  };
+
+  const handleTestIntegration = async (integracao: Integracao) => {
+    const integracaoId = integracao.id_integracao;
+    
+    setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
+    
+    try {
+      let functionName = '';
+      
+      switch (integracao.tipo) {
+        case 'META_ADS':
+          functionName = 'coletar-metricas-meta';
+          break;
+        case 'GOOGLE_ADS':
+          functionName = 'coletar-metricas-google';
+          break;
+        case 'PIPEDRIVE':
+          functionName = 'sincronizar-pipedrive';
+          break;
+        case 'TOKENIZA':
+          functionName = 'sincronizar-tokeniza';
+          break;
+        default:
+          throw new Error('Tipo de integração não suportado');
+      }
+      
+      const { data, error } = await supabase.functions.invoke(functionName);
+      
+      if (error) throw error;
+      
+      const result = data as any;
+      
+      if (result.error) {
+        toast.error(`Erro na integração: ${result.error}`);
+      } else {
+        toast.success(`Integração testada com sucesso! ${result.message || ''}`);
+      }
+    } catch (error: any) {
+      console.error('Erro ao testar integração:', error);
+      toast.error(`Erro ao testar integração: ${error.message}`);
+    } finally {
+      setTestingIntegracoes(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(integracaoId);
+        return newSet;
+      });
     }
   };
 
@@ -424,6 +473,15 @@ export default function Integracoes() {
                         <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleTestIntegration(integracao)}
+                          disabled={testingIntegracoes.has(integracao.id_integracao)}
+                        >
+                          <TestTube2 className="w-4 h-4 mr-2" />
+                          {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -465,6 +523,15 @@ export default function Integracoes() {
                         <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleTestIntegration(integracao)}
+                          disabled={testingIntegracoes.has(integracao.id_integracao)}
+                        >
+                          <TestTube2 className="w-4 h-4 mr-2" />
+                          {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -506,6 +573,15 @@ export default function Integracoes() {
                         <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleTestIntegration(integracao)}
+                          disabled={testingIntegracoes.has(integracao.id_integracao)}
+                        >
+                          <TestTube2 className="w-4 h-4 mr-2" />
+                          {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -547,6 +623,15 @@ export default function Integracoes() {
                         <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleTestIntegration(integracao)}
+                          disabled={testingIntegracoes.has(integracao.id_integracao)}
+                        >
+                          <TestTube2 className="w-4 h-4 mr-2" />
+                          {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
                           <Edit className="w-4 h-4" />
                         </Button>
