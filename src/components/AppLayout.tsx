@@ -286,6 +286,26 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                     Empresas
                   </Button>
                 </Link>
+                <Link to="/contas-anuncio">
+                  <Button 
+                    variant={location.pathname === "/contas-anuncio" ? "secondary" : "ghost"} 
+                    size="sm"
+                    className="hover:bg-accent transition-all"
+                  >
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Contas Anúncio
+                  </Button>
+                </Link>
+                <Link to="/campanhas-cadastro">
+                  <Button 
+                    variant={location.pathname === "/campanhas-cadastro" ? "secondary" : "ghost"} 
+                    size="sm"
+                    className="hover:bg-accent transition-all"
+                  >
+                    <TrendingUp className="mr-2 h-4 w-4" />
+                    Cadastro Campanhas
+                  </Button>
+                </Link>
                 <Link to="/usuarios">
                   <Button 
                     variant={location.pathname === "/usuarios" ? "secondary" : "ghost"} 
