@@ -52,8 +52,9 @@ serve(async (req) => {
       }
 
       try {
-        // Buscar stages da pipeline para mapear IDs para nomes
+        // Buscar stages da pipeline para mapear IDs para nomes e obter lista de stage_ids
         const stagesMap: Record<number, string> = {};
+        const stageIds: number[] = [];
         if (pipelineId) {
           const stagesUrl = `https://${domain}.pipedrive.com/api/v1/stages?api_token=${apiToken}&pipeline_id=${pipelineId}`;
           console.log(`Buscando stages da pipeline ${pipelineId}...`);
@@ -70,9 +71,11 @@ serve(async (req) => {
               if (stagesData.success && stagesData.data) {
                 for (const stage of stagesData.data) {
                   stagesMap[stage.id] = stage.name;
+                  stageIds.push(stage.id);
                   console.log(`Stage mapeado: ${stage.id} -> ${stage.name}`);
                 }
-                console.log(`${Object.keys(stagesMap).length} stages carregados`);
+                console.log(`${Object.keys(stagesMap).length} stages carregados para pipeline ${pipelineId}`);
+                console.log(`Stage IDs da pipeline ${pipelineId}: ${stageIds.join(', ')}`);
               }
             } else {
               console.error(`Erro ao buscar stages: ${stagesResponse.status}`);
@@ -84,10 +87,11 @@ serve(async (req) => {
           console.log("Pipeline ID não especificado, stages não serão carregados");
         }
 
-        // Buscar deals abertos SEM filtro de pipeline na URL (API não filtra bem quando combina os dois)
-        const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=open`;
+        // Buscar TODOS os deals (sem status para evitar filtros conflitantes)
+        // Vamos filtrar manualmente por stage_id que pertencem à pipeline correta
+        const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500`;
         
-        console.log(`Buscando deals abertos (status=open) sem filtro de pipeline...`);
+        console.log(`Buscando TODOS os deals e filtrando por stage_ids da pipeline ${pipelineId}...`);
         
         const dealsResponse = await fetch(dealsUrl);
         if (!dealsResponse.ok) {
@@ -109,22 +113,22 @@ serve(async (req) => {
         }
         
         const allDeals = dealsData.data;
-        console.log(`Total: ${allDeals.length} deals retornados. Filtrando por pipeline ${pipelineId}...`);
+        console.log(`Total: ${allDeals.length} deals retornados da API`);
+
+        // Filtrar por stage_id da pipeline (mais confiável que pipeline_id na API)
+        const dealsFiltered = stageIds.length > 0 
+          ? allDeals.filter((deal: any) => stageIds.includes(deal.stage_id) || String(deal.pipeline_id) === String(pipelineId))
+          : allDeals.filter((deal: any) => String(deal.pipeline_id) === String(pipelineId));
+        
+        console.log(`${dealsFiltered.length} deals pertencem à pipeline ${pipelineId}`);
 
         // Processar cada deal como um lead
-        console.log(`Processando ${allDeals.length} deals...`);
         let dealsProcessados = 0;
-        let dealsIgnorados = 0;
         
-        for (const deal of allDeals) {
+        for (const deal of dealsFiltered) {
           try {
-            // Filtrar manualmente por pipeline_id (API não filtra bem na URL)
-            if (pipelineId && String(deal.pipeline_id) !== String(pipelineId)) {
-              dealsIgnorados++;
-              continue;
-            }
-            
             dealsProcessados++;
+            console.log(`Deal ${deal.id}: pipeline ${deal.pipeline_id}, stage ${deal.stage_id} (${stagesMap[deal.stage_id] || 'desconhecido'}), status ${deal.status}`);
             
             // Mapear status do deal para campos do lead
             const dealPerdido = deal.status === "lost";
@@ -191,7 +195,7 @@ serve(async (req) => {
           }
         }
         
-        console.log(`Pipeline ${pipelineId}: ${dealsProcessados} deals processados, ${dealsIgnorados} ignorados`);
+        console.log(`Pipeline ${pipelineId}: ${dealsProcessados} deals processados`);
       } catch (error) {
         console.error(`Erro ao processar integração ${integracao.id_integracao}:`, error);
         resultados.push({ integracao: integracao.id_integracao, status: "error", error: String(error) });
