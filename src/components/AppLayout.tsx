@@ -22,7 +22,8 @@ import {
   Shield, 
   Link as LinkIcon,
   ArrowLeft,
-  TrendingUp
+  TrendingUp,
+  Users
 } from "lucide-react";
 import sgtLogo from "@/assets/sgt-logo.png";
 
@@ -233,6 +234,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               >
                 <Image className="mr-2 h-4 w-4" />
                 Criativos
+              </Button>
+            </Link>
+            <Link to="/leads">
+              <Button 
+                variant={location.pathname === "/leads" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
+                <Users className="mr-2 h-4 w-4" />
+                Leads
               </Button>
             </Link>
             <Link to="/relatorios">

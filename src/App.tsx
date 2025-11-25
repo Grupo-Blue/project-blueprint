@@ -21,6 +21,7 @@ import Empresas from "./pages/Empresas";
 import CalculoMetricas from "./pages/CalculoMetricas";
 import Alertas from "./pages/Alertas";
 import Criativos from "./pages/Criativos";
+import Leads from "./pages/Leads";
 import Usuarios from "./pages/Usuarios";
 import Integracoes from "./pages/Integracoes";
 import ContasAnuncio from "./pages/ContasAnuncio";
@@ -53,6 +54,7 @@ const App = () => (
           <Route path="/calculo-metricas" element={<AppLayout><CalculoMetricas /></AppLayout>} />
           <Route path="/alertas" element={<Alertas />} />
           <Route path="/criativos" element={<AppLayout><Criativos /></AppLayout>} />
+          <Route path="/leads" element={<AppLayout><Leads /></AppLayout>} />
           <Route path="/usuarios" element={<Usuarios />} />
           <Route path="/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
           <Route path="/contas-anuncio" element={<ContasAnuncio />} />
