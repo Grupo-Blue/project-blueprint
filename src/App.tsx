@@ -27,6 +27,7 @@ import Usuarios from "./pages/Usuarios";
 import Integracoes from "./pages/Integracoes";
 import ContasAnuncio from "./pages/ContasAnuncio";
 import CampanhasCadastro from "./pages/CampanhasCadastro";
+import GuiaUTM from "./pages/GuiaUTM";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,6 +62,7 @@ const App = () => (
           <Route path="/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
           <Route path="/contas-anuncio" element={<AppLayout><ContasAnuncio /></AppLayout>} />
           <Route path="/campanhas-cadastro" element={<AppLayout><CampanhasCadastro /></AppLayout>} />
+          <Route path="/guia-utm" element={<AppLayout><GuiaUTM /></AppLayout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

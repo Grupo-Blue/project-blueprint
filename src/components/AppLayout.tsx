@@ -266,6 +266,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                 Performance Criativos
               </Button>
             </Link>
+            <Link to="/guia-utm">
+              <Button 
+                variant={location.pathname === "/guia-utm" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                Guia UTM
+              </Button>
+            </Link>
             <Link to="/hipoteses">
               <Button 
                 variant={location.pathname === "/hipoteses" ? "secondary" : "ghost"} 
