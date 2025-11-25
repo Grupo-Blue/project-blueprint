@@ -88,31 +88,63 @@ serve(async (req) => {
         }
 
         // Buscar TODOS os deals (sem status para evitar filtros conflitantes)
-        // Vamos filtrar manualmente por stage_id que pertencem à pipeline correta
-        const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500`;
-        
-        console.log(`Buscando TODOS os deals e filtrando por stage_ids da pipeline ${pipelineId}...`);
-        
-        const dealsResponse = await fetch(dealsUrl);
-        if (!dealsResponse.ok) {
-          const errorText = await dealsResponse.text();
-          console.error(`Erro na API Pipedrive: ${dealsResponse.status} - ${errorText}`);
-          resultados.push({ 
-            integracao: integracao.id_integracao, 
-            status: "error", 
-            error: `Erro na API Pipedrive (${dealsResponse.status}): ${errorText}. Verifique seu API Token e domínio.` 
-          });
-          continue;
+        // Vamos paginar e depois filtrar manualmente por stage_id que pertencem à pipeline correta
+        const allDeals: any[] = [];
+        const limit = 500;
+        let start = 0;
+        let page = 0;
+        const maxPages = 20;
+
+        while (true) {
+          const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=${start}&limit=${limit}`;
+          console.log(`Buscando deals - página ${page + 1}, start=${start}, limit=${limit}...`);
+
+          const dealsResponse = await fetch(dealsUrl);
+          if (!dealsResponse.ok) {
+            const errorText = await dealsResponse.text();
+            console.error(`Erro na API Pipedrive: ${dealsResponse.status} - ${errorText}`);
+            resultados.push({ 
+              integracao: integracao.id_integracao, 
+              status: "error", 
+              error: `Erro na API Pipedrive (${dealsResponse.status}): ${errorText}. Verifique seu API Token e domínio.` 
+            });
+            break;
+          }
+
+          const dealsData = await dealsResponse.json();
+
+          if (!dealsData.success || !dealsData.data || dealsData.data.length === 0) {
+            console.log("Nenhum deal adicional encontrado nesta página");
+            break;
+          }
+
+          allDeals.push(...dealsData.data);
+
+          const pagination = dealsData.additional_data?.pagination;
+          if (!pagination || !pagination.more_items_in_collection) {
+            console.log("Não há mais páginas de deals para buscar");
+            break;
+          }
+
+          if (pagination.next_start != null) {
+            start = pagination.next_start;
+          } else {
+            start += limit;
+          }
+
+          page++;
+          if (page >= maxPages) {
+            console.log(`Limite máximo de páginas (${maxPages}) atingido ao buscar deals`);
+            break;
+          }
         }
 
-        const dealsData = await dealsResponse.json();
-        
-        if (!dealsData.success || !dealsData.data) {
+        if (allDeals.length === 0) {
           console.log("Nenhum deal encontrado");
           continue;
         }
+
         
-        const allDeals = dealsData.data;
         console.log(`Total: ${allDeals.length} deals retornados da API`);
 
         // Filtrar por stage_id da pipeline (mais confiável que pipeline_id na API)
