@@ -52,10 +52,8 @@ serve(async (req) => {
       }
 
       try {
-        // Construir URL com filtro de pipeline e status
-        // Nota: A API do Pipedrive não aceita pipeline_id como parâmetro direto
-        // Vamos buscar todos os deals e filtrar depois
-        let dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=open`;
+        // Buscar deals abertos e perdidos
+        let dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=all_not_deleted`;
         
         console.log(`Buscando deals da URL: ${dealsUrl}`);
         
@@ -88,21 +86,29 @@ serve(async (req) => {
             }
             
             // Mapear status do deal para campos do lead
-            const isMql = deal.stage_id !== null && deal.stage_id > 1;
-            const levantouMao = deal.stage_id !== null && deal.stage_id > 2;
-            const temReuniao = deal.stage_id !== null && deal.stage_id > 3;
-            const reuniaoRealizada = deal.stage_id !== null && deal.stage_id > 4;
+            const dealPerdido = deal.status === "lost";
+            const dealAberto = deal.status === "open";
             const vendaRealizada = deal.status === "won";
+            
+            // Só processar deals abertos ou perdidos se pipeline_id for especificado
+            // Para manter consistência com o comportamento anterior de status=open
+            const isMql = dealAberto && deal.stage_id !== null && deal.stage_id > 1;
+            const levantouMao = dealAberto && deal.stage_id !== null && deal.stage_id > 2;
+            const temReuniao = dealAberto && deal.stage_id !== null && deal.stage_id > 3;
+            const reuniaoRealizada = dealAberto && deal.stage_id !== null && deal.stage_id > 4;
             
             // Construir URL do Pipedrive
             const urlPipedrive = `https://${domain}.pipedrive.com/deal/${deal.id}`;
+            
+            // Valor: sempre sincronizar se existir, independente do status
+            const valorDeal = deal.value ? parseFloat(deal.value) : null;
             
             const leadData = {
               id_empresa: idEmpresa,
               id_lead_externo: String(deal.id),
               nome_lead: deal.person_name || deal.title || "Lead sem nome",
               organizacao: deal.org_name || null,
-              stage_atual: deal.stage_id ? `Stage ${deal.stage_id}` : null,
+              stage_atual: deal.stage_order_nr && dealPerdido ? "Perdido" : (deal.stage_name || null),
               pipeline_id: deal.pipeline_id ? String(deal.pipeline_id) : null,
               url_pipedrive: urlPipedrive,
               data_criacao: deal.add_time || new Date().toISOString(),
@@ -114,7 +120,7 @@ serve(async (req) => {
               reuniao_realizada: reuniaoRealizada,
               venda_realizada: vendaRealizada,
               data_venda: vendaRealizada ? (deal.won_time || deal.update_time) : null,
-              valor_venda: vendaRealizada ? parseFloat(deal.value || "0") : null,
+              valor_venda: valorDeal,
             };
 
             // Inserir ou atualizar lead usando as colunas do constraint único
