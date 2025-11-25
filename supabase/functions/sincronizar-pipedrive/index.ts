@@ -84,8 +84,8 @@ serve(async (req) => {
           console.log("Pipeline ID não especificado, stages não serão carregados");
         }
 
-        // Buscar deals abertos (open) e ganhos (won) da pipeline
-        let dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&pipeline_id=${pipelineId}&status=open,won`;
+        // Buscar apenas deals abertos (excluindo perdidos e ganhos)
+        let dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&pipeline_id=${pipelineId}&status=open`;
         
         console.log(`Buscando deals da URL: ${dealsUrl}`);
         
