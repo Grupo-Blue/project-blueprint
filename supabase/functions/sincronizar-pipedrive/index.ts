@@ -84,10 +84,10 @@ serve(async (req) => {
           console.log("Pipeline ID não especificado, stages não serão carregados");
         }
 
-        // Buscar TODOS os deals não deletados (sem especificar status = open+won+lost)
-        const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500`;
+        // Buscar deals abertos SEM filtro de pipeline na URL (API não filtra bem quando combina os dois)
+        const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=open`;
         
-        console.log(`Buscando TODOS deals (sem filtro status) da URL: ${dealsUrl}`);
+        console.log(`Buscando deals abertos (status=open) sem filtro de pipeline...`);
         
         const dealsResponse = await fetch(dealsUrl);
         if (!dealsResponse.ok) {
@@ -107,29 +107,24 @@ serve(async (req) => {
           console.log("Nenhum deal encontrado");
           continue;
         }
+        
+        const allDeals = dealsData.data;
+        console.log(`Total: ${allDeals.length} deals retornados. Filtrando por pipeline ${pipelineId}...`);
 
         // Processar cada deal como um lead
-        console.log(`Total de ${dealsData.data.length} deals retornados pela API`);
+        console.log(`Processando ${allDeals.length} deals...`);
         let dealsProcessados = 0;
         let dealsIgnorados = 0;
         
-        for (const deal of dealsData.data) {
+        for (const deal of allDeals) {
           try {
-            // Filtrar por pipeline_id e também por status para não incluir deals perdidos
+            // Filtrar manualmente por pipeline_id (API não filtra bem na URL)
             if (pipelineId && String(deal.pipeline_id) !== String(pipelineId)) {
-              console.log(`Deal ${deal.id} ignorado - pipeline ${deal.pipeline_id} diferente de ${pipelineId}`);
               dealsIgnorados++;
               continue;
             }
             
             dealsProcessados++;
-            console.log(`Deal ${deal.id} da pipeline ${deal.pipeline_id}, stage ${deal.stage_id}: ${stagesMap[deal.stage_id] || 'stage não mapeado'}`);
-            
-             // Deals perdidos não devem vir com status=open, mas manter verificação por segurança
-             if (deal.status === 'lost') {
-               console.log(`Deal ${deal.id} ignorado - status lost (não deveria vir com status=open)`);
-               continue;
-             }
             
             // Mapear status do deal para campos do lead
             const dealPerdido = deal.status === "lost";
@@ -177,36 +172,16 @@ serve(async (req) => {
               valor_venda: valorDeal,
             };
 
-            // Inserir ou atualizar lead usando as colunas do constraint único
-            const { data: leadInserido, error: leadError } = await supabase
+            // Inserir ou atualizar lead usando as colunas do constraint único (sem buscar registro inserido)
+            const { error: leadError } = await supabase
               .from("lead")
               .upsert(leadData, { 
                 onConflict: "id_lead_externo,id_empresa"
-              })
-              .select()
-              .single();
+              });
 
             if (leadError) {
               console.error(`Erro ao salvar lead ${deal.id}:`, leadError);
               continue;
-            }
-
-            // Registrar evento de mudança de stage se necessário
-            if (deal.stage_change_time) {
-              const eventoData = {
-                id_lead: leadInserido.id_lead,
-                etapa: `Stage ${deal.stage_id}`,
-                data_evento: deal.stage_change_time,
-                observacao: deal.stage_name || null,
-              };
-
-              const { error: eventoError } = await supabase
-                .from("lead_evento")
-                .insert(eventoData);
-
-              if (eventoError) {
-                console.error(`Erro ao registrar evento do lead ${deal.id}:`, eventoError);
-              }
             }
 
             resultados.push({ deal: deal.id, status: "success" });
