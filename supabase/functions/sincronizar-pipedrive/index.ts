@@ -84,10 +84,10 @@ serve(async (req) => {
           console.log("Pipeline ID não especificado, stages não serão carregados");
         }
 
-        // Buscar deals abertos (a API não suporta filtro de pipeline_id na URL de forma confiável)
-        let dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=open`;
+        // Buscar todos os deals não deletados (open, won, lost) e filtrar por pipeline no código
+        const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=all_not_deleted`;
         
-        console.log(`Buscando deals abertos da URL: ${dealsUrl}`);
+        console.log(`Buscando deals (todos status) da URL: ${dealsUrl}`);
         
         const dealsResponse = await fetch(dealsUrl);
         if (!dealsResponse.ok) {
@@ -117,11 +117,7 @@ serve(async (req) => {
               continue;
             }
             
-            // Ignorar deals perdidos (lost)
-            if (deal.status === 'lost') {
-              console.log(`Deal ${deal.id} ignorado - status lost`);
-              continue;
-            }
+             // Não ignorar deals perdidos: serão sincronizados com stage "Perdido" para análise no funil
             
             // Mapear status do deal para campos do lead
             const dealPerdido = deal.status === "lost";
