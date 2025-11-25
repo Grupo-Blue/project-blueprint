@@ -66,21 +66,28 @@ export default function DashboardTrafego() {
         .from("campanha_semana_metricas")
         .select(`
           *,
-          campanha:id_campanha (nome, id_conta),
-          conta_anuncio!inner (id_empresa)
+          campanha:id_campanha (
+            nome, 
+            id_conta,
+            conta_anuncio:id_conta (id_empresa)
+          )
         `)
         .eq("id_semana", semanaAtual.id_semana);
-
-      if (empresaSelecionada !== "todas") {
-        query = query.eq("conta_anuncio.id_empresa", empresaSelecionada);
-      }
 
       const { data, error } = await query;
       if (error) throw error;
 
-      return data.map((m: any) => ({
+      // Filtrar por empresa se necessário
+      let filteredData = data;
+      if (empresaSelecionada !== "todas") {
+        filteredData = data.filter((m: any) => 
+          m.campanha?.conta_anuncio?.id_empresa === empresaSelecionada
+        );
+      }
+
+      return filteredData.map((m: any) => ({
         id_campanha: m.id_campanha,
-        nome: m.campanha.nome,
+        nome: m.campanha?.nome || "Campanha sem nome",
         leads: m.leads,
         verba_investida: m.verba_investida,
         cpl: m.cpl,
