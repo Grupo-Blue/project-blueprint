@@ -52,6 +52,38 @@ serve(async (req) => {
       }
 
       try {
+        // Buscar stages da pipeline para mapear IDs para nomes
+        const stagesMap: Record<number, string> = {};
+        if (pipelineId) {
+          const stagesUrl = `https://${domain}.pipedrive.com/api/v1/stages?api_token=${apiToken}&pipeline_id=${pipelineId}`;
+          console.log(`Buscando stages da pipeline ${pipelineId}...`);
+          console.log(`URL stages: ${stagesUrl}`);
+          
+          try {
+            const stagesResponse = await fetch(stagesUrl);
+            console.log(`Status response stages: ${stagesResponse.status}`);
+            
+            if (stagesResponse.ok) {
+              const stagesData = await stagesResponse.json();
+              console.log(`Stages data success: ${stagesData.success}, data exists: ${!!stagesData.data}`);
+              
+              if (stagesData.success && stagesData.data) {
+                for (const stage of stagesData.data) {
+                  stagesMap[stage.id] = stage.name;
+                  console.log(`Stage mapeado: ${stage.id} -> ${stage.name}`);
+                }
+                console.log(`${Object.keys(stagesMap).length} stages carregados`);
+              }
+            } else {
+              console.error(`Erro ao buscar stages: ${stagesResponse.status}`);
+            }
+          } catch (stageError) {
+            console.error(`Erro ao processar stages: ${stageError}`);
+          }
+        } else {
+          console.log("Pipeline ID não especificado, stages não serão carregados");
+        }
+
         // Buscar deals abertos e perdidos
         let dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=all_not_deleted`;
         
@@ -103,12 +135,20 @@ serve(async (req) => {
             // Valor: sempre sincronizar se existir, independente do status
             const valorDeal = deal.value ? parseFloat(deal.value) : null;
             
+            // Determinar nome do stage
+            let stageAtual = null;
+            if (dealPerdido) {
+              stageAtual = "Perdido";
+            } else if (deal.stage_id && stagesMap[deal.stage_id]) {
+              stageAtual = stagesMap[deal.stage_id];
+            }
+            
             const leadData = {
               id_empresa: idEmpresa,
               id_lead_externo: String(deal.id),
               nome_lead: deal.person_name || deal.title || "Lead sem nome",
               organizacao: deal.org_name || null,
-              stage_atual: deal.stage_order_nr && dealPerdido ? "Perdido" : (deal.stage_name || null),
+              stage_atual: stageAtual,
               pipeline_id: deal.pipeline_id ? String(deal.pipeline_id) : null,
               url_pipedrive: urlPipedrive,
               data_criacao: deal.add_time || new Date().toISOString(),
