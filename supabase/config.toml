@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.sincronizar-tokeniza]
 verify_jwt = false
+
+[functions.coletar-criativos-meta]
+verify_jwt = false
+
+[functions.coletar-criativos-google]
+verify_jwt = false
