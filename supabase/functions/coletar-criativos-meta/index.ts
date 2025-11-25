@@ -73,13 +73,13 @@ serve(async (req) => {
           continue;
         }
 
-        // Para cada campanha, buscar os ads (criativos)
+        // Para cada campanha, buscar os ads (criativos) com métricas
         for (const campanha of campanhas || []) {
           try {
-            console.log(`Buscando criativos da campanha ${campanha.nome}`);
+            console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
-            // Endpoint da API do Meta para buscar ads de uma campanha
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec,image_url,video_id,thumbnail_url}&access_token=${accessToken}`;
+            // Endpoint da API do Meta para buscar ads com métricas de investimento
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec,image_url,video_id,thumbnail_url},insights.date_preset(last_7d){spend}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -113,9 +113,15 @@ serve(async (req) => {
             const adsData = await adsResponse.json();
             console.log(`Encontrados ${adsData.data?.length || 0} ads para campanha ${campanha.nome}`);
 
-            // Processar cada ad (criativo)
+            // Processar cada ad (criativo) com investimento
             for (const ad of adsData.data || []) {
               const creative = ad.creative;
+              
+              // Capturar investimento dos últimos 7 dias
+              let investimento7dias = 0;
+              if (ad.insights && ad.insights.data && ad.insights.data.length > 0) {
+                investimento7dias = parseFloat(ad.insights.data[0].spend || 0);
+              }
               
               // Determinar tipo de criativo
               let tipoCriativo = "OUTRO";
@@ -150,7 +156,7 @@ serve(async (req) => {
               if (upsertError) {
                 console.error("Erro ao salvar criativo:", upsertError);
               } else {
-                console.log(`Criativo ${ad.name || ad.id} salvo`);
+                console.log(`Criativo ${ad.name || ad.id} salvo com investimento de R$ ${investimento7dias.toFixed(2)} (últimos 7 dias)`);
               }
             }
 

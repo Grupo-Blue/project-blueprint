@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BarChart3, Users, DollarSign, TrendingUp, Target, Calendar } from "lucide-react";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { AlertaIntegracao } from "@/components/AlertaIntegracao";
+import { ValidacaoUTM } from "@/components/ValidacaoUTM";
 
 const Dashboard = () => {
   const mesAtual = new Date();
@@ -85,6 +87,8 @@ const Dashboard = () => {
 
   return (
     <>
+      <AlertaIntegracao />
+      
       <div className="mb-8">
         <h2 className="text-3xl font-bold mb-2">Bem-vindo ao SGT!</h2>
         <p className="text-muted-foreground">
@@ -214,6 +218,8 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      <ValidacaoUTM />
     </>
   );
 };
