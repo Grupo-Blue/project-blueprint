@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CriativoAlertCard } from "@/components/CriativoAlertCard";
-import { AlertTriangle, ArrowLeft, RefreshCw, Image, Video, Grid3x3, FileQuestion } from "lucide-react";
+import { AlertTriangle, ArrowLeft, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 
@@ -49,6 +49,7 @@ const getTipoLabel = (tipo: string) => {
 const Criativos = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [syncingCreatives, setSyncingCreatives] = useState(false);
 
   // Buscar campanhas com criativos
   const { data: campanhas, isLoading, refetch } = useQuery({
@@ -116,6 +117,92 @@ const Criativos = () => {
     });
   };
 
+  const handleSyncCreatives = async () => {
+    setSyncingCreatives(true);
+    
+    try {
+      toast({
+        title: "Sincronizando criativos...",
+        description: "Buscando criativos das integrações ativas",
+      });
+
+      // Chamar ambas as edge functions em paralelo
+      const [metaResult, googleResult] = await Promise.allSettled([
+        supabase.functions.invoke("coletar-criativos-meta"),
+        supabase.functions.invoke("coletar-criativos-google"),
+      ]);
+
+      let hasErrors = false;
+      let successCount = 0;
+
+      // Verificar resultado Meta
+      if (metaResult.status === "fulfilled") {
+        const metaData = metaResult.value.data as any;
+        if (metaData?.success) {
+          successCount++;
+        } else if (metaData?.error) {
+          hasErrors = true;
+          toast({
+            title: "Erro no Meta Ads",
+            description: metaData.error,
+            variant: "destructive",
+          });
+        }
+      } else {
+        hasErrors = true;
+        toast({
+          title: "Erro no Meta Ads",
+          description: metaResult.reason?.message || "Erro desconhecido",
+          variant: "destructive",
+        });
+      }
+
+      // Verificar resultado Google
+      if (googleResult.status === "fulfilled") {
+        const googleData = googleResult.value.data as any;
+        if (googleData?.success) {
+          successCount++;
+        } else if (googleData?.error) {
+          hasErrors = true;
+          toast({
+            title: "Erro no Google Ads",
+            description: googleData.error,
+            variant: "destructive",
+          });
+        }
+      } else {
+        hasErrors = true;
+        toast({
+          title: "Erro no Google Ads",
+          description: googleResult.reason?.message || "Erro desconhecido",
+          variant: "destructive",
+        });
+      }
+
+      if (!hasErrors && successCount > 0) {
+        toast({
+          title: "Sincronização concluída!",
+          description: "Criativos sincronizados com sucesso",
+        });
+        await refetch();
+      } else if (successCount === 0 && hasErrors) {
+        toast({
+          title: "Falha na sincronização",
+          description: "Nenhuma integração foi sincronizada com sucesso",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao sincronizar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingCreatives(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -144,10 +231,19 @@ const Criativos = () => {
                 </p>
               </div>
             </div>
-            <Button variant="outline" onClick={handleRefresh}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Atualizar
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleSyncCreatives}
+                disabled={syncingCreatives}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {syncingCreatives ? "Sincronizando..." : "Sincronizar Criativos"}
+              </Button>
+              <Button variant="outline" onClick={handleRefresh}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Atualizar
+              </Button>
+            </div>
           </div>
         </div>
       </header>
