@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -14,6 +15,8 @@ import { ptBR } from "date-fns/locale";
 const Leads = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
 
   const { data: leads, isLoading } = useQuery({
     queryKey: ["leads"],
@@ -57,6 +60,18 @@ const Leads = () => {
 
     return matchesSearch && matchesStatus;
   });
+
+  // Paginação
+  const totalPages = Math.ceil((filteredLeads?.length || 0) / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedLeads = filteredLeads?.slice(startIndex, endIndex);
+
+  // Resetar para primeira página quando filtros mudarem
+  const handleFilterChange = (setter: (value: any) => void) => (value: any) => {
+    setter(value);
+    setCurrentPage(1);
+  };
 
   // Calcular estatísticas
   const stats = {
@@ -172,11 +187,11 @@ const Leads = () => {
             <Input
               placeholder="Buscar por nome, organização ou empresa..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleFilterChange(setSearchTerm)(e.target.value)}
               className="pl-9"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={handleFilterChange(setStatusFilter)}>
             <SelectTrigger className="w-full sm:w-[200px]">
               <SelectValue placeholder="Filtrar por status" />
             </SelectTrigger>
@@ -195,10 +210,19 @@ const Leads = () => {
       {/* Leads Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Leads ({filteredLeads?.length || 0})</CardTitle>
-          <CardDescription>
-            Leads sincronizados do Pipedrive com informações detalhadas
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Lista de Leads ({filteredLeads?.length || 0})</CardTitle>
+              <CardDescription>
+                Leads sincronizados do Pipedrive com informações detalhadas
+              </CardDescription>
+            </div>
+            {totalPages > 1 && (
+              <p className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </p>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -215,7 +239,7 @@ const Leads = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLeads?.map((lead) => {
+                {paginatedLeads?.map((lead) => {
                   const diasNoFunil = differenceInDays(new Date(), new Date(lead.data_criacao));
                   
                   return (
@@ -319,6 +343,66 @@ const Leads = () => {
               </TableBody>
             </Table>
           </div>
+
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between border-t pt-4">
+              <p className="text-sm text-muted-foreground">
+                Exibindo {startIndex + 1} a {Math.min(endIndex, filteredLeads?.length || 0)} de {filteredLeads?.length || 0} leads
+              </p>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    // Mostrar apenas algumas páginas (primeira, última, atual e vizinhas)
+                    const showPage = 
+                      page === 1 || 
+                      page === totalPages || 
+                      (page >= currentPage - 1 && page <= currentPage + 1);
+                    
+                    const showEllipsis = 
+                      (page === currentPage - 2 && currentPage > 3) ||
+                      (page === currentPage + 2 && currentPage < totalPages - 2);
+
+                    if (showEllipsis) {
+                      return (
+                        <PaginationItem key={page}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      );
+                    }
+
+                    if (!showPage) return null;
+
+                    return (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
