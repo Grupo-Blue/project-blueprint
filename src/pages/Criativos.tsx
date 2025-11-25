@@ -385,11 +385,19 @@ const Criativos = () => {
                                     {getTipoLabel(criativo.tipo)}
                                   </span>
                                 </div>
-                                {criativo.descricao && (
-                                  <span className="text-sm text-muted-foreground truncate max-w-[400px]">
-                                    {criativo.descricao}
-                                  </span>
-                                )}
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">ID:</span>
+                                    <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                                      {criativo.id_criativo_externo}
+                                    </code>
+                                  </div>
+                                  {criativo.descricao && (
+                                    <span className="text-sm text-muted-foreground truncate max-w-[400px]">
+                                      {criativo.descricao}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               <div className="flex items-center gap-2">
                                 <Badge variant={criativo.ativo ? "secondary" : "outline"}>
