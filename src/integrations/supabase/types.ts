@@ -652,11 +652,16 @@ export type Database = {
           id_lead_externo: string | null
           is_mql: boolean
           levantou_mao: boolean
+          nome_lead: string | null
+          organizacao: string | null
           origem_campanha: string | null
           origem_canal: Database["public"]["Enums"]["canal_origem"] | null
+          pipeline_id: string | null
           reuniao_realizada: boolean
+          stage_atual: string | null
           tem_reuniao: boolean
           updated_at: string
+          url_pipedrive: string | null
           valor_venda: number | null
           venda_realizada: boolean
         }
@@ -669,11 +674,16 @@ export type Database = {
           id_lead_externo?: string | null
           is_mql?: boolean
           levantou_mao?: boolean
+          nome_lead?: string | null
+          organizacao?: string | null
           origem_campanha?: string | null
           origem_canal?: Database["public"]["Enums"]["canal_origem"] | null
+          pipeline_id?: string | null
           reuniao_realizada?: boolean
+          stage_atual?: string | null
           tem_reuniao?: boolean
           updated_at?: string
+          url_pipedrive?: string | null
           valor_venda?: number | null
           venda_realizada?: boolean
         }
@@ -686,11 +696,16 @@ export type Database = {
           id_lead_externo?: string | null
           is_mql?: boolean
           levantou_mao?: boolean
+          nome_lead?: string | null
+          organizacao?: string | null
           origem_campanha?: string | null
           origem_canal?: Database["public"]["Enums"]["canal_origem"] | null
+          pipeline_id?: string | null
           reuniao_realizada?: boolean
+          stage_atual?: string | null
           tem_reuniao?: boolean
           updated_at?: string
+          url_pipedrive?: string | null
           valor_venda?: number | null
           venda_realizada?: boolean
         }

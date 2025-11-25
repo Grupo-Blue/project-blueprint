@@ -91,9 +91,17 @@ serve(async (req) => {
             const reuniaoRealizada = deal.stage_id !== null && deal.stage_id > 4;
             const vendaRealizada = deal.status === "won";
             
+            // Construir URL do Pipedrive
+            const urlPipedrive = `https://${domain}.pipedrive.com/deal/${deal.id}`;
+            
             const leadData = {
               id_empresa: idEmpresa,
               id_lead_externo: String(deal.id),
+              nome_lead: deal.person_name || deal.title || "Lead sem nome",
+              organizacao: deal.org_name || null,
+              stage_atual: deal.stage_name || null,
+              pipeline_id: deal.pipeline_id ? String(deal.pipeline_id) : null,
+              url_pipedrive: urlPipedrive,
               data_criacao: deal.add_time || new Date().toISOString(),
               origem_canal: "OUTRO" as const,
               origem_campanha: deal.origin || null,
