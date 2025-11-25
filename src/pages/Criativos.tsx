@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CriativoAlertCard } from "@/components/CriativoAlertCard";
-import { AlertTriangle, ArrowLeft, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download } from "lucide-react";
+import { AlertTriangle, ArrowLeft, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 
@@ -13,10 +13,12 @@ interface CampanhaCriativo {
   id_campanha: string;
   nome_campanha: string;
   empresa: string;
+  plataforma: string;
   criativos_ativos: number;
   total_criativos: number;
   criativos: Array<{
     id_criativo: string;
+    id_criativo_externo: string;
     tipo: string;
     descricao: string | null;
     ativo: boolean;
@@ -46,6 +48,15 @@ const getTipoLabel = (tipo: string) => {
   return labels[tipo] || tipo;
 };
 
+const getCriativoUrl = (plataforma: string, idExterno: string) => {
+  if (plataforma === "META") {
+    return `https://business.facebook.com/adsmanager/manage/ads?act=${idExterno.split('_')[0]}&selected_ad_ids=${idExterno}`;
+  } else if (plataforma === "GOOGLE") {
+    return `https://ads.google.com/aw/ads?campaignId=${idExterno}`;
+  }
+  return null;
+};
+
 const Criativos = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -62,6 +73,7 @@ const Criativos = () => {
           nome,
           conta_anuncio!inner (
             id_empresa,
+            plataforma,
             empresa:id_empresa (
               nome
             )
@@ -77,7 +89,7 @@ const Criativos = () => {
       for (const camp of campanhasData || []) {
         const { data: criativosData, error: criativosError } = await supabase
           .from("criativo")
-          .select("*")
+          .select("id_criativo, id_criativo_externo, tipo, descricao, ativo")
           .eq("id_campanha", camp.id_campanha);
 
         if (criativosError) continue;
@@ -88,10 +100,12 @@ const Criativos = () => {
           id_campanha: camp.id_campanha,
           nome_campanha: camp.nome,
           empresa: (camp as any).conta_anuncio?.empresa?.nome || "N/A",
+          plataforma: (camp as any).conta_anuncio?.plataforma || "OUTRO",
           criativos_ativos: criativosAtivos,
           total_criativos: criativosData?.length || 0,
           criativos: criativosData?.map((c) => ({
             id_criativo: c.id_criativo,
+            id_criativo_externo: c.id_criativo_externo,
             tipo: c.tipo,
             descricao: c.descricao,
             ativo: c.ativo,
@@ -356,29 +370,46 @@ const Criativos = () => {
                       <p className="text-sm text-muted-foreground">Nenhum criativo cadastrado</p>
                     ) : (
                       <div className="space-y-2">
-                        {campanha.criativos.map((criativo) => (
-                          <div
-                            key={criativo.id_criativo}
-                            className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-2">
-                                {getTipoIcon(criativo.tipo)}
-                                <span className="text-sm font-medium">
-                                  {getTipoLabel(criativo.tipo)}
-                                </span>
+                        {campanha.criativos.map((criativo) => {
+                          const criativoUrl = getCriativoUrl(campanha.plataforma, criativo.id_criativo_externo);
+                          
+                          return (
+                            <div
+                              key={criativo.id_criativo}
+                              className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                            >
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className="flex items-center gap-2">
+                                  {getTipoIcon(criativo.tipo)}
+                                  <span className="text-sm font-medium">
+                                    {getTipoLabel(criativo.tipo)}
+                                  </span>
+                                </div>
+                                {criativo.descricao && (
+                                  <span className="text-sm text-muted-foreground truncate max-w-[400px]">
+                                    {criativo.descricao}
+                                  </span>
+                                )}
                               </div>
-                              {criativo.descricao && (
-                                <span className="text-sm text-muted-foreground">
-                                  {criativo.descricao}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2">
+                                <Badge variant={criativo.ativo ? "secondary" : "outline"}>
+                                  {criativo.ativo ? "Ativo" : "Inativo"}
+                                </Badge>
+                                {criativoUrl && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(criativoUrl, '_blank')}
+                                    className="gap-1"
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                    Ver
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <Badge variant={criativo.ativo ? "secondary" : "outline"}>
-                              {criativo.ativo ? "Ativo" : "Inativo"}
-                            </Badge>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
