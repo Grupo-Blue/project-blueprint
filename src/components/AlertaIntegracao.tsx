@@ -73,10 +73,10 @@ export const AlertaIntegracao = () => {
       <AlertTriangle className="h-4 w-4" />
       <AlertTitle>Problemas com Integrações Detectados</AlertTitle>
       <AlertDescription className="space-y-2">
-        {!statusMeta?.ok && (
+        {statusMeta && !statusMeta.ok && (
           <p>• Meta Ads: {statusMeta.error} - Reconecte a integração</p>
         )}
-        {!statusGoogle?.ok && (
+        {statusGoogle && !statusGoogle.ok && (
           <p>• Google Ads: {statusGoogle.error} - Verifique as credenciais</p>
         )}
         <Button 
