@@ -47,6 +47,7 @@ serve(async (req) => {
       const pipelineId = config.pipeline_id; // ID da pipeline específica
 
       console.log(`Processando integração para empresa ${idEmpresa}`);
+      console.log(`Token utilizado: ${apiToken.substring(0, 8)}...`);
       if (pipelineId) {
         console.log(`Filtrando deals da pipeline ID: ${pipelineId}`);
       }
@@ -97,10 +98,10 @@ serve(async (req) => {
         let page = 0;
         const maxPages = 20;
 
-        // Buscar deals ativos
+        // Buscar TODOS os deals (open, won, lost) usando status=all
         while (true) {
-          const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=${start}&limit=${limit}`;
-          console.log(`Buscando deals ativos - página ${page + 1}, start=${start}, limit=${limit}...`);
+          const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&status=all&start=${start}&limit=${limit}`;
+          console.log(`Buscando deals (todos status) - página ${page + 1}, start=${start}, limit=${limit}...`);
 
           const dealsResponse = await fetch(dealsUrl);
           if (!dealsResponse.ok) {
@@ -122,6 +123,12 @@ serve(async (req) => {
           }
 
           allDeals.push(...dealsData.data);
+          
+          // Log específico para deals procurados
+          const foundTargets = dealsData.data.filter((d: any) => d.id === 13346 || d.id === 17991);
+          if (foundTargets.length > 0) {
+            console.log(`✓ ENCONTRADO! Deals alvos nesta página: ${foundTargets.map((d: any) => d.id).join(', ')}`);
+          }
 
           const pagination = dealsData.additional_data?.pagination;
           if (!pagination || !pagination.more_items_in_collection) {
@@ -142,9 +149,15 @@ serve(async (req) => {
           }
         }
 
-        console.log(`Total de deals ativos encontrados: ${allDeals.length}`);
+        console.log(`Total de deals encontrados: ${allDeals.length}`);
+        
+        // Verificar se deals específicos foram encontrados
+        const hasTarget13346 = allDeals.some((d: any) => d.id === 13346);
+        const hasTarget17991 = allDeals.some((d: any) => d.id === 17991);
+        console.log(`Deal 13346 encontrado: ${hasTarget13346 ? 'SIM ✓' : 'NÃO'}`);
+        console.log(`Deal 17991 encontrado: ${hasTarget17991 ? 'SIM ✓' : 'NÃO'}`);
 
-        // Buscar deals arquivados também
+        // Buscar deals arquivados também (deletados manualmente)
         start = 0;
         page = 0;
         console.log(`Buscando deals arquivados...`);
