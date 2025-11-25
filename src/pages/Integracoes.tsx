@@ -157,18 +157,23 @@ export default function Integracoes() {
       
       const { data, error } = await supabase.functions.invoke(functionName);
       
-      if (error) throw error;
+      // Se houve erro na invocação da função
+      if (error) {
+        toast.error(`Falha ao conectar com a API: ${error.message}`);
+        return;
+      }
       
+      // Verificar se a resposta contém erro
       const result = data as any;
       
       if (result.error) {
-        toast.error(`Erro na integração: ${result.error}`);
+        toast.error(result.error);
       } else {
-        toast.success(`Integração testada com sucesso! ${result.message || ''}`);
+        toast.success(result.message || 'Integração testada com sucesso!');
       }
     } catch (error: any) {
       console.error('Erro ao testar integração:', error);
-      toast.error(`Erro ao testar integração: ${error.message}`);
+      toast.error(`Erro inesperado: ${error.message}`);
     } finally {
       setTestingIntegracoes(prev => {
         const newSet = new Set(prev);
