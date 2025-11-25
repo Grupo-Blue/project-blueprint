@@ -99,7 +99,7 @@ serve(async (req) => {
               id_lead_externo: String(deal.id),
               nome_lead: deal.person_name || deal.title || "Lead sem nome",
               organizacao: deal.org_name || null,
-              stage_atual: deal.stage_name || null,
+              stage_atual: deal.stage_id ? `Stage ${deal.stage_id}` : null,
               pipeline_id: deal.pipeline_id ? String(deal.pipeline_id) : null,
               url_pipedrive: urlPipedrive,
               data_criacao: deal.add_time || new Date().toISOString(),
