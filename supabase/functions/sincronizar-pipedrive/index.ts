@@ -52,15 +52,12 @@ serve(async (req) => {
       }
 
       try {
-        // Buscar deals recentes (últimos 30 dias)
-        const dataInicio = new Date();
-        dataInicio.setDate(dataInicio.getDate() - 30);
+        // Construir URL com filtro de pipeline e status
+        // Nota: A API do Pipedrive não aceita pipeline_id como parâmetro direto
+        // Vamos buscar todos os deals e filtrar depois
+        let dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=open`;
         
-        // Construir URL com filtro de pipeline se especificado
-        let dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=all_not_deleted`;
-        if (pipelineId) {
-          dealsUrl += `&pipeline_id=${pipelineId}`;
-        }
+        console.log(`Buscando deals da URL: ${dealsUrl}`);
         
         const dealsResponse = await fetch(dealsUrl);
         if (!dealsResponse.ok) {
@@ -84,6 +81,12 @@ serve(async (req) => {
         // Processar cada deal como um lead
         for (const deal of dealsData.data) {
           try {
+            // Filtrar por pipeline_id se especificado
+            if (pipelineId && String(deal.pipeline_id) !== String(pipelineId)) {
+              console.log(`Deal ${deal.id} ignorado - pipeline ${deal.pipeline_id} diferente de ${pipelineId}`);
+              continue;
+            }
+            
             // Mapear status do deal para campos do lead
             const isMql = deal.stage_id !== null && deal.stage_id > 1;
             const levantouMao = deal.stage_id !== null && deal.stage_id > 2;
