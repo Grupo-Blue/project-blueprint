@@ -158,7 +158,9 @@ export default function Integracoes() {
           throw new Error('Tipo de integração não suportado');
       }
       
-      const { data, error } = await supabase.functions.invoke(functionName);
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: {}
+      });
       
       // Verificar se a resposta contém erro
       const result = data as any;
