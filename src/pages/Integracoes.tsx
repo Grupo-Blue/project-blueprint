@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from '@supabase/supabase-js';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -166,8 +167,21 @@ export default function Integracoes() {
       const result = data as any;
       
       if (error) {
-        // Erro de invocação da função
-        toast.error(`Falha ao conectar: ${error.message}`);
+        // Classificar tipo de erro
+        if (error instanceof FunctionsHttpError) {
+          const errorMessage = await error.context.json();
+          console.error('Erro HTTP da função:', errorMessage);
+          toast.error(`Erro na integração: ${errorMessage.error || errorMessage.message || 'Verifique suas credenciais'}`);
+        } else if (error instanceof FunctionsRelayError) {
+          console.error('Erro de relay:', error.message);
+          toast.error(`Erro ao comunicar com a função: ${error.message}`);
+        } else if (error instanceof FunctionsFetchError) {
+          console.error('Erro de requisição:', error.message);
+          toast.error(`Erro de conexão: ${error.message}. Verifique sua internet.`);
+        } else {
+          console.error('Erro desconhecido:', error);
+          toast.error(`Erro desconhecido: ${error.message}`);
+        }
         return;
       }
       
