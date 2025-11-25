@@ -87,17 +87,20 @@ serve(async (req) => {
           console.log("Pipeline ID não especificado, stages não serão carregados");
         }
 
-        // Buscar TODOS os deals (sem status para evitar filtros conflitantes)
+        // Buscar TODOS os deals ativos (sem status para evitar filtros conflitantes)
         // Vamos paginar e depois filtrar manualmente por stage_id que pertencem à pipeline correta
+        console.log(`IMPORTANTE: A API retorna apenas deals visíveis ao usuário do token. Se deals estão faltando, verifique as permissões de visibilidade do usuário no Pipedrive.`);
+        
         const allDeals: any[] = [];
         const limit = 500;
         let start = 0;
         let page = 0;
         const maxPages = 20;
 
+        // Buscar deals ativos
         while (true) {
           const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=${start}&limit=${limit}`;
-          console.log(`Buscando deals - página ${page + 1}, start=${start}, limit=${limit}...`);
+          console.log(`Buscando deals ativos - página ${page + 1}, start=${start}, limit=${limit}...`);
 
           const dealsResponse = await fetch(dealsUrl);
           if (!dealsResponse.ok) {
@@ -139,13 +142,57 @@ serve(async (req) => {
           }
         }
 
+        console.log(`Total de deals ativos encontrados: ${allDeals.length}`);
+
+        // Buscar deals arquivados também
+        start = 0;
+        page = 0;
+        console.log(`Buscando deals arquivados...`);
+        
+        while (true) {
+          const archivedUrl = `https://${domain}.pipedrive.com/api/v1/deals/archive?api_token=${apiToken}&start=${start}&limit=${limit}`;
+          console.log(`Buscando deals arquivados - página ${page + 1}, start=${start}, limit=${limit}...`);
+
+          const archivedResponse = await fetch(archivedUrl);
+          if (!archivedResponse.ok) {
+            console.log(`Não foi possível buscar deals arquivados: ${archivedResponse.status}`);
+            break;
+          }
+
+          const archivedData = await archivedResponse.json();
+
+          if (!archivedData.success || !archivedData.data || archivedData.data.length === 0) {
+            console.log("Nenhum deal arquivado adicional encontrado");
+            break;
+          }
+
+          allDeals.push(...archivedData.data);
+
+          const pagination = archivedData.additional_data?.pagination;
+          if (!pagination || !pagination.more_items_in_collection) {
+            break;
+          }
+
+          if (pagination.next_start != null) {
+            start = pagination.next_start;
+          } else {
+            start += limit;
+          }
+
+          page++;
+          if (page >= maxPages) {
+            console.log(`Limite máximo de páginas (${maxPages}) atingido ao buscar deals arquivados`);
+            break;
+          }
+        }
+
         if (allDeals.length === 0) {
-          console.log("Nenhum deal encontrado");
+          console.log("Nenhum deal encontrado (ativos + arquivados)");
           continue;
         }
 
         
-        console.log(`Total: ${allDeals.length} deals retornados da API`);
+        console.log(`Total: ${allDeals.length} deals retornados (ativos + arquivados)`);
 
         // Filtrar por stage_id da pipeline (mais confiável que pipeline_id na API)
         const dealsFiltered = stageIds.length > 0 
