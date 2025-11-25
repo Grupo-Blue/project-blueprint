@@ -256,6 +256,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                 Relatórios
               </Button>
             </Link>
+            <Link to="/relatorio-criativos">
+              <Button 
+                variant={location.pathname === "/relatorio-criativos" ? "secondary" : "ghost"} 
+                size="sm"
+                className="hover:bg-accent transition-all"
+              >
+                <Image className="mr-2 h-4 w-4" />
+                Performance Criativos
+              </Button>
+            </Link>
             <Link to="/hipoteses">
               <Button 
                 variant={location.pathname === "/hipoteses" ? "secondary" : "ghost"} 
