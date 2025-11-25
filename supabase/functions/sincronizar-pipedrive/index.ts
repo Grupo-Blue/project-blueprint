@@ -84,10 +84,10 @@ serve(async (req) => {
           console.log("Pipeline ID não especificado, stages não serão carregados");
         }
 
-        // Buscar todos os deals não deletados (open, won, lost) e filtrar por pipeline no código
-        const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=all_not_deleted`;
+        // Buscar TODOS os deals não deletados (sem especificar status = open+won+lost)
+        const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500`;
         
-        console.log(`Buscando deals (todos status) da URL: ${dealsUrl}`);
+        console.log(`Buscando TODOS deals (sem filtro status) da URL: ${dealsUrl}`);
         
         const dealsResponse = await fetch(dealsUrl);
         if (!dealsResponse.ok) {
@@ -109,15 +109,27 @@ serve(async (req) => {
         }
 
         // Processar cada deal como um lead
+        console.log(`Total de ${dealsData.data.length} deals retornados pela API`);
+        let dealsProcessados = 0;
+        let dealsIgnorados = 0;
+        
         for (const deal of dealsData.data) {
           try {
             // Filtrar por pipeline_id e também por status para não incluir deals perdidos
             if (pipelineId && String(deal.pipeline_id) !== String(pipelineId)) {
               console.log(`Deal ${deal.id} ignorado - pipeline ${deal.pipeline_id} diferente de ${pipelineId}`);
+              dealsIgnorados++;
               continue;
             }
             
-             // Não ignorar deals perdidos: serão sincronizados com stage "Perdido" para análise no funil
+            dealsProcessados++;
+            console.log(`Deal ${deal.id} da pipeline ${deal.pipeline_id}, stage ${deal.stage_id}: ${stagesMap[deal.stage_id] || 'stage não mapeado'}`);
+            
+             // Deals perdidos não devem vir com status=open, mas manter verificação por segurança
+             if (deal.status === 'lost') {
+               console.log(`Deal ${deal.id} ignorado - status lost (não deveria vir com status=open)`);
+               continue;
+             }
             
             // Mapear status do deal para campos do lead
             const dealPerdido = deal.status === "lost";
@@ -203,6 +215,8 @@ serve(async (req) => {
             resultados.push({ deal: deal.id, status: "error", error: String(error) });
           }
         }
+        
+        console.log(`Pipeline ${pipelineId}: ${dealsProcessados} deals processados, ${dealsIgnorados} ignorados`);
       } catch (error) {
         console.error(`Erro ao processar integração ${integracao.id_integracao}:`, error);
         resultados.push({ integracao: integracao.id_integracao, status: "error", error: String(error) });
