@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CriativoAlertCard } from "@/components/CriativoAlertCard";
-import { AlertTriangle, ArrowLeft, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink } from "lucide-react";
+import { AlertTriangle, ArrowLeft, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 
@@ -128,6 +128,14 @@ const Criativos = () => {
     toast({
       title: "Criativos atualizados",
       description: "Os dados foram recarregados com sucesso",
+    });
+  };
+
+  const handleCopyId = (idExterno: string) => {
+    navigator.clipboard.writeText(idExterno);
+    toast({
+      title: "ID copiado!",
+      description: "Use este ID no parâmetro utm_content dos seus anúncios",
     });
   };
 
@@ -391,6 +399,15 @@ const Criativos = () => {
                                     <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
                                       {criativo.id_criativo_externo}
                                     </code>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleCopyId(criativo.id_criativo_externo)}
+                                      className="h-6 w-6 p-0"
+                                      title="Copiar ID"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </Button>
                                   </div>
                                   {criativo.descricao && (
                                     <span className="text-sm text-muted-foreground truncate max-w-[400px]">
