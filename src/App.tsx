@@ -54,13 +54,13 @@ const App = () => (
           <Route path="/dashboard-trafego" element={<AppLayout><DashboardTrafego /></AppLayout>} />
           <Route path="/empresas" element={<AppLayout><Empresas /></AppLayout>} />
           <Route path="/calculo-metricas" element={<AppLayout><CalculoMetricas /></AppLayout>} />
-          <Route path="/alertas" element={<Alertas />} />
+          <Route path="/alertas" element={<AppLayout><Alertas /></AppLayout>} />
           <Route path="/criativos" element={<AppLayout><Criativos /></AppLayout>} />
           <Route path="/leads" element={<AppLayout><Leads /></AppLayout>} />
-          <Route path="/usuarios" element={<Usuarios />} />
+          <Route path="/usuarios" element={<AppLayout><Usuarios /></AppLayout>} />
           <Route path="/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
-          <Route path="/contas-anuncio" element={<ContasAnuncio />} />
-          <Route path="/campanhas-cadastro" element={<CampanhasCadastro />} />
+          <Route path="/contas-anuncio" element={<AppLayout><ContasAnuncio /></AppLayout>} />
+          <Route path="/campanhas-cadastro" element={<AppLayout><CampanhasCadastro /></AppLayout>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
