@@ -45,12 +45,12 @@ export default function DashboardTrafego() {
   const { data: semanaAtual } = useQuery({
     queryKey: ["semana-atual"],
     queryFn: async () => {
+      const hoje = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from("semana")
         .select("*")
-        .order("ano", { ascending: false })
-        .order("numero_semana", { ascending: false })
-        .limit(1)
+        .lte("data_inicio", hoje)
+        .gte("data_fim", hoje)
         .maybeSingle();
       if (error) throw error;
       return data;
