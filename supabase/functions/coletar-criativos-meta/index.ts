@@ -41,13 +41,32 @@ serve(async (req) => {
 
         console.log(`Processando integração para empresa ${idEmpresa}, ad account ${adAccountId}`);
 
-        // Buscar campanhas ativas da empresa
+        // Primeiro buscar contas de anúncio da empresa com plataforma META
+        const { data: contasAnuncio, error: contasError } = await supabase
+          .from("conta_anuncio")
+          .select("id_conta")
+          .eq("id_empresa", idEmpresa)
+          .eq("plataforma", "META")
+          .eq("ativa", true);
+
+        if (contasError) {
+          console.error("Erro ao buscar contas de anúncio:", contasError);
+          continue;
+        }
+
+        if (!contasAnuncio || contasAnuncio.length === 0) {
+          console.log(`Nenhuma conta de anúncio META encontrada para empresa ${idEmpresa}`);
+          continue;
+        }
+
+        const idsContas = contasAnuncio.map(c => c.id_conta);
+
+        // Buscar campanhas ativas dessas contas
         const { data: campanhas, error: campanhasError } = await supabase
           .from("campanha")
           .select("id_campanha, id_campanha_externo, nome, id_conta")
           .eq("ativa", true)
-          .eq("conta_anuncio.id_empresa", idEmpresa)
-          .eq("conta_anuncio.plataforma", "META");
+          .in("id_conta", idsContas);
 
         if (campanhasError) {
           console.error("Erro ao buscar campanhas:", campanhasError);
