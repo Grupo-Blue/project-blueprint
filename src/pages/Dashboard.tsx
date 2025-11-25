@@ -1,11 +1,98 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Users, DollarSign, TrendingUp } from "lucide-react";
+import { BarChart3, Users, DollarSign, TrendingUp, Target, Calendar } from "lucide-react";
+import { startOfMonth, endOfMonth, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
 const Dashboard = () => {
-  return <>
+  const mesAtual = new Date();
+  const inicioMes = startOfMonth(mesAtual);
+  const fimMes = endOfMonth(mesAtual);
+
+  // Buscar campanhas ativas
+  const { data: campanhas } = useQuery({
+    queryKey: ["campanhas-ativas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("campanha")
+        .select("id_campanha")
+        .eq("ativa", true);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Buscar leads do mês atual
+  const { data: leadsDoMes } = useQuery({
+    queryKey: ["leads-mes-atual", inicioMes, fimMes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lead")
+        .select("id_lead, venda_realizada, valor_venda")
+        .gte("data_criacao", inicioMes.toISOString())
+        .lte("data_criacao", fimMes.toISOString());
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Buscar métricas semanais mais recentes para calcular CPL médio
+  const { data: semanaAtual } = useQuery({
+    queryKey: ["semana-atual-dashboard"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("semana")
+        .select("*")
+        .order("ano", { ascending: false })
+        .order("numero_semana", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: metricasSemanais } = useQuery({
+    queryKey: ["metricas-dashboard", semanaAtual?.id_semana],
+    queryFn: async () => {
+      if (!semanaAtual) return null;
+      const { data, error } = await supabase
+        .from("empresa_semana_metricas")
+        .select("*")
+        .eq("id_semana", semanaAtual.id_semana);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!semanaAtual,
+  });
+
+  // Calcular estatísticas
+  const totalCampanhas = campanhas?.length || 0;
+  const totalLeads = leadsDoMes?.length || 0;
+  const totalVendas = leadsDoMes?.filter((l) => l.venda_realizada).length || 0;
+  const taxaConversao = totalLeads > 0 ? (totalVendas / totalLeads) * 100 : 0;
+
+  const totaisMetricas = metricasSemanais?.reduce(
+    (acc, m) => ({
+      verba: acc.verba + m.verba_investida,
+      leads: acc.leads + m.leads_total,
+    }),
+    { verba: 0, leads: 0 }
+  ) || { verba: 0, leads: 0 };
+
+  const cplMedio = totaisMetricas.leads > 0 ? totaisMetricas.verba / totaisMetricas.leads : 0;
+
+  return (
+    <>
       <div className="mb-8">
         <h2 className="text-3xl font-bold mb-2">Bem-vindo ao SGT!</h2>
         <p className="text-muted-foreground">
           Sistema de Governança de Tráfego Pago
+        </p>
+        <p className="text-sm text-muted-foreground mt-1">
+          <Calendar className="inline h-3 w-3 mr-1" />
+          {format(mesAtual, "MMMM 'de' yyyy", { locale: ptBR })}
         </p>
       </div>
 
@@ -16,8 +103,10 @@ const Dashboard = () => {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
-            <p className="text-xs text-muted-foreground">Nenhuma campanha cadastrada</p>
+            <div className="text-2xl font-bold">{totalCampanhas}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalCampanhas === 0 ? "Nenhuma campanha cadastrada" : "Em execução"}
+            </p>
           </CardContent>
         </Card>
 
@@ -27,8 +116,10 @@ const Dashboard = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
-            <p className="text-xs text-muted-foreground">Aguardando integração</p>
+            <div className="text-2xl font-bold">{totalLeads}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalLeads === 0 ? "Nenhum lead este mês" : `${format(inicioMes, "dd/MMM", { locale: ptBR })} - ${format(fimMes, "dd/MMM", { locale: ptBR })}`}
+            </p>
           </CardContent>
         </Card>
 
@@ -38,19 +129,32 @@ const Dashboard = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 0,00</div>
-            <p className="text-xs text-muted-foreground">Sem dados disponíveis</p>
+            <div className="text-2xl font-bold">
+              {cplMedio > 0 
+                ? new Intl.NumberFormat("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  }).format(cplMedio)
+                : "R$ 0,00"}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {metricasSemanais && metricasSemanais.length > 0 
+                ? `Semana ${semanaAtual?.numero_semana}/${semanaAtual?.ano}` 
+                : "Sem métricas semanais"}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Conversão</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Conversão do Mês</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0%</div>
-            <p className="text-xs text-muted-foreground">Sem dados disponíveis</p>
+            <div className="text-2xl font-bold">{taxaConversao.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">
+              {totalVendas} vendas de {totalLeads} leads
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -110,6 +214,7 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
-    </>;
+    </>
+  );
 };
 export default Dashboard;
