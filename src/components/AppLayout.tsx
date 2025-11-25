@@ -104,6 +104,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   const isAdmin = profile?.perfil === "ADMIN";
   const isDirecao = profile?.perfil === "DIRECAO" || isAdmin;
+  const isTrafego = profile?.perfil === "TRAFEGO" || isAdmin;
   const showBackButton = location.pathname !== "/dashboard";
 
   if (loading) {
@@ -274,18 +275,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                 Alertas
               </Button>
             </Link>
-            {isAdmin && (
+            {isTrafego && (
               <>
-                <Link to="/empresas">
-                  <Button 
-                    variant={location.pathname === "/empresas" ? "secondary" : "ghost"} 
-                    size="sm"
-                    className="hover:bg-accent transition-all"
-                  >
-                    <Building2 className="mr-2 h-4 w-4" />
-                    Empresas
-                  </Button>
-                </Link>
                 <Link to="/contas-anuncio">
                   <Button 
                     variant={location.pathname === "/contas-anuncio" ? "secondary" : "ghost"} 
@@ -304,6 +295,20 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                   >
                     <TrendingUp className="mr-2 h-4 w-4" />
                     Cadastro Campanhas
+                  </Button>
+                </Link>
+              </>
+            )}
+            {isAdmin && (
+              <>
+                <Link to="/empresas">
+                  <Button 
+                    variant={location.pathname === "/empresas" ? "secondary" : "ghost"} 
+                    size="sm"
+                    className="hover:bg-accent transition-all"
+                  >
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Empresas
                   </Button>
                 </Link>
                 <Link to="/usuarios">
