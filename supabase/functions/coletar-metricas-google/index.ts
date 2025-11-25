@@ -58,7 +58,13 @@ serve(async (req) => {
         });
 
         if (!tokenResponse.ok) {
-          console.error(`Erro ao obter token: ${await tokenResponse.text()}`);
+          const errorText = await tokenResponse.text();
+          console.error(`Erro ao obter token: ${errorText}`);
+          resultados.push({ 
+            integracao: integracao.id_integracao, 
+            status: "error", 
+            error: `Falha na autenticação Google Ads: ${errorText}. Verifique suas credenciais OAuth2.` 
+          });
           continue;
         }
 
@@ -109,7 +115,13 @@ serve(async (req) => {
         });
 
         if (!response.ok) {
-          console.error(`Erro na API Google Ads: ${response.status} - ${await response.text()}`);
+          const errorText = await response.text();
+          console.error(`Erro na API Google Ads: ${response.status} - ${errorText}`);
+          resultados.push({ 
+            integracao: integracao.id_integracao, 
+            status: "error", 
+            error: `Erro na API Google Ads (${response.status}): ${errorText}` 
+          });
           continue;
         }
 
@@ -146,8 +158,25 @@ serve(async (req) => {
     }
 
     console.log("Coleta de métricas Google Ads concluída");
+    
+    const erros = resultados.filter(r => r.status === "error");
+    const sucessos = resultados.filter(r => r.status === "success");
+    
+    if (erros.length > 0 && sucessos.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: erros[0].error || "Erro ao coletar métricas do Google Ads",
+          resultados 
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     return new Response(
-      JSON.stringify({ message: "Coleta concluída", resultados }),
+      JSON.stringify({ 
+        message: `Coleta concluída: ${sucessos.length} sucesso(s), ${erros.length} erro(s)`, 
+        resultados 
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

@@ -56,7 +56,13 @@ serve(async (req) => {
         
         const dealsResponse = await fetch(dealsUrl);
         if (!dealsResponse.ok) {
-          console.error(`Erro na API Pipedrive: ${dealsResponse.status} - ${await dealsResponse.text()}`);
+          const errorText = await dealsResponse.text();
+          console.error(`Erro na API Pipedrive: ${dealsResponse.status} - ${errorText}`);
+          resultados.push({ 
+            integracao: integracao.id_integracao, 
+            status: "error", 
+            error: `Erro na API Pipedrive (${dealsResponse.status}): ${errorText}. Verifique seu API Token e domínio.` 
+          });
           continue;
         }
 
@@ -137,8 +143,25 @@ serve(async (req) => {
     }
 
     console.log("Sincronização Pipedrive concluída");
+    
+    const erros = resultados.filter(r => r.status === "error");
+    const sucessos = resultados.filter(r => r.status === "success");
+    
+    if (erros.length > 0 && sucessos.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: erros[0].error || "Erro ao sincronizar com Pipedrive",
+          resultados 
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     return new Response(
-      JSON.stringify({ message: "Sincronização concluída", resultados }),
+      JSON.stringify({ 
+        message: `Sincronização concluída: ${sucessos.length} sucesso(s), ${erros.length} erro(s)`, 
+        resultados 
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

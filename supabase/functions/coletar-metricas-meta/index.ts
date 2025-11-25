@@ -71,7 +71,13 @@ serve(async (req) => {
 
         const response = await fetch(url);
         if (!response.ok) {
-          console.error(`Erro na API Meta: ${response.status} - ${await response.text()}`);
+          const errorText = await response.text();
+          console.error(`Erro na API Meta: ${response.status} - ${errorText}`);
+          resultados.push({ 
+            integracao: integracao.id_integracao, 
+            status: "error", 
+            error: `Erro na API Meta Ads (${response.status}): ${errorText}. Verifique seu Access Token.` 
+          });
           continue;
         }
 
@@ -111,8 +117,25 @@ serve(async (req) => {
     }
 
     console.log("Coleta de métricas Meta Ads concluída");
+    
+    const erros = resultados.filter(r => r.status === "error");
+    const sucessos = resultados.filter(r => r.status === "success");
+    
+    if (erros.length > 0 && sucessos.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: erros[0].error || "Erro ao coletar métricas do Meta Ads",
+          resultados 
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     return new Response(
-      JSON.stringify({ message: "Coleta concluída", resultados }),
+      JSON.stringify({ 
+        message: `Coleta concluída: ${sucessos.length} sucesso(s), ${erros.length} erro(s)`, 
+        resultados 
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
