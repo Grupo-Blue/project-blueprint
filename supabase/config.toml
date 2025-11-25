@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.coletar-criativos-google]
 verify_jwt = false
+
+[functions.pipedrive-webhook]
+verify_jwt = false
