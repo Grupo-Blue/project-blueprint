@@ -111,9 +111,15 @@ serve(async (req) => {
         // Processar cada deal como um lead
         for (const deal of dealsData.data) {
           try {
-            // Filtrar por pipeline_id se especificado
+            // Filtrar por pipeline_id e também por status para não incluir deals perdidos
             if (pipelineId && String(deal.pipeline_id) !== String(pipelineId)) {
               console.log(`Deal ${deal.id} ignorado - pipeline ${deal.pipeline_id} diferente de ${pipelineId}`);
+              continue;
+            }
+            
+            // Ignorar deals perdidos (lost)
+            if (deal.status === 'lost') {
+              console.log(`Deal ${deal.id} ignorado - status lost`);
               continue;
             }
             
