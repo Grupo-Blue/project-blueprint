@@ -135,6 +135,41 @@ serve(async (req) => {
       stageAtual = stagesMap[dealData.stage_id];
     }
 
+    // Capturar UTM parameters dos campos customizados do Pipedrive
+    // Pipedrive armazena campos customizados em um objeto aninhado
+    const customFields = dealData.custom_fields || {};
+    
+    // Extrair UTM parameters (ajustar os IDs dos campos conforme sua configuração no Pipedrive)
+    const utmSource = customFields.utm_source || null;
+    const utmMedium = customFields.utm_medium || null;
+    const utmCampaign = customFields.utm_campaign || null;
+    const utmContent = customFields.utm_content || null;
+    const utmTerm = customFields.utm_term || null;
+
+    console.log("UTM Parameters capturados:", { utmSource, utmMedium, utmCampaign, utmContent, utmTerm });
+
+    // Tentar vincular ao criativo usando utm_content (que deve conter o id_criativo_externo)
+    let idCriativo = null;
+    if (utmContent) {
+      try {
+        const { data: criativo } = await supabase
+          .from("criativo")
+          .select("id_criativo")
+          .eq("id_criativo_externo", utmContent)
+          .eq("ativo", true)
+          .maybeSingle();
+        
+        if (criativo) {
+          idCriativo = criativo.id_criativo;
+          console.log(`Criativo vinculado: ${idCriativo} (utm_content: ${utmContent})`);
+        } else {
+          console.log(`Nenhum criativo encontrado para utm_content: ${utmContent}`);
+        }
+      } catch (criativoError) {
+        console.error("Erro ao buscar criativo:", criativoError);
+      }
+    }
+
     const leadData = {
       id_empresa: idEmpresa,
       id_lead_externo: String(dealData.id),
@@ -153,6 +188,13 @@ serve(async (req) => {
       venda_realizada: vendaRealizada,
       data_venda: vendaRealizada ? (dealData.won_time || dealData.update_time) : null,
       valor_venda: valorDeal,
+      // Novos campos para rastreamento
+      id_criativo: idCriativo,
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign,
+      utm_content: utmContent,
+      utm_term: utmTerm,
     };
 
     console.log("Dados do lead a serem salvos:", JSON.stringify(leadData, null, 2));

@@ -647,6 +647,7 @@ export type Database = {
           created_at: string
           data_criacao: string
           data_venda: string | null
+          id_criativo: string | null
           id_empresa: string
           id_lead: string
           id_lead_externo: string | null
@@ -662,6 +663,11 @@ export type Database = {
           tem_reuniao: boolean
           updated_at: string
           url_pipedrive: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
           valor_venda: number | null
           venda_realizada: boolean
         }
@@ -669,6 +675,7 @@ export type Database = {
           created_at?: string
           data_criacao?: string
           data_venda?: string | null
+          id_criativo?: string | null
           id_empresa: string
           id_lead?: string
           id_lead_externo?: string | null
@@ -684,6 +691,11 @@ export type Database = {
           tem_reuniao?: boolean
           updated_at?: string
           url_pipedrive?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
           valor_venda?: number | null
           venda_realizada?: boolean
         }
@@ -691,6 +703,7 @@ export type Database = {
           created_at?: string
           data_criacao?: string
           data_venda?: string | null
+          id_criativo?: string | null
           id_empresa?: string
           id_lead?: string
           id_lead_externo?: string | null
@@ -706,10 +719,22 @@ export type Database = {
           tem_reuniao?: boolean
           updated_at?: string
           url_pipedrive?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
           valor_venda?: number | null
           venda_realizada?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_id_criativo_fkey"
+            columns: ["id_criativo"]
+            isOneToOne: false
+            referencedRelation: "criativo"
+            referencedColumns: ["id_criativo"]
+          },
           {
             foreignKeyName: "lead_id_empresa_fkey"
             columns: ["id_empresa"]

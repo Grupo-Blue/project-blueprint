@@ -13,6 +13,7 @@ import Campanhas from "./pages/Campanhas";
 import Relatorios from "./pages/Relatorios";
 import RelatorioEditor from "./pages/RelatorioEditor";
 import RelatorioNovo from "./pages/RelatorioNovo";
+import RelatorioCreativos from "./pages/RelatorioCreativos";
 import Hipoteses from "./pages/Hipoteses";
 import Aprendizados from "./pages/Aprendizados";
 import DashboardDirecao from "./pages/DashboardDirecao";
@@ -46,6 +47,7 @@ const App = () => (
           <Route path="/relatorios" element={<AppLayout><Relatorios /></AppLayout>} />
           <Route path="/relatorios/novo" element={<AppLayout><RelatorioNovo /></AppLayout>} />
           <Route path="/relatorios/:id" element={<AppLayout><RelatorioEditor /></AppLayout>} />
+          <Route path="/relatorio-criativos" element={<AppLayout><RelatorioCreativos /></AppLayout>} />
           <Route path="/hipoteses" element={<AppLayout><Hipoteses /></AppLayout>} />
           <Route path="/aprendizados" element={<AppLayout><Aprendizados /></AppLayout>} />
           <Route path="/dashboard-direcao" element={<AppLayout><DashboardDirecao /></AppLayout>} />
