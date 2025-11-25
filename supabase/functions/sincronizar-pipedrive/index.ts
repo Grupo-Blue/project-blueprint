@@ -44,15 +44,23 @@ serve(async (req) => {
       // Remove .pipedrive.com se o usuário incluiu no domínio
       domain = domain.replace('.pipedrive.com', '');
       const idEmpresa = config.id_empresa;
+      const pipelineId = config.pipeline_id; // ID da pipeline específica
 
       console.log(`Processando integração para empresa ${idEmpresa}`);
+      if (pipelineId) {
+        console.log(`Filtrando deals da pipeline ID: ${pipelineId}`);
+      }
 
       try {
         // Buscar deals recentes (últimos 30 dias)
         const dataInicio = new Date();
         dataInicio.setDate(dataInicio.getDate() - 30);
         
-        const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=all_not_deleted`;
+        // Construir URL com filtro de pipeline se especificado
+        let dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&start=0&limit=500&status=all_not_deleted`;
+        if (pipelineId) {
+          dealsUrl += `&pipeline_id=${pipelineId}`;
+        }
         
         const dealsResponse = await fetch(dealsUrl);
         if (!dealsResponse.ok) {

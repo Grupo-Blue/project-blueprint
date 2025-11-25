@@ -43,6 +43,7 @@ export default function Integracoes() {
   // Pipedrive credentials
   const [pipedriveApiToken, setPipedriveApiToken] = useState("");
   const [pipedriveDomain, setPipedriveDomain] = useState("");
+  const [pipedrivePipelineId, setPipedrivePipelineId] = useState("");
   
   // Tokeniza credentials
   const [tokenizaApiToken, setTokenizaApiToken] = useState("");
@@ -84,6 +85,7 @@ export default function Integracoes() {
     setGoogleCustomerId("");
     setPipedriveApiToken("");
     setPipedriveDomain("");
+    setPipedrivePipelineId("");
     setTokenizaApiToken("");
     setTokenizaBaseUrl("https://api.tokeniza.com.br");
     setEditingId(null);
@@ -108,6 +110,7 @@ export default function Integracoes() {
     } else if (integracao.tipo === "PIPEDRIVE") {
       setPipedriveApiToken(config.api_token || "");
       setPipedriveDomain(config.domain || "");
+      setPipedrivePipelineId(config.pipeline_id || "");
     } else if (integracao.tipo === "TOKENIZA") {
       setTokenizaApiToken(config.api_token || "");
       setTokenizaBaseUrl(config.base_url || "https://api.tokeniza.com.br");
@@ -233,7 +236,8 @@ export default function Integracoes() {
       configJson = {
         ...configJson,
         api_token: pipedriveApiToken,
-        domain: pipedriveDomain
+        domain: pipedriveDomain,
+        pipeline_id: pipedrivePipelineId || null
       };
     } else if (tipoIntegracao === "TOKENIZA") {
       if (!tokenizaApiToken || !tokenizaBaseUrl) {
@@ -409,6 +413,17 @@ export default function Integracoes() {
                       placeholder="suaempresa (de suaempresa.pipedrive.com)"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Pipeline ID (opcional)</Label>
+                    <Input
+                      value={pipedrivePipelineId}
+                      onChange={(e) => setPipedrivePipelineId(e.target.value)}
+                      placeholder="Ex: 123 (deixe vazio para sincronizar todas)"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      ID da pipeline específica do Pipedrive (ex: "Blue - Pipeline de Vendas"). Se não preenchido, sincroniza todos os deals.
+                    </p>
+                  </div>
                 </>
               )}
 
@@ -581,6 +596,12 @@ export default function Integracoes() {
                         <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
                         <CardDescription>
                           Domain: {config.domain}.pipedrive.com
+                          {config.pipeline_id && (
+                            <>
+                              <br />
+                              Pipeline ID: {config.pipeline_id}
+                            </>
+                          )}
                         </CardDescription>
                       </div>
                       <div className="flex items-center space-x-2">
