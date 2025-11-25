@@ -73,10 +73,26 @@ serve(async (req) => {
         if (!response.ok) {
           const errorText = await response.text();
           console.error(`Erro na API Meta: ${response.status} - ${errorText}`);
+          
+          // Parse error message from Meta API
+          let errorMessage = "Erro ao conectar com Meta Ads";
+          try {
+            const errorData = JSON.parse(errorText);
+            if (errorData.error?.message) {
+              if (errorData.error.code === 190) {
+                errorMessage = "Access Token inválido ou expirado. Por favor, gere um novo token no Meta Business.";
+              } else {
+                errorMessage = errorData.error.message;
+              }
+            }
+          } catch {
+            errorMessage = `Erro ${response.status}: Verifique suas credenciais do Meta Ads`;
+          }
+          
           resultados.push({ 
             integracao: integracao.id_integracao, 
             status: "error", 
-            error: `Erro na API Meta Ads (${response.status}): ${errorText}. Verifique seu Access Token.` 
+            error: errorMessage
           });
           continue;
         }

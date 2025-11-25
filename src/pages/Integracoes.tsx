@@ -157,17 +157,26 @@ export default function Integracoes() {
       
       const { data, error } = await supabase.functions.invoke(functionName);
       
-      // Se houve erro na invocação da função
-      if (error) {
-        toast.error(`Falha ao conectar com a API: ${error.message}`);
-        return;
-      }
-      
       // Verificar se a resposta contém erro
       const result = data as any;
       
+      if (error) {
+        // Erro de invocação da função
+        toast.error(`Falha ao conectar: ${error.message}`);
+        return;
+      }
+      
       if (result.error) {
+        // Erro retornado pela API
         toast.error(result.error);
+      } else if (result.resultados) {
+        // Verificar se há erros nos resultados
+        const erros = result.resultados.filter((r: any) => r.status === "error");
+        if (erros.length > 0) {
+          toast.error(erros[0].error || 'Erro ao testar integração');
+        } else {
+          toast.success(result.message || 'Integração testada com sucesso!');
+        }
       } else {
         toast.success(result.message || 'Integração testada com sucesso!');
       }
