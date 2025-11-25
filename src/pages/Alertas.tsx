@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCard } from "@/components/AlertCard";
-import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 
@@ -21,7 +20,6 @@ interface EmpresaMetrica {
 }
 
 const Alertas = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   // Buscar semana atual
@@ -120,31 +118,19 @@ const Alertas = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold">Alertas Automáticos</h1>
-                <p className="text-sm text-muted-foreground">
-                  CPL e CAC acima das metas • Semana {semanaAtual?.numero_semana}/{semanaAtual?.ano}
-                </p>
-              </div>
-            </div>
-            <Button variant="outline" onClick={handleRefresh}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Atualizar
-            </Button>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Alertas Automáticos</h1>
+          <p className="text-muted-foreground">
+            CPL e CAC acima das metas • Semana {semanaAtual?.numero_semana}/{semanaAtual?.ano}
+          </p>
         </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
+        <Button variant="outline" onClick={handleRefresh}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Atualizar
+        </Button>
+      </div>
         {/* Resumo de Alertas */}
         <div className="grid gap-4 md:grid-cols-3 mb-8">
           <Card>
@@ -248,7 +234,6 @@ const Alertas = () => {
             </div>
           </div>
         )}
-      </main>
     </div>
   );
 };
