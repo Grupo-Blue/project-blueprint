@@ -133,7 +133,7 @@ serve(async (req) => {
               // Preparar dados do criativo
               const criativoData = {
                 id_campanha: campanha.id_campanha,
-                id_criativo_externo: ad.id,
+                id_criativo_externo: creative.id,  // Usar ID do creative, não do ad
                 tipo: tipoCriativo,
                 descricao: ad.name || creative.name || null,
                 ativo: ativo,
