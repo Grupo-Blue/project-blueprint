@@ -52,7 +52,8 @@ const Leads = () => {
       (statusFilter === "mql" && lead.is_mql) ||
       (statusFilter === "reuniao" && lead.tem_reuniao) ||
       (statusFilter === "venda" && lead.venda_realizada) ||
-      (statusFilter === "novo" && !lead.is_mql);
+      (statusFilter === "perdido" && lead.stage_atual === "Perdido") ||
+      (statusFilter === "novo" && !lead.is_mql && lead.stage_atual !== "Perdido");
 
     return matchesSearch && matchesStatus;
   });
@@ -185,6 +186,7 @@ const Leads = () => {
               <SelectItem value="mql">MQLs</SelectItem>
               <SelectItem value="reuniao">Com Reunião</SelectItem>
               <SelectItem value="venda">Vendas</SelectItem>
+              <SelectItem value="perdido">Perdidos</SelectItem>
             </SelectContent>
           </Select>
         </CardContent>
@@ -241,13 +243,16 @@ const Leads = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
-                          {!lead.is_mql && (
+                          {lead.stage_atual === "Perdido" && (
+                            <Badge variant="destructive">Perdido</Badge>
+                          )}
+                          {lead.stage_atual !== "Perdido" && !lead.is_mql && (
                             <Badge variant="secondary">Novo</Badge>
                           )}
-                          {lead.is_mql && (
+                          {lead.stage_atual !== "Perdido" && lead.is_mql && (
                             <Badge variant="default">MQL</Badge>
                           )}
-                          {lead.tem_reuniao && (
+                          {lead.stage_atual !== "Perdido" && lead.tem_reuniao && (
                             <Badge variant="outline">Reunião</Badge>
                           )}
                           {lead.venda_realizada && (
