@@ -32,10 +32,10 @@ serve(async (req) => {
     const payload = await req.json();
     console.log("Webhook recebido:", JSON.stringify(payload, null, 2));
 
-    // Estrutura do webhook Pipedrive:
-    // { event: 'added.deal', current: { id, title, ... }, previous: {...}, meta: {...} }
-    const event = payload.event;
-    const dealData = payload.current || payload.previous;
+    // Estrutura do webhook Pipedrive v2.0:
+    // { data: { id, title, ... }, previous: {...}, meta: { action: 'added'/'updated'/'deleted', ... } }
+    const event = payload.meta?.action; // 'added', 'updated', 'deleted', 'change', etc
+    const dealData = payload.data;
 
     if (!dealData) {
       console.log("Nenhum dado do deal encontrado no payload");
@@ -158,7 +158,7 @@ serve(async (req) => {
     console.log("Dados do lead a serem salvos:", JSON.stringify(leadData, null, 2));
 
     // Processar evento
-    if (event === "deleted.deal") {
+    if (event === "deleted" || dealData.is_archived) {
       // Deal foi deletado - remover do banco
       const { error: deleteError } = await supabase
         .from("lead")
