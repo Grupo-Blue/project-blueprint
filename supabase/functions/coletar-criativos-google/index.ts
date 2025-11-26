@@ -43,12 +43,24 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // Verificar se foi passado um ID de integração específico
+    const body = await req.json().catch(() => ({}));
+    const integracaoIdFiltro = body.integracao_id;
+
     // Buscar integrações ativas do Google Ads
-    const { data: integracoes, error: integracoesError } = await supabase
+    let query = supabase
       .from("integracao")
       .select("*")
       .eq("tipo", "GOOGLE_ADS")
       .eq("ativo", true);
+
+    // Se foi passado um ID específico, filtrar por ele
+    if (integracaoIdFiltro) {
+      query = query.eq("id_integracao", integracaoIdFiltro);
+      console.log(`Filtrando por integração: ${integracaoIdFiltro}`);
+    }
+
+    const { data: integracoes, error: integracoesError } = await query;
 
     if (integracoesError) throw integracoesError;
 
