@@ -135,53 +135,64 @@ serve(async (req) => {
       stageAtual = stagesMap[dealData.stage_id];
     }
 
+    // Buscar campos customizados do Pipedrive automaticamente
+    let dealFieldsMap: Record<string, string> = {};
+    try {
+      const fieldsUrl = `https://${domain}.pipedrive.com/api/v1/dealFields?api_token=${apiToken}`;
+      const fieldsResponse = await fetch(fieldsUrl);
+      
+      if (fieldsResponse.ok) {
+        const fieldsData = await fieldsResponse.json();
+        if (fieldsData.success && fieldsData.data) {
+          for (const field of fieldsData.data) {
+            // Mapear nome do campo para hash key
+            const fieldName = (field.name || '').toLowerCase().trim();
+            dealFieldsMap[fieldName] = field.key;
+          }
+          console.log(`${Object.keys(dealFieldsMap).length} campos customizados mapeados`);
+        }
+      }
+    } catch (fieldsError) {
+      console.error("Erro ao buscar campos customizados:", fieldsError);
+    }
+
+    // Mapear nomes dos campos UTM para os IDs reais do Pipedrive
+    const PIPEDRIVE_FIELD_IDS = {
+      utm_source: dealFieldsMap['utm_source'] || dealFieldsMap['utm source'] || null,
+      utm_medium: dealFieldsMap['utm_medium'] || dealFieldsMap['utm medium'] || null,
+      utm_campaign: dealFieldsMap['utm_campaign'] || dealFieldsMap['utm campaign'] || null,
+      utm_content: dealFieldsMap['utm_content'] || dealFieldsMap['utm content'] || null,
+      utm_term: dealFieldsMap['utm_term'] || dealFieldsMap['utm term'] || null,
+    };
+
+    console.log("IDs dos campos UTM mapeados:", PIPEDRIVE_FIELD_IDS);
+
     // Capturar UTM parameters dos campos customizados do Pipedrive
-    // Pipedrive armazena campos customizados em um objeto aninhado
-    const customFields = dealData.custom_fields || {};
+    const customFields = dealData;
     
     // Função auxiliar para extrair valor de campo customizado
-    const extractCustomFieldValue = (fieldId: string) => {
-      const field = customFields[fieldId];
-      if (!field) return null;
+    const extractCustomFieldValue = (fieldKey: string | null) => {
+      if (!fieldKey) return null;
+      
+      const fieldValue = customFields[fieldKey];
+      if (!fieldValue) return null;
       
       // Pipedrive pode retornar diferentes estruturas
-      if (typeof field === 'string') return field;
-      if (field.value) return field.value;
-      if (field.values && Array.isArray(field.values) && field.values.length > 0) {
-        return field.values[0].id || field.values[0];
+      if (typeof fieldValue === 'string') return fieldValue;
+      if (typeof fieldValue === 'object' && fieldValue.value !== undefined) {
+        return fieldValue.value;
       }
       return null;
     };
     
-    // IMPORTANTE: Você precisa mapear estes IDs para os campos do seu Pipedrive
-    // Acesse Pipedrive > Settings > Data fields > Deal fields para encontrar os IDs
-    const PIPEDRIVE_FIELD_IDS = {
-      utm_source: null,    // Substituir pelo ID real do campo (ex: "a893044bfc73d55c5f6b5ed79e6498fea2cce890")
-      utm_medium: null,    // Substituir pelo ID real do campo
-      utm_campaign: null,  // Substituir pelo ID real do campo
-      utm_content: null,   // Substituir pelo ID real do campo
-      utm_term: null,      // Substituir pelo ID real do campo
-    };
-    
     // Extrair UTM parameters
-    const utmSource = PIPEDRIVE_FIELD_IDS.utm_source 
-      ? extractCustomFieldValue(PIPEDRIVE_FIELD_IDS.utm_source) 
-      : null;
-    const utmMedium = PIPEDRIVE_FIELD_IDS.utm_medium 
-      ? extractCustomFieldValue(PIPEDRIVE_FIELD_IDS.utm_medium) 
-      : null;
-    const utmCampaign = PIPEDRIVE_FIELD_IDS.utm_campaign 
-      ? extractCustomFieldValue(PIPEDRIVE_FIELD_IDS.utm_campaign) 
-      : null;
-    const utmContent = PIPEDRIVE_FIELD_IDS.utm_content 
-      ? extractCustomFieldValue(PIPEDRIVE_FIELD_IDS.utm_content) 
-      : null;
-    const utmTerm = PIPEDRIVE_FIELD_IDS.utm_term 
-      ? extractCustomFieldValue(PIPEDRIVE_FIELD_IDS.utm_term) 
-      : null;
+    const utmSource = extractCustomFieldValue(PIPEDRIVE_FIELD_IDS.utm_source);
+    const utmMedium = extractCustomFieldValue(PIPEDRIVE_FIELD_IDS.utm_medium);
+    const utmCampaign = extractCustomFieldValue(PIPEDRIVE_FIELD_IDS.utm_campaign);
+    const utmContent = extractCustomFieldValue(PIPEDRIVE_FIELD_IDS.utm_content);
+    const utmTerm = extractCustomFieldValue(PIPEDRIVE_FIELD_IDS.utm_term);
 
     console.log("UTM Parameters capturados:", { utmSource, utmMedium, utmCampaign, utmContent, utmTerm });
-    console.log("ATENÇÃO: Configure os PIPEDRIVE_FIELD_IDS no código do webhook para mapear campos customizados");
 
     // Tentar vincular ao criativo usando utm_content (que deve conter o id_criativo_externo)
     let idCriativo = null;
