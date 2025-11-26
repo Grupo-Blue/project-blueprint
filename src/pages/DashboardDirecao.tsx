@@ -35,15 +35,16 @@ export default function DashboardDirecao() {
   const { data: semanaAtual } = useQuery({
     queryKey: ["semana-atual"],
     queryFn: async () => {
-      const hoje = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
-        .from("semana")
-        .select("*")
-        .lte("data_inicio", hoje)
-        .gte("data_fim", hoje)
+      // Buscar a semana mais recente que tenha métricas calculadas
+      const { data: metricasComSemana, error } = await supabase
+        .from("empresa_semana_metricas")
+        .select("id_semana, semana:id_semana(id_semana, numero_semana, ano, data_inicio, data_fim)")
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
+      
       if (error) throw error;
-      return data;
+      return metricasComSemana?.semana;
     },
   });
 
