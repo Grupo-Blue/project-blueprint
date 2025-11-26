@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { AppLayout } from "@/components/AppLayout";
 
 interface ContaAnuncio {
   id_conta: string;
@@ -155,11 +154,9 @@ export default function ContasAnuncio() {
 
   if (loading) {
     return (
-      <AppLayout>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Carregando...</p>
-        </div>
-      </AppLayout>
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Carregando...</p>
+      </div>
     );
   }
 
@@ -168,8 +165,7 @@ export default function ContasAnuncio() {
   };
 
   return (
-    <AppLayout>
-      <div className="container mx-auto py-8 space-y-6">
+    <div className="container mx-auto py-8 space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Contas de Anúncio</h1>
@@ -331,7 +327,6 @@ export default function ContasAnuncio() {
             </CardContent>
           </Card>
         )}
-      </div>
-    </AppLayout>
+    </div>
   );
 }
