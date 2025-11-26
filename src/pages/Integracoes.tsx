@@ -161,7 +161,7 @@ export default function Integracoes() {
       }
       
       const { data, error } = await supabase.functions.invoke(functionName, {
-        body: {}
+        body: { integracao_id: integracaoId }
       });
       
       // Verificar se a resposta contém erro
