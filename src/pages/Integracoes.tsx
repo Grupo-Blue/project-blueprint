@@ -141,65 +141,70 @@ export default function Integracoes() {
     setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
     
     try {
-      let functionName = '';
+      let functionNames: string[] = [];
       
       switch (integracao.tipo) {
         case 'META_ADS':
-          functionName = 'coletar-metricas-meta';
+          functionNames = ['coletar-metricas-meta', 'coletar-criativos-meta'];
           break;
         case 'GOOGLE_ADS':
-          functionName = 'coletar-metricas-google';
+          functionNames = ['coletar-metricas-google', 'coletar-criativos-google'];
           break;
         case 'PIPEDRIVE':
-          functionName = 'sincronizar-pipedrive';
+          functionNames = ['sincronizar-pipedrive'];
           break;
         case 'TOKENIZA':
-          functionName = 'sincronizar-tokeniza';
+          functionNames = ['sincronizar-tokeniza'];
           break;
         default:
           throw new Error('Tipo de integração não suportado');
       }
       
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: { integracao_id: integracaoId }
-      });
+      // Executar todas as funções de coleta sequencialmente
+      let hasError = false;
+      let errorMessage = '';
       
-      // Verificar se a resposta contém erro
-      const result = data as any;
-      
-      if (error) {
-        // Classificar tipo de erro
-        if (error instanceof FunctionsHttpError) {
-          const errorMessage = await error.context.json();
-          console.error('Erro HTTP da função:', errorMessage);
-          toast.error(`Erro na integração: ${errorMessage.error || errorMessage.message || 'Verifique suas credenciais'}`);
-        } else if (error instanceof FunctionsRelayError) {
-          console.error('Erro de relay:', error.message);
-          toast.error(`Erro ao comunicar com a função: ${error.message}`);
-        } else if (error instanceof FunctionsFetchError) {
-          console.error('Erro de requisição:', error.message);
-          toast.error(`Erro de conexão: ${error.message}. Verifique sua internet.`);
-        } else {
-          console.error('Erro desconhecido:', error);
-          toast.error(`Erro desconhecido: ${error.message}`);
+      for (const functionName of functionNames) {
+        const { data, error } = await supabase.functions.invoke(functionName, {
+          body: { integracao_id: integracaoId }
+        });
+        
+        if (error) {
+          hasError = true;
+          if (error instanceof FunctionsHttpError) {
+            const errorData = await error.context.json();
+            errorMessage = errorData.error || errorData.message || 'Erro desconhecido';
+          } else {
+            errorMessage = error.message;
+          }
+          break;
         }
+        
+        const result = data as any;
+        if (result.error || (result.resultados && result.resultados.some((r: any) => r.status === "error"))) {
+          hasError = true;
+          errorMessage = result.error || result.resultados.find((r: any) => r.status === "error")?.error || 'Erro na coleta';
+          break;
+        }
+      }
+      
+      if (hasError) {
+        toast.error(errorMessage);
         return;
       }
       
-      if (result.error) {
-        // Erro retornado pela API
-        toast.error(result.error);
-      } else if (result.resultados) {
-        // Verificar se há erros nos resultados
-        const erros = result.resultados.filter((r: any) => r.status === "error");
-        if (erros.length > 0) {
-          toast.error(erros[0].error || 'Erro ao testar integração');
-        } else {
-          toast.success(result.message || 'Integração testada com sucesso!');
+      // Após coletar dados diários, recalcular métricas semanais para atualizar o dashboard
+      if (integracao.tipo === 'META_ADS' || integracao.tipo === 'GOOGLE_ADS') {
+        const { error: calcError } = await supabase.functions.invoke('calcular-metricas-semanais', {
+          body: {}
+        });
+        
+        if (calcError) {
+          console.error('Erro ao calcular métricas semanais:', calcError);
         }
-      } else {
-        toast.success(result.message || 'Integração testada com sucesso!');
       }
+      
+      toast.success('Integração testada com sucesso! Dados coletados e dashboard atualizado.');
     } catch (error: any) {
       console.error('Erro ao testar integração:', error);
       toast.error(`Erro inesperado: ${error.message}`);
