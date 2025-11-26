@@ -107,7 +107,9 @@ serve(async (req) => {
             const errorData = JSON.parse(errorText);
             if (errorData.error?.message) {
               if (errorData.error.code === 190) {
-                errorMessage = "Access Token inválido ou expirado. Por favor, gere um novo token no Meta Business.";
+                errorMessage = "Access Token inválido ou expirado. Gere um novo System User Token no Meta Business Manager.";
+              } else if (errorData.error.code === 200 && errorData.error.message.includes("API access blocked")) {
+                errorMessage = "API Access Blocked: Verifique se o System User Token tem as permissões corretas (ads_read, ads_management) e se o App Meta está em modo Produção. Verifique também se o token tem acesso à conta de anúncios no Business Manager.";
               } else {
                 errorMessage = errorData.error.message;
               }
