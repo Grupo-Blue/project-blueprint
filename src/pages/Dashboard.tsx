@@ -39,19 +39,20 @@ const Dashboard = () => {
     },
   });
 
-  // Buscar métricas semanais mais recentes para calcular CPL médio
+  // Buscar a semana mais recente que tenha métricas reais
   const { data: semanaAtual } = useQuery({
     queryKey: ["semana-atual-dashboard"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("semana")
-        .select("*")
-        .order("ano", { ascending: false })
-        .order("numero_semana", { ascending: false })
+      // Buscar a semana mais recente que tenha métricas calculadas
+      const { data: metricasComSemana, error } = await supabase
+        .from("empresa_semana_metricas")
+        .select("id_semana, semana:id_semana(id_semana, numero_semana, ano, data_inicio, data_fim)")
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      
       if (error) throw error;
-      return data;
+      return metricasComSemana?.semana;
     },
   });
 
