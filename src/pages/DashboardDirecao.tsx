@@ -18,6 +18,8 @@ import {
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { FiltroPeriodo } from "@/components/FiltroPeriodo";
+import { usePeriodo } from "@/contexts/PeriodoContext";
 
 interface EmpresaMetrica {
   id_empresa: string;
@@ -32,20 +34,21 @@ interface EmpresaMetrica {
 }
 
 export default function DashboardDirecao() {
+  const { semanaSelecionada } = usePeriodo();
+
   const { data: semanaAtual } = useQuery({
-    queryKey: ["semana-atual"],
+    queryKey: ["semana-info-direcao", semanaSelecionada],
     queryFn: async () => {
-      // Buscar a semana mais recente que tenha métricas calculadas
-      const { data: metricasComSemana, error } = await supabase
-        .from("empresa_semana_metricas")
-        .select("id_semana, semana:id_semana(id_semana, numero_semana, ano, data_inicio, data_fim)")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
+      if (!semanaSelecionada) return null;
+      const { data, error } = await supabase
+        .from("semana")
+        .select("*")
+        .eq("id_semana", semanaSelecionada)
+        .single();
       if (error) throw error;
-      return metricasComSemana?.semana;
+      return data;
     },
+    enabled: !!semanaSelecionada,
   });
 
   const { data: empresas } = useQuery({
@@ -58,9 +61,9 @@ export default function DashboardDirecao() {
   });
 
   const { data: metricas, isLoading } = useQuery({
-    queryKey: ["metricas-direcao", semanaAtual?.id_semana],
+    queryKey: ["metricas-direcao", semanaSelecionada],
     queryFn: async () => {
-      if (!semanaAtual) return [];
+      if (!semanaSelecionada) return [];
 
       const { data, error } = await supabase
         .from("empresa_semana_metricas")
@@ -68,7 +71,7 @@ export default function DashboardDirecao() {
           *,
           empresa:id_empresa (nome, cpl_maximo, cac_maximo)
         `)
-        .eq("id_semana", semanaAtual.id_semana);
+        .eq("id_semana", semanaSelecionada);
 
       if (error) throw error;
       
@@ -84,7 +87,7 @@ export default function DashboardDirecao() {
         cac_maximo: m.empresa.cac_maximo,
       })) as EmpresaMetrica[];
     },
-    enabled: !!semanaAtual,
+    enabled: !!semanaSelecionada,
   });
 
   const { data: acoesAprovacao } = useQuery({
@@ -159,7 +162,7 @@ export default function DashboardDirecao() {
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
           <div>
             <h1 className="text-4xl font-bold text-foreground">Dashboard Direção</h1>
             <p className="text-muted-foreground mt-2">
@@ -167,6 +170,7 @@ export default function DashboardDirecao() {
               {semanaAtual && ` - Semana ${semanaAtual.numero_semana}/${semanaAtual.ano}`}
             </p>
           </div>
+          <FiltroPeriodo />
         </div>
 
         {/* Alertas Críticos */}

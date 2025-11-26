@@ -15,6 +15,8 @@ import {
   Eye,
   CheckCircle
 } from "lucide-react";
+import { FiltroPeriodo } from "@/components/FiltroPeriodo";
+import { usePeriodo } from "@/contexts/PeriodoContext";
 
 interface CampanhaMetrica {
   id_campanha: string;
@@ -32,6 +34,7 @@ interface CampanhaMetrica {
 
 export default function DashboardTrafego() {
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
+  const { semanaSelecionada } = usePeriodo();
 
   const { data: empresas } = useQuery({
     queryKey: ["empresas"],
@@ -43,25 +46,24 @@ export default function DashboardTrafego() {
   });
 
   const { data: semanaAtual } = useQuery({
-    queryKey: ["semana-atual"],
+    queryKey: ["semana-info-trafego", semanaSelecionada],
     queryFn: async () => {
-      // Buscar a semana mais recente que tenha métricas calculadas
-      const { data: metricasComSemana, error } = await supabase
-        .from("campanha_semana_metricas")
-        .select("id_semana, semana:id_semana(id_semana, numero_semana, ano, data_inicio, data_fim)")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
+      if (!semanaSelecionada) return null;
+      const { data, error } = await supabase
+        .from("semana")
+        .select("*")
+        .eq("id_semana", semanaSelecionada)
+        .single();
       if (error) throw error;
-      return metricasComSemana?.semana;
+      return data;
     },
+    enabled: !!semanaSelecionada,
   });
 
   const { data: campanhasMetricas, isLoading } = useQuery({
-    queryKey: ["campanhas-metricas", semanaAtual?.id_semana, empresaSelecionada],
+    queryKey: ["campanhas-metricas", semanaSelecionada, empresaSelecionada],
     queryFn: async () => {
-      if (!semanaAtual) return [];
+      if (!semanaSelecionada) return [];
 
       let query = supabase
         .from("campanha_semana_metricas")
@@ -73,7 +75,7 @@ export default function DashboardTrafego() {
             conta_anuncio:id_conta (id_empresa)
           )
         `)
-        .eq("id_semana", semanaAtual.id_semana);
+        .eq("id_semana", semanaSelecionada);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -100,7 +102,7 @@ export default function DashboardTrafego() {
         cac: m.cac || 0,
       })) as CampanhaMetrica[];
     },
-    enabled: !!semanaAtual,
+    enabled: !!semanaSelecionada,
   });
 
   const totais = campanhasMetricas?.reduce(
@@ -136,27 +138,32 @@ export default function DashboardTrafego() {
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-4xl font-bold text-foreground">Dashboard Tráfego</h1>
-            <p className="text-muted-foreground mt-2">
-              Análise detalhada de campanhas e funil
-              {semanaAtual && ` - Semana ${semanaAtual.numero_semana}/${semanaAtual.ano}`}
-            </p>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+            <div>
+              <h1 className="text-4xl font-bold text-foreground">Dashboard Tráfego</h1>
+              <p className="text-muted-foreground mt-2">
+                Análise detalhada de campanhas e funil
+                {semanaAtual && ` - Semana ${semanaAtual.numero_semana}/${semanaAtual.ano}`}
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <FiltroPeriodo />
+              <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas as Empresas</SelectItem>
+                  {empresas?.map((e) => (
+                    <SelectItem key={e.id_empresa} value={e.id_empresa}>
+                      {e.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todas">Todas as Empresas</SelectItem>
-              {empresas?.map((e) => (
-                <SelectItem key={e.id_empresa} value={e.id_empresa}>
-                  {e.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         {/* KPIs Topo */}
@@ -169,7 +176,7 @@ export default function DashboardTrafego() {
             </CardHeader>
             <CardContent>
               <div className="text-xl font-bold">
-                R$ {totais.verba.toLocaleString("pt-BR")}
+                R$ {totais.verba.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </CardContent>
           </Card>

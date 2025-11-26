@@ -6,8 +6,11 @@ import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertaIntegracao } from "@/components/AlertaIntegracao";
 import { ValidacaoUTM } from "@/components/ValidacaoUTM";
+import { FiltroPeriodo } from "@/components/FiltroPeriodo";
+import { usePeriodo } from "@/contexts/PeriodoContext";
 
 const Dashboard = () => {
+  const { semanaSelecionada } = usePeriodo();
   const mesAtual = new Date();
   const inicioMes = startOfMonth(mesAtual);
   const fimMes = endOfMonth(mesAtual);
@@ -39,35 +42,33 @@ const Dashboard = () => {
     },
   });
 
-  // Buscar a semana mais recente que tenha métricas reais
-  const { data: semanaAtual } = useQuery({
-    queryKey: ["semana-atual-dashboard"],
+  const { data: semanaInfo } = useQuery({
+    queryKey: ["semana-info", semanaSelecionada],
     queryFn: async () => {
-      // Buscar a semana mais recente que tenha métricas calculadas
-      const { data: metricasComSemana, error } = await supabase
-        .from("empresa_semana_metricas")
-        .select("id_semana, semana:id_semana(id_semana, numero_semana, ano, data_inicio, data_fim)")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return metricasComSemana?.semana;
-    },
-  });
-
-  const { data: metricasSemanais } = useQuery({
-    queryKey: ["metricas-dashboard", semanaAtual?.id_semana],
-    queryFn: async () => {
-      if (!semanaAtual) return null;
+      if (!semanaSelecionada) return null;
       const { data, error } = await supabase
-        .from("empresa_semana_metricas")
+        .from("semana")
         .select("*")
-        .eq("id_semana", semanaAtual.id_semana);
+        .eq("id_semana", semanaSelecionada)
+        .single();
       if (error) throw error;
       return data;
     },
-    enabled: !!semanaAtual,
+    enabled: !!semanaSelecionada,
+  });
+
+  const { data: metricasSemanais } = useQuery({
+    queryKey: ["metricas-dashboard", semanaSelecionada],
+    queryFn: async () => {
+      if (!semanaSelecionada) return null;
+      const { data, error } = await supabase
+        .from("empresa_semana_metricas")
+        .select("*")
+        .eq("id_semana", semanaSelecionada);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!semanaSelecionada,
   });
 
   // Calcular estatísticas
@@ -91,14 +92,15 @@ const Dashboard = () => {
       <AlertaIntegracao />
       
       <div className="mb-6 md:mb-8">
-        <h2 className="text-2xl md:text-3xl font-bold mb-2">Bem-vindo ao SGT!</h2>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Sistema de Governança de Tráfego Pago
-        </p>
-        <p className="text-xs md:text-sm text-muted-foreground mt-1">
-          <Calendar className="inline h-3 w-3 mr-1" />
-          {format(mesAtual, "MMMM 'de' yyyy", { locale: ptBR })}
-        </p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold mb-2">Bem-vindo ao SGT!</h2>
+            <p className="text-sm md:text-base text-muted-foreground">
+              Sistema de Governança de Tráfego Pago
+            </p>
+          </div>
+          <FiltroPeriodo />
+        </div>
       </div>
 
       <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6 md:mb-8">
@@ -144,7 +146,7 @@ const Dashboard = () => {
             </div>
             <p className="text-xs text-muted-foreground">
               {metricasSemanais && metricasSemanais.length > 0 
-                ? `Semana ${semanaAtual?.numero_semana}/${semanaAtual?.ano}` 
+                ? `Semana ${semanaInfo?.numero_semana}/${semanaInfo?.ano}` 
                 : "Sem métricas semanais"}
             </p>
           </CardContent>
