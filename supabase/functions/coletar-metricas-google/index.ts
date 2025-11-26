@@ -18,12 +18,24 @@ serve(async (req) => {
 
     console.log("Iniciando coleta de métricas Google Ads...");
 
+    // Verificar se foi passado um ID de integração específico
+    const body = await req.json().catch(() => ({}));
+    const integracaoIdFiltro = body.integracao_id;
+
     // Buscar todas as integrações Google Ads ativas
-    const { data: integracoes, error: intError } = await supabase
+    let query = supabase
       .from("integracao")
       .select("*")
       .eq("tipo", "GOOGLE_ADS")
       .eq("ativo", true);
+
+    // Se foi passado um ID específico, filtrar por ele
+    if (integracaoIdFiltro) {
+      query = query.eq("id_integracao", integracaoIdFiltro);
+      console.log(`Filtrando por integração: ${integracaoIdFiltro}`);
+    }
+
+    const { data: integracoes, error: intError } = await query;
 
     if (intError) throw intError;
 
