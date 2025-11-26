@@ -31,6 +31,7 @@ serve(async (req) => {
     console.log(`Encontradas ${integracoes?.length || 0} integrações Meta Ads ativas`);
 
     const resultados = [];
+    const hoje = new Date().toISOString().split("T")[0];
 
     for (const integracao of integracoes || []) {
       try {
@@ -73,13 +74,45 @@ serve(async (req) => {
           continue;
         }
 
+        // Buscar informações atualizadas das campanhas da API
+        const campaignIds = campanhas?.map(c => c.id_campanha_externo).join(",") || "";
+        if (campaignIds) {
+          const campaignsUrl = `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?fields=id,name,status,objective&ids=${campaignIds}&access_token=${accessToken}`;
+          
+          try {
+            const campaignsResponse = await fetch(campaignsUrl);
+            if (campaignsResponse.ok) {
+              const campaignsData = await campaignsResponse.json();
+              
+              // Atualizar dados das campanhas
+              for (const campData of campaignsData.data || []) {
+                const campanhaLocal = campanhas?.find(c => c.id_campanha_externo === campData.id);
+                if (campanhaLocal) {
+                  await supabase
+                    .from("campanha")
+                    .update({
+                      nome: campData.name,
+                      ativa: campData.status === "ACTIVE",
+                      objetivo: campData.objective || null,
+                    })
+                    .eq("id_campanha", campanhaLocal.id_campanha);
+                  
+                  console.log(`Campanha ${campData.name} atualizada`);
+                }
+              }
+            }
+          } catch (err) {
+            console.error("Erro ao atualizar campanhas:", err);
+          }
+        }
+
         // Para cada campanha, buscar os ads (criativos) com métricas
         for (const campanha of campanhas || []) {
           try {
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
-            // Endpoint da API do Meta para buscar ads com métricas de investimento
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec,image_url,video_id,thumbnail_url},insights.date_preset(last_7d){spend}&access_token=${accessToken}`;
+            // Endpoint da API do Meta para buscar ads com métricas de hoje
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec,image_url,video_id,thumbnail_url},insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -113,15 +146,9 @@ serve(async (req) => {
             const adsData = await adsResponse.json();
             console.log(`Encontrados ${adsData.data?.length || 0} ads para campanha ${campanha.nome}`);
 
-            // Processar cada ad (criativo) com investimento
+            // Processar cada ad (criativo) com métricas de hoje
             for (const ad of adsData.data || []) {
               const creative = ad.creative;
-              
-              // Capturar investimento dos últimos 7 dias
-              let investimento7dias = 0;
-              if (ad.insights && ad.insights.data && ad.insights.data.length > 0) {
-                investimento7dias = parseFloat(ad.insights.data[0].spend || 0);
-              }
               
               // Determinar tipo de criativo
               let tipoCriativo = "OUTRO";
@@ -139,24 +166,64 @@ serve(async (req) => {
               // Preparar dados do criativo
               const criativoData = {
                 id_campanha: campanha.id_campanha,
-                id_criativo_externo: creative.id,  // Usar ID do creative, não do ad
+                id_criativo_externo: creative.id,
                 tipo: tipoCriativo,
                 descricao: ad.name || creative.name || null,
                 ativo: ativo,
               };
 
               // Upsert do criativo (insere ou atualiza)
-              const { error: upsertError } = await supabase
+              const { data: criativoSalvo, error: upsertError } = await supabase
                 .from("criativo")
                 .upsert(criativoData, {
                   onConflict: "id_criativo_externo",
                   ignoreDuplicates: false,
-                });
+                })
+                .select()
+                .single();
 
               if (upsertError) {
                 console.error("Erro ao salvar criativo:", upsertError);
+                continue;
+              }
+
+              // Capturar métricas de hoje
+              let impressoes = 0;
+              let cliques = 0;
+              let investimento = 0;
+              let leads = 0;
+
+              if (ad.insights && ad.insights.data && ad.insights.data.length > 0) {
+                const metricas = ad.insights.data[0];
+                impressoes = parseInt(metricas.impressions || "0");
+                cliques = parseInt(metricas.clicks || "0");
+                investimento = parseFloat(metricas.spend || "0");
+                
+                // Buscar leads das actions
+                const leadAction = metricas.actions?.find((a: any) => a.action_type === "lead");
+                if (leadAction) {
+                  leads = parseInt(leadAction.value || "0");
+                }
+              }
+
+              // Salvar métricas diárias do criativo
+              const metricasData = {
+                id_criativo: criativoSalvo.id_criativo,
+                data: hoje,
+                impressoes,
+                cliques,
+                verba_investida: investimento,
+                leads,
+              };
+
+              const { error: metricasError } = await supabase
+                .from("criativo_metricas_dia")
+                .upsert(metricasData, { onConflict: "id_criativo,data" });
+
+              if (metricasError) {
+                console.error("Erro ao salvar métricas do criativo:", metricasError);
               } else {
-                console.log(`Criativo ${ad.name || ad.id} salvo com investimento de R$ ${investimento7dias.toFixed(2)} (últimos 7 dias)`);
+                console.log(`Criativo ${ad.name || ad.id} salvo com métricas: R$ ${investimento.toFixed(2)}, ${impressoes} impressões, ${cliques} cliques, ${leads} leads`);
               }
             }
 
