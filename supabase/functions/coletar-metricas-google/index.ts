@@ -89,6 +89,53 @@ serve(async (req) => {
 
         const campaignIds = campanhas.map(c => c.id_campanha_externo);
 
+        // Buscar informações atualizadas das campanhas
+        const campaignsQuery = `
+          SELECT 
+            campaign.id,
+            campaign.name,
+            campaign.status,
+            campaign.advertising_channel_type
+          FROM campaign
+          WHERE campaign.id IN (${campaignIds.join(",")})
+        `;
+
+        try {
+          const campaignsUrl = `https://googleads.googleapis.com/v14/customers/${config.customer_id.replace(/-/g, "")}/googleAds:search`;
+          const campaignsResponse = await fetch(campaignsUrl, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${access_token}`,
+              "developer-token": config.developer_token,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ query: campaignsQuery }),
+          });
+
+          if (campaignsResponse.ok) {
+            const campaignsData = await campaignsResponse.json();
+            
+            // Atualizar dados das campanhas
+            for (const result of campaignsData.results || []) {
+              const campData = result.campaign;
+              const campanhaLocal = campanhas.find(c => c.id_campanha_externo === String(campData.id));
+              
+              if (campanhaLocal) {
+                await supabase
+                  .from("campanha")
+                  .update({
+                    nome: campData.name,
+                    ativa: campData.status === "ENABLED",
+                    objetivo: campData.advertisingChannelType || null,
+                  })
+                  .eq("id_campanha", campanhaLocal.id_campanha);
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Erro ao atualizar campanhas:", err);
+        }
+
         // Query GAQL para buscar métricas
         const query = `
           SELECT 

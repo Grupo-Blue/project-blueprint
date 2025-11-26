@@ -431,6 +431,47 @@ export type Database = {
           },
         ]
       }
+      criativo_metricas_dia: {
+        Row: {
+          cliques: number
+          created_at: string
+          data: string
+          id_criativo: string
+          id_metricas_dia: string
+          impressoes: number
+          leads: number
+          verba_investida: number
+        }
+        Insert: {
+          cliques?: number
+          created_at?: string
+          data: string
+          id_criativo: string
+          id_metricas_dia?: string
+          impressoes?: number
+          leads?: number
+          verba_investida?: number
+        }
+        Update: {
+          cliques?: number
+          created_at?: string
+          data?: string
+          id_criativo?: string
+          id_metricas_dia?: string
+          impressoes?: number
+          leads?: number
+          verba_investida?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "criativo_metricas_dia_id_criativo_fkey"
+            columns: ["id_criativo"]
+            isOneToOne: false
+            referencedRelation: "criativo"
+            referencedColumns: ["id_criativo"]
+          },
+        ]
+      }
       empresa: {
         Row: {
           cac_maximo: number

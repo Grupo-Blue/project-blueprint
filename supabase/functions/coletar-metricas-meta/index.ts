@@ -64,10 +64,37 @@ serve(async (req) => {
         if (campError) throw campError;
         if (!campanhas || campanhas.length === 0) continue;
 
+        // Buscar informações atualizadas das campanhas da API
+        const campanhIdsStr = campanhas.map(c => c.id_campanha_externo).join(",");
+        const campaignsUrl = `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?fields=id,name,status,objective&ids=${campanhIdsStr}&access_token=${accessToken}`;
+        
+        try {
+          const campaignsResponse = await fetch(campaignsUrl);
+          if (campaignsResponse.ok) {
+            const campaignsData = await campaignsResponse.json();
+            
+            // Atualizar dados das campanhas
+            for (const campData of campaignsData.data || []) {
+              const campanhaLocal = campanhas.find(c => c.id_campanha_externo === campData.id);
+              if (campanhaLocal) {
+                await supabase
+                  .from("campanha")
+                  .update({
+                    nome: campData.name,
+                    ativa: campData.status === "ACTIVE",
+                    objetivo: campData.objective || null,
+                  })
+                  .eq("id_campanha", campanhaLocal.id_campanha);
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Erro ao atualizar campanhas:", err);
+        }
+
         // Buscar métricas da API do Meta
-        const campaignIds = campanhas.map(c => c.id_campanha_externo).join(",");
         const fields = "campaign_id,impressions,clicks,spend,actions";
-        const url = `https://graph.facebook.com/v18.0/${adAccountId}/insights?fields=${fields}&level=campaign&date_preset=today&access_token=${accessToken}&filtering=[{"field":"campaign.id","operator":"IN","value":["${campaignIds.replace(/,/g, '","')}"]}]`;
+        const url = `https://graph.facebook.com/v18.0/${adAccountId}/insights?fields=${fields}&level=campaign&date_preset=today&access_token=${accessToken}&filtering=[{"field":"campaign.id","operator":"IN","value":["${campanhIdsStr.replace(/,/g, '","')}"]}]`;
 
         const response = await fetch(url);
         if (!response.ok) {
