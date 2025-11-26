@@ -10,7 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2, TestTube2 } from "lucide-react";
+import { Plus, Edit, Trash2, TestTube2, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { Database } from "@/integrations/supabase/types";
 
 type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
@@ -346,14 +347,32 @@ export default function Integracoes() {
 
               {tipoIntegracao === "META_ADS" && (
                 <>
+                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-900 dark:text-blue-100">Token Permanente Recomendado</AlertTitle>
+                    <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm space-y-2">
+                      <p><strong>Use System User Token para evitar expirações!</strong></p>
+                      <ol className="list-decimal ml-4 space-y-1">
+                        <li>Acesse <strong>Meta Business Manager</strong> (business.facebook.com)</li>
+                        <li>Vá em <strong>Configurações → Usuários → Usuários do Sistema</strong></li>
+                        <li>Clique em <strong>Adicionar</strong> e configure permissões (ads_read, ads_management)</li>
+                        <li>Gere o <strong>Access Token</strong> - ele nunca expira!</li>
+                        <li>Cole o token no campo abaixo</li>
+                      </ol>
+                    </AlertDescription>
+                  </Alert>
+
                   <div className="space-y-2">
-                    <Label>Access Token *</Label>
+                    <Label>Access Token (System User Token) *</Label>
                     <Input
                       type="password"
                       value={metaAccessToken}
                       onChange={(e) => setMetaAccessToken(e.target.value)}
                       placeholder="EAAxxxxxxxxxx"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Use um System User Token para integração permanente sem expirações
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label>Ad Account ID *</Label>
