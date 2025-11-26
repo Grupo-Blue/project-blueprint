@@ -89,18 +89,18 @@ const Dashboard = () => {
     <>
       <AlertaIntegracao />
       
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold mb-2">Bem-vindo ao SGT!</h2>
-        <p className="text-muted-foreground">
+      <div className="mb-6 md:mb-8">
+        <h2 className="text-2xl md:text-3xl font-bold mb-2">Bem-vindo ao SGT!</h2>
+        <p className="text-sm md:text-base text-muted-foreground">
           Sistema de Governança de Tráfego Pago
         </p>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-xs md:text-sm text-muted-foreground mt-1">
           <Calendar className="inline h-3 w-3 mr-1" />
           {format(mesAtual, "MMMM 'de' yyyy", { locale: ptBR })}
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6 md:mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Campanhas Ativas</CardTitle>
@@ -163,11 +163,11 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Status do Sistema</CardTitle>
-            <CardDescription>Backend configurado e pronto para uso</CardDescription>
+            <CardTitle className="text-lg">Status do Sistema</CardTitle>
+            <CardDescription className="text-sm">Backend configurado e pronto para uso</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -193,8 +193,8 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Próximos Passos</CardTitle>
-            <CardDescription>Configure o sistema para começar a usar</CardDescription>
+            <CardTitle className="text-lg">Próximos Passos</CardTitle>
+            <CardDescription className="text-sm">Configure o sistema para começar a usar</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
