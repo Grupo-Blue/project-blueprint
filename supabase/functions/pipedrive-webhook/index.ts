@@ -147,7 +147,7 @@ serve(async (req) => {
     console.log("IDs dos campos UTM mapeados:", PIPEDRIVE_FIELD_IDS);
 
     // Capturar UTM parameters dos campos customizados do Pipedrive
-    const customFields = dealData;
+    const customFields = dealData.custom_fields || {};
     
     // Função auxiliar para extrair valor de campo customizado
     const extractCustomFieldValue = (fieldKey: string | null) => {
