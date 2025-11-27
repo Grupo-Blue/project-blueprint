@@ -4,8 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Image, TrendingUp, DollarSign, Users, Target, CheckCircle2 } from "lucide-react";
+import { Image, TrendingUp, DollarSign, Users, Target, CheckCircle2, Eye, ExternalLink } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface CriativoPerformance {
   id_criativo: string;
@@ -25,6 +27,25 @@ interface CriativoPerformance {
 
 const RelatorioCreativos = () => {
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
+  const [criativoSelecionado, setCriativoSelecionado] = useState<string | null>(null);
+  
+  // Query para buscar leads do criativo selecionado
+  const { data: leadsDetalhados } = useQuery({
+    queryKey: ["leads-criativo", criativoSelecionado],
+    queryFn: async () => {
+      if (!criativoSelecionado) return [];
+      
+      const { data, error } = await supabase
+        .from("lead")
+        .select("*")
+        .eq("id_criativo", criativoSelecionado)
+        .order("data_criacao", { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!criativoSelecionado,
+  });
 
   const { data: empresas } = useQuery({
     queryKey: ["empresas"],
@@ -246,6 +267,7 @@ const RelatorioCreativos = () => {
                     <TableHead className="text-center">Vendas</TableHead>
                     <TableHead className="text-center">Taxa Conv.</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
+                    <TableHead className="text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -298,6 +320,17 @@ const RelatorioCreativos = () => {
                           currency: "BRL",
                         }).format(criativo.valor_total_vendas)}
                       </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCriativoSelecionado(criativo.id_criativo)}
+                          disabled={criativo.total_leads === 0}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver Leads
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -336,6 +369,82 @@ const RelatorioCreativos = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog para mostrar leads do criativo */}
+      <Dialog open={!!criativoSelecionado} onOpenChange={(open) => !open && setCriativoSelecionado(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Leads do Criativo</DialogTitle>
+            <DialogDescription>
+              {criativos?.find(c => c.id_criativo === criativoSelecionado)?.descricao || 
+               criativos?.find(c => c.id_criativo === criativoSelecionado)?.id_criativo_externo}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {leadsDetalhados && leadsDetalhados.length > 0 ? (
+            <div className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Organização</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Link</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leadsDetalhados.map((lead) => (
+                    <TableRow key={lead.id_lead}>
+                      <TableCell>{lead.nome_lead || "Sem nome"}</TableCell>
+                      <TableCell>{lead.organizacao || "—"}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {lead.is_mql && <Badge variant="secondary">MQL</Badge>}
+                          {lead.tem_reuniao && <Badge variant="outline">Reunião</Badge>}
+                          {lead.venda_realizada && <Badge className="bg-green-600">Venda</Badge>}
+                          {!lead.is_mql && !lead.tem_reuniao && !lead.venda_realizada && (
+                            <Badge variant="outline">Lead</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(lead.data_criacao).toLocaleDateString("pt-BR")}
+                      </TableCell>
+                      <TableCell>
+                        {lead.valor_venda
+                          ? new Intl.NumberFormat("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            }).format(lead.valor_venda)
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {lead.url_pipedrive && (
+                          <a
+                            href={lead.url_pipedrive}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Abrir
+                          </a>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Nenhum lead encontrado para este criativo.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
