@@ -21,6 +21,7 @@ export const ValidacaoUTM = () => {
           descricao,
           tipo,
           ativo,
+          url_final,
           campanha:id_campanha (
             nome,
             conta_anuncio:id_conta (
@@ -39,8 +40,34 @@ export const ValidacaoUTM = () => {
 
   if (isLoading) return null;
 
+  // Função para verificar se a URL tem UTM configurada
+  const verificarUTMnaURL = (url: string | null) => {
+    if (!url) return false;
+    try {
+      const urlObj = new URL(url);
+      const hasUtmContent = urlObj.searchParams.has('utm_content');
+      const hasUtmSource = urlObj.searchParams.has('utm_source');
+      const hasUtmMedium = urlObj.searchParams.has('utm_medium');
+      const hasUtmCampaign = urlObj.searchParams.has('utm_campaign');
+      
+      // Consideramos configurado se tiver pelo menos utm_content
+      return hasUtmContent || (hasUtmSource && hasUtmMedium && hasUtmCampaign);
+    } catch {
+      return false;
+    }
+  };
+
+  // Criativos com URL e UTM configurada
+  const criativosComUTMnaURL = criativos?.filter(c => verificarUTMnaURL(c.url_final)) || [];
+  
+  // Criativos sem URL capturada
+  const criativosSemURL = criativos?.filter(c => !c.url_final) || [];
+  
+  // Criativos com URL mas sem UTM
+  const criativosComURLSemUTM = criativos?.filter(c => c.url_final && !verificarUTMnaURL(c.url_final)) || [];
+  
   // Criativos com pelo menos um lead que tem UTM configurada
-  const criativosComUTM = criativos?.filter(c => 
+  const criativosComUTMnosLeads = criativos?.filter(c => 
     c.lead && c.lead.length > 0 && c.lead.some((l: any) => l.utm_content)
   ) || [];
   
@@ -50,20 +77,15 @@ export const ValidacaoUTM = () => {
   // Criativos sem nenhum lead
   const criativosSemLeads = criativos?.filter(c => !c.lead || c.lead.length === 0) || [];
   
-  // Criativos com leads mas sem UTM configurada
-  const criativosComLeadsSemUTM = criativosComLeads.filter(c => 
-    !c.lead.some((l: any) => l.utm_content)
-  );
-  
-  const porcentagemComUTM = criativos && criativos.length > 0
-    ? (criativosComUTM.length / criativos.length) * 100
+  const porcentagemComUTMnaURL = criativos && criativos.length > 0
+    ? (criativosComUTMnaURL.length / criativos.length) * 100
     : 0;
     
   const porcentagemComLeads = criativos && criativos.length > 0
     ? (criativosComLeads.length / criativos.length) * 100
     : 0;
 
-  const status = porcentagemComUTM >= 80 ? "success" : porcentagemComUTM >= 50 ? "warning" : "error";
+  const status = porcentagemComUTMnaURL >= 80 ? "success" : porcentagemComUTMnaURL >= 50 ? "warning" : "error";
 
   return (
     <Card className={status === "error" ? "border-destructive" : status === "warning" ? "border-yellow-500" : ""}>
@@ -83,39 +105,66 @@ export const ValidacaoUTM = () => {
           <Badge 
             variant={status === "success" ? "default" : status === "warning" ? "secondary" : "destructive"}
           >
-            {porcentagemComUTM.toFixed(0)}% com UTM
+            {porcentagemComUTMnaURL.toFixed(0)}% com UTM
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Criativos Ativos</p>
             <p className="text-2xl font-bold">{criativos?.length || 0}</p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Com UTM Configurada</p>
-            <p className="text-2xl font-bold text-blue-600">{criativosComUTM.length}</p>
+            <p className="text-sm text-muted-foreground">Com UTM na URL</p>
+            <p className="text-2xl font-bold text-blue-600">{criativosComUTMnaURL.length}</p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Com Leads Vinculados</p>
+            <p className="text-sm text-muted-foreground">Sem URL/UTM</p>
+            <p className="text-2xl font-bold text-yellow-600">{criativosSemURL.length + criativosComURLSemUTM.length}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Com Leads</p>
             <p className="text-2xl font-bold text-green-600">{criativosComLeads.length}</p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Sem Rastreamento</p>
-            <p className="text-2xl font-bold text-destructive">{criativosSemLeads.length}</p>
+            <p className="text-sm text-muted-foreground">Sem Leads</p>
+            <p className="text-2xl font-bold text-muted-foreground">{criativosSemLeads.length}</p>
           </div>
         </div>
 
-        {criativosComLeadsSemUTM.length > 0 && (
+        {criativosSemURL.length > 0 && (
           <Alert variant="default" className="border-yellow-500">
             <AlertCircle className="h-4 w-4 text-yellow-600" />
             <AlertTitle>
-              {criativosComLeadsSemUTM.length} criativo{criativosComLeadsSemUTM.length !== 1 ? 's' : ''} com leads mas sem UTM
+              {criativosSemURL.length} criativo{criativosSemURL.length !== 1 ? 's' : ''} sem URL capturada
             </AlertTitle>
             <AlertDescription className="space-y-2">
               <p className="text-sm">
-                Esses criativos estão gerando leads, mas os leads não possuem utm_content configurado no Pipedrive.
+                A integração ainda não capturou a URL final desses anúncios. Execute a coleta de criativos novamente.
+              </p>
+              <div className="flex gap-2 mt-3">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate("/integracoes")}
+                >
+                  Ir para Integrações
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {criativosComURLSemUTM.length > 0 && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>
+              {criativosComURLSemUTM.length} criativo{criativosComURLSemUTM.length !== 1 ? 's' : ''} com URL mas sem UTM
+            </AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p className="text-sm">
+                Esses anúncios têm URL configurada mas não possuem parâmetros UTM (utm_content, utm_source, utm_medium, utm_campaign).
               </p>
               <div className="flex gap-2 mt-3">
                 <Button 
@@ -125,12 +174,19 @@ export const ValidacaoUTM = () => {
                 >
                   Ver Guia UTM <ExternalLink className="h-3 w-3 ml-1" />
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate("/criativos")}
+                >
+                  Ver Criativos
+                </Button>
               </div>
             </AlertDescription>
           </Alert>
         )}
 
-        {criativosSemLeads.length > 0 && (
+        {criativosSemLeads.length > 0 && criativosComUTMnaURL.length > 0 && (
           <Alert variant={status === "error" ? "destructive" : "default"}>
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>
