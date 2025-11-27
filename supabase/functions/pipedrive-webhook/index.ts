@@ -135,34 +135,13 @@ serve(async (req) => {
       stageAtual = stagesMap[dealData.stage_id];
     }
 
-    // Buscar campos customizados do Pipedrive automaticamente
-    let dealFieldsMap: Record<string, string> = {};
-    try {
-      const fieldsUrl = `https://${domain}.pipedrive.com/api/v1/dealFields?api_token=${apiToken}`;
-      const fieldsResponse = await fetch(fieldsUrl);
-      
-      if (fieldsResponse.ok) {
-        const fieldsData = await fieldsResponse.json();
-        if (fieldsData.success && fieldsData.data) {
-          for (const field of fieldsData.data) {
-            // Mapear nome do campo para hash key
-            const fieldName = (field.name || '').toLowerCase().trim();
-            dealFieldsMap[fieldName] = field.key;
-          }
-          console.log(`${Object.keys(dealFieldsMap).length} campos customizados mapeados`);
-        }
-      }
-    } catch (fieldsError) {
-      console.error("Erro ao buscar campos customizados:", fieldsError);
-    }
-
-    // Mapear nomes dos campos UTM para os IDs reais do Pipedrive
+    // IDs dos campos customizados do Pipedrive para UTMs
     const PIPEDRIVE_FIELD_IDS = {
-      utm_source: dealFieldsMap['utm_source'] || dealFieldsMap['utm source'] || null,
-      utm_medium: dealFieldsMap['utm_medium'] || dealFieldsMap['utm medium'] || null,
-      utm_campaign: dealFieldsMap['utm_campaign'] || dealFieldsMap['utm campaign'] || null,
-      utm_content: dealFieldsMap['utm_content'] || dealFieldsMap['utm content'] || null,
-      utm_term: dealFieldsMap['utm_term'] || dealFieldsMap['utm term'] || null,
+      utm_source: "921388ca610b1d32c1d88692c831a1e247eb5831",
+      utm_medium: "e68861332446a8d4de1a8a1332bafd033e1e7ec8",
+      utm_campaign: "e0b37f3266054dd44a5889ce7e53f44c20e5067a",
+      utm_content: "789859d10eb211851c1a6d1c35a82f45f155667b",
+      utm_term: "01678645f979eaae54857aab0418ab42fcfd91a4",
     };
 
     console.log("IDs dos campos UTM mapeados:", PIPEDRIVE_FIELD_IDS);
