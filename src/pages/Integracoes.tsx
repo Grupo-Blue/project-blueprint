@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Plus, Edit, Trash2, TestTube2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ValidacaoUTM } from "@/components/ValidacaoUTM";
+import { ImportarCampanhas } from "@/components/ImportarCampanhas";
 import type { Database } from "@/integrations/supabase/types";
 
 type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
@@ -534,38 +535,46 @@ export default function Integracoes() {
               const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
               
               return (
-                <Card key={integracao.id_integracao}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription>
-                          Ad Account: {config.ad_account_id}
-                        </CardDescription>
+                <div key={integracao.id_integracao} className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                          <CardDescription>
+                            Ad Account: {config.ad_account_id}
+                          </CardDescription>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                            {integracao.ativo ? 'Ativo' : 'Inativo'}
+                          </span>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleTestIntegration(integracao)}
+                            disabled={testingIntegracoes.has(integracao.id_integracao)}
+                          >
+                            <TestTube2 className="w-4 h-4 mr-2" />
+                            {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                          {integracao.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleTestIntegration(integracao)}
-                          disabled={testingIntegracoes.has(integracao.id_integracao)}
-                        >
-                          <TestTube2 className="w-4 h-4 mr-2" />
-                          {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
+                    </CardHeader>
+                  </Card>
+                  
+                  <ImportarCampanhas 
+                    plataforma="META"
+                    integracaoId={integracao.id_integracao}
+                    empresaNome={empresa?.nome || "Empresa não encontrada"}
+                  />
+                </div>
               );
             })
           )}
@@ -584,38 +593,46 @@ export default function Integracoes() {
               const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
               
               return (
-                <Card key={integracao.id_integracao}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription>
-                          Customer ID: {config.customer_id}
-                        </CardDescription>
+                <div key={integracao.id_integracao} className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                          <CardDescription>
+                            Customer ID: {config.customer_id}
+                          </CardDescription>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                            {integracao.ativo ? 'Ativo' : 'Inativo'}
+                          </span>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleTestIntegration(integracao)}
+                            disabled={testingIntegracoes.has(integracao.id_integracao)}
+                          >
+                            <TestTube2 className="w-4 h-4 mr-2" />
+                            {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                          {integracao.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleTestIntegration(integracao)}
-                          disabled={testingIntegracoes.has(integracao.id_integracao)}
-                        >
-                          <TestTube2 className="w-4 h-4 mr-2" />
-                          {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
+                    </CardHeader>
+                  </Card>
+                  
+                  <ImportarCampanhas 
+                    plataforma="GOOGLE"
+                    integracaoId={integracao.id_integracao}
+                    empresaNome={empresa?.nome || "Empresa não encontrada"}
+                  />
+                </div>
               );
             })
           )}
