@@ -326,9 +326,13 @@ const RelatorioCreativos = () => {
                           size="sm"
                           onClick={() => setCriativoSelecionado(criativo.id_criativo)}
                           disabled={criativo.total_leads === 0}
+                          className="gap-2"
                         >
-                          <Eye className="h-4 w-4 mr-1" />
+                          <Eye className="h-4 w-4" />
                           Ver Leads
+                          <Badge variant="secondary" className="ml-1">
+                            {criativo.total_leads}
+                          </Badge>
                         </Button>
                       </TableCell>
                     </TableRow>
