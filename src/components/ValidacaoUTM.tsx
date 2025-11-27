@@ -28,7 +28,7 @@ export const ValidacaoUTM = () => {
               empresa:id_empresa (nome)
             )
           ),
-          lead:lead!id_criativo (id_lead)
+          lead:lead!id_criativo (id_lead, utm_content)
         `)
         .eq("ativo", true);
       
@@ -39,14 +39,31 @@ export const ValidacaoUTM = () => {
 
   if (isLoading) return null;
 
-  const criativosSemLeads = criativos?.filter(c => !c.lead || c.lead.length === 0) || [];
+  // Criativos com pelo menos um lead que tem UTM configurada
+  const criativosComUTM = criativos?.filter(c => 
+    c.lead && c.lead.length > 0 && c.lead.some((l: any) => l.utm_content)
+  ) || [];
+  
+  // Criativos com pelo menos um lead vinculado (independente de ter UTM)
   const criativosComLeads = criativos?.filter(c => c.lead && c.lead.length > 0) || [];
   
+  // Criativos sem nenhum lead
+  const criativosSemLeads = criativos?.filter(c => !c.lead || c.lead.length === 0) || [];
+  
+  // Criativos com leads mas sem UTM configurada
+  const criativosComLeadsSemUTM = criativosComLeads.filter(c => 
+    !c.lead.some((l: any) => l.utm_content)
+  );
+  
+  const porcentagemComUTM = criativos && criativos.length > 0
+    ? (criativosComUTM.length / criativos.length) * 100
+    : 0;
+    
   const porcentagemComLeads = criativos && criativos.length > 0
     ? (criativosComLeads.length / criativos.length) * 100
     : 0;
 
-  const status = porcentagemComLeads >= 80 ? "success" : porcentagemComLeads >= 50 ? "warning" : "error";
+  const status = porcentagemComUTM >= 80 ? "success" : porcentagemComUTM >= 50 ? "warning" : "error";
 
   return (
     <Card className={status === "error" ? "border-destructive" : status === "warning" ? "border-yellow-500" : ""}>
@@ -66,21 +83,52 @@ export const ValidacaoUTM = () => {
           <Badge 
             variant={status === "success" ? "default" : status === "warning" ? "secondary" : "destructive"}
           >
-            {porcentagemComLeads.toFixed(0)}% rastreado
+            {porcentagemComUTM.toFixed(0)}% com UTM
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Criativos Ativos</p>
             <p className="text-2xl font-bold">{criativos?.length || 0}</p>
           </div>
           <div>
+            <p className="text-sm text-muted-foreground">Com UTM Configurada</p>
+            <p className="text-2xl font-bold text-blue-600">{criativosComUTM.length}</p>
+          </div>
+          <div>
             <p className="text-sm text-muted-foreground">Com Leads Vinculados</p>
             <p className="text-2xl font-bold text-green-600">{criativosComLeads.length}</p>
           </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Sem Rastreamento</p>
+            <p className="text-2xl font-bold text-destructive">{criativosSemLeads.length}</p>
+          </div>
         </div>
+
+        {criativosComLeadsSemUTM.length > 0 && (
+          <Alert variant="default" className="border-yellow-500">
+            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertTitle>
+              {criativosComLeadsSemUTM.length} criativo{criativosComLeadsSemUTM.length !== 1 ? 's' : ''} com leads mas sem UTM
+            </AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p className="text-sm">
+                Esses criativos estão gerando leads, mas os leads não possuem utm_content configurado no Pipedrive.
+              </p>
+              <div className="flex gap-2 mt-3">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate("/guia-utm")}
+                >
+                  Ver Guia UTM <ExternalLink className="h-3 w-3 ml-1" />
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {criativosSemLeads.length > 0 && (
           <Alert variant={status === "error" ? "destructive" : "default"}>
