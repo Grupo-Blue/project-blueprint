@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Edit, Trash2, TestTube2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ValidacaoUTM } from "@/components/ValidacaoUTM";
 import type { Database } from "@/integrations/supabase/types";
 
 type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
@@ -506,6 +507,10 @@ export default function Integracoes() {
             </form>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="mb-6">
+        <ValidacaoUTM />
       </div>
 
       <Tabs defaultValue="meta" className="space-y-4">
