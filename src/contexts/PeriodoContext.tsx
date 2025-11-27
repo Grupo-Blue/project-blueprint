@@ -1,25 +1,51 @@
 import React, { createContext, useContext, useState } from "react";
 
+export type TipoFiltroPeriodo = "mes_atual" | "mes_anterior" | "data_especifica";
+
 interface PeriodoContextType {
-  mesSelecionado: Date;
+  tipoFiltro: TipoFiltroPeriodo;
+  dataEspecifica: Date | null;
   semanaSelecionada: string | null;
-  setMesSelecionado: (mes: Date) => void;
+  setTipoFiltro: (tipo: TipoFiltroPeriodo) => void;
+  setDataEspecifica: (data: Date | null) => void;
   setSemanaSelecionada: (semana: string | null) => void;
+  getDataReferencia: () => Date;
 }
 
 const PeriodoContext = createContext<PeriodoContextType | undefined>(undefined);
 
 export function PeriodoProvider({ children }: { children: React.ReactNode }) {
-  const [mesSelecionado, setMesSelecionado] = useState<Date>(new Date());
+  const [tipoFiltro, setTipoFiltro] = useState<TipoFiltroPeriodo>("mes_atual");
+  const [dataEspecifica, setDataEspecifica] = useState<Date | null>(null);
   const [semanaSelecionada, setSemanaSelecionada] = useState<string | null>(null);
+
+  const getDataReferencia = () => {
+    const hoje = new Date();
+    
+    switch (tipoFiltro) {
+      case "mes_atual":
+        return hoje;
+      case "mes_anterior":
+        const mesAnterior = new Date(hoje);
+        mesAnterior.setMonth(mesAnterior.getMonth() - 1);
+        return mesAnterior;
+      case "data_especifica":
+        return dataEspecifica || hoje;
+      default:
+        return hoje;
+    }
+  };
 
   return (
     <PeriodoContext.Provider
       value={{
-        mesSelecionado,
+        tipoFiltro,
+        dataEspecifica,
         semanaSelecionada,
-        setMesSelecionado,
+        setTipoFiltro,
+        setDataEspecifica,
         setSemanaSelecionada,
+        getDataReferencia,
       }}
     >
       {children}
