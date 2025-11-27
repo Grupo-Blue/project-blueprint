@@ -174,12 +174,14 @@ serve(async (req) => {
           try {
             console.log(`Buscando criativos da campanha ${campanha.nome}`);
 
-            // Query GAQL para buscar ads da campanha com métricas de hoje
+            // Query GAQL para buscar ads da campanha com métricas de hoje e URLs finais
             const gaqlQuery = `
               SELECT 
                 ad_group_ad.ad.id,
                 ad_group_ad.ad.name,
                 ad_group_ad.ad.type,
+                ad_group_ad.ad.final_urls,
+                ad_group_ad.ad.tracking_url_template,
                 ad_group_ad.status,
                 ad_group_ad.ad.responsive_display_ad.marketing_images,
                 ad_group_ad.ad.responsive_display_ad.logo_images,
@@ -256,6 +258,23 @@ serve(async (req) => {
               // Determinar se está ativo
               const ativo = adGroupAd.status === "ENABLED";
 
+              // Extrair URL final do anúncio
+              let urlFinal = null;
+              try {
+                // Google Ads retorna final_urls como array
+                if (ad.finalUrls && ad.finalUrls.length > 0) {
+                  urlFinal = ad.finalUrls[0];
+                  
+                  // Se houver tracking_url_template, combinar com a URL
+                  if (ad.trackingUrlTemplate) {
+                    // O tracking template geralmente adiciona parâmetros à URL
+                    urlFinal = ad.trackingUrlTemplate.replace('{lpurl}', urlFinal);
+                  }
+                }
+              } catch (urlErr) {
+                console.log(`Não foi possível extrair URL do criativo ${ad.id}`);
+              }
+
               // Preparar dados do criativo
               const criativoData = {
                 id_campanha: campanha.id_campanha,
@@ -263,6 +282,7 @@ serve(async (req) => {
                 tipo: tipoCriativo,
                 descricao: ad.name || null,
                 ativo: ativo,
+                url_final: urlFinal,
               };
 
               // Upsert do criativo (insere ou atualiza)

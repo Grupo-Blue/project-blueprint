@@ -123,8 +123,8 @@ serve(async (req) => {
           try {
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
-            // Endpoint da API do Meta para buscar ads com métricas de hoje
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec,image_url,video_id,thumbnail_url},insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
+            // Endpoint da API do Meta para buscar ads com métricas de hoje e URL final
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec,image_url,video_id,thumbnail_url,url_tags},tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -177,6 +177,28 @@ serve(async (req) => {
               // Determinar se está ativo
               const ativo = ad.status === "ACTIVE";
 
+              // Extrair URL final do anúncio
+              let urlFinal = null;
+              try {
+                // Tentar extrair da object_story_spec
+                if (creative.object_story_spec?.link_data?.link) {
+                  urlFinal = creative.object_story_spec.link_data.link;
+                } 
+                // Tentar extrair dos tracking_specs
+                else if (ad.tracking_specs && ad.tracking_specs.length > 0) {
+                  const trackingSpec = ad.tracking_specs[0];
+                  if (trackingSpec.url) {
+                    urlFinal = trackingSpec.url;
+                  }
+                }
+                // Tentar extrair dos url_tags do creative
+                else if (creative.url_tags) {
+                  urlFinal = creative.url_tags;
+                }
+              } catch (urlErr) {
+                console.log(`Não foi possível extrair URL do criativo ${creative.id}`);
+              }
+
               // Preparar dados do criativo
               const criativoData = {
                 id_campanha: campanha.id_campanha,
@@ -184,6 +206,7 @@ serve(async (req) => {
                 tipo: tipoCriativo,
                 descricao: ad.name || creative.name || null,
                 ativo: ativo,
+                url_final: urlFinal,
               };
 
               // Upsert do criativo (insere ou atualiza)

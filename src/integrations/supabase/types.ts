@@ -400,6 +400,7 @@ export type Database = {
           id_criativo_externo: string
           tipo: Database["public"]["Enums"]["tipo_criativo"]
           updated_at: string
+          url_final: string | null
         }
         Insert: {
           ativo?: boolean
@@ -410,6 +411,7 @@ export type Database = {
           id_criativo_externo: string
           tipo: Database["public"]["Enums"]["tipo_criativo"]
           updated_at?: string
+          url_final?: string | null
         }
         Update: {
           ativo?: boolean
@@ -420,6 +422,7 @@ export type Database = {
           id_criativo_externo?: string
           tipo?: Database["public"]["Enums"]["tipo_criativo"]
           updated_at?: string
+          url_final?: string | null
         }
         Relationships: [
           {
