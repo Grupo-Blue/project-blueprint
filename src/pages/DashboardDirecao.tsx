@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
+import { startOfMonth, endOfMonth } from "date-fns";
 
 interface EmpresaMetrica {
   id_empresa: string;
@@ -36,8 +37,13 @@ interface EmpresaMetrica {
 }
 
 export default function DashboardDirecao() {
-  const { semanaSelecionada } = usePeriodo();
+  const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
+
+  // Usar data do filtro selecionado
+  const dataReferencia = getDataReferencia();
+  const inicioMes = startOfMonth(dataReferencia);
+  const fimMes = endOfMonth(dataReferencia);
 
   const { data: semanaAtual } = useQuery({
     queryKey: ["semana-info-direcao", semanaSelecionada],
@@ -64,9 +70,47 @@ export default function DashboardDirecao() {
   });
 
   const { data: metricas, isLoading } = useQuery({
-    queryKey: ["metricas-direcao", semanaSelecionada, empresaSelecionada],
+    queryKey: ["metricas-direcao", tipoFiltro, semanaSelecionada, inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada],
     queryFn: async () => {
-      if (!semanaSelecionada) return [];
+      // Se for filtro de semana específica, busca só aquela semana
+      if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
+        let query = supabase
+          .from("empresa_semana_metricas")
+          .select(`
+            *,
+            empresa:id_empresa (nome, cpl_maximo, cac_maximo)
+          `)
+          .eq("id_semana", semanaSelecionada);
+
+        if (empresaSelecionada && empresaSelecionada !== "todas") {
+          query = query.eq("id_empresa", empresaSelecionada);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        return data.map((m: any) => ({
+          id_empresa: m.id_empresa,
+          nome: m.empresa.nome,
+          verba_investida: m.verba_investida,
+          leads_total: m.leads_total,
+          cpl: m.cpl,
+          cac: m.cac,
+          vendas: m.vendas,
+          cpl_maximo: m.empresa.cpl_maximo,
+          cac_maximo: m.empresa.cac_maximo,
+        })) as EmpresaMetrica[];
+      }
+
+      // Para outros filtros, busca todas as semanas do período
+      const { data: semanas, error: semanasError } = await supabase
+        .from("semana")
+        .select("id_semana")
+        .gte("data_inicio", inicioMes.toISOString())
+        .lte("data_fim", fimMes.toISOString());
+      
+      if (semanasError) throw semanasError;
+      if (!semanas || semanas.length === 0) return [];
 
       let query = supabase
         .from("empresa_semana_metricas")
@@ -74,30 +118,42 @@ export default function DashboardDirecao() {
           *,
           empresa:id_empresa (nome, cpl_maximo, cac_maximo)
         `)
-        .eq("id_semana", semanaSelecionada);
+        .in("id_semana", semanas.map(s => s.id_semana));
 
-      // Filtrar por empresa se uma específica for selecionada
       if (empresaSelecionada && empresaSelecionada !== "todas") {
         query = query.eq("id_empresa", empresaSelecionada);
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
-      
-      return data.map((m: any) => ({
-        id_empresa: m.id_empresa,
-        nome: m.empresa.nome,
-        verba_investida: m.verba_investida,
-        leads_total: m.leads_total,
-        cpl: m.cpl,
-        cac: m.cac,
-        vendas: m.vendas,
-        cpl_maximo: m.empresa.cpl_maximo,
-        cac_maximo: m.empresa.cac_maximo,
+
+      // Agregar métricas por empresa
+      const metricasAgregadas = data.reduce((acc: any, m: any) => {
+        const empresaId = m.id_empresa;
+        if (!acc[empresaId]) {
+          acc[empresaId] = {
+            id_empresa: empresaId,
+            nome: m.empresa.nome,
+            verba_investida: 0,
+            leads_total: 0,
+            vendas: 0,
+            cpl_maximo: m.empresa.cpl_maximo,
+            cac_maximo: m.empresa.cac_maximo,
+          };
+        }
+        acc[empresaId].verba_investida += m.verba_investida;
+        acc[empresaId].leads_total += m.leads_total;
+        acc[empresaId].vendas += m.vendas;
+        return acc;
+      }, {});
+
+      // Calcular CPL e CAC agregados
+      return Object.values(metricasAgregadas).map((m: any) => ({
+        ...m,
+        cpl: m.leads_total > 0 ? m.verba_investida / m.leads_total : null,
+        cac: m.vendas > 0 ? m.verba_investida / m.vendas : null,
       })) as EmpresaMetrica[];
     },
-    enabled: !!semanaSelecionada,
   });
 
   const { data: acoesAprovacao } = useQuery({
@@ -166,6 +222,24 @@ export default function DashboardDirecao() {
     (m) => (m.cpl && m.cpl > m.cpl_maximo) || (m.cac && m.cac > m.cac_maximo)
   ) || [];
 
+  // Determinar label do período
+  const getLabelPeriodo = () => {
+    switch (tipoFiltro) {
+      case "mes_atual":
+        return "Mês Atual";
+      case "mes_anterior":
+        return "Mês Anterior";
+      case "data_especifica":
+        return format(dataReferencia, "MMMM/yyyy", { locale: ptBR });
+      case "semana_especifica":
+        return semanaAtual ? `Semana ${semanaAtual.numero_semana}/${semanaAtual.ano}` : "Semana";
+      default:
+        return "Período";
+    }
+  };
+
+  const labelPeriodo = getLabelPeriodo();
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-8">
@@ -190,8 +264,7 @@ export default function DashboardDirecao() {
           <div>
             <h1 className="text-4xl font-bold text-foreground">Dashboard Direção</h1>
             <p className="text-muted-foreground mt-2">
-              Visão executiva consolidada
-              {semanaAtual && ` - Semana ${semanaAtual.numero_semana}/${semanaAtual.ano}`}
+              Visão executiva consolidada - {labelPeriodo}
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
