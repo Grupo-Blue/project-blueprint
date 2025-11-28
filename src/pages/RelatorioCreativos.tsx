@@ -84,6 +84,25 @@ const RelatorioCreativos = () => {
       const { data, error } = await query;
       if (error) throw error;
 
+      // Buscar métricas de investimento de todos os criativos
+      const { data: metricasData, error: metricasError } = await supabase
+        .from("criativo_metricas_dia")
+        .select("id_criativo, verba_investida, leads");
+
+      if (metricasError) {
+        console.error("Erro ao buscar métricas:", metricasError);
+      }
+
+      // Agrupar métricas por criativo
+      const metricasPorCriativo = (metricasData || []).reduce((acc: any, m: any) => {
+        if (!acc[m.id_criativo]) {
+          acc[m.id_criativo] = { verba_total: 0, leads_total: 0 };
+        }
+        acc[m.id_criativo].verba_total += parseFloat(m.verba_investida || 0);
+        acc[m.id_criativo].leads_total += parseInt(m.leads || 0);
+        return acc;
+      }, {});
+
       // Processar dados para calcular métricas
       const performance: CriativoPerformance[] = (data || [])
         .map((c: any) => {
@@ -103,6 +122,12 @@ const RelatorioCreativos = () => {
           const vendas = leads.filter((l: any) => l.venda_realizada).length;
           const valorTotalVendas = leads.reduce((sum: number, l: any) => sum + (l.valor_venda || 0), 0);
 
+          // Calcular CPL com base nas métricas reais
+          const metricas = metricasPorCriativo[c.id_criativo];
+          const cplEstimado = metricas?.verba_total && metricas.leads_total > 0
+            ? metricas.verba_total / metricas.leads_total
+            : 0;
+
           return {
             id_criativo: c.id_criativo,
             id_criativo_externo: c.id_criativo_externo,
@@ -116,7 +141,7 @@ const RelatorioCreativos = () => {
             valor_total_vendas: valorTotalVendas,
             taxa_conversao_mql: totalLeads > 0 ? (mqls / totalLeads) * 100 : 0,
             taxa_conversao_venda: mqls > 0 ? (vendas / mqls) * 100 : 0,
-            cpl_estimado: 0, // Seria necessário dados de investimento por criativo
+            cpl_estimado: cplEstimado,
           };
         })
         .filter((c): c is CriativoPerformance => c !== null)
@@ -265,6 +290,7 @@ const RelatorioCreativos = () => {
                     <TableHead className="text-center">MQLs</TableHead>
                     <TableHead className="text-center">Reuniões</TableHead>
                     <TableHead className="text-center">Vendas</TableHead>
+                    <TableHead className="text-center">CPL</TableHead>
                     <TableHead className="text-center">Taxa Conv.</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
                     <TableHead className="text-center">Ações</TableHead>
@@ -305,6 +331,18 @@ const RelatorioCreativos = () => {
                         <span className="font-semibold text-green-600">
                           {criativo.vendas}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {criativo.cpl_estimado > 0 ? (
+                          <span className="font-mono text-sm">
+                            {new Intl.NumberFormat("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            }).format(criativo.cpl_estimado)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">

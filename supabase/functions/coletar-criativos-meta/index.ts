@@ -180,23 +180,31 @@ serve(async (req) => {
               // Extrair URL final do anúncio
               let urlFinal = null;
               try {
-                // Tentar extrair da object_story_spec
+                // Prioridade 1: object_story_spec.link_data.link
                 if (creative.object_story_spec?.link_data?.link) {
                   urlFinal = creative.object_story_spec.link_data.link;
-                } 
-                // Tentar extrair dos tracking_specs
+                  console.log(`URL extraída de object_story_spec.link_data.link: ${urlFinal}`);
+                }
+                // Prioridade 2: tracking_specs (contém URL com parâmetros)
                 else if (ad.tracking_specs && ad.tracking_specs.length > 0) {
-                  const trackingSpec = ad.tracking_specs[0];
-                  if (trackingSpec.url) {
-                    urlFinal = trackingSpec.url;
+                  for (const trackingSpec of ad.tracking_specs) {
+                    if (trackingSpec.url && trackingSpec.url.includes('http')) {
+                      urlFinal = trackingSpec.url;
+                      console.log(`URL extraída de tracking_specs: ${urlFinal}`);
+                      break;
+                    }
                   }
                 }
-                // Tentar extrair dos url_tags do creative
-                else if (creative.url_tags) {
-                  urlFinal = creative.url_tags;
+                // Prioridade 3: effective_object_story_id pode ter URL
+                else if (ad.effective_object_story_id) {
+                  console.log(`Ad tem effective_object_story_id, mas URL não disponível diretamente`);
+                }
+                
+                if (!urlFinal) {
+                  console.log(`⚠️ URL não capturada para criativo ${creative.id} (${ad.name})`);
                 }
               } catch (urlErr) {
-                console.log(`Não foi possível extrair URL do criativo ${creative.id}`);
+                console.error(`Erro ao extrair URL do criativo ${creative.id}:`, urlErr);
               }
 
               // Preparar dados do criativo
