@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag } from "lucide-react";
+import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,6 +18,8 @@ const Leads = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [scoreMinimo, setScoreMinimo] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const ITEMS_PER_PAGE = 15;
 
   const { data: leads, isLoading } = useQuery({
@@ -57,6 +59,7 @@ const Leads = () => {
       (statusFilter === "reuniao" && lead.tem_reuniao) ||
       (statusFilter === "venda" && lead.venda_realizada) ||
       (statusFilter === "perdido" && lead.stage_atual === "Perdido") ||
+      (statusFilter === "nao_comprou" && !lead.venda_realizada) ||
       (statusFilter === "novo" && !lead.is_mql && lead.stage_atual !== "Perdido");
 
     const matchesScore = 
@@ -66,17 +69,92 @@ const Leads = () => {
     return matchesSearch && matchesStatus && matchesScore;
   });
 
+  // Ordenação
+  const sortedLeads = filteredLeads ? [...filteredLeads].sort((a, b) => {
+    if (!sortColumn) return 0;
+    
+    let aValue: any;
+    let bValue: any;
+    
+    switch (sortColumn) {
+      case "nome":
+        aValue = a.nome_lead?.toLowerCase() || "";
+        bValue = b.nome_lead?.toLowerCase() || "";
+        break;
+      case "organizacao":
+        aValue = a.organizacao?.toLowerCase() || "";
+        bValue = b.organizacao?.toLowerCase() || "";
+        break;
+      case "empresa":
+        aValue = (a as any).empresa?.nome?.toLowerCase() || "";
+        bValue = (b as any).empresa?.nome?.toLowerCase() || "";
+        break;
+      case "stage":
+        aValue = a.stage_atual?.toLowerCase() || "";
+        bValue = b.stage_atual?.toLowerCase() || "";
+        break;
+      case "score":
+        aValue = a.mautic_score ?? -1;
+        bValue = b.mautic_score ?? -1;
+        break;
+      case "data":
+        aValue = new Date(a.data_criacao).getTime();
+        bValue = new Date(b.data_criacao).getTime();
+        break;
+      case "valor":
+        aValue = a.valor_venda || 0;
+        bValue = b.valor_venda || 0;
+        break;
+      default:
+        return 0;
+    }
+    
+    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+    return 0;
+  }) : [];
+
   // Paginação
-  const totalPages = Math.ceil((filteredLeads?.length || 0) / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil((sortedLeads?.length || 0) / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedLeads = filteredLeads?.slice(startIndex, endIndex);
+  const paginatedLeads = sortedLeads?.slice(startIndex, endIndex);
 
   // Resetar para primeira página quando filtros mudarem
   const handleFilterChange = (setter: (value: any) => void) => (value: any) => {
     setter(value);
     setCurrentPage(1);
   };
+
+  // Função para alternar ordenação
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      // Se já está ordenando por essa coluna, inverte a direção
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // Se é uma nova coluna, ordena ascendente
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1); // Resetar para primeira página
+  };
+
+  // Componente de header de tabela com ordenação
+  const SortableTableHead = ({ column, children }: { column: string; children: React.ReactNode }) => (
+    <TableHead 
+      onClick={() => handleSort(column)}
+      className="cursor-pointer hover:bg-muted/50 select-none"
+    >
+      <div className="flex items-center gap-2">
+        {children}
+        {sortColumn === column ? (
+          sortDirection === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />
+        ) : (
+          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+        )}
+      </div>
+    </TableHead>
+  );
 
   // Função auxiliar para determinar engajamento baseado em última atividade
   const getEngajamento = (lastActive: string | null, score: number | null) => {
@@ -223,6 +301,7 @@ const Leads = () => {
               <SelectItem value="mql">MQLs</SelectItem>
               <SelectItem value="reuniao">Com Reunião</SelectItem>
               <SelectItem value="venda">Vendas</SelectItem>
+              <SelectItem value="nao_comprou">Não Comprou</SelectItem>
               <SelectItem value="perdido">Perdidos</SelectItem>
             </SelectContent>
           </Select>
@@ -242,9 +321,9 @@ const Leads = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Lista de Leads ({filteredLeads?.length || 0})</CardTitle>
+              <CardTitle>Lista de Leads ({sortedLeads?.length || 0})</CardTitle>
               <CardDescription>
-                Leads sincronizados do Pipedrive com informações detalhadas
+                Leads sincronizados do Pipedrive com informações detalhadas. Clique nos headers para ordenar.
               </CardDescription>
             </div>
             {totalPages > 1 && (
@@ -259,13 +338,13 @@ const Leads = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Lead / Organização</TableHead>
-                  <TableHead>Empresa</TableHead>
-                  <TableHead>Stage</TableHead>
+                  <SortableTableHead column="nome">Lead / Organização</SortableTableHead>
+                  <SortableTableHead column="empresa">Empresa</SortableTableHead>
+                  <SortableTableHead column="stage">Stage</SortableTableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-center">Score / Engajamento</TableHead>
-                  <TableHead>Criado em</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
+                  <SortableTableHead column="score">Score / Engajamento</SortableTableHead>
+                  <SortableTableHead column="data">Criado em</SortableTableHead>
+                  <SortableTableHead column="valor">Valor</SortableTableHead>
                   <TableHead className="text-center">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -415,7 +494,7 @@ const Leads = () => {
                     </TableRow>
                   );
                 })}
-                {!filteredLeads || filteredLeads.length === 0 ? (
+                {!sortedLeads || sortedLeads.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       {searchTerm || statusFilter !== "all" || scoreMinimo
@@ -433,7 +512,7 @@ const Leads = () => {
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between border-t pt-4">
               <p className="text-sm text-muted-foreground">
-                Exibindo {startIndex + 1} a {Math.min(endIndex, filteredLeads?.length || 0)} de {filteredLeads?.length || 0} leads
+                Exibindo {startIndex + 1} a {Math.min(endIndex, sortedLeads?.length || 0)} de {sortedLeads?.length || 0} leads
               </p>
               <Pagination>
                 <PaginationContent>
