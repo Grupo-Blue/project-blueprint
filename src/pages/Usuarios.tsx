@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, RefreshCw, Users, Edit, Shield, UserX, UserCheck } from "lucide-react";
+import { RefreshCw, Users, Edit, Shield, UserX, UserCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -244,17 +244,11 @@ const Usuarios = () => {
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold">Gestão de Usuários</h1>
-                <p className="text-sm text-muted-foreground">
-                  Gerenciar perfis e permissões dos usuários
-                </p>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold">Gestão de Usuários</h1>
+              <p className="text-sm text-muted-foreground">
+                Gerenciar perfis e permissões dos usuários
+              </p>
             </div>
             <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["usuarios"] })}>
               <RefreshCw className="mr-2 h-4 w-4" />
