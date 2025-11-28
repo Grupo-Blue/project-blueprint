@@ -325,6 +325,13 @@ serve(async (req) => {
             
             const mauticData = enrichmentData.data;
             
+            // Lógica de qualificação MQL: Score >= 50 OU PageHits >= 10
+            const score = mauticData.mautic_score || 0;
+            const pageHits = mauticData.mautic_page_hits || 0;
+            const isMqlMautic = score >= 50 || pageHits >= 10;
+            
+            console.log(`[Webhook] Qualificação MQL - Score: ${score}, PageHits: ${pageHits}, is_mql: ${isMqlMautic}`);
+            
             // Implementar fallback de UTMs: usar Mautic se Pipedrive não forneceu
             const updateData: any = {
               id_mautic_contact: mauticData.id_mautic_contact,
@@ -336,6 +343,7 @@ serve(async (req) => {
               mautic_segments: mauticData.mautic_segments,
               cidade_mautic: mauticData.cidade_mautic,
               estado_mautic: mauticData.estado_mautic,
+              is_mql: isMqlMautic,
             };
 
             // Fallback de UTMs: se Pipedrive não tem, usar do Mautic

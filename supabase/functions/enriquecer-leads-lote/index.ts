@@ -80,6 +80,13 @@ serve(async (req) => {
 
         // Se o enriquecimento foi bem-sucedido, atualizar o lead
         if (enrichmentData?.success && enrichmentData?.data) {
+          // Lógica de qualificação MQL: Score >= 50 OU PageHits >= 10
+          const score = enrichmentData.data.mautic_score || 0;
+          const pageHits = enrichmentData.data.mautic_page_hits || 0;
+          const isMqlMautic = score >= 50 || pageHits >= 10;
+          
+          console.log(`[EnriquecerLote] Lead ${lead.email} - Score: ${score}, PageHits: ${pageHits}, is_mql: ${isMqlMautic}`);
+          
           const { error: updateError } = await supabase
             .from('lead')
             .update({
@@ -92,6 +99,7 @@ serve(async (req) => {
               mautic_segments: enrichmentData.data.mautic_segments,
               cidade_mautic: enrichmentData.data.cidade_mautic,
               estado_mautic: enrichmentData.data.estado_mautic,
+              is_mql: isMqlMautic,
               // UTM fallback: só atualiza se estiver vazio no lead
               utm_source: lead.utm_source || enrichmentData.data.utm_source_mautic,
               utm_medium: lead.utm_medium || enrichmentData.data.utm_medium_mautic,
