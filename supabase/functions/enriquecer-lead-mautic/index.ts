@@ -110,8 +110,11 @@ serve(async (req) => {
       throw new Error('Configuração Mautic incompleta (url_base, login ou senha faltando)');
     }
 
+    // Normalizar URL base (remover barra final se existir)
+    const normalizedBaseUrl = url_base.endsWith('/') ? url_base.slice(0, -1) : url_base;
+
     // Fazer requisição à API do Mautic
-    const mauticUrl = `${url_base}/api/contacts?search=email:${encodeURIComponent(email)}`;
+    const mauticUrl = `${normalizedBaseUrl}/api/contacts?search=email:${encodeURIComponent(email)}`;
     console.log(`[Mautic] Buscando contato em: ${mauticUrl}`);
 
     const basicAuth = btoa(`${login}:${senha}`);
