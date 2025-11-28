@@ -4,13 +4,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import { AlertCircle, CheckCircle2, XCircle, ExternalLink, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { useState } from "react";
 
 export const ValidacaoUTM = () => {
   const navigate = useNavigate();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { data: criativos, isLoading } = useQuery({
+  const { data: criativos, isLoading, refetch } = useQuery({
     queryKey: ["criativos-utm-validation"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -37,6 +40,44 @@ export const ValidacaoUTM = () => {
       return data;
     },
   });
+
+  const handleRecoletarCriativos = async () => {
+    setIsRefreshing(true);
+    try {
+      // Buscar integrações ativas
+      const { data: integracoes, error } = await supabase
+        .from("integracao")
+        .select("id_integracao, tipo")
+        .eq("ativo", true)
+        .in("tipo", ["META_ADS", "GOOGLE_ADS"]);
+
+      if (error) throw error;
+
+      const promises = [];
+      
+      for (const int of integracoes || []) {
+        const functionName = int.tipo === "META_ADS" 
+          ? "coletar-criativos-meta" 
+          : "coletar-criativos-google";
+        
+        promises.push(
+          supabase.functions.invoke(functionName, {
+            body: { integracao_id: int.id_integracao }
+          })
+        );
+      }
+
+      await Promise.all(promises);
+      
+      toast.success("Criativos recoletados com sucesso!");
+      refetch();
+    } catch (error) {
+      console.error("Erro ao recoletar criativos:", error);
+      toast.error("Erro ao recoletar criativos");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   if (isLoading) return null;
 
@@ -141,9 +182,18 @@ export const ValidacaoUTM = () => {
             </AlertTitle>
             <AlertDescription className="space-y-2">
               <p className="text-sm">
-                A integração ainda não capturou a URL final desses anúncios. Execute a coleta de criativos novamente.
+                A integração ainda não capturou a URL final desses anúncios. Execute a coleta de criativos novamente ou configure os anúncios nas plataformas.
               </p>
               <div className="flex gap-2 mt-3">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleRecoletarCriativos}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Recoletar Agora
+                </Button>
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -164,9 +214,19 @@ export const ValidacaoUTM = () => {
             </AlertTitle>
             <AlertDescription className="space-y-2">
               <p className="text-sm">
-                Esses anúncios têm URL configurada mas não possuem parâmetros UTM (utm_content, utm_source, utm_medium, utm_campaign).
+                Esses anúncios têm URL configurada mas não possuem parâmetros UTM (utm_content, utm_source, utm_medium, utm_campaign). 
+                Isso impede o rastreamento correto de leads. Configure os UTMs diretamente nos anúncios das plataformas.
               </p>
               <div className="flex gap-2 mt-3">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleRecoletarCriativos}
+                  disabled={isRefreshing}
+                >
+                  <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  Recoletar Agora
+                </Button>
                 <Button 
                   variant="outline" 
                   size="sm"
