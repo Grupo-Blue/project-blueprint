@@ -34,8 +34,7 @@ const Leads = () => {
             observacao
           )
         `)
-        .order("data_criacao", { ascending: false })
-        .limit(200);
+        .order("data_criacao", { ascending: false });
 
       if (error) throw error;
       return data;
