@@ -13,15 +13,18 @@ export const InteligenciaIA = ({ empresaId }: InteligenciaIAProps) => {
   const { data, isLoading, error } = useQuery({
     queryKey: ["inteligencia-ia", empresaId],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("analise-inteligencia", {
-        body: { id_empresa: empresaId }
-      });
+      // Buscar a análise mais recente para a empresa
+      const { data, error } = await supabase
+        .from("analise_inteligencia")
+        .select("*")
+        .eq("id_empresa", empresaId)
+        .order("data_analise", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
       if (error) throw error;
       return data;
     },
-    refetchInterval: 1000 * 60 * 30, // Atualiza a cada 30 minutos
-    staleTime: 1000 * 60 * 15, // Considera stale após 15 minutos
     enabled: !!empresaId, // Só executa se houver empresa selecionada
   });
 
@@ -53,13 +56,23 @@ export const InteligenciaIA = ({ empresaId }: InteligenciaIAProps) => {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2 text-muted-foreground">Analisando dados...</span>
           </div>
-        ) : (
-          <div className="prose prose-sm max-w-none dark:prose-invert">
-            <div className="text-sm leading-relaxed">
-              <ReactMarkdown>
-                {data?.analise || "Nenhuma análise disponível no momento."}
-              </ReactMarkdown>
+        ) : data ? (
+          <div className="space-y-4">
+            <div className="text-xs text-muted-foreground">
+              Análise gerada em {new Date(data.data_analise).toLocaleDateString("pt-BR")} • 
+              Período: {new Date(data.data_inicio_periodo).toLocaleDateString("pt-BR")} - {new Date(data.data_fim_periodo).toLocaleDateString("pt-BR")}
             </div>
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <div className="text-sm leading-relaxed">
+                <ReactMarkdown>
+                  {data.analise_texto}
+                </ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            Nenhuma análise disponível no momento. A próxima análise será gerada automaticamente.
           </div>
         )}
       </CardContent>
