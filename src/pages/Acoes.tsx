@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Filter, Calendar, AlertCircle, CheckCircle2, Clock, XCircle, Paperclip } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { SugestoesIA } from "@/components/SugestoesIA";
 
 type CategoriaAcao = "A" | "B" | "C";
 type StatusAcao = "PENDENTE" | "APROVADA" | "REPROVADA" | "EXECUTADA";
@@ -497,6 +498,9 @@ const Acoes = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Sugestões da IA */}
+      <SugestoesIA onAcaoCriada={fetchAcoes} />
 
       <Card>
         <CardHeader>
