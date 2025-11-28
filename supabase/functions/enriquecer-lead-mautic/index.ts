@@ -195,13 +195,37 @@ serve(async (req) => {
     };
 
     // Extrair UTMs se disponíveis
-    if (contact.utmtags && contact.utmtags.length > 0) {
+    console.log(`[Mautic] Estrutura de utmtags:`, JSON.stringify(contact.utmtags));
+    
+    if (contact.utmtags && Array.isArray(contact.utmtags) && contact.utmtags.length > 0) {
       const latestUtm = contact.utmtags[0];
       enrichedData.utm_source_mautic = latestUtm.utm_source || null;
       enrichedData.utm_medium_mautic = latestUtm.utm_medium || null;
       enrichedData.utm_campaign_mautic = latestUtm.utm_campaign || null;
       enrichedData.utm_content_mautic = latestUtm.utm_content || null;
       enrichedData.utm_term_mautic = latestUtm.utm_term || null;
+      
+      console.log(`[Mautic] UTMs extraídos (array):`, {
+        source: enrichedData.utm_source_mautic,
+        medium: enrichedData.utm_medium_mautic,
+        campaign: enrichedData.utm_campaign_mautic,
+      });
+    } else if (contact.utmtags && typeof contact.utmtags === 'object') {
+      // Se utmtags for um objeto e não um array, tentar extrair diretamente
+      const utmObj = contact.utmtags as any;
+      enrichedData.utm_source_mautic = utmObj.utm_source || utmObj.utmSource || null;
+      enrichedData.utm_medium_mautic = utmObj.utm_medium || utmObj.utmMedium || null;
+      enrichedData.utm_campaign_mautic = utmObj.utm_campaign || utmObj.utmCampaign || null;
+      enrichedData.utm_content_mautic = utmObj.utm_content || utmObj.utmContent || null;
+      enrichedData.utm_term_mautic = utmObj.utm_term || utmObj.utmTerm || null;
+      
+      console.log(`[Mautic] UTMs extraídos (objeto):`, {
+        source: enrichedData.utm_source_mautic,
+        medium: enrichedData.utm_medium_mautic,
+        campaign: enrichedData.utm_campaign_mautic,
+      });
+    } else {
+      console.log(`[Mautic] Nenhum UTM encontrado em utmtags`);
     }
 
     console.log(`[Mautic] Enriquecimento completo para ${email}:`, {
