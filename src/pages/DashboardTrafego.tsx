@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
+import { startOfMonth, endOfMonth, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface CampanhaMetrica {
   id_campanha: string;
@@ -34,7 +36,12 @@ interface CampanhaMetrica {
 
 export default function DashboardTrafego() {
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
-  const { semanaSelecionada } = usePeriodo();
+  const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
+
+  // Usar data do filtro selecionado
+  const dataReferencia = getDataReferencia();
+  const inicioMes = startOfMonth(dataReferencia);
+  const fimMes = endOfMonth(dataReferencia);
 
   const { data: empresas } = useQuery({
     queryKey: ["empresas"],
@@ -61,9 +68,56 @@ export default function DashboardTrafego() {
   });
 
   const { data: campanhasMetricas, isLoading } = useQuery({
-    queryKey: ["campanhas-metricas", semanaSelecionada, empresaSelecionada],
+    queryKey: ["campanhas-metricas", tipoFiltro, semanaSelecionada, inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada],
     queryFn: async () => {
-      if (!semanaSelecionada) return [];
+      // Se for filtro de semana específica, busca só aquela semana
+      if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
+        let query = supabase
+          .from("campanha_semana_metricas")
+          .select(`
+            *,
+            campanha:id_campanha (
+              nome, 
+              id_conta,
+              conta_anuncio:id_conta (id_empresa)
+            )
+          `)
+          .eq("id_semana", semanaSelecionada);
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        let filteredData = data;
+        if (empresaSelecionada !== "todas") {
+          filteredData = data.filter((m: any) => 
+            m.campanha?.conta_anuncio?.id_empresa === empresaSelecionada
+          );
+        }
+
+        return filteredData.map((m: any) => ({
+          id_campanha: m.id_campanha,
+          nome: m.campanha?.nome || "Campanha sem nome",
+          leads: m.leads,
+          verba_investida: m.verba_investida,
+          cpl: m.cpl,
+          reunioes: m.reunioes || 0,
+          mqls: m.mqls || 0,
+          levantadas: m.levantadas || 0,
+          vendas: m.vendas || 0,
+          ticket_medio: m.ticket_medio || 0,
+          cac: m.cac || 0,
+        })) as CampanhaMetrica[];
+      }
+
+      // Para outros filtros, busca todas as semanas do período
+      const { data: semanas, error: semanasError } = await supabase
+        .from("semana")
+        .select("id_semana")
+        .gte("data_inicio", inicioMes.toISOString())
+        .lte("data_fim", fimMes.toISOString());
+      
+      if (semanasError) throw semanasError;
+      if (!semanas || semanas.length === 0) return [];
 
       let query = supabase
         .from("campanha_semana_metricas")
@@ -75,12 +129,11 @@ export default function DashboardTrafego() {
             conta_anuncio:id_conta (id_empresa)
           )
         `)
-        .eq("id_semana", semanaSelecionada);
+        .in("id_semana", semanas.map(s => s.id_semana));
 
       const { data, error } = await query;
       if (error) throw error;
 
-      // Filtrar por empresa se necessário
       let filteredData = data;
       if (empresaSelecionada !== "todas") {
         filteredData = data.filter((m: any) => 
@@ -88,21 +141,40 @@ export default function DashboardTrafego() {
         );
       }
 
-      return filteredData.map((m: any) => ({
-        id_campanha: m.id_campanha,
-        nome: m.campanha?.nome || "Campanha sem nome",
-        leads: m.leads,
-        verba_investida: m.verba_investida,
-        cpl: m.cpl,
-        reunioes: m.reunioes || 0,
-        mqls: m.mqls || 0,
-        levantadas: m.levantadas || 0,
-        vendas: m.vendas || 0,
-        ticket_medio: m.ticket_medio || 0,
-        cac: m.cac || 0,
+      // Agregar métricas por campanha
+      const metricasAgregadas = filteredData.reduce((acc: any, m: any) => {
+        const campanhaId = m.id_campanha;
+        if (!acc[campanhaId]) {
+          acc[campanhaId] = {
+            id_campanha: campanhaId,
+            nome: m.campanha?.nome || "Campanha sem nome",
+            leads: 0,
+            verba_investida: 0,
+            reunioes: 0,
+            mqls: 0,
+            levantadas: 0,
+            vendas: 0,
+            ticket_medio: 0,
+            cac: 0,
+          };
+        }
+        acc[campanhaId].leads += m.leads;
+        acc[campanhaId].verba_investida += m.verba_investida;
+        acc[campanhaId].reunioes += m.reunioes || 0;
+        acc[campanhaId].mqls += m.mqls || 0;
+        acc[campanhaId].levantadas += m.levantadas || 0;
+        acc[campanhaId].vendas += m.vendas || 0;
+        return acc;
+      }, {});
+
+      // Calcular CPL e CAC agregados
+      return Object.values(metricasAgregadas).map((m: any) => ({
+        ...m,
+        cpl: m.leads > 0 ? m.verba_investida / m.leads : null,
+        cac: m.vendas > 0 ? m.verba_investida / m.vendas : null,
+        ticket_medio: m.vendas > 0 ? (m.verba_investida * 3) / m.vendas : 0, // Aproximação
       })) as CampanhaMetrica[];
     },
-    enabled: !!semanaSelecionada,
   });
 
   const totais = campanhasMetricas?.reduce(
@@ -121,6 +193,24 @@ export default function DashboardTrafego() {
   const taxaLevantada = totais.mqls > 0 ? (totais.levantadas / totais.mqls) * 100 : 0;
   const taxaReuniao = totais.levantadas > 0 ? (totais.reunioes / totais.levantadas) * 100 : 0;
   const taxaVenda = totais.reunioes > 0 ? (totais.vendas / totais.reunioes) * 100 : 0;
+
+  // Determinar label do período
+  const getLabelPeriodo = () => {
+    switch (tipoFiltro) {
+      case "mes_atual":
+        return "Mês Atual";
+      case "mes_anterior":
+        return "Mês Anterior";
+      case "data_especifica":
+        return format(dataReferencia, "MMMM/yyyy", { locale: ptBR });
+      case "semana_especifica":
+        return semanaAtual ? `Semana ${semanaAtual.numero_semana}/${semanaAtual.ano}` : "Semana";
+      default:
+        return "Período";
+    }
+  };
+
+  const labelPeriodo = getLabelPeriodo();
 
   if (isLoading) {
     return (
@@ -143,8 +233,7 @@ export default function DashboardTrafego() {
             <div>
               <h1 className="text-4xl font-bold text-foreground">Dashboard Tráfego</h1>
               <p className="text-muted-foreground mt-2">
-                Análise detalhada de campanhas e funil
-                {semanaAtual && ` - Semana ${semanaAtual.numero_semana}/${semanaAtual.ano}`}
+                Análise detalhada de campanhas e funil - {labelPeriodo}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
