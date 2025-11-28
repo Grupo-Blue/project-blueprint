@@ -19,6 +19,7 @@ import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CampanhaMetrica {
   id_campanha: string;
@@ -67,6 +68,32 @@ export default function DashboardTrafego() {
       return data;
     },
     enabled: !!semanaSelecionada,
+  });
+
+  // Query para distribuição de MQLs por critério
+  const { data: mqlDistribuicao } = useQuery({
+    queryKey: ["mql-distribuicao", empresaSelecionada],
+    queryFn: async () => {
+      let query = supabase
+        .from("lead")
+        .select("mautic_score, mautic_page_hits, is_mql, id_empresa");
+
+      if (empresaSelecionada !== "todas") {
+        query = query.eq("id_empresa", empresaSelecionada);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const mqls = data?.filter(l => l.is_mql) || [];
+      
+      return {
+        total: mqls.length,
+        porScore: mqls.filter(l => (l.mautic_score || 0) >= 50).length,
+        porPageHits: mqls.filter(l => (l.mautic_page_hits || 0) >= 10).length,
+        porAmbos: mqls.filter(l => (l.mautic_score || 0) >= 50 && (l.mautic_page_hits || 0) >= 10).length,
+      };
+    },
   });
 
   const { data: campanhasMetricas, isLoading } = useQuery({
@@ -347,6 +374,25 @@ export default function DashboardTrafego() {
             </CardHeader>
             <CardContent>
               <div className="text-xl font-bold">{totais.mqls}</div>
+              {mqlDistribuicao && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-xs text-muted-foreground mt-1 cursor-help">
+                        {mqlDistribuicao.porScore} score • {mqlDistribuicao.porPageHits} engajamento
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="space-y-1">
+                        <p className="font-medium">Critérios de MQL:</p>
+                        <p>Score ≥ 50: {mqlDistribuicao.porScore} leads</p>
+                        <p>Page Hits ≥ 10: {mqlDistribuicao.porPageHits} leads</p>
+                        <p>Ambos: {mqlDistribuicao.porAmbos} leads</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </CardContent>
           </Card>
 

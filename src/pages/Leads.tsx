@@ -178,6 +178,9 @@ const Leads = () => {
     total: leads?.length || 0,
     novos: leads?.filter(l => !l.is_mql).length || 0,
     mqls: leads?.filter(l => l.is_mql).length || 0,
+    mqlsPorScore: leads?.filter(l => l.is_mql && (l.mautic_score || 0) >= 50).length || 0,
+    mqlsPorPageHits: leads?.filter(l => l.is_mql && (l.mautic_page_hits || 0) >= 10).length || 0,
+    mqlsPorAmbos: leads?.filter(l => l.is_mql && (l.mautic_score || 0) >= 50 && (l.mautic_page_hits || 0) >= 10).length || 0,
     reunioes: leads?.filter(l => l.tem_reuniao).length || 0,
     vendas: leads?.filter(l => l.venda_realizada).length || 0,
     valorTotal: leads?.reduce((sum, l) => sum + (l.valor_venda || 0), 0) || 0,
@@ -216,7 +219,7 @@ const Leads = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
@@ -227,6 +230,33 @@ const Leads = () => {
             <p className="text-xs text-muted-foreground mt-1">
               {stats.novos} novos • {stats.mqls} MQLs
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Qualificação MQL</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.mqls}</div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <p className="text-xs text-muted-foreground mt-1 cursor-help">
+                    {stats.mqlsPorScore} score • {stats.mqlsPorPageHits} engajamento
+                  </p>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="space-y-1">
+                    <p className="font-medium">Critérios de MQL:</p>
+                    <p>Score ≥ 50: {stats.mqlsPorScore} leads</p>
+                    <p>Page Hits ≥ 10: {stats.mqlsPorPageHits} leads</p>
+                    <p>Ambos: {stats.mqlsPorAmbos} leads</p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </CardContent>
         </Card>
 
