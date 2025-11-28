@@ -123,8 +123,8 @@ serve(async (req) => {
           try {
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
-            // Endpoint da API do Meta para buscar ads com métricas de hoje e URL final
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec{link_data{link,call_to_action}},image_url,video_id,thumbnail_url,url_tags},tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
+            // Endpoint da API do Meta para buscar ads com métricas de hoje, URL final e URL tags (UTMs)
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec{link_data{link,call_to_action}},image_url,video_id,thumbnail_url,url_tags},url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -177,13 +177,34 @@ serve(async (req) => {
               // Determinar se está ativo
               const ativo = ad.status === "ACTIVE";
 
-              // Extrair URL final do anúncio
+              // Extrair URL final do anúncio e UTM parameters
               let urlFinal = null;
               try {
-                // Prioridade 1: object_story_spec.link_data.link
+                // Prioridade 1: object_story_spec.link_data.link (URL base)
                 if (creative.object_story_spec?.link_data?.link) {
                   urlFinal = creative.object_story_spec.link_data.link;
-                  console.log(`URL extraída de object_story_spec.link_data.link: ${urlFinal}`);
+                  console.log(`URL base extraída: ${urlFinal}`);
+                  
+                  // Adicionar url_tags se existirem (contêm os UTM parameters configurados)
+                  let urlTags = null;
+                  
+                  // Verificar url_tags no criativo
+                  if (creative.url_tags) {
+                    urlTags = creative.url_tags;
+                    console.log(`URL tags do criativo: ${urlTags}`);
+                  }
+                  // Verificar url_tags no ad
+                  else if (ad.url_tags) {
+                    urlTags = ad.url_tags;
+                    console.log(`URL tags do ad: ${urlTags}`);
+                  }
+                  
+                  // Combinar URL base com UTM parameters
+                  if (urlTags && urlFinal) {
+                    const separator = urlFinal.includes('?') ? '&' : '?';
+                    urlFinal = `${urlFinal}${separator}${urlTags}`;
+                    console.log(`URL completa com UTMs: ${urlFinal}`);
+                  }
                 }
                 // Prioridade 2: tracking_specs (contém URL com parâmetros)
                 else if (ad.tracking_specs && ad.tracking_specs.length > 0) {
@@ -194,10 +215,6 @@ serve(async (req) => {
                       break;
                     }
                   }
-                }
-                // Prioridade 3: effective_object_story_id pode ter URL
-                else if (ad.effective_object_story_id) {
-                  console.log(`Ad tem effective_object_story_id, mas URL não disponível diretamente`);
                 }
                 
                 if (!urlFinal) {

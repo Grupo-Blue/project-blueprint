@@ -174,14 +174,16 @@ serve(async (req) => {
           try {
             console.log(`Buscando criativos da campanha ${campanha.nome}`);
 
-            // Query GAQL para buscar ads da campanha com métricas de hoje e URLs finais
+            // Query GAQL para buscar ads da campanha com métricas de hoje, URLs finais e custom parameters
             const gaqlQuery = `
               SELECT 
                 ad_group_ad.ad.id,
                 ad_group_ad.ad.name,
                 ad_group_ad.ad.type,
                 ad_group_ad.ad.final_urls,
+                ad_group_ad.ad.final_url_suffix,
                 ad_group_ad.ad.tracking_url_template,
+                ad_group_ad.ad.url_custom_parameters,
                 ad_group_ad.status,
                 ad_group_ad.ad.responsive_display_ad.marketing_images,
                 ad_group_ad.ad.responsive_display_ad.logo_images,
@@ -265,7 +267,7 @@ serve(async (req) => {
               // Determinar se está ativo
               const ativo = adGroupAd.status === "ENABLED";
 
-              // Extrair URL final do anúncio
+              // Extrair URL final do anúncio com parâmetros UTM
               let urlFinal = null;
               try {
                 // Google Ads retorna final_urls como array
@@ -273,11 +275,27 @@ serve(async (req) => {
                   urlFinal = ad.finalUrls[0];
                   console.log(`URL base extraída: ${urlFinal}`);
                   
-                  // Se houver tracking_url_template, ele contém parâmetros adicionais
-                  // mas a URL final já é a URL completa com parâmetros
-                  // O tracking template não precisa ser combinado aqui
+                  // Adicionar final_url_suffix se existir (contém UTM parameters)
+                  if (ad.finalUrlSuffix) {
+                    const separator = urlFinal.includes('?') ? '&' : '?';
+                    urlFinal = `${urlFinal}${separator}${ad.finalUrlSuffix}`;
+                    console.log(`URL com final_url_suffix: ${urlFinal}`);
+                  }
+                  
+                  // Verificar url_custom_parameters (parâmetros customizados)
+                  if (ad.urlCustomParameters && ad.urlCustomParameters.length > 0) {
+                    console.log(`Custom parameters detectados:`, ad.urlCustomParameters);
+                    const customParams = ad.urlCustomParameters
+                      .map((p: any) => `${p.key}=${p.value}`)
+                      .join('&');
+                    const separator = urlFinal.includes('?') ? '&' : '?';
+                    urlFinal = `${urlFinal}${separator}${customParams}`;
+                    console.log(`URL com custom parameters: ${urlFinal}`);
+                  }
+                  
+                  // Tracking template é aplicado pelo Google automaticamente no click
                   if (ad.trackingUrlTemplate) {
-                    console.log(`Tracking template detectado: ${ad.trackingUrlTemplate}`);
+                    console.log(`Tracking template configurado: ${ad.trackingUrlTemplate}`);
                   }
                 }
                 
