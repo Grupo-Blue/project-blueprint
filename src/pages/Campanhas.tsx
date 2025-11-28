@@ -19,6 +19,7 @@ interface Campanha {
   conta_anuncio: {
     nome: string;
     plataforma: string;
+    id_empresa: string;
   };
 }
 
@@ -32,12 +33,22 @@ interface MetricasSemana {
 }
 
 export default function Campanhas() {
-  const [filtroStatus, setFiltroStatus] = useState<string>("todas");
+  const [filtroStatus, setFiltroStatus] = useState<string>("ativas");
+  const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
   const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState<{ id: string; nome: string } | null>(null);
 
+  const { data: empresas } = useQuery({
+    queryKey: ["empresas"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("empresa").select("id_empresa, nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: campanhas, isLoading } = useQuery({
-    queryKey: ["campanhas", filtroStatus],
+    queryKey: ["campanhas", filtroStatus, empresaSelecionada],
     queryFn: async () => {
       let query = supabase
         .from("campanha")
@@ -49,7 +60,8 @@ export default function Campanhas() {
           data_criacao,
           conta_anuncio:id_conta (
             nome,
-            plataforma
+            plataforma,
+            id_empresa
           )
         `)
         .order("data_criacao", { ascending: false });
@@ -60,7 +72,16 @@ export default function Campanhas() {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as Campanha[];
+
+      // Filtrar por empresa se necessário
+      let filteredData = data as Campanha[];
+      if (empresaSelecionada !== "todas") {
+        filteredData = data?.filter((c: any) => 
+          c.conta_anuncio?.id_empresa === empresaSelecionada
+        ) || [];
+      }
+
+      return filteredData;
     },
   });
 
@@ -121,23 +142,40 @@ export default function Campanhas() {
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-4xl font-bold text-foreground">Campanhas</h1>
-            <p className="text-muted-foreground mt-2">
-              Gerencie e monitore o desempenho das campanhas
-            </p>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+            <div>
+              <h1 className="text-4xl font-bold text-foreground">Campanhas</h1>
+              <p className="text-muted-foreground mt-2">
+                Gerencie e monitore o desempenho das campanhas
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  <SelectItem value="ativas">Ativas</SelectItem>
+                  <SelectItem value="inativas">Inativas</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas as Empresas</SelectItem>
+                  {empresas?.map((e) => (
+                    <SelectItem key={e.id_empresa} value={e.id_empresa}>
+                      {e.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todas">Todas</SelectItem>
-              <SelectItem value="ativas">Ativas</SelectItem>
-              <SelectItem value="inativas">Inativas</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         <div className="grid gap-6">
