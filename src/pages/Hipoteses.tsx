@@ -9,9 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Lightbulb, Plus, CheckCircle, XCircle, HelpCircle, Calendar, Upload, Paperclip, X } from "lucide-react";
+import { Lightbulb, Plus, CheckCircle, XCircle, HelpCircle, Calendar, Upload, Paperclip, X, Sparkles, TrendingUp, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Hipotese {
   id_hipotese: string;
@@ -35,14 +36,24 @@ interface Hipotese {
   };
 }
 
+interface HipoteseSugerida {
+  tipo: string;
+  descricao: string;
+  criterio_sucesso: string;
+  prioridade: "alta" | "media" | "baixa";
+}
+
 export default function Hipoteses() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogAberto, setDialogAberto] = useState(false);
   const [dialogResultado, setDialogResultado] = useState(false);
+  const [dialogSugestoes, setDialogSugestoes] = useState(false);
   const [hipoteseSelecionada, setHipoteseSelecionada] = useState<Hipotese | null>(null);
   const [filtroEmpresa, setFiltroEmpresa] = useState("todas");
   const [filtroResultado, setFiltroResultado] = useState("todos");
+  const [sugestoes, setSugestoes] = useState<HipoteseSugerida[]>([]);
+  const [gerandoSugestoes, setGerandoSugestoes] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -204,6 +215,73 @@ export default function Hipoteses() {
     },
   });
 
+  const handleGerarSugestoes = async () => {
+    if (filtroEmpresa === "todas") {
+      toast({
+        title: "Selecione uma empresa",
+        description: "Para gerar sugestões, primeiro selecione uma empresa específica",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGerandoSugestoes(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gerar-sugestoes-hipoteses", {
+        body: { id_empresa: filtroEmpresa },
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        toast({
+          title: "Erro ao gerar sugestões",
+          description: data.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setSugestoes(data.hipoteses || []);
+      setDialogSugestoes(true);
+      toast({
+        title: "Sugestões geradas!",
+        description: `${data.hipoteses?.length || 0} hipóteses sugeridas pela IA`,
+      });
+    } catch (error: any) {
+      console.error("Erro ao gerar sugestões:", error);
+      toast({
+        title: "Erro ao gerar sugestões",
+        description: error.message || "Ocorreu um erro ao processar sua solicitação",
+        variant: "destructive",
+      });
+    } finally {
+      setGerandoSugestoes(false);
+    }
+  };
+
+  const handleUsarSugestao = (sugestao: HipoteseSugerida) => {
+    setFormData({
+      ...formData,
+      tipo: sugestao.tipo,
+      descricao: sugestao.descricao,
+      criterio_sucesso: sugestao.criterio_sucesso,
+      id_empresa: filtroEmpresa !== "todas" ? filtroEmpresa : "",
+    });
+    setDialogSugestoes(false);
+    setDialogAberto(true);
+  };
+
+  const getPrioridadeBadge = (prioridade: string) => {
+    const configs: Record<string, { variant: "default" | "destructive" | "secondary"; label: string }> = {
+      alta: { variant: "destructive", label: "Alta Prioridade" },
+      media: { variant: "default", label: "Média Prioridade" },
+      baixa: { variant: "secondary", label: "Baixa Prioridade" },
+    };
+    const config = configs[prioridade] || configs.media;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
   const getResultadoBadge = (resultado: string | null) => {
     if (!resultado) {
       return <Badge variant="secondary">Pendente</Badge>;
@@ -246,13 +324,22 @@ export default function Hipoteses() {
               Registre e acompanhe hipóteses de teste semanais
             </p>
           </div>
-          <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Nova Hipótese
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleGerarSugestoes}
+              disabled={gerandoSugestoes || filtroEmpresa === "todas"}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {gerandoSugestoes ? "Gerando..." : "Sugestões IA"}
+            </Button>
+            <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nova Hipótese
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Cadastrar Hipótese de Teste</DialogTitle>
@@ -389,6 +476,7 @@ export default function Hipoteses() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <div className="flex gap-4">
@@ -540,6 +628,71 @@ export default function Hipoteses() {
               >
                 Salvar Resultado
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={dialogSugestoes} onOpenChange={setDialogSugestoes}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Sugestões de Hipóteses por IA
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              {filtroEmpresa === "todas" && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Selecione uma empresa específica para gerar sugestões personalizadas
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {sugestoes.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Clique em "Sugestões IA" para gerar hipóteses baseadas nos dados da empresa</p>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {sugestoes.map((sugestao, index) => (
+                    <Card key={index} className="hover:shadow-md transition-shadow">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-2 flex-1">
+                            <div className="flex items-center gap-2">
+                              <Lightbulb className="h-4 w-4 text-primary" />
+                              <CardTitle className="text-lg">{sugestao.tipo}</CardTitle>
+                              {getPrioridadeBadge(sugestao.prioridade)}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleUsarSugestao(sugestao)}
+                          >
+                            Usar Esta
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-sm mb-1">Hipótese:</h4>
+                          <p className="text-sm">{sugestao.descricao}</p>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm mb-1 flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3" />
+                            Critério de Sucesso:
+                          </h4>
+                          <p className="text-sm text-muted-foreground">{sugestao.criterio_sucesso}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>

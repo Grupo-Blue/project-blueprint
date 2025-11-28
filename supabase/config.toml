@@ -45,3 +45,6 @@ verify_jwt = false
 [functions.importar-campanhas-google]
 verify_jwt = false
 
+[functions.gerar-sugestoes-hipoteses]
+verify_jwt = true
+
