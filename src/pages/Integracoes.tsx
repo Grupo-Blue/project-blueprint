@@ -53,6 +53,11 @@ export default function Integracoes() {
   // Tokeniza credentials
   const [tokenizaApiToken, setTokenizaApiToken] = useState("");
   const [tokenizaBaseUrl, setTokenizaBaseUrl] = useState("https://api.tokeniza.com.br");
+  
+  // Mautic credentials
+  const [mauticUrlBase, setMauticUrlBase] = useState("");
+  const [mauticLogin, setMauticLogin] = useState("");
+  const [mauticSenha, setMauticSenha] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -94,6 +99,9 @@ export default function Integracoes() {
     setPipedrivePipelineId("");
     setTokenizaApiToken("");
     setTokenizaBaseUrl("https://api.tokeniza.com.br");
+    setMauticUrlBase("");
+    setMauticLogin("");
+    setMauticSenha("");
     setEditingId(null);
   };
 
@@ -120,6 +128,10 @@ export default function Integracoes() {
     } else if (integracao.tipo === "TOKENIZA") {
       setTokenizaApiToken(config.api_token || "");
       setTokenizaBaseUrl(config.base_url || "https://api.tokeniza.com.br");
+    } else if (integracao.tipo === "MAUTIC") {
+      setMauticUrlBase(config.url_base || "");
+      setMauticLogin(config.login || "");
+      setMauticSenha(config.senha || "");
     }
     
     setEmpresaSelecionada(config.id_empresa || "");
@@ -160,6 +172,9 @@ export default function Integracoes() {
         case 'TOKENIZA':
           functionNames = ['sincronizar-tokeniza'];
           break;
+        case 'MAUTIC':
+          functionNames = ['enriquecer-lead-mautic'];
+          break;
         default:
           throw new Error('Tipo de integração não suportado');
       }
@@ -169,8 +184,13 @@ export default function Integracoes() {
       let errorMessage = '';
       
       for (const functionName of functionNames) {
+        // Para Mautic, precisamos de um email de teste
+        const body = integracao.tipo === 'MAUTIC' 
+          ? { email: 'teste@exemplo.com', id_empresa: (integracao.config_json as any).id_empresa }
+          : { integracao_id: integracaoId };
+          
         const { data, error } = await supabase.functions.invoke(functionName, {
-          body: { integracao_id: integracaoId }
+          body
         });
         
         if (error) {
@@ -265,7 +285,7 @@ export default function Integracoes() {
         domain: pipedriveDomain,
         pipeline_id: pipedrivePipelineId || null
       };
-    } else if (tipoIntegracao === "TOKENIZA") {
+      } else if (tipoIntegracao === "TOKENIZA") {
       if (!tokenizaApiToken || !tokenizaBaseUrl) {
         toast.error("Preencha todos os campos obrigatórios");
         return;
@@ -274,6 +294,17 @@ export default function Integracoes() {
         ...configJson,
         api_token: tokenizaApiToken,
         base_url: tokenizaBaseUrl
+      };
+    } else if (tipoIntegracao === "MAUTIC") {
+      if (!mauticUrlBase || !mauticLogin || !mauticSenha) {
+        toast.error("Preencha todos os campos obrigatórios");
+        return;
+      }
+      configJson = {
+        ...configJson,
+        url_base: mauticUrlBase,
+        login: mauticLogin,
+        senha: mauticSenha
       };
     }
 
@@ -310,7 +341,7 @@ export default function Integracoes() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Integrações</h1>
-          <p className="text-muted-foreground">Gerencie as integrações com Meta Ads, Google Ads, Pipedrive e Tokeniza por empresa</p>
+          <p className="text-muted-foreground">Gerencie as integrações com Meta Ads, Google Ads, Pipedrive, Tokeniza e Mautic por empresa</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
@@ -350,6 +381,7 @@ export default function Integracoes() {
                     <SelectItem value="GOOGLE_ADS">Google Ads</SelectItem>
                     <SelectItem value="PIPEDRIVE">Pipedrive</SelectItem>
                     <SelectItem value="TOKENIZA">Tokeniza</SelectItem>
+                    <SelectItem value="MAUTIC">Mautic</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -502,6 +534,46 @@ export default function Integracoes() {
                 </>
               )}
 
+              {tipoIntegracao === "MAUTIC" && (
+                <>
+                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-900 dark:text-blue-100">Autenticação Mautic</AlertTitle>
+                    <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm">
+                      <p>O Mautic será usado para enriquecer leads do Pipedrive com dados comportamentais, score, tags e localização.</p>
+                      <p className="mt-2"><strong>Autenticação:</strong> Basic Auth (Login + Senha)</p>
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-2">
+                    <Label>URL Base *</Label>
+                    <Input
+                      value={mauticUrlBase}
+                      onChange={(e) => setMauticUrlBase(e.target.value)}
+                      placeholder="https://seu-mautic.com"
+                    />
+                    <p className="text-xs text-muted-foreground">URL base da sua instância Mautic (sem /api)</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Login (Username) *</Label>
+                    <Input
+                      value={mauticLogin}
+                      onChange={(e) => setMauticLogin(e.target.value)}
+                      placeholder="seu_usuario"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Senha (Password) *</Label>
+                    <Input
+                      type="password"
+                      value={mauticSenha}
+                      onChange={(e) => setMauticSenha(e.target.value)}
+                      placeholder="sua_senha"
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="flex items-center space-x-2">
                 <Switch checked={ativo} onCheckedChange={setAtivo} id="ativo" />
                 <Label htmlFor="ativo">Integração Ativa</Label>
@@ -530,6 +602,7 @@ export default function Integracoes() {
           <TabsTrigger value="google">Google Ads</TabsTrigger>
           <TabsTrigger value="pipedrive">Pipedrive</TabsTrigger>
           <TabsTrigger value="tokeniza">Tokeniza</TabsTrigger>
+          <TabsTrigger value="mautic">Mautic</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meta" className="space-y-4">
@@ -724,6 +797,58 @@ export default function Integracoes() {
                         <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
                         <CardDescription>
                           Base URL: {config.base_url}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                          {integracao.ativo ? 'Ativo' : 'Inativo'}
+                        </span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleTestIntegration(integracao)}
+                          disabled={testingIntegracoes.has(integracao.id_integracao)}
+                        >
+                          <TestTube2 className="w-4 h-4 mr-2" />
+                          {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })
+          )}
+        </TabsContent>
+
+        <TabsContent value="mautic" className="space-y-4">
+          {integracoes.filter(i => i.tipo === "MAUTIC").length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Nenhuma integração Mautic configurada
+              </CardContent>
+            </Card>
+          ) : (
+            integracoes.filter(i => i.tipo === "MAUTIC").map((integracao) => {
+              const config = integracao.config_json as any;
+              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              
+              return (
+                <Card key={integracao.id_integracao}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription>
+                          URL Base: {config.url_base}
+                          <br />
+                          Login: {config.login}
                         </CardDescription>
                       </div>
                       <div className="flex items-center space-x-2">
