@@ -18,17 +18,25 @@ export function FiltroPeriodo() {
   const inicioMes = startOfMonth(dataReferencia);
   const fimMes = endOfMonth(dataReferencia);
 
-  // Buscar semanas disponíveis (últimos 6 meses)
+  // Debug: log do estado atual
+  React.useEffect(() => {
+    console.log("FiltroPeriodo - Estado atual:", {
+      tipoFiltro,
+      dataReferencia: format(dataReferencia, "MMMM yyyy", { locale: ptBR }),
+      dataEspecifica: dataEspecifica ? format(dataEspecifica, "MMMM yyyy", { locale: ptBR }) : null,
+      semanaSelecionada,
+    });
+  }, [tipoFiltro, dataReferencia, dataEspecifica, semanaSelecionada]);
+
+  // Buscar semanas disponíveis do mês de referência
   const { data: semanas } = useQuery({
-    queryKey: ["semanas-disponiveis"],
+    queryKey: ["semanas-disponiveis", inicioMes.toISOString(), fimMes.toISOString()],
     queryFn: async () => {
-      const seisMesesAtras = new Date();
-      seisMesesAtras.setMonth(seisMesesAtras.getMonth() - 6);
-      
       const { data, error } = await supabase
         .from("semana")
         .select("*")
-        .gte("data_inicio", seisMesesAtras.toISOString())
+        .gte("data_inicio", inicioMes.toISOString())
+        .lte("data_fim", fimMes.toISOString())
         .order("ano", { ascending: false })
         .order("numero_semana", { ascending: false });
       if (error) throw error;
@@ -52,12 +60,13 @@ export function FiltroPeriodo() {
     },
   });
 
-  // Definir semana atual automaticamente apenas se tipo for semana_especifica
+  // Definir semana automaticamente quando mudar para semana_especifica
   React.useEffect(() => {
-    if (tipoFiltro === "semana_especifica" && !semanaSelecionada && semanaAtual) {
-      setSemanaSelecionada(semanaAtual);
+    if (tipoFiltro === "semana_especifica" && !semanaSelecionada && semanas && semanas.length > 0) {
+      // Selecionar a semana mais recente do mês
+      setSemanaSelecionada(semanas[0].id_semana);
     }
-  }, [semanaAtual, semanaSelecionada, setSemanaSelecionada, tipoFiltro]);
+  }, [semanas, semanaSelecionada, setSemanaSelecionada, tipoFiltro]);
 
   const handleTipoChange = (value: string) => {
     const novoTipo = value as TipoFiltroPeriodo;
@@ -69,8 +78,6 @@ export function FiltroPeriodo() {
     }
     if (novoTipo !== "semana_especifica") {
       setSemanaSelecionada(null);
-    } else if (novoTipo === "semana_especifica" && semanaAtual) {
-      setSemanaSelecionada(semanaAtual);
     }
   };
 
