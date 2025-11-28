@@ -53,6 +53,8 @@ serve(async (req) => {
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
       const idEmpresa = config.id_empresa;
+      const customerId = config.customer_id?.replace(/-/g, "");
+      const loginCustomerId = config.login_customer_id?.replace(/-/g, "");
 
       console.log(`Processando integração para empresa ${idEmpresa}`);
 
@@ -113,14 +115,20 @@ serve(async (req) => {
         `;
 
         try {
-          const campaignsUrl = `https://googleads.googleapis.com/v14/customers/${config.customer_id.replace(/-/g, "")}/googleAds:search`;
+          const campaignsUrl = `https://googleads.googleapis.com/v14/customers/${customerId}/googleAds:search`;
+          const campaignsHeaders: Record<string, string> = {
+            "Authorization": `Bearer ${access_token}`,
+            "developer-token": config.developer_token,
+            "Content-Type": "application/json",
+          };
+          
+          if (loginCustomerId) {
+            campaignsHeaders["login-customer-id"] = loginCustomerId;
+          }
+          
           const campaignsResponse = await fetch(campaignsUrl, {
             method: "POST",
-            headers: {
-              "Authorization": `Bearer ${access_token}`,
-              "developer-token": config.developer_token,
-              "Content-Type": "application/json",
-            },
+            headers: campaignsHeaders,
             body: JSON.stringify({ query: campaignsQuery }),
           });
 
@@ -161,15 +169,21 @@ serve(async (req) => {
             AND segments.date = '${hoje}'
         `;
 
-        const apiUrl = `https://googleads.googleapis.com/v14/customers/${config.customer_id.replace(/-/g, "")}/googleAds:searchStream`;
+        const apiUrl = `https://googleads.googleapis.com/v14/customers/${customerId}/googleAds:searchStream`;
+        
+        const metricsHeaders: Record<string, string> = {
+          "Authorization": `Bearer ${access_token}`,
+          "developer-token": config.developer_token,
+          "Content-Type": "application/json",
+        };
+        
+        if (loginCustomerId) {
+          metricsHeaders["login-customer-id"] = loginCustomerId;
+        }
         
         const response = await fetch(apiUrl, {
           method: "POST",
-          headers: {
-            "Authorization": `Bearer ${access_token}`,
-            "developer-token": config.developer_token,
-            "Content-Type": "application/json",
-          },
+          headers: metricsHeaders,
           body: JSON.stringify({ query }),
         });
 
