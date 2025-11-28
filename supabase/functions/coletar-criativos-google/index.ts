@@ -131,7 +131,7 @@ serve(async (req) => {
           `;
 
           try {
-            const campaignsUrl = `https://googleads.googleapis.com/v16/customers/${customerId}/googleAds:search`;
+            const campaignsUrl = `https://googleads.googleapis.com/v22/customers/${customerId}/googleAds:search`;
             const campaignsResponse = await fetch(campaignsUrl, {
               method: "POST",
               headers: {
