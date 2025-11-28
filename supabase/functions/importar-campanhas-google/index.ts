@@ -102,7 +102,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Query GAQL para buscar todas as campanhas ativas
+        // Query GAQL para buscar todas as campanhas
         const gaqlQuery = `
           SELECT 
             campaign.id,
@@ -110,7 +110,7 @@ serve(async (req) => {
             campaign.status,
             campaign.advertising_channel_type
           FROM campaign
-          WHERE campaign.status = 'ENABLED'
+          WHERE campaign.status IN ('ENABLED', 'PAUSED')
           ORDER BY campaign.name
         `;
 
