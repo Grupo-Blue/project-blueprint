@@ -120,23 +120,35 @@ serve(async (req) => {
     const dealAberto = dealData.status === "open";
     const vendaRealizada = dealData.status === "won";
     
-    // Calcular flags de funil
-    const levantouMao = dealAberto && dealData.stage_id !== null && dealData.stage_id > 2;
-    const temReuniao = dealAberto && dealData.stage_id !== null && dealData.stage_id > 3;
-    const reuniaoRealizada = dealAberto && dealData.stage_id !== null && dealData.stage_id > 4;
-    
-    // MQL: stage > 1 OU levantou a mão (quem levanta a mão é qualificado automaticamente)
-    const isMql = (dealAberto && dealData.stage_id !== null && dealData.stage_id > 1) || levantouMao;
-    
-    const urlPipedrive = `https://${domain}.pipedrive.com/deal/${dealData.id}`;
-    const valorDeal = dealData.value ? parseFloat(dealData.value) : null;
-    
+    // Buscar nome do stage atual
     let stageAtual = null;
     if (dealPerdido) {
       stageAtual = "Perdido";
     } else if (dealData.stage_id && stagesMap[dealData.stage_id]) {
       stageAtual = stagesMap[dealData.stage_id];
     }
+    
+    // Calcular flags de funil baseado no NOME do stage (não no ID numérico)
+    const levantouMao = dealAberto && stageAtual && [
+      "Contato Iniciado",
+      "Negociação", 
+      "Aguardando pagamento"
+    ].includes(stageAtual);
+    
+    const temReuniao = dealAberto && stageAtual && [
+      "Negociação",
+      "Aguardando pagamento"
+    ].includes(stageAtual);
+    
+    const reuniaoRealizada = dealAberto && stageAtual && [
+      "Aguardando pagamento"
+    ].includes(stageAtual);
+    
+    // MQL: qualquer stage além de "Lead" inicial, ou se levantou a mão
+    const isMql = (dealAberto && stageAtual && stageAtual !== "Lead") || levantouMao;
+    
+    const urlPipedrive = `https://${domain}.pipedrive.com/deal/${dealData.id}`;
+    const valorDeal = dealData.value ? parseFloat(dealData.value) : null;
 
     // IDs dos campos customizados do Pipedrive para UTMs
     const PIPEDRIVE_FIELD_IDS = {
