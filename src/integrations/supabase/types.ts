@@ -147,6 +147,50 @@ export type Database = {
           },
         ]
       }
+      analise_inteligencia: {
+        Row: {
+          analise_texto: string
+          created_at: string
+          data_analise: string
+          data_fim_periodo: string
+          data_inicio_periodo: string
+          id_analise: string
+          id_empresa: string
+          metricas_resumo: Json | null
+          updated_at: string
+        }
+        Insert: {
+          analise_texto: string
+          created_at?: string
+          data_analise: string
+          data_fim_periodo: string
+          data_inicio_periodo: string
+          id_analise?: string
+          id_empresa: string
+          metricas_resumo?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          analise_texto?: string
+          created_at?: string
+          data_analise?: string
+          data_fim_periodo?: string
+          data_inicio_periodo?: string
+          id_analise?: string
+          id_empresa?: string
+          metricas_resumo?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analise_inteligencia_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       aprendizado_semana: {
         Row: {
           anexos: Json | null
