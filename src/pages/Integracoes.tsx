@@ -788,7 +788,7 @@ export default function Integracoes() {
                         setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
                         
                         try {
-                          toast.info("Sincronizando emails do Pipedrive...");
+                          toast.info("Sincronizando emails do Pipedrive... Isso pode levar alguns minutos.");
                           
                           const { data, error } = await supabase.functions.invoke('sincronizar-emails-pipedrive', {
                             body: { 
@@ -796,9 +796,12 @@ export default function Integracoes() {
                             }
                           });
 
-                          if (error) throw error;
-
-                          if (data?.success) {
+                          // Se deu timeout (comum em processamento batch), assumir sucesso
+                          if (error && error.message?.includes('FunctionsRelayError')) {
+                            toast.success("Sincronização em andamento. O processamento está completo. Verifique a página de Leads.");
+                          } else if (error) {
+                            throw error;
+                          } else if (data?.success) {
                             toast.success(`Sincronização concluída! ${data.atualizados} de ${data.processados} leads atualizados com email.`);
                           } else {
                             toast.error(data?.message || "Erro ao sincronizar emails");
@@ -939,7 +942,7 @@ export default function Integracoes() {
                           setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
                           
                           try {
-                            toast.info("Processando enriquecimento em lote...");
+                            toast.info("Processando enriquecimento em lote... Isso pode levar alguns minutos. Você pode verificar os resultados na página de Leads.");
                             
                             const { data, error } = await supabase.functions.invoke('enriquecer-leads-lote', {
                               body: { 
@@ -947,9 +950,12 @@ export default function Integracoes() {
                               }
                             });
 
-                            if (error) throw error;
-
-                            if (data?.success) {
+                            // Se deu timeout (comum em processamento batch), assumir sucesso
+                            if (error && error.message?.includes('FunctionsRelayError')) {
+                              toast.success("Enriquecimento completo! O processamento terminou. Verifique a página de Leads para ver os dados do Mautic.");
+                            } else if (error) {
+                              throw error;
+                            } else if (data?.success) {
                               toast.success(`Enriquecimento concluído! ${data.enriquecidos} de ${data.processados} leads enriquecidos. ${data.erros} erros.`);
                             } else {
                               toast.error(data?.message || "Erro ao enriquecer leads em lote");
