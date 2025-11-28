@@ -175,11 +175,8 @@ serve(async (req) => {
         console.log(`[Mautic] Dados completos obtidos - UTMs disponíveis: ${fullContact.utmtags ? 'Sim' : 'Não'}`);
         
         // Log detalhado dos campos para debug de UTM
-        console.log(`[Mautic] Campos do contato:`, JSON.stringify({
-          utmtags: fullContact.utmtags,
-          fields_all_keys: fullContact.fields?.all ? Object.keys(fullContact.fields.all) : [],
-          sample_fields: fullContact.fields?.all ? Object.keys(fullContact.fields.all).slice(0, 10) : []
-        }));
+        console.log(`[Mautic] Campo attribution:`, fullContact.fields?.all?.attribution || 'N/A');
+        console.log(`[Mautic] utmtags array:`, JSON.stringify(fullContact.utmtags));
       }
     }
 
