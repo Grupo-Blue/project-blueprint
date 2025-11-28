@@ -8,13 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2 } from "lucide-react";
+import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const Leads = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [scoreMinimo, setScoreMinimo] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
 
@@ -57,7 +59,11 @@ const Leads = () => {
       (statusFilter === "perdido" && lead.stage_atual === "Perdido") ||
       (statusFilter === "novo" && !lead.is_mql && lead.stage_atual !== "Perdido");
 
-    return matchesSearch && matchesStatus;
+    const matchesScore = 
+      !scoreMinimo ||
+      (lead.mautic_score !== null && lead.mautic_score !== undefined && lead.mautic_score >= parseInt(scoreMinimo));
+
+    return matchesSearch && matchesStatus && matchesScore;
   });
 
   // Paginação
@@ -70,6 +76,23 @@ const Leads = () => {
   const handleFilterChange = (setter: (value: any) => void) => (value: any) => {
     setter(value);
     setCurrentPage(1);
+  };
+
+  // Função auxiliar para determinar engajamento baseado em última atividade
+  const getEngajamento = (lastActive: string | null, score: number | null) => {
+    if (!lastActive || score === null) return null;
+    
+    const diasInativo = differenceInDays(new Date(), new Date(lastActive));
+    
+    if (diasInativo <= 7 && score >= 50) {
+      return { nivel: 'alto', label: 'Alto', icon: Flame, color: 'text-red-600' };
+    } else if (diasInativo <= 30 && score >= 20) {
+      return { nivel: 'medio', label: 'Médio', icon: Zap, color: 'text-yellow-600' };
+    } else if (score > 0) {
+      return { nivel: 'baixo', label: 'Baixo', icon: Activity, color: 'text-blue-600' };
+    }
+    
+    return null;
   };
 
   // Calcular estatísticas
@@ -203,6 +226,14 @@ const Leads = () => {
               <SelectItem value="perdido">Perdidos</SelectItem>
             </SelectContent>
           </Select>
+          <Input
+            type="number"
+            placeholder="Score mínimo"
+            value={scoreMinimo}
+            onChange={(e) => handleFilterChange(setScoreMinimo)(e.target.value)}
+            className="w-full sm:w-[150px]"
+            min="0"
+          />
         </CardContent>
       </Card>
 
@@ -232,6 +263,7 @@ const Leads = () => {
                   <TableHead>Empresa</TableHead>
                   <TableHead>Stage</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-center">Score / Engajamento</TableHead>
                   <TableHead>Criado em</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-center">Ações</TableHead>
@@ -240,6 +272,8 @@ const Leads = () => {
               <TableBody>
                 {paginatedLeads?.map((lead) => {
                   const diasNoFunil = differenceInDays(new Date(), new Date(lead.data_criacao));
+                  const engajamento = getEngajamento(lead.mautic_last_active, lead.mautic_score);
+                  const temDadosMautic = lead.mautic_score !== null || lead.mautic_tags || lead.cidade_mautic;
                   
                   return (
                     <TableRow key={lead.id_lead}>
@@ -251,6 +285,30 @@ const Leads = () => {
                               <Building2 className="h-3 w-3" />
                               {lead.organizacao}
                             </span>
+                          )}
+                          {temDadosMautic && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {lead.mautic_tags && Array.isArray(lead.mautic_tags) && lead.mautic_tags.length > 0 && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="text-xs cursor-help">
+                                        <Tag className="h-3 w-3 mr-1" />
+                                        {lead.mautic_tags.length} {lead.mautic_tags.length === 1 ? 'tag' : 'tags'}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="text-xs">{lead.mautic_tags.join(', ')}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                              {lead.cidade_mautic && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {lead.cidade_mautic}{lead.estado_mautic ? ` - ${lead.estado_mautic}` : ''}
+                                </Badge>
+                              )}
+                            </div>
                           )}
                         </div>
                       </TableCell>
@@ -282,6 +340,34 @@ const Leads = () => {
                             <Badge className="bg-green-600">Venda</Badge>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {lead.mautic_score !== null && lead.mautic_score !== undefined ? (
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="font-semibold text-lg">{lead.mautic_score}</span>
+                            {engajamento && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className={`${engajamento.color} cursor-help`}>
+                                      <engajamento.icon className="h-3 w-3 mr-1" />
+                                      {engajamento.label}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">
+                                      Última atividade: {lead.mautic_last_active 
+                                        ? format(new Date(lead.mautic_last_active), "dd/MM/yyyy", { locale: ptBR })
+                                        : 'N/A'}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
@@ -331,8 +417,8 @@ const Leads = () => {
                 })}
                 {!filteredLeads || filteredLeads.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      {searchTerm || statusFilter !== "all" 
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      {searchTerm || statusFilter !== "all" || scoreMinimo
                         ? "Nenhum lead encontrado com os filtros aplicados"
                         : "Nenhum lead encontrado"
                       }
