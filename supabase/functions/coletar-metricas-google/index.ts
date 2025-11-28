@@ -115,7 +115,7 @@ serve(async (req) => {
         `;
 
         try {
-          const campaignsUrl = `https://googleads.googleapis.com/v14/customers/${customerId}/googleAds:search`;
+          const campaignsUrl = `https://googleads.googleapis.com/v22/customers/${customerId}/googleAds:search`;
           const campaignsHeaders: Record<string, string> = {
             "Authorization": `Bearer ${access_token}`,
             "developer-token": config.developer_token,
@@ -169,7 +169,7 @@ serve(async (req) => {
             AND segments.date = '${hoje}'
         `;
 
-        const apiUrl = `https://googleads.googleapis.com/v14/customers/${customerId}/googleAds:search`;
+        const apiUrl = `https://googleads.googleapis.com/v22/customers/${customerId}/googleAds:search`;
         
         const metricsHeaders: Record<string, string> = {
           "Authorization": `Bearer ${access_token}`,
