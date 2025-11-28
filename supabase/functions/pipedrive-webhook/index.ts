@@ -135,17 +135,17 @@ serve(async (req) => {
       "Aguardando pagamento"
     ].includes(stageAtual);
     
-    const temReuniao = dealAberto && stageAtual && [
+    const temReuniao = (dealAberto && stageAtual && [
       "Negociação",
       "Aguardando pagamento"
-    ].includes(stageAtual);
+    ].includes(stageAtual)) || vendaRealizada; // Vendas sempre tiveram reunião
     
-    const reuniaoRealizada = dealAberto && stageAtual && [
+    const reuniaoRealizada = (dealAberto && stageAtual && [
       "Aguardando pagamento"
-    ].includes(stageAtual);
+    ].includes(stageAtual)) || vendaRealizada; // Vendas sempre tiveram reunião
     
     // MQL: qualquer stage além de "Lead" inicial, ou se levantou a mão
-    const isMql = (dealAberto && stageAtual && stageAtual !== "Lead") || levantouMao;
+    const isMql = (dealAberto && stageAtual && stageAtual !== "Lead") || levantouMao || vendaRealizada;
     
     const urlPipedrive = `https://${domain}.pipedrive.com/deal/${dealData.id}`;
     const valorDeal = dealData.value ? parseFloat(dealData.value) : null;
