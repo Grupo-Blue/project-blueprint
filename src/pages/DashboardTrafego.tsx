@@ -230,6 +230,12 @@ function CriativosQuery({ campanhaId, plataforma }: { campanhaId: string; plataf
               <p className="font-medium">{criativo.cliques || 0}</p>
             </div>
             <div className="text-center">
+              <p className="text-xs text-muted-foreground">Verba</p>
+              <p className="font-medium">
+                R$ {(criativo.verba_investida || 0).toFixed(2)}
+              </p>
+            </div>
+            <div className="text-center">
               <p className="text-xs text-muted-foreground">CPL</p>
               <p className="font-medium">
                 {criativo.cpl ? `R$ ${criativo.cpl.toFixed(2)}` : "N/A"}
