@@ -99,17 +99,41 @@ const Dashboard = () => {
   });
 
   const { data: metricasSemanais } = useQuery({
-    queryKey: ["metricas-dashboard", semanaSelecionada],
+    queryKey: ["metricas-dashboard", tipoFiltro, semanaSelecionada, inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada],
     queryFn: async () => {
-      if (!semanaSelecionada) return null;
+      if (!empresaSelecionada) return null;
+      
+      // Se for filtro de semana específica, busca só aquela semana
+      if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
+        const { data, error } = await supabase
+          .from("empresa_semana_metricas")
+          .select("*, semana(*)")
+          .eq("id_semana", semanaSelecionada)
+          .eq("id_empresa", empresaSelecionada);
+        if (error) throw error;
+        return data;
+      }
+      
+      // Para outros filtros, busca todas as semanas do período
+      const { data: semanas, error: semanasError } = await supabase
+        .from("semana")
+        .select("id_semana")
+        .gte("data_inicio", inicioMes.toISOString())
+        .lte("data_fim", fimMes.toISOString());
+      
+      if (semanasError) throw semanasError;
+      if (!semanas || semanas.length === 0) return null;
+      
       const { data, error } = await supabase
         .from("empresa_semana_metricas")
-        .select("*")
-        .eq("id_semana", semanaSelecionada);
+        .select("*, semana(*)")
+        .in("id_semana", semanas.map(s => s.id_semana))
+        .eq("id_empresa", empresaSelecionada);
+      
       if (error) throw error;
       return data;
     },
-    enabled: !!semanaSelecionada,
+    enabled: !!empresaSelecionada,
   });
 
   // Calcular estatísticas
@@ -201,8 +225,10 @@ const Dashboard = () => {
             </div>
             <p className="text-xs text-muted-foreground">
               {metricasSemanais && metricasSemanais.length > 0 
-                ? `Semana ${semanaInfo?.numero_semana}/${semanaInfo?.ano}` 
-                : "Sem métricas semanais"}
+                ? (tipoFiltro === "semana_especifica" 
+                    ? `Semana ${semanaInfo?.numero_semana}/${semanaInfo?.ano}`
+                    : labelPeriodo)
+                : "Sem métricas no período"}
             </p>
           </CardContent>
         </Card>
