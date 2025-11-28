@@ -9,12 +9,32 @@ import { ValidacaoUTM } from "@/components/ValidacaoUTM";
 import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { InteligenciaIA } from "@/components/InteligenciaIA";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from "react";
 
 const Dashboard = () => {
   const { semanaSelecionada } = usePeriodo();
+  const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("");
   const mesAtual = new Date();
   const inicioMes = startOfMonth(mesAtual);
   const fimMes = endOfMonth(mesAtual);
+
+  // Buscar empresas
+  const { data: empresas } = useQuery({
+    queryKey: ["empresas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("empresa")
+        .select("id_empresa, nome")
+        .order("nome");
+      if (error) throw error;
+      // Seleciona a primeira empresa por padrão
+      if (data && data.length > 0 && !empresaSelecionada) {
+        setEmpresaSelecionada(data[0].id_empresa);
+      }
+      return data;
+    },
+  });
 
   // Buscar campanhas ativas
   const { data: campanhas } = useQuery({
@@ -100,7 +120,21 @@ const Dashboard = () => {
               Sistema de Governança de Tráfego Pago
             </p>
           </div>
-          <FiltroPeriodo />
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+            <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Selecione a empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                {empresas?.map((empresa) => (
+                  <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
+                    {empresa.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FiltroPeriodo />
+          </div>
         </div>
       </div>
 
@@ -168,7 +202,7 @@ const Dashboard = () => {
       </div>
 
       <div className="mb-6 md:mb-8">
-        <InteligenciaIA />
+        {empresaSelecionada && <InteligenciaIA empresaId={empresaSelecionada} />}
       </div>
 
       <ValidacaoUTM />

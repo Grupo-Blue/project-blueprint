@@ -12,11 +12,25 @@ serve(async (req) => {
   }
 
   try {
+    const { id_empresa } = await req.json();
+    
+    if (!id_empresa) {
+      return new Response(
+        JSON.stringify({ error: "id_empresa é obrigatório" }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    console.log(`Analisando dados para empresa: ${id_empresa}`);
 
     // Calcular data de ontem e 30 dias atrás
     const hoje = new Date();
@@ -33,28 +47,51 @@ serve(async (req) => {
       fim: ontem.toISOString(),
     });
 
-    // Buscar leads dos últimos 30 dias
+    // Buscar leads dos últimos 30 dias da empresa
     const { data: leads, error: leadsError } = await supabase
       .from("lead")
       .select("*, criativo(*)")
+      .eq("id_empresa", id_empresa)
       .gte("data_criacao", inicio30Dias.toISOString())
       .lte("data_criacao", ontem.toISOString());
 
     if (leadsError) throw leadsError;
 
+    // Buscar contas de anúncio da empresa
+    const { data: contas, error: contasError } = await supabase
+      .from("conta_anuncio")
+      .select("id_conta")
+      .eq("id_empresa", id_empresa);
+    
+    if (contasError) throw contasError;
+    
+    const contasIds = contas?.map(c => c.id_conta) || [];
+    
+    // Buscar campanhas das contas da empresa
+    const { data: campanhas, error: campanhasError } = await supabase
+      .from("campanha")
+      .select("id_campanha")
+      .in("id_conta", contasIds);
+    
+    if (campanhasError) throw campanhasError;
+    
+    const campanhasIds = campanhas?.map(c => c.id_campanha) || [];
+
     // Buscar métricas de campanhas dos últimos 30 dias
     const { data: metricasDia, error: metricasError } = await supabase
       .from("campanha_metricas_dia")
       .select("*, campanha(*)")
+      .in("id_campanha", campanhasIds)
       .gte("data", inicio30Dias.toISOString().split("T")[0])
       .lte("data", ontem.toISOString().split("T")[0]);
 
     if (metricasError) throw metricasError;
 
-    // Buscar métricas semanais recentes
+    // Buscar métricas semanais recentes da empresa
     const { data: metricasSemanais, error: semanaisError } = await supabase
       .from("empresa_semana_metricas")
       .select("*, semana(*)")
+      .eq("id_empresa", id_empresa)
       .order("created_at", { ascending: false })
       .limit(4);
 

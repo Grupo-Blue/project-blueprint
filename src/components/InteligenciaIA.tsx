@@ -3,18 +3,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Brain, Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import ReactMarkdown from "react-markdown";
 
-export const InteligenciaIA = () => {
+interface InteligenciaIAProps {
+  empresaId: string;
+}
+
+export const InteligenciaIA = ({ empresaId }: InteligenciaIAProps) => {
   const { data, isLoading, error } = useQuery({
-    queryKey: ["inteligencia-ia"],
+    queryKey: ["inteligencia-ia", empresaId],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("analise-inteligencia");
+      const { data, error } = await supabase.functions.invoke("analise-inteligencia", {
+        body: { id_empresa: empresaId }
+      });
       
       if (error) throw error;
       return data;
     },
     refetchInterval: 1000 * 60 * 30, // Atualiza a cada 30 minutos
     staleTime: 1000 * 60 * 15, // Considera stale após 15 minutos
+    enabled: !!empresaId, // Só executa se houver empresa selecionada
   });
 
   if (error) {
@@ -47,8 +55,10 @@ export const InteligenciaIA = () => {
           </div>
         ) : (
           <div className="prose prose-sm max-w-none dark:prose-invert">
-            <div className="whitespace-pre-wrap text-sm leading-relaxed">
-              {data?.analise}
+            <div className="text-sm leading-relaxed">
+              <ReactMarkdown>
+                {data?.analise || "Nenhuma análise disponível no momento."}
+              </ReactMarkdown>
             </div>
           </div>
         )}
