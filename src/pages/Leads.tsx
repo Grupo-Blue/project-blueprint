@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 const Leads = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [stageFilter, setStageFilter] = useState<string>("all");
   const [scoreMinimo, setScoreMinimo] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -62,11 +63,15 @@ const Leads = () => {
       (statusFilter === "nao_comprou" && !lead.venda_realizada) ||
       (statusFilter === "novo" && !lead.is_mql && lead.stage_atual !== "Perdido");
 
+    const matchesStage = 
+      stageFilter === "all" ||
+      lead.stage_atual === stageFilter;
+
     const matchesScore = 
       !scoreMinimo ||
       (lead.mautic_score !== null && lead.mautic_score !== undefined && lead.mautic_score >= parseInt(scoreMinimo));
 
-    return matchesSearch && matchesStatus && matchesScore;
+    return matchesSearch && matchesStatus && matchesStage && matchesScore;
   });
 
   // Ordenação
@@ -335,6 +340,18 @@ const Leads = () => {
               <SelectItem value="perdido">Perdidos</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={stageFilter} onValueChange={handleFilterChange(setStageFilter)}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Filtrar por stage" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Stages</SelectItem>
+              <SelectItem value="Lead">Lead</SelectItem>
+              <SelectItem value="Aguardando pagamento">Aguardando pagamento</SelectItem>
+              <SelectItem value="Vendido">Vendido</SelectItem>
+              <SelectItem value="Perdido">Perdido</SelectItem>
+            </SelectContent>
+          </Select>
           <Input
             type="number"
             placeholder="Score mínimo"
@@ -370,7 +387,7 @@ const Leads = () => {
                 <TableRow>
                   <SortableTableHead column="nome">Lead / Organização</SortableTableHead>
                   <SortableTableHead column="empresa">Empresa</SortableTableHead>
-                  <SortableTableHead column="stage">Stage</SortableTableHead>
+                  <TableHead>Stage</TableHead>
                   <TableHead>Status</TableHead>
                   <SortableTableHead column="score">Score / Engajamento</SortableTableHead>
                   <SortableTableHead column="data">Criado em</SortableTableHead>
