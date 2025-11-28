@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   TrendingUp, 
   Target, 
@@ -13,13 +15,29 @@ import {
   Zap,
   ArrowRight,
   Eye,
-  CheckCircle
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Image,
+  Video,
+  Grid3x3,
+  FileQuestion,
+  Copy,
+  ExternalLink,
+  RefreshCw,
+  Download,
+  GitBranch,
+  AlertTriangle
 } from "lucide-react";
 import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { CampanhaFluxoDiagram } from "@/components/CampanhaFluxoDiagram";
 
 interface CampanhaMetrica {
   id_campanha: string;
@@ -34,11 +52,227 @@ interface CampanhaMetrica {
   ticket_medio: number;
   cac: number;
   qtd_criativos?: number;
+  plataforma?: string;
+}
+
+interface Criativo {
+  id_criativo: string;
+  id_criativo_externo: string;
+  tipo: string;
+  descricao: string | null;
+  ativo: boolean;
+  url_midia: string | null;
+  url_final: string | null;
+  leads?: number;
+  cliques?: number;
+  impressoes?: number;
+  verba_investida?: number;
+  cpl?: number | null;
+  ctr?: number | null;
+}
+
+const getTipoIcon = (tipo: string) => {
+  switch (tipo) {
+    case "VIDEO":
+      return <Video className="h-4 w-4" />;
+    case "IMAGEM":
+      return <Image className="h-4 w-4" />;
+    case "CARROSSEL":
+      return <Grid3x3 className="h-4 w-4" />;
+    default:
+      return <FileQuestion className="h-4 w-4" />;
+  }
+};
+
+const getTipoLabel = (tipo: string) => {
+  const labels: Record<string, string> = {
+    VIDEO: "Vídeo",
+    IMAGEM: "Imagem",
+    CARROSSEL: "Carrossel",
+    OUTRO: "Outro",
+  };
+  return labels[tipo] || tipo;
+};
+
+const getCriativoUrl = (plataforma: string, idExterno: string) => {
+  if (plataforma === "META") {
+    return `https://business.facebook.com/adsmanager/manage/ads?act=${idExterno.split('_')[0]}&selected_ad_ids=${idExterno}`;
+  } else if (plataforma === "GOOGLE") {
+    return `https://ads.google.com/aw/ads?campaignId=${idExterno}`;
+  }
+  return null;
+};
+
+// Componente para renderizar criativos de uma campanha
+function CriativosQuery({ campanhaId, plataforma }: { campanhaId: string; plataforma: string }) {
+  const { toast } = useToast();
+  
+  const { data: criativos, isLoading } = useQuery({
+    queryKey: ["criativos-campanha", campanhaId],
+    queryFn: async () => {
+      const { data: criativos, error: criativosError } = await supabase
+        .from("criativo")
+        .select("*")
+        .eq("id_campanha", campanhaId);
+
+      if (criativosError) throw criativosError;
+
+      // Buscar métricas dos criativos
+      const criativosComMetricas = await Promise.all(
+        (criativos || []).map(async (criativo) => {
+          // Buscar leads do criativo
+          const { count: leadsCount } = await supabase
+            .from("lead")
+            .select("id_lead", { count: "exact", head: true })
+            .eq("id_criativo", criativo.id_criativo);
+
+          // Buscar métricas diárias do criativo
+          const { data: metricas } = await supabase
+            .from("criativo_metricas_dia")
+            .select("cliques, impressoes, verba_investida")
+            .eq("id_criativo", criativo.id_criativo);
+
+          const totaisMetricas = (metricas || []).reduce(
+            (acc, m) => ({
+              cliques: acc.cliques + (m.cliques || 0),
+              impressoes: acc.impressoes + (m.impressoes || 0),
+              verba_investida: acc.verba_investida + (m.verba_investida || 0),
+            }),
+            { cliques: 0, impressoes: 0, verba_investida: 0 }
+          );
+
+          const cpl = (leadsCount || 0) > 0 ? totaisMetricas.verba_investida / (leadsCount || 0) : null;
+          const ctr = totaisMetricas.impressoes > 0 ? (totaisMetricas.cliques / totaisMetricas.impressoes) * 100 : null;
+
+          return {
+            ...criativo,
+            leads: leadsCount || 0,
+            cpl,
+            ctr,
+            ...totaisMetricas,
+          };
+        })
+      );
+
+      return criativosComMetricas as Criativo[];
+    },
+  });
+
+  const handleCopyId = (idExterno: string) => {
+    navigator.clipboard.writeText(idExterno);
+    toast({
+      title: "ID copiado!",
+      description: "Use este ID no parâmetro utm_content dos seus anúncios",
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+      </div>
+    );
+  }
+
+  if (!criativos || criativos.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-4">
+        Nenhum criativo cadastrado
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {criativos.map((criativo) => (
+        <div
+          key={criativo.id_criativo}
+          className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+        >
+          <div className="flex items-center gap-3 flex-1">
+            <div className="flex items-center gap-2">
+              {getTipoIcon(criativo.tipo)}
+              <span className="text-sm font-medium">
+                {getTipoLabel(criativo.tipo)}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">ID:</span>
+                <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                  {criativo.id_criativo_externo}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleCopyId(criativo.id_criativo_externo)}
+                  className="h-6 w-6 p-0"
+                  title="Copiar ID"
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+              {criativo.descricao && (
+                <span className="text-sm text-muted-foreground truncate max-w-[400px]">
+                  {criativo.descricao}
+                </span>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-4 text-sm">
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Leads</p>
+              <p className="font-medium">{criativo.leads || 0}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">Cliques</p>
+              <p className="font-medium">{criativo.cliques || 0}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">CPL</p>
+              <p className="font-medium">
+                {criativo.cpl ? `R$ ${criativo.cpl.toFixed(2)}` : "N/A"}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-muted-foreground">CTR</p>
+              <p className="font-medium">
+                {criativo.ctr ? `${criativo.ctr.toFixed(2)}%` : "N/A"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 ml-4">
+            <Badge variant={criativo.ativo ? "secondary" : "outline"}>
+              {criativo.ativo ? "Ativo" : "Inativo"}
+            </Badge>
+            {criativo.url_midia && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(criativo.url_midia!, '_blank')}
+                className="gap-1"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Ver Mídia
+              </Button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function DashboardTrafego() {
+  const { toast } = useToast();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
   const [ordenacao, setOrdenacao] = useState<string>("verba_desc");
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [syncingCreatives, setSyncingCreatives] = useState(false);
+  const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
+  const [campanhaSelecionada, setCampanhaSelecionada] = useState<{ id: string; nome: string } | null>(null);
   const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
 
   // Usar data do filtro selecionado
@@ -108,7 +342,7 @@ export default function DashboardTrafego() {
             campanha:id_campanha (
               nome, 
               id_conta,
-              conta_anuncio:id_conta (id_empresa)
+              conta_anuncio:id_conta (id_empresa, plataforma)
             )
           `)
           .eq("id_semana", semanaSelecionada);
@@ -145,6 +379,7 @@ export default function DashboardTrafego() {
               ticket_medio: m.ticket_medio || 0,
               cac: m.cac || 0,
               qtd_criativos: count || 0,
+              plataforma: m.campanha?.conta_anuncio?.plataforma || "OUTRO",
             };
           })
         );
@@ -169,7 +404,7 @@ export default function DashboardTrafego() {
           campanha:id_campanha (
             nome, 
             id_conta,
-            conta_anuncio:id_conta (id_empresa)
+            conta_anuncio:id_conta (id_empresa, plataforma)
           )
         `)
         .in("id_semana", semanas.map(s => s.id_semana));
@@ -191,6 +426,7 @@ export default function DashboardTrafego() {
           acc[campanhaId] = {
             id_campanha: campanhaId,
             nome: m.campanha?.nome || "Campanha sem nome",
+            plataforma: m.campanha?.conta_anuncio?.plataforma || "OUTRO",
             leads: 0,
             verba_investida: 0,
             reunioes: 0,
@@ -362,6 +598,114 @@ export default function DashboardTrafego() {
   };
 
   const labelPeriodo = getLabelPeriodo();
+
+  const handleCopyId = (idExterno: string) => {
+    navigator.clipboard.writeText(idExterno);
+    toast({
+      title: "ID copiado!",
+      description: "Use este ID no parâmetro utm_content dos seus anúncios",
+    });
+  };
+
+  const handleRefresh = async () => {
+    window.location.reload();
+  };
+
+  const handleSyncCreatives = async () => {
+    setSyncingCreatives(true);
+    
+    try {
+      toast({
+        title: "Sincronizando criativos...",
+        description: "Buscando criativos das integrações ativas",
+      });
+
+      // Chamar ambas as edge functions em paralelo
+      const [metaResult, googleResult] = await Promise.allSettled([
+        supabase.functions.invoke("coletar-criativos-meta"),
+        supabase.functions.invoke("coletar-criativos-google"),
+      ]);
+
+      let hasErrors = false;
+      let successCount = 0;
+
+      // Verificar resultado Meta
+      if (metaResult.status === "fulfilled") {
+        const metaData = metaResult.value.data as any;
+        if (metaData?.success) {
+          successCount++;
+        } else if (metaData?.error) {
+          hasErrors = true;
+          toast({
+            title: "Erro no Meta Ads",
+            description: metaData.error,
+            variant: "destructive",
+          });
+        }
+      } else {
+        hasErrors = true;
+        toast({
+          title: "Erro no Meta Ads",
+          description: metaResult.reason?.message || "Erro desconhecido",
+          variant: "destructive",
+        });
+      }
+
+      // Verificar resultado Google
+      if (googleResult.status === "fulfilled") {
+        const googleData = googleResult.value.data as any;
+        if (googleData?.success) {
+          successCount++;
+        } else if (googleData?.error) {
+          hasErrors = true;
+          toast({
+            title: "Erro no Google Ads",
+            description: googleData.error,
+            variant: "destructive",
+          });
+        }
+      } else {
+        hasErrors = true;
+        toast({
+          title: "Erro no Google Ads",
+          description: googleResult.reason?.message || "Erro desconhecido",
+          variant: "destructive",
+        });
+      }
+
+      if (!hasErrors && successCount > 0) {
+        toast({
+          title: "Sincronização concluída!",
+          description: "Criativos sincronizados com sucesso",
+        });
+        window.location.reload();
+      } else if (successCount === 0 && hasErrors) {
+        toast({
+          title: "Falha na sincronização",
+          description: "Nenhuma integração foi sincronizada com sucesso",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao sincronizar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingCreatives(false);
+    }
+  };
+
+  const toggleCampaign = (campanhaId: string) => {
+    const newExpanded = new Set(expandedCampaigns);
+    if (newExpanded.has(campanhaId)) {
+      newExpanded.delete(campanhaId);
+    } else {
+      newExpanded.add(campanhaId);
+    }
+    setExpandedCampaigns(newExpanded);
+  };
 
   // Ordenar campanhas conforme o filtro selecionado
   const campanhasOrdenadas = campanhasMetricas?.slice().sort((a, b) => {
@@ -643,6 +987,25 @@ export default function DashboardTrafego() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <CardTitle>Performance por Campanha</CardTitle>
               <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" disabled={syncingCreatives}>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      {syncingCreatives ? "Atualizando..." : "Atualizar"}
+                      <ChevronDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleRefresh}>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Recarregar Dados
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSyncCreatives}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Sincronizar com APIs
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <span className="text-sm text-muted-foreground">Ordenar por:</span>
                 <Select value={ordenacao} onValueChange={setOrdenacao}>
                   <SelectTrigger className="w-[180px]">
@@ -672,64 +1035,145 @@ export default function DashboardTrafego() {
                 </p>
               ) : (
                 campanhasOrdenadas?.map((campanha) => (
-                  <div
+                  <Collapsible
                     key={campanha.id_campanha}
-                    className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    open={expandedCampaigns.has(campanha.id_campanha)}
+                    onOpenChange={() => toggleCampaign(campanha.id_campanha)}
                   >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold">{campanha.nome}</h3>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">
-                            CPL: R$ {campanha.cpl?.toFixed(2) || "N/A"}
-                          </Badge>
-                          {campanha.qtd_criativos !== undefined && (
-                            <Badge variant="secondary">
-                              {campanha.qtd_criativos} criativos
-                            </Badge>
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="p-4 bg-card hover:bg-muted/50 transition-colors">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="p-0 h-6 w-6">
+                                  {expandedCampaigns.has(campanha.id_campanha) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </CollapsibleTrigger>
+                              <h3 className="font-semibold">{campanha.nome}</h3>
+                              {campanha.qtd_criativos !== undefined && campanha.qtd_criativos < 2 && (
+                                <Badge variant="destructive" className="ml-2">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Alerta
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setCampanhaSelecionada({ id: campanha.id_campanha, nome: campanha.nome });
+                                  setCampanhaFluxoOpen(true);
+                                }}
+                              >
+                                <GitBranch className="h-4 w-4 mr-2" />
+                                Ver Fluxo
+                              </Button>
+                              <Badge variant="outline">
+                                CPL: R$ {campanha.cpl?.toFixed(2) || "N/A"}
+                              </Badge>
+                              {campanha.qtd_criativos !== undefined && (
+                                <Badge 
+                                  variant={campanha.qtd_criativos < 2 ? "destructive" : "secondary"}
+                                >
+                                  {campanha.qtd_criativos} criativo{campanha.qtd_criativos !== 1 ? 's' : ''}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Verba</p>
+                              <p className="font-medium">
+                                R$ {campanha.verba_investida.toLocaleString("pt-BR")}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Leads</p>
+                              <p className="font-medium">{campanha.leads}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">MQLs</p>
+                              <p className="font-medium">{campanha.mqls}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Vendas</p>
+                              <p className="font-medium">{campanha.vendas}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span>Reuniões: {campanha.reunioes}</span>
+                            <span>Levantadas: {campanha.levantadas}</span>
+                            {campanha.cac > 0 && (
+                              <span>CAC: R$ {campanha.cac.toFixed(2)}</span>
+                            )}
+                            {campanha.ticket_medio > 0 && (
+                              <span>Ticket Médio: R$ {campanha.ticket_medio.toFixed(2)}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <CollapsibleContent>
+                        <div className="border-t bg-muted/20">
+                          {campanha.qtd_criativos === 0 ? (
+                            <div className="p-4 text-center text-sm text-muted-foreground">
+                              <AlertTriangle className="h-5 w-5 mx-auto mb-2 text-destructive" />
+                              <p className="font-medium text-destructive">
+                                ⚠️ Nenhum criativo ativo - campanha pode estar pausada ou sem material
+                              </p>
+                            </div>
+                          ) : campanha.qtd_criativos === 1 ? (
+                            <div className="p-4">
+                              <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                  ⚠️ Apenas 1 criativo ativo - recomenda-se ter pelo menos 2 criativos para teste A/B
+                                </p>
+                              </div>
+                              <CriativosQuery 
+                                campanhaId={campanha.id_campanha} 
+                                plataforma={campanha.plataforma || "OUTRO"}
+                              />
+                            </div>
+                          ) : (
+                            <div className="p-4">
+                              <CriativosQuery 
+                                campanhaId={campanha.id_campanha} 
+                                plataforma={campanha.plataforma || "OUTRO"}
+                              />
+                            </div>
                           )}
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Verba</p>
-                          <p className="font-medium">
-                            R$ {campanha.verba_investida.toLocaleString("pt-BR")}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Leads</p>
-                          <p className="font-medium">{campanha.leads}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">MQLs</p>
-                          <p className="font-medium">{campanha.mqls}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Vendas</p>
-                          <p className="font-medium">{campanha.vendas}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>Reuniões: {campanha.reunioes}</span>
-                        <span>Levantadas: {campanha.levantadas}</span>
-                        {campanha.cac > 0 && (
-                          <span>CAC: R$ {campanha.cac.toFixed(2)}</span>
-                        )}
-                        {campanha.ticket_medio > 0 && (
-                          <span>Ticket Médio: R$ {campanha.ticket_medio.toFixed(2)}</span>
-                        )}
-                      </div>
+                      </CollapsibleContent>
                     </div>
-                  </div>
+                  </Collapsible>
                 ))
               )}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={campanhaFluxoOpen} onOpenChange={setCampanhaFluxoOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Fluxo de Conversão</DialogTitle>
+          </DialogHeader>
+          {campanhaSelecionada && (
+            <CampanhaFluxoDiagram 
+              campanhaId={campanhaSelecionada.id}
+              campanhaNome={campanhaSelecionada.nome}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
