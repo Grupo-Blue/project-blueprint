@@ -735,15 +735,25 @@ export type Database = {
       }
       lead: {
         Row: {
+          cidade_mautic: string | null
           created_at: string
           data_criacao: string
           data_venda: string | null
+          email: string | null
+          estado_mautic: string | null
           id_criativo: string | null
           id_empresa: string
           id_lead: string
           id_lead_externo: string | null
+          id_mautic_contact: string | null
           is_mql: boolean
           levantou_mao: boolean
+          mautic_first_visit: string | null
+          mautic_last_active: string | null
+          mautic_page_hits: number | null
+          mautic_score: number | null
+          mautic_segments: Json | null
+          mautic_tags: Json | null
           nome_lead: string | null
           organizacao: string | null
           origem_campanha: string | null
@@ -763,15 +773,25 @@ export type Database = {
           venda_realizada: boolean
         }
         Insert: {
+          cidade_mautic?: string | null
           created_at?: string
           data_criacao?: string
           data_venda?: string | null
+          email?: string | null
+          estado_mautic?: string | null
           id_criativo?: string | null
           id_empresa: string
           id_lead?: string
           id_lead_externo?: string | null
+          id_mautic_contact?: string | null
           is_mql?: boolean
           levantou_mao?: boolean
+          mautic_first_visit?: string | null
+          mautic_last_active?: string | null
+          mautic_page_hits?: number | null
+          mautic_score?: number | null
+          mautic_segments?: Json | null
+          mautic_tags?: Json | null
           nome_lead?: string | null
           organizacao?: string | null
           origem_campanha?: string | null
@@ -791,15 +811,25 @@ export type Database = {
           venda_realizada?: boolean
         }
         Update: {
+          cidade_mautic?: string | null
           created_at?: string
           data_criacao?: string
           data_venda?: string | null
+          email?: string | null
+          estado_mautic?: string | null
           id_criativo?: string | null
           id_empresa?: string
           id_lead?: string
           id_lead_externo?: string | null
+          id_mautic_contact?: string | null
           is_mql?: boolean
           levantou_mao?: boolean
+          mautic_first_visit?: string | null
+          mautic_last_active?: string | null
+          mautic_page_hits?: number | null
+          mautic_score?: number | null
+          mautic_segments?: Json | null
+          mautic_tags?: Json | null
           nome_lead?: string | null
           organizacao?: string | null
           origem_campanha?: string | null
@@ -1125,7 +1155,12 @@ export type Database = {
       status_relatorio: "EM_EDICAO" | "PRONTO" | "VALIDADO"
       tipo_aprendizado: "CRIATIVO" | "PUBLICO" | "OFERTA" | "FUNIL" | "OUTRO"
       tipo_criativo: "VIDEO" | "IMAGEM" | "CARROSSEL" | "OUTRO"
-      tipo_integracao: "META_ADS" | "GOOGLE_ADS" | "PIPEDRIVE" | "TOKENIZA"
+      tipo_integracao:
+        | "META_ADS"
+        | "GOOGLE_ADS"
+        | "PIPEDRIVE"
+        | "TOKENIZA"
+        | "MAUTIC"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1264,7 +1299,13 @@ export const Constants = {
       status_relatorio: ["EM_EDICAO", "PRONTO", "VALIDADO"],
       tipo_aprendizado: ["CRIATIVO", "PUBLICO", "OFERTA", "FUNIL", "OUTRO"],
       tipo_criativo: ["VIDEO", "IMAGEM", "CARROSSEL", "OUTRO"],
-      tipo_integracao: ["META_ADS", "GOOGLE_ADS", "PIPEDRIVE", "TOKENIZA"],
+      tipo_integracao: [
+        "META_ADS",
+        "GOOGLE_ADS",
+        "PIPEDRIVE",
+        "TOKENIZA",
+        "MAUTIC",
+      ],
     },
   },
 } as const
