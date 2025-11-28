@@ -3,7 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useState } from "react";
+import {
   TrendingUp, 
   TrendingDown, 
   DollarSign, 
@@ -35,6 +37,7 @@ interface EmpresaMetrica {
 
 export default function DashboardDirecao() {
   const { semanaSelecionada } = usePeriodo();
+  const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
 
   const { data: semanaAtual } = useQuery({
     queryKey: ["semana-info-direcao", semanaSelecionada],
@@ -61,17 +64,24 @@ export default function DashboardDirecao() {
   });
 
   const { data: metricas, isLoading } = useQuery({
-    queryKey: ["metricas-direcao", semanaSelecionada],
+    queryKey: ["metricas-direcao", semanaSelecionada, empresaSelecionada],
     queryFn: async () => {
       if (!semanaSelecionada) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("empresa_semana_metricas")
         .select(`
           *,
           empresa:id_empresa (nome, cpl_maximo, cac_maximo)
         `)
         .eq("id_semana", semanaSelecionada);
+
+      // Filtrar por empresa se uma específica for selecionada
+      if (empresaSelecionada && empresaSelecionada !== "todas") {
+        query = query.eq("id_empresa", empresaSelecionada);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -91,15 +101,22 @@ export default function DashboardDirecao() {
   });
 
   const { data: acoesAprovacao } = useQuery({
-    queryKey: ["acoes-pendentes"],
+    queryKey: ["acoes-pendentes", empresaSelecionada],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("acao")
         .select(`
           *,
           empresa:id_empresa (nome)
         `)
-        .eq("status", "PENDENTE")
+        .eq("status", "PENDENTE");
+
+      // Filtrar por empresa se uma específica for selecionada
+      if (empresaSelecionada && empresaSelecionada !== "todas") {
+        query = query.eq("id_empresa", empresaSelecionada);
+      }
+
+      const { data, error } = await query
         .order("data_criacao", { ascending: false })
         .limit(5);
 
@@ -109,15 +126,22 @@ export default function DashboardDirecao() {
   });
 
   const { data: ultimosAprendizados } = useQuery({
-    queryKey: ["ultimos-aprendizados"],
+    queryKey: ["ultimos-aprendizados", empresaSelecionada],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("aprendizado_semana")
         .select(`
           *,
           empresa:id_empresa (nome),
           semana:id_semana (numero_semana, ano)
-        `)
+        `);
+
+      // Filtrar por empresa se uma específica for selecionada
+      if (empresaSelecionada && empresaSelecionada !== "todas") {
+        query = query.eq("id_empresa", empresaSelecionada);
+      }
+
+      const { data, error } = await query
         .order("created_at", { ascending: false })
         .limit(5);
 
@@ -170,7 +194,22 @@ export default function DashboardDirecao() {
               {semanaAtual && ` - Semana ${semanaAtual.numero_semana}/${semanaAtual.ano}`}
             </p>
           </div>
-          <FiltroPeriodo />
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+            <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Selecione a empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas as empresas</SelectItem>
+                {empresas?.map((empresa) => (
+                  <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
+                    {empresa.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FiltroPeriodo />
+          </div>
         </div>
 
         {/* Alertas Críticos */}
@@ -216,7 +255,9 @@ export default function DashboardDirecao() {
                 R$ {totais.verba.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Consolidado de {empresas?.length || 0} empresas
+                {empresaSelecionada === "todas" 
+                  ? `Consolidado de ${empresas?.length || 0} empresas`
+                  : empresas?.find(e => e.id_empresa === empresaSelecionada)?.nome}
               </p>
             </CardContent>
           </Card>
@@ -249,11 +290,15 @@ export default function DashboardDirecao() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Empresas</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {empresaSelecionada === "todas" ? "Empresas" : "Empresa Selecionada"}
+              </CardTitle>
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{empresas?.length || 0}</div>
+              <div className="text-2xl font-bold">
+                {empresaSelecionada === "todas" ? empresas?.length || 0 : 1}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
                 {alertas.length} com alertas
               </p>
