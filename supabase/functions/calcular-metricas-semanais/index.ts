@@ -206,14 +206,40 @@ Deno.serve(async (req) => {
         const verba_investida = metricasDia?.reduce((sum, m) => sum + m.verba_investida, 0) || 0;
         const leads = metricasDia?.reduce((sum, m) => sum + m.leads, 0) || 0;
 
-        // Buscar leads da campanha para calcular funil
-        const { data: leadsCampanha } = await supabase
+        // Buscar criativos da campanha
+        const { data: criativosCampanha } = await supabase
+          .from('criativo')
+          .select('id_criativo')
+          .eq('id_campanha', campanha.id_campanha);
+
+        const idsCreativos = criativosCampanha?.map(c => c.id_criativo) || [];
+
+        // Buscar leads da campanha através dos criativos OU origem_campanha
+        let leadsCampanha: any[] = [];
+        
+        if (idsCreativos.length > 0) {
+          const { data: leadsViaCreativos } = await supabase
+            .from('lead')
+            .select('*')
+            .in('id_criativo', idsCreativos)
+            .gte('data_criacao', semana.data_inicio)
+            .lte('data_criacao', semana.data_fim);
+          
+          leadsCampanha = leadsViaCreativos || [];
+        }
+        
+        // Adicionar leads que vieram pela origem_campanha (fallback)
+        const { data: leadsViaOrigem } = await supabase
           .from('lead')
           .select('*')
           .eq('id_empresa', (campanha as any).conta_anuncio.id_empresa)
           .eq('origem_campanha', campanha.nome)
           .gte('data_criacao', semana.data_inicio)
           .lte('data_criacao', semana.data_fim);
+        
+        if (leadsViaOrigem && leadsViaOrigem.length > 0) {
+          leadsCampanha = [...leadsCampanha, ...leadsViaOrigem];
+        }
 
         const mqls = leadsCampanha?.filter(l => l.is_mql).length || 0;
         const levantadas = leadsCampanha?.filter(l => l.levantou_mao).length || 0;
