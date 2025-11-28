@@ -122,6 +122,7 @@ export default function Integracoes() {
       setGoogleClientSecret(config.client_secret || "");
       setGoogleRefreshToken(config.refresh_token || "");
       setGoogleCustomerId(config.customer_id || "");
+      setGoogleLoginCustomerId(config.login_customer_id || "");
     } else if (integracao.tipo === "PIPEDRIVE") {
       setPipedriveApiToken(config.api_token || "");
       setPipedriveDomain(config.domain || "");
@@ -273,7 +274,8 @@ export default function Integracoes() {
         client_id: googleClientId,
         client_secret: googleClientSecret,
         refresh_token: googleRefreshToken,
-        customer_id: googleCustomerId
+        customer_id: googleCustomerId,
+        login_customer_id: googleLoginCustomerId || null
       };
     } else if (tipoIntegracao === "PIPEDRIVE") {
       if (!pipedriveApiToken || !pipedriveDomain) {
@@ -429,6 +431,15 @@ export default function Integracoes() {
 
               {tipoIntegracao === "GOOGLE_ADS" && (
                 <>
+                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-900 dark:text-blue-100">Conta de Gerente (MCC)</AlertTitle>
+                    <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm space-y-2">
+                      <p><strong>Se você acessa contas via Manager Account (MCC):</strong></p>
+                      <p>Preencha o campo "Manager Customer ID" com o ID da sua conta de gerente (sem hífens). Isso é necessário quando você gerencia várias contas através de uma MCC.</p>
+                    </AlertDescription>
+                  </Alert>
+
                   <div className="space-y-2">
                     <Label>Developer Token *</Label>
                     <Input
