@@ -13,19 +13,24 @@ import { cn } from "@/lib/utils";
 
 export function FiltroPeriodo() {
   const { tipoFiltro, dataEspecifica, semanaSelecionada, setTipoFiltro, setDataEspecifica, setSemanaSelecionada, getDataReferencia } = usePeriodo();
+  const [mostrarCalendario, setMostrarCalendario] = React.useState(false);
+  const [mostrarSemanas, setMostrarSemanas] = React.useState(false);
 
   const dataReferencia = getDataReferencia();
   const inicioMes = startOfMonth(dataReferencia);
   const fimMes = endOfMonth(dataReferencia);
 
+  // Buscar semanas disponíveis (últimos 3 meses)
   const { data: semanas } = useQuery({
-    queryKey: ["semanas-disponiveis", tipoFiltro, dataEspecifica],
+    queryKey: ["semanas-disponiveis"],
     queryFn: async () => {
+      const treseMesesAtras = new Date();
+      treseMesesAtras.setMonth(treseMesesAtras.getMonth() - 3);
+      
       const { data, error } = await supabase
         .from("semana")
         .select("*")
-        .gte("data_inicio", inicioMes.toISOString())
-        .lte("data_fim", fimMes.toISOString())
+        .gte("data_inicio", treseMesesAtras.toISOString())
         .order("ano", { ascending: false })
         .order("numero_semana", { ascending: false });
       if (error) throw error;
@@ -33,7 +38,7 @@ export function FiltroPeriodo() {
     },
   });
 
-  // Buscar a semana mais recente com métricas se nenhuma estiver selecionada
+  // Buscar a semana mais recente com métricas
   const { data: semanaAtual } = useQuery({
     queryKey: ["semana-atual-filtro"],
     queryFn: async () => {
@@ -49,80 +54,131 @@ export function FiltroPeriodo() {
     },
   });
 
-  // Definir semana atual automaticamente
+  // Definir semana atual automaticamente apenas se tipo for semana_especifica
   React.useEffect(() => {
-    if (!semanaSelecionada && semanaAtual) {
+    if (tipoFiltro === "semana_especifica" && !semanaSelecionada && semanaAtual) {
       setSemanaSelecionada(semanaAtual);
     }
-  }, [semanaAtual, semanaSelecionada, setSemanaSelecionada]);
+  }, [semanaAtual, semanaSelecionada, setSemanaSelecionada, tipoFiltro]);
 
-  const semanaAtiva = semanaSelecionada || semanaAtual;
+  const handleTipoChange = (value: string) => {
+    const novoTipo = value as TipoFiltroPeriodo;
+    setTipoFiltro(novoTipo);
+    
+    if (novoTipo === "data_especifica") {
+      setMostrarCalendario(true);
+      setMostrarSemanas(false);
+      setSemanaSelecionada(null);
+    } else if (novoTipo === "semana_especifica") {
+      setMostrarSemanas(true);
+      setMostrarCalendario(false);
+      setDataEspecifica(null);
+      if (semanaAtual) {
+        setSemanaSelecionada(semanaAtual);
+      }
+    } else {
+      setMostrarCalendario(false);
+      setMostrarSemanas(false);
+      setDataEspecifica(null);
+      setSemanaSelecionada(null);
+    }
+  };
+
+  const getValorAtual = () => {
+    if (tipoFiltro === "semana_especifica" && semanaSelecionada && semanas) {
+      const semana = semanas.find(s => s.id_semana === semanaSelecionada);
+      if (semana) {
+        return `Semana ${semana.numero_semana}/${semana.ano} (${format(new Date(semana.data_inicio), "dd/MMM", { locale: ptBR })} - ${format(new Date(semana.data_fim), "dd/MMM", { locale: ptBR })})`;
+      }
+    }
+    
+    if (tipoFiltro === "data_especifica" && dataEspecifica) {
+      return format(dataEspecifica, "MMMM yyyy", { locale: ptBR });
+    }
+    
+    switch (tipoFiltro) {
+      case "mes_atual":
+        return "Mês Atual";
+      case "mes_anterior":
+        return "Mês Anterior";
+      case "data_especifica":
+        return "Data Específica";
+      case "semana_especifica":
+        return "Semana Específica";
+      default:
+        return "Selecione o período";
+    }
+  };
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <CalendarIcon className="h-4 w-4 text-muted-foreground" />
       
-      <Select
-        value={tipoFiltro}
-        onValueChange={(value) => {
-          setTipoFiltro(value as TipoFiltroPeriodo);
-          setSemanaSelecionada(null);
-        }}
-      >
-        <SelectTrigger className="w-[160px]">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="mes_atual">Mês Atual</SelectItem>
-          <SelectItem value="mes_anterior">Mês Anterior</SelectItem>
-          <SelectItem value="data_especifica">Data Específica</SelectItem>
-        </SelectContent>
-      </Select>
+      <Popover open={mostrarCalendario || mostrarSemanas} onOpenChange={(open) => {
+        if (!open) {
+          setMostrarCalendario(false);
+          setMostrarSemanas(false);
+        }
+      }}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              "min-w-[280px] justify-start text-left font-normal",
+              !tipoFiltro && "text-muted-foreground"
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {getValorAtual()}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="p-3 space-y-2">
+            <Select value={tipoFiltro} onValueChange={handleTipoChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o tipo de período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mes_atual">Mês Atual</SelectItem>
+                <SelectItem value="mes_anterior">Mês Anterior</SelectItem>
+                <SelectItem value="data_especifica">Data Específica</SelectItem>
+                <SelectItem value="semana_especifica">Semana Específica</SelectItem>
+              </SelectContent>
+            </Select>
 
-      {tipoFiltro === "data_especifica" && (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn(
-                "w-[200px] justify-start text-left font-normal",
-                !dataEspecifica && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {dataEspecifica ? format(dataEspecifica, "MMMM yyyy", { locale: ptBR }) : "Selecione o mês"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={dataEspecifica || undefined}
-              onSelect={(date) => {
-                setDataEspecifica(date || null);
-                setSemanaSelecionada(null);
-              }}
-              initialFocus
-              className="pointer-events-auto"
-            />
-          </PopoverContent>
-        </Popover>
-      )}
+            {tipoFiltro === "data_especifica" && (
+              <Calendar
+                mode="single"
+                selected={dataEspecifica || undefined}
+                onSelect={(date) => {
+                  setDataEspecifica(date || null);
+                  setMostrarCalendario(false);
+                }}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            )}
 
-      <Select
-        value={semanaAtiva || undefined}
-        onValueChange={setSemanaSelecionada}
-      >
-        <SelectTrigger className="w-[280px]">
-          <SelectValue placeholder="Selecione a semana" />
-        </SelectTrigger>
-        <SelectContent>
-          {semanas?.map((semana) => (
-            <SelectItem key={semana.id_semana} value={semana.id_semana}>
-              Semana {semana.numero_semana}/{semana.ano} ({format(new Date(semana.data_inicio), "dd/MMM", { locale: ptBR })} - {format(new Date(semana.data_fim), "dd/MMM", { locale: ptBR })})
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+            {tipoFiltro === "semana_especifica" && semanas && (
+              <div className="max-h-[300px] overflow-y-auto space-y-1">
+                {semanas.map((semana) => (
+                  <Button
+                    key={semana.id_semana}
+                    variant={semanaSelecionada === semana.id_semana ? "default" : "ghost"}
+                    className="w-full justify-start text-left font-normal"
+                    onClick={() => {
+                      setSemanaSelecionada(semana.id_semana);
+                      setMostrarSemanas(false);
+                    }}
+                  >
+                    Semana {semana.numero_semana}/{semana.ano} ({format(new Date(semana.data_inicio), "dd/MMM", { locale: ptBR })} - {format(new Date(semana.data_fim), "dd/MMM", { locale: ptBR })})
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
