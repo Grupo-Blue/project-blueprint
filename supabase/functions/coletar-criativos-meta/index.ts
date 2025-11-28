@@ -124,7 +124,7 @@ serve(async (req) => {
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
             // Endpoint da API do Meta para buscar ads com todos os campos de URL e UTM
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec{link_data{link,call_to_action}},effective_object_story_id,image_url,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,adset{targeting{url_tags}},insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec{link_data{link,call_to_action,picture,image_hash}},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,adset{targeting{url_tags}},insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -172,7 +172,12 @@ serve(async (req) => {
                 tipoCriativo = "VIDEO";
                 // Para vídeos, usar thumbnail_url se disponível
                 urlMidia = creative.thumbnail_url || null;
+              } else if (creative.object_story_spec?.link_data?.picture) {
+                // Prioridade 1: picture do object_story_spec (imagem completa)
+                tipoCriativo = "IMAGEM";
+                urlMidia = creative.object_story_spec.link_data.picture;
               } else if (creative.image_url) {
+                // Prioridade 2: image_url (pode ser thumbnail)
                 tipoCriativo = "IMAGEM";
                 urlMidia = creative.image_url;
               } else if (creative.object_story_spec?.link_data?.child_attachments) {
