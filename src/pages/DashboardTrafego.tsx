@@ -269,6 +269,7 @@ export default function DashboardTrafego() {
   const { toast } = useToast();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
   const [ordenacao, setOrdenacao] = useState<string>("verba_desc");
+  const [filtroStatusCampanha, setFiltroStatusCampanha] = useState<string>("ativas");
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
   const [syncingCreatives, setSyncingCreatives] = useState(false);
   const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
@@ -331,7 +332,7 @@ export default function DashboardTrafego() {
   });
 
   const { data: campanhasMetricas, isLoading } = useQuery({
-    queryKey: ["campanhas-metricas", tipoFiltro, semanaSelecionada, inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada],
+    queryKey: ["campanhas-metricas", tipoFiltro, semanaSelecionada, inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada, filtroStatusCampanha],
     queryFn: async () => {
       // Se for filtro de semana específica, busca só aquela semana
       if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
@@ -342,6 +343,7 @@ export default function DashboardTrafego() {
             campanha:id_campanha (
               nome, 
               id_conta,
+              ativa,
               conta_anuncio:id_conta (id_empresa, plataforma)
             )
           `)
@@ -354,6 +356,14 @@ export default function DashboardTrafego() {
         if (empresaSelecionada !== "todas") {
           filteredData = data.filter((m: any) => 
             m.campanha?.conta_anuncio?.id_empresa === empresaSelecionada
+          );
+        }
+
+        // Filtrar por status da campanha
+        if (filtroStatusCampanha !== "todas") {
+          const statusFiltro = filtroStatusCampanha === "ativas";
+          filteredData = filteredData.filter((m: any) => 
+            m.campanha?.ativa === statusFiltro
           );
         }
 
@@ -404,6 +414,7 @@ export default function DashboardTrafego() {
           campanha:id_campanha (
             nome, 
             id_conta,
+            ativa,
             conta_anuncio:id_conta (id_empresa, plataforma)
           )
         `)
@@ -416,6 +427,14 @@ export default function DashboardTrafego() {
       if (empresaSelecionada !== "todas") {
         filteredData = data.filter((m: any) => 
           m.campanha?.conta_anuncio?.id_empresa === empresaSelecionada
+        );
+      }
+
+      // Filtrar por status da campanha
+      if (filtroStatusCampanha !== "todas") {
+        const statusFiltro = filtroStatusCampanha === "ativas";
+        filteredData = filteredData.filter((m: any) => 
+          m.campanha?.ativa === statusFiltro
         );
       }
 
@@ -986,7 +1005,7 @@ export default function DashboardTrafego() {
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <CardTitle>Performance por Campanha</CardTitle>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" disabled={syncingCreatives}>
@@ -1006,6 +1025,16 @@ export default function DashboardTrafego() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <Select value={filtroStatusCampanha} onValueChange={setFiltroStatusCampanha}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativas">Ativas</SelectItem>
+                    <SelectItem value="inativas">Inativas</SelectItem>
+                    <SelectItem value="todas">Todas</SelectItem>
+                  </SelectContent>
+                </Select>
                 <span className="text-sm text-muted-foreground">Ordenar por:</span>
                 <Select value={ordenacao} onValueChange={setOrdenacao}>
                   <SelectTrigger className="w-[180px]">
