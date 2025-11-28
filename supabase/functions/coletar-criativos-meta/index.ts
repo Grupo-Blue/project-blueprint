@@ -124,7 +124,7 @@ serve(async (req) => {
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
             // Endpoint da API do Meta para buscar ads com métricas de hoje e URL final
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec,image_url,video_id,thumbnail_url,url_tags},tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec{link_data{link,call_to_action}},image_url,video_id,thumbnail_url,url_tags},tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
