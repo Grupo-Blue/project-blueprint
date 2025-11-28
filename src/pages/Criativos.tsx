@@ -4,9 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CriativoAlertCard } from "@/components/CriativoAlertCard";
-import { AlertTriangle, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink, Copy } from "lucide-react";
+import { AlertTriangle, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink, Copy, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface CampanhaCriativo {
   id_campanha: string;
@@ -247,19 +253,25 @@ const Criativos = () => {
                 Alertas de campanhas com menos de 2 criativos ativos
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleSyncCreatives}
-                disabled={syncingCreatives}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                {syncingCreatives ? "Sincronizando..." : "Sincronizar Criativos"}
-              </Button>
-              <Button variant="outline" onClick={handleRefresh}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Atualizar
-              </Button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={syncingCreatives}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  {syncingCreatives ? "Atualizando..." : "Atualizar"}
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleRefresh}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Recarregar Dados
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSyncCreatives}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Sincronizar com APIs
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
