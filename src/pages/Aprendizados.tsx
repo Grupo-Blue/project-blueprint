@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { BookOpen, Plus, Calendar, TrendingUp, Upload, Paperclip, X } from "lucide-react";
+import { BookOpen, Plus, Calendar, TrendingUp, Upload, Paperclip, X, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -29,6 +29,12 @@ interface Aprendizado {
   };
 }
 
+interface AprendizadoSugerido {
+  tipo: string;
+  descricao: string;
+  metricas_suporte: string;
+}
+
 const tiposAprendizado = [
   { value: "CRIATIVO", label: "Criativo", color: "bg-blue-500" },
   { value: "PUBLICO", label: "Público", color: "bg-purple-500" },
@@ -41,8 +47,11 @@ export default function Aprendizados() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogAberto, setDialogAberto] = useState(false);
+  const [dialogSugestoes, setDialogSugestoes] = useState(false);
   const [filtroEmpresa, setFiltroEmpresa] = useState("todas");
   const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [sugestoes, setSugestoes] = useState<AprendizadoSugerido[]>([]);
+  const [gerandoSugestoes, setGerandoSugestoes] = useState(false);
 
   const [formData, setFormData] = useState({
     id_empresa: "",
@@ -155,6 +164,42 @@ export default function Aprendizados() {
     },
   });
 
+  const handleGerarSugestoes = async () => {
+    if (!filtroEmpresa || filtroEmpresa === "todas") {
+      toast({
+        title: "Selecione uma empresa",
+        description: "É necessário filtrar por uma empresa específica para gerar sugestões.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGerandoSugestoes(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gerar-sugestoes-aprendizados", {
+        body: { id_empresa: filtroEmpresa },
+      });
+
+      if (error) throw error;
+
+      setSugestoes(data.aprendizados);
+      setDialogSugestoes(true);
+      toast({
+        title: "Sugestões geradas",
+        description: `${data.aprendizados.length} aprendizados foram sugeridos pela IA.`,
+      });
+    } catch (error: any) {
+      console.error("Erro ao gerar sugestões:", error);
+      toast({
+        title: "Erro ao gerar sugestões",
+        description: error.message || "Não foi possível gerar sugestões neste momento.",
+        variant: "destructive",
+      });
+    } finally {
+      setGerandoSugestoes(false);
+    }
+  };
+
   const getTipoBadge = (tipo: string) => {
     const tipoConfig = tiposAprendizado.find((t) => t.value === tipo);
     if (!tipoConfig) return <Badge>{tipo}</Badge>;
@@ -188,13 +233,22 @@ export default function Aprendizados() {
               Registre e consulte aprendizados de cada semana
             </p>
           </div>
-          <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Novo Aprendizado
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleGerarSugestoes}
+              disabled={gerandoSugestoes || filtroEmpresa === "todas"}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {gerandoSugestoes ? "Gerando..." : "Sugestões IA"}
+            </Button>
+            <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo Aprendizado
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Registrar Aprendizado da Semana</DialogTitle>
@@ -322,9 +376,58 @@ export default function Aprendizados() {
                   Registrar Aprendizado
                 </Button>
               </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
+
+        <Dialog open={dialogSugestoes} onOpenChange={setDialogSugestoes}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Sugestões de Aprendizados pela IA
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+              <p className="text-sm text-muted-foreground">
+                Baseado nos dados históricos, a IA sugeriu os seguintes aprendizados:
+              </p>
+              {sugestoes.map((sugestao, index) => (
+                <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => {
+                  setFormData({
+                    ...formData,
+                    tipo: sugestao.tipo,
+                    descricao: sugestao.descricao,
+                    metricas_suporte: sugestao.metricas_suporte,
+                  });
+                  setDialogSugestoes(false);
+                  setDialogAberto(true);
+                }}>
+                  <CardHeader>
+                    <div className="flex items-start gap-3">
+                      {getTipoBadge(sugestao.tipo)}
+                      <div className="flex-1">
+                        <p className="text-sm">{sugestao.descricao}</p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {sugestao.metricas_suporte && (
+                    <CardContent>
+                      <div className="bg-muted/50 p-3 rounded-lg">
+                        <div className="flex items-center gap-2 mb-1">
+                          <TrendingUp className="h-4 w-4 text-primary" />
+                          <h4 className="font-semibold text-sm">Métricas:</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{sugestao.metricas_suporte}</p>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="flex gap-4">
           <Select value={filtroEmpresa} onValueChange={setFiltroEmpresa}>

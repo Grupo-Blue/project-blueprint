@@ -48,3 +48,6 @@ verify_jwt = false
 [functions.gerar-sugestoes-hipoteses]
 verify_jwt = true
 
+[functions.gerar-sugestoes-aprendizados]
+verify_jwt = true
+
