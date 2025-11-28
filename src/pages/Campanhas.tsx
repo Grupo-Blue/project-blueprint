@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Target, DollarSign, Users, MousePointer } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TrendingUp, TrendingDown, Target, DollarSign, Users, MousePointer, GitBranch } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { CampanhaFluxoDiagram } from "@/components/CampanhaFluxoDiagram";
 
 interface Campanha {
   id_campanha: string;
@@ -31,6 +33,8 @@ interface MetricasSemana {
 
 export default function Campanhas() {
   const [filtroStatus, setFiltroStatus] = useState<string>("todas");
+  const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
+  const [campanhaSelecionada, setCampanhaSelecionada] = useState<{ id: string; nome: string } | null>(null);
 
   const { data: campanhas, isLoading } = useQuery({
     queryKey: ["campanhas", filtroStatus],
@@ -145,8 +149,22 @@ export default function Campanhas() {
               <Card key={campanha.id_campanha} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <div className="space-y-2">
-                      <CardTitle className="text-2xl">{campanha.nome}</CardTitle>
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-2xl">{campanha.nome}</CardTitle>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setCampanhaSelecionada({ id: campanha.id_campanha, nome: campanha.nome });
+                            setCampanhaFluxoOpen(true);
+                          }}
+                          className="ml-4"
+                        >
+                          <GitBranch className="h-4 w-4 mr-2" />
+                          Ver Fluxo
+                        </Button>
+                      </div>
                       <div className="flex gap-2 items-center">
                         <Badge variant={campanha.ativa ? "default" : "secondary"}>
                           {campanha.ativa ? "Ativa" : "Inativa"}
@@ -252,6 +270,20 @@ export default function Campanhas() {
           </Card>
         )}
       </div>
+
+      <Dialog open={campanhaFluxoOpen} onOpenChange={setCampanhaFluxoOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Fluxo de Conversão</DialogTitle>
+          </DialogHeader>
+          {campanhaSelecionada && (
+            <CampanhaFluxoDiagram 
+              campanhaId={campanhaSelecionada.id}
+              campanhaNome={campanhaSelecionada.nome}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
