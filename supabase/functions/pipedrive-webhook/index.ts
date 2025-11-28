@@ -177,26 +177,48 @@ serve(async (req) => {
     let personEmail = null;
     if (dealData.person_id) {
       try {
+        console.log(`[Email] Buscando email para person_id: ${dealData.person_id}`);
         // Buscar dados da pessoa via API do Pipedrive
         const personUrl = `https://${domain}.pipedrive.com/api/v1/persons/${dealData.person_id}?api_token=${apiToken}`;
+        console.log(`[Email] URL da busca: ${personUrl.replace(apiToken, 'HIDDEN')}`);
+        
         const personResponse = await fetch(personUrl);
+        console.log(`[Email] Status da resposta: ${personResponse.status}`);
         
         if (personResponse.ok) {
           const personData = await personResponse.json();
-          if (personData.success && personData.data && personData.data.email) {
-            // Pegar o primeiro email
+          console.log(`[Email] Dados da pessoa recebidos:`, JSON.stringify(personData, null, 2));
+          
+          if (personData.success && personData.data) {
             const emails = personData.data.email;
-            if (Array.isArray(emails) && emails.length > 0) {
-              personEmail = emails[0].value;
-            } else if (typeof emails === 'string') {
-              personEmail = emails;
+            console.log(`[Email] Campo email bruto:`, emails);
+            
+            if (emails) {
+              if (Array.isArray(emails) && emails.length > 0) {
+                personEmail = emails[0].value;
+                console.log(`✓ Email capturado do array: ${personEmail}`);
+              } else if (typeof emails === 'string') {
+                personEmail = emails;
+                console.log(`✓ Email capturado como string: ${personEmail}`);
+              } else {
+                console.log(`⚠ Email em formato não reconhecido:`, typeof emails, emails);
+              }
+            } else {
+              console.log(`⚠ Pessoa ${dealData.person_id} não tem email cadastrado no Pipedrive`);
             }
-            console.log(`Email capturado: ${personEmail}`);
+          } else {
+            console.log(`⚠ Resposta da API não contém dados válidos`);
           }
+        } else {
+          const errorText = await personResponse.text();
+          console.error(`✗ Erro na API do Pipedrive: ${personResponse.status} - ${errorText}`);
         }
       } catch (emailError) {
-        console.error("Erro ao buscar email da pessoa:", emailError);
+        console.error("✗ Erro ao buscar email da pessoa:", emailError);
+        console.error("Stack trace:", emailError instanceof Error ? emailError.stack : emailError);
       }
+    } else {
+      console.log(`⚠ Deal não tem person_id associado`);
     }
 
     // Tentar vincular ao criativo usando utm_content (que deve conter o id_criativo_externo)

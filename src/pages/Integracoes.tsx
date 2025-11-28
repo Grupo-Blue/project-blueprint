@@ -753,24 +753,73 @@ export default function Integracoes() {
                         <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleTestIntegration(integracao)}
-                          disabled={testingIntegracoes.has(integracao.id_integracao)}
-                        >
-                          <TestTube2 className="w-4 h-4 mr-2" />
-                          {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleTestIntegration(integracao)}
+                        disabled={testingIntegracoes.has(integracao.id_integracao)}
+                      >
+                        <TestTube2 className="w-4 h-4 mr-2" />
+                        {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
-                  </CardHeader>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      Sincronize emails dos leads existentes que ainda não têm email cadastrado.
+                    </p>
+                    <Button 
+                      variant="secondary" 
+                      className="w-full"
+                      onClick={async () => {
+                        if (!window.confirm("Deseja buscar emails no Pipedrive para todos os leads que não têm email? Isso pode levar alguns minutos.")) {
+                          return;
+                        }
+
+                        const integracaoId = integracao.id_integracao;
+                        setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
+                        
+                        try {
+                          toast.info("Sincronizando emails do Pipedrive...");
+                          
+                          const { data, error } = await supabase.functions.invoke('sincronizar-emails-pipedrive', {
+                            body: { 
+                              id_empresa: config.id_empresa
+                            }
+                          });
+
+                          if (error) throw error;
+
+                          if (data?.success) {
+                            toast.success(`Sincronização concluída! ${data.atualizados} de ${data.processados} leads atualizados com email.`);
+                          } else {
+                            toast.error(data?.message || "Erro ao sincronizar emails");
+                          }
+                        } catch (error: any) {
+                          console.error('Erro ao sincronizar emails:', error);
+                          toast.error(error.message || "Erro ao processar sincronização de emails");
+                        } finally {
+                          setTestingIntegracoes(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(integracaoId);
+                            return newSet;
+                          });
+                        }
+                      }}
+                      disabled={testingIntegracoes.has(integracao.id_integracao)}
+                    >
+                      {testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar Emails Pipedrive'}
+                    </Button>
+                  </div>
+                </CardContent>
                 </Card>
               );
             })
