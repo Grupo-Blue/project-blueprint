@@ -201,15 +201,22 @@ serve(async (req) => {
               LIMIT 100
             `;
 
-            const searchUrl = `https://googleads.googleapis.com/v16/customers/${customerId}/googleAds:search`;
+            const loginCustomerId = config.login_customer_id?.replace(/-/g, "");
+            const searchUrl = `https://googleads.googleapis.com/v22/customers/${customerId}/googleAds:search`;
+
+            const headers: Record<string, string> = {
+              "Authorization": `Bearer ${accessToken}`,
+              "developer-token": developerToken,
+              "Content-Type": "application/json",
+            };
+
+            if (loginCustomerId) {
+              headers["login-customer-id"] = loginCustomerId;
+            }
 
             const searchResponse = await fetch(searchUrl, {
               method: "POST",
-              headers: {
-                "Authorization": `Bearer ${accessToken}`,
-                "developer-token": developerToken,
-                "Content-Type": "application/json",
-              },
+              headers,
               body: JSON.stringify({ query: gaqlQuery }),
             });
 
