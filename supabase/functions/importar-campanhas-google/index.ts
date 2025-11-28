@@ -71,6 +71,7 @@ serve(async (req) => {
       try {
         const config = integracao.config_json as any;
         const customerId = config.customer_id?.replace(/-/g, "");
+        const loginCustomerId = config.login_customer_id?.replace(/-/g, "");
         const refreshToken = config.refresh_token;
         const clientId = config.client_id;
         const clientSecret = config.client_secret;
@@ -114,13 +115,19 @@ serve(async (req) => {
 
         const searchUrl = `https://googleads.googleapis.com/v22/customers/${customerId}/googleAds:search`;
 
+        const headers: Record<string, string> = {
+          "Authorization": `Bearer ${accessToken}`,
+          "developer-token": developerToken,
+          "Content-Type": "application/json",
+        };
+
+        if (loginCustomerId) {
+          headers["login-customer-id"] = loginCustomerId;
+        }
+
         const searchResponse = await fetch(searchUrl, {
           method: "POST",
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-            "developer-token": developerToken,
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify({ query: gaqlQuery }),
         });
 

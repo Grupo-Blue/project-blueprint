@@ -43,6 +43,7 @@ export default function Integracoes() {
   const [googleClientSecret, setGoogleClientSecret] = useState("");
   const [googleRefreshToken, setGoogleRefreshToken] = useState("");
   const [googleCustomerId, setGoogleCustomerId] = useState("");
+  const [googleLoginCustomerId, setGoogleLoginCustomerId] = useState("");
   
   // Pipedrive credentials
   const [pipedriveApiToken, setPipedriveApiToken] = useState("");
@@ -87,6 +88,7 @@ export default function Integracoes() {
     setGoogleClientSecret("");
     setGoogleRefreshToken("");
     setGoogleCustomerId("");
+    setGoogleLoginCustomerId("");
     setPipedriveApiToken("");
     setPipedriveDomain("");
     setPipedrivePipelineId("");
@@ -426,11 +428,19 @@ export default function Integracoes() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Customer ID *</Label>
+                    <Label>Customer ID (conta alvo) *</Label>
                     <Input
                       value={googleCustomerId}
                       onChange={(e) => setGoogleCustomerId(e.target.value)}
                       placeholder="123-456-7890"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Login Customer ID (conta gerente - opcional)</Label>
+                    <Input
+                      value={googleLoginCustomerId}
+                      onChange={(e) => setGoogleLoginCustomerId(e.target.value)}
+                      placeholder="ID da conta gerente (MCC), se houver"
                     />
                   </div>
                 </>
