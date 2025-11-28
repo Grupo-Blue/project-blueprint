@@ -8,19 +8,28 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ptBR } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const Leads = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [stageFilter, setStageFilter] = useState<string[]>([]);
   const [scoreMinimo, setScoreMinimo] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const availableStages = [
+    { value: "Lead", label: "Lead" },
+    { value: "Aguardando pagamento", label: "Aguardando pagamento" },
+    { value: "Vendido", label: "Vendido" },
+    { value: "Perdido", label: "Perdido" },
+  ];
   const ITEMS_PER_PAGE = 15;
 
   const { data: leads, isLoading } = useQuery({
@@ -64,8 +73,8 @@ const Leads = () => {
       (statusFilter === "novo" && !lead.is_mql && lead.stage_atual !== "Perdido");
 
     const matchesStage = 
-      stageFilter === "all" ||
-      lead.stage_atual === stageFilter;
+      stageFilter.length === 0 ||
+      (lead.stage_atual && stageFilter.includes(lead.stage_atual));
 
     const matchesScore = 
       !scoreMinimo ||
@@ -340,18 +349,52 @@ const Leads = () => {
               <SelectItem value="perdido">Perdidos</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={stageFilter} onValueChange={handleFilterChange(setStageFilter)}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Filtrar por stage" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Stages</SelectItem>
-              <SelectItem value="Lead">Lead</SelectItem>
-              <SelectItem value="Aguardando pagamento">Aguardando pagamento</SelectItem>
-              <SelectItem value="Vendido">Vendido</SelectItem>
-              <SelectItem value="Perdido">Perdido</SelectItem>
-            </SelectContent>
-          </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full sm:w-[200px] justify-between">
+                <span className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  {stageFilter.length === 0 ? "Filtrar por stage" : `${stageFilter.length} selecionado(s)`}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[250px] p-4">
+              <div className="space-y-4">
+                <div className="font-medium text-sm">Selecione os stages</div>
+                {availableStages.map((stage) => (
+                  <div key={stage.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={stage.value}
+                      checked={stageFilter.includes(stage.value)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          handleFilterChange(setStageFilter)([...stageFilter, stage.value]);
+                        } else {
+                          handleFilterChange(setStageFilter)(stageFilter.filter((s) => s !== stage.value));
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor={stage.value}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      {stage.label}
+                    </label>
+                  </div>
+                ))}
+                {stageFilter.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => handleFilterChange(setStageFilter)([])}
+                  >
+                    Limpar seleção
+                  </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Input
             type="number"
             placeholder="Score mínimo"
