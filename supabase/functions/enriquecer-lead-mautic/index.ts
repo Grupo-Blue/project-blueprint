@@ -149,6 +149,33 @@ serve(async (req) => {
 
     console.log(`[Mautic] Contato encontrado - ID: ${contactId}, Score: ${contact.points || 0}`);
 
+    // Buscar dados completos do contato (incluindo UTMs)
+    const contactDetailUrl = `${normalizedBaseUrl}/api/contacts/${contactId}`;
+    console.log(`[Mautic] Buscando dados completos do contato: ${contactDetailUrl}`);
+    
+    const detailResponse = await fetch(contactDetailUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!detailResponse.ok) {
+      const errorText = await detailResponse.text();
+      console.error(`[Mautic] Erro ao buscar detalhes do contato: ${detailResponse.status} - ${errorText}`);
+      // Continuar com dados básicos se falhar
+    } else {
+      const detailData = await detailResponse.json();
+      const fullContact = detailData.contact;
+      
+      if (fullContact) {
+        // Atualizar com dados completos
+        Object.assign(contact, fullContact);
+        console.log(`[Mautic] Dados completos obtidos - UTMs disponíveis: ${fullContact.utmtags ? 'Sim' : 'Não'}`);
+      }
+    }
+
     // Extrair dados estruturados
     const enrichedData: EnrichedLeadData = {
       id_mautic_contact: contactId,
@@ -181,6 +208,8 @@ serve(async (req) => {
       score: enrichedData.mautic_score,
       cidade: enrichedData.cidade_mautic,
       utm_source: enrichedData.utm_source_mautic,
+      utm_campaign: enrichedData.utm_campaign_mautic,
+      utms_encontrados: !!(enrichedData.utm_source_mautic || enrichedData.utm_campaign_mautic),
     });
 
     return new Response(
