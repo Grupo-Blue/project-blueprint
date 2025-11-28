@@ -14,6 +14,7 @@ import { Plus, Edit, Trash2, TestTube2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ValidacaoUTM } from "@/components/ValidacaoUTM";
 import { ImportarCampanhas } from "@/components/ImportarCampanhas";
+import { CronjobsMonitor } from "@/components/CronjobsMonitor";
 import type { Database } from "@/integrations/supabase/types";
 
 type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
@@ -983,6 +984,10 @@ export default function Integracoes() {
           )}
         </TabsContent>
       </Tabs>
+
+      <div className="mt-8">
+        <CronjobsMonitor />
+      </div>
     </div>
   );
 }
