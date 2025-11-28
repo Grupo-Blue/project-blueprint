@@ -98,14 +98,32 @@ serve(async (req) => {
 
         const dealData = await dealResponse.json();
 
-        if (!dealData.success || !dealData.data || !dealData.data.person_id) {
-          console.log(`[Sync Emails] Deal ${dealId} não tem person_id associado`);
+        if (!dealData.success || !dealData.data) {
+          console.log(`[Sync Emails] Deal ${dealId} não retornou dados válidos`);
           processados++;
           continue;
         }
 
-        const personId = dealData.data.person_id;
-        console.log(`[Sync Emails] Person ID encontrado: ${personId}`);
+        // Extrair person_id corretamente
+        let personId = null;
+        if (dealData.data.person_id) {
+          // person_id pode vir como objeto {value: 123} ou como número direto
+          if (typeof dealData.data.person_id === 'object' && dealData.data.person_id.value) {
+            personId = dealData.data.person_id.value;
+          } else if (typeof dealData.data.person_id === 'number') {
+            personId = dealData.data.person_id;
+          } else if (typeof dealData.data.person_id === 'string') {
+            personId = parseInt(dealData.data.person_id);
+          }
+        }
+
+        if (!personId) {
+          console.log(`[Sync Emails] Deal ${dealId} não tem person_id válido associado`);
+          processados++;
+          continue;
+        }
+
+        console.log(`[Sync Emails] Person ID encontrado: ${personId} (tipo: ${typeof personId})`);
 
         // Buscar dados da pessoa via API do Pipedrive
         const personUrl = `https://${domain}.pipedrive.com/api/v1/persons/${personId}?api_token=${apiToken}`;
