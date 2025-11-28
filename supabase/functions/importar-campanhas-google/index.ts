@@ -112,7 +112,7 @@ serve(async (req) => {
           FROM campaign
         `;
 
-        const searchUrl = `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:search`;
+        const searchUrl = `https://googleads.googleapis.com/v17/customers/${customerId}/googleAds:search`;
 
         const searchResponse = await fetch(searchUrl, {
           method: "POST",
