@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CriativoAlertCard } from "@/components/CriativoAlertCard";
-import { AlertTriangle, ArrowLeft, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink, Copy } from "lucide-react";
+import { AlertTriangle, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 
@@ -59,7 +58,6 @@ const getCriativoUrl = (plataforma: string, idExterno: string) => {
 };
 
 const Criativos = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [syncingCreatives, setSyncingCreatives] = useState(false);
 
@@ -243,17 +241,11 @@ const Criativos = () => {
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold">Gestão de Criativos</h1>
-                <p className="text-sm text-muted-foreground">
-                  Alertas de campanhas com menos de 2 criativos ativos
-                </p>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold">Gestão de Criativos</h1>
+              <p className="text-sm text-muted-foreground">
+                Alertas de campanhas com menos de 2 criativos ativos
+              </p>
             </div>
             <div className="flex gap-2">
               <Button 
