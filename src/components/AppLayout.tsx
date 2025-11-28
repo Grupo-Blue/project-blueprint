@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   LogOut, 
   BarChart3, 
@@ -47,6 +48,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -115,7 +117,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const isAdmin = profile?.perfil === "ADMIN";
   const isDirecao = profile?.perfil === "DIRECAO" || isAdmin;
   const isTrafego = profile?.perfil === "TRAFEGO" || isAdmin;
-  const showBackButton = location.pathname !== "/dashboard";
+  const showBackButton = location.pathname !== "/dashboard" && !isMobile;
 
   if (loading) {
     return (
