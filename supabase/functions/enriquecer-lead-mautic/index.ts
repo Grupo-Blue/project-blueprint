@@ -174,9 +174,11 @@ serve(async (req) => {
         Object.assign(contact, fullContact);
         console.log(`[Mautic] Dados completos obtidos - UTMs disponíveis: ${fullContact.utmtags ? 'Sim' : 'Não'}`);
         
-        // Log detalhado dos campos para debug de UTM
-        console.log(`[Mautic] Campo attribution:`, fullContact.fields?.all?.attribution || 'N/A');
-        console.log(`[Mautic] utmtags array:`, JSON.stringify(fullContact.utmtags));
+        // Log completo para debug específico do email mychel@blueconsult.com.br
+        if (email === 'mychel@blueconsult.com.br') {
+          console.log(`[Mautic] ========== ANÁLISE COMPLETA MYCHEL ==========`);
+          console.log(`[Mautic] Estrutura completa do contato:`, JSON.stringify(fullContact, null, 2));
+        }
       }
     }
 
