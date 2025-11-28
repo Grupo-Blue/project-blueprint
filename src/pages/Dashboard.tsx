@@ -8,6 +8,7 @@ import { AlertaIntegracao } from "@/components/AlertaIntegracao";
 import { ValidacaoUTM } from "@/components/ValidacaoUTM";
 import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
+import { InteligenciaIA } from "@/components/InteligenciaIA";
 
 const Dashboard = () => {
   const { semanaSelecionada } = usePeriodo();
@@ -166,60 +167,8 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Status do Sistema</CardTitle>
-            <CardDescription className="text-sm">Backend configurado e pronto para uso</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                <span className="text-sm">✅ Banco de dados criado</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                <span className="text-sm">✅ Autenticação configurada</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                <span className="text-sm">✅ Empresas cadastradas</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                <span className="text-sm">✅ Governança A/B/C ativa</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Próximos Passos</CardTitle>
-            <CardDescription className="text-sm">Configure o sistema para começar a usar</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-blue-500 mr-2"></div>
-                <span className="text-sm">Configure as integrações com Meta e Google Ads</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-blue-500 mr-2"></div>
-                <span className="text-sm">Configure a integração com Pipedrive</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-blue-500 mr-2"></div>
-                <span className="text-sm">Configure a integração com Tokeniza</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-blue-500 mr-2"></div>
-                <span className="text-sm">Cadastre suas campanhas</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mb-6 md:mb-8">
+        <InteligenciaIA />
       </div>
 
       <ValidacaoUTM />
