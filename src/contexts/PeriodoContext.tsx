@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 
-export type TipoFiltroPeriodo = "mes_atual" | "mes_anterior" | "data_especifica";
+export type TipoFiltroPeriodo = "mes_atual" | "mes_anterior" | "data_especifica" | "semana_especifica";
 
 interface PeriodoContextType {
   tipoFiltro: TipoFiltroPeriodo;
