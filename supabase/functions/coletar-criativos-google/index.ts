@@ -174,7 +174,7 @@ serve(async (req) => {
           try {
             console.log(`Buscando criativos da campanha ${campanha.nome}`);
 
-            // Query GAQL para buscar ads da campanha com métricas de hoje, URLs finais e custom parameters
+            // Query GAQL para buscar ads da campanha com todos os campos de URL
             const gaqlQuery = `
               SELECT 
                 ad_group_ad.ad.id,
@@ -184,6 +184,11 @@ serve(async (req) => {
                 ad_group_ad.ad.final_url_suffix,
                 ad_group_ad.ad.tracking_url_template,
                 ad_group_ad.ad.url_custom_parameters,
+                ad_group_ad.ad.final_mobile_urls,
+                ad_group.final_url_suffix,
+                ad_group.tracking_url_template,
+                campaign.final_url_suffix,
+                campaign.tracking_url_template,
                 ad_group_ad.status,
                 ad_group_ad.ad.responsive_display_ad.marketing_images,
                 ad_group_ad.ad.responsive_display_ad.logo_images,
@@ -284,40 +289,85 @@ serve(async (req) => {
               // Extrair URL final do anúncio com parâmetros UTM
               let urlFinal = null;
               try {
+                console.log(`\n=== Processando criativo ${ad.id} (${ad.name}) ===`);
+                
                 // Google Ads retorna final_urls como array
                 if (ad.finalUrls && ad.finalUrls.length > 0) {
                   urlFinal = ad.finalUrls[0];
-                  console.log(`URL base extraída: ${urlFinal}`);
+                  console.log(`✓ URL base extraída: ${urlFinal}`);
                   
-                  // Adicionar final_url_suffix se existir (contém UTM parameters)
+                  const allSuffixes = [];
+                  
+                  // 1. final_url_suffix do ad (nível mais específico)
                   if (ad.finalUrlSuffix) {
-                    const separator = urlFinal.includes('?') ? '&' : '?';
-                    urlFinal = `${urlFinal}${separator}${ad.finalUrlSuffix}`;
-                    console.log(`URL com final_url_suffix: ${urlFinal}`);
+                    console.log(`✓ Final URL suffix no ad: ${ad.finalUrlSuffix}`);
+                    allSuffixes.push(ad.finalUrlSuffix);
                   }
                   
-                  // Verificar url_custom_parameters (parâmetros customizados)
+                  // 2. final_url_suffix do ad group (herança)
+                  if (result.adGroup?.finalUrlSuffix) {
+                    console.log(`✓ Final URL suffix no ad group: ${result.adGroup.finalUrlSuffix}`);
+                    allSuffixes.push(result.adGroup.finalUrlSuffix);
+                  }
+                  
+                  // 3. final_url_suffix da campaign (herança)
+                  if (result.campaign?.finalUrlSuffix) {
+                    console.log(`✓ Final URL suffix na campaign: ${result.campaign.finalUrlSuffix}`);
+                    allSuffixes.push(result.campaign.finalUrlSuffix);
+                  }
+                  
+                  // Combinar todos os suffixes encontrados
+                  if (allSuffixes.length > 0) {
+                    const combinedSuffix = allSuffixes.join('&');
+                    const separator = urlFinal.includes('?') ? '&' : '?';
+                    urlFinal = `${urlFinal}${separator}${combinedSuffix}`;
+                    console.log(`✓ URL com suffixes: ${urlFinal}`);
+                  }
+                  
+                  // 4. Verificar url_custom_parameters (parâmetros customizados)
                   if (ad.urlCustomParameters && ad.urlCustomParameters.length > 0) {
-                    console.log(`Custom parameters detectados:`, ad.urlCustomParameters);
+                    console.log(`✓ Custom parameters detectados:`, ad.urlCustomParameters);
                     const customParams = ad.urlCustomParameters
                       .map((p: any) => `${p.key}=${p.value}`)
                       .join('&');
                     const separator = urlFinal.includes('?') ? '&' : '?';
                     urlFinal = `${urlFinal}${separator}${customParams}`;
-                    console.log(`URL com custom parameters: ${urlFinal}`);
+                    console.log(`✓ URL com custom parameters: ${urlFinal}`);
                   }
                   
-                  // Tracking template é aplicado pelo Google automaticamente no click
+                  // 5. Tracking template (logging apenas)
+                  const trackingTemplates = [];
                   if (ad.trackingUrlTemplate) {
-                    console.log(`Tracking template configurado: ${ad.trackingUrlTemplate}`);
+                    trackingTemplates.push(`Ad: ${ad.trackingUrlTemplate}`);
                   }
+                  if (result.adGroup?.trackingUrlTemplate) {
+                    trackingTemplates.push(`AdGroup: ${result.adGroup.trackingUrlTemplate}`);
+                  }
+                  if (result.campaign?.trackingUrlTemplate) {
+                    trackingTemplates.push(`Campaign: ${result.campaign.trackingUrlTemplate}`);
+                  }
+                  if (trackingTemplates.length > 0) {
+                    console.log(`ℹ️ Tracking templates (aplicados no click):`, trackingTemplates);
+                  }
+                  
+                  if (!allSuffixes.length && !ad.urlCustomParameters?.length) {
+                    console.log(`⚠️ Nenhum UTM configurado - URL sem parâmetros de rastreamento`);
+                  }
+                } else {
+                  console.log(`❌ ERRO: final_urls não encontrado`);
                 }
                 
                 if (!urlFinal) {
-                  console.log(`⚠️ URL não capturada para criativo ${ad.id} (${ad.name})`);
+                  console.log(`❌ ERRO: URL não capturada para criativo ${ad.id}`);
+                  console.log(`Debug - ad:`, JSON.stringify({
+                    finalUrls: ad.finalUrls,
+                    finalUrlSuffix: ad.finalUrlSuffix,
+                    urlCustomParameters: ad.urlCustomParameters,
+                    trackingUrlTemplate: ad.trackingUrlTemplate
+                  }, null, 2));
                 }
               } catch (urlErr) {
-                console.error(`Erro ao extrair URL do criativo ${ad.id}:`, urlErr);
+                console.error(`❌ Erro ao extrair URL do criativo ${ad.id}:`, urlErr);
               }
 
               // Preparar dados do criativo

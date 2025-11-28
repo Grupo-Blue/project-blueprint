@@ -123,8 +123,8 @@ serve(async (req) => {
           try {
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
-            // Endpoint da API do Meta para buscar ads com métricas de hoje, URL final e URL tags (UTMs)
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec{link_data{link,call_to_action}},image_url,video_id,thumbnail_url,url_tags},url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
+            // Endpoint da API do Meta para buscar ads com todos os campos de URL e UTM
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec{link_data{link,call_to_action}},effective_object_story_id,image_url,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,adset{targeting{url_tags}},insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -188,48 +188,66 @@ serve(async (req) => {
               // Extrair URL final do anúncio e UTM parameters
               let urlFinal = null;
               try {
+                console.log(`\n=== Processando criativo ${creative.id} (${ad.name}) ===`);
+                
                 // Prioridade 1: object_story_spec.link_data.link (URL base)
                 if (creative.object_story_spec?.link_data?.link) {
                   urlFinal = creative.object_story_spec.link_data.link;
-                  console.log(`URL base extraída: ${urlFinal}`);
+                  console.log(`✓ URL base extraída: ${urlFinal}`);
                   
-                  // Adicionar url_tags se existirem (contêm os UTM parameters configurados)
-                  let urlTags = null;
+                  // Coletar url_tags de múltiplas fontes e combinar
+                  const allUrlTags = [];
                   
-                  // Verificar url_tags no criativo
+                  // 1. url_tags no criativo
                   if (creative.url_tags) {
-                    urlTags = creative.url_tags;
-                    console.log(`URL tags do criativo: ${urlTags}`);
-                  }
-                  // Verificar url_tags no ad
-                  else if (ad.url_tags) {
-                    urlTags = ad.url_tags;
-                    console.log(`URL tags do ad: ${urlTags}`);
+                    console.log(`✓ URL tags no criativo: ${creative.url_tags}`);
+                    allUrlTags.push(creative.url_tags);
                   }
                   
-                  // Combinar URL base com UTM parameters
-                  if (urlTags && urlFinal) {
+                  // 2. url_tags no ad
+                  if (ad.url_tags) {
+                    console.log(`✓ URL tags no ad: ${ad.url_tags}`);
+                    allUrlTags.push(ad.url_tags);
+                  }
+                  
+                  // 3. url_tags no adset targeting (se disponível)
+                  if (ad.adset?.targeting?.url_tags) {
+                    console.log(`✓ URL tags no adset: ${ad.adset.targeting.url_tags}`);
+                    allUrlTags.push(ad.adset.targeting.url_tags);
+                  }
+                  
+                  // Combinar todos os parâmetros encontrados
+                  if (allUrlTags.length > 0) {
+                    const combinedTags = allUrlTags.join('&');
                     const separator = urlFinal.includes('?') ? '&' : '?';
-                    urlFinal = `${urlFinal}${separator}${urlTags}`;
-                    console.log(`URL completa com UTMs: ${urlFinal}`);
+                    urlFinal = `${urlFinal}${separator}${combinedTags}`;
+                    console.log(`✓ URL completa com UTMs: ${urlFinal}`);
+                  } else {
+                    console.log(`⚠️ Nenhum url_tags encontrado - URL sem UTMs`);
                   }
                 }
                 // Prioridade 2: tracking_specs (contém URL com parâmetros)
                 else if (ad.tracking_specs && ad.tracking_specs.length > 0) {
+                  console.log(`Tentando extrair de tracking_specs...`);
                   for (const trackingSpec of ad.tracking_specs) {
                     if (trackingSpec.url && trackingSpec.url.includes('http')) {
                       urlFinal = trackingSpec.url;
-                      console.log(`URL extraída de tracking_specs: ${urlFinal}`);
+                      console.log(`✓ URL extraída de tracking_specs: ${urlFinal}`);
                       break;
                     }
                   }
                 }
                 
                 if (!urlFinal) {
-                  console.log(`⚠️ URL não capturada para criativo ${creative.id} (${ad.name})`);
+                  console.log(`❌ ERRO: URL não capturada para criativo ${creative.id}`);
+                  console.log(`Debug - creative:`, JSON.stringify(creative, null, 2));
+                  console.log(`Debug - ad:`, JSON.stringify({ 
+                    url_tags: ad.url_tags, 
+                    tracking_specs: ad.tracking_specs 
+                  }, null, 2));
                 }
               } catch (urlErr) {
-                console.error(`Erro ao extrair URL do criativo ${creative.id}:`, urlErr);
+                console.error(`❌ Erro ao extrair URL do criativo ${creative.id}:`, urlErr);
               }
 
               // Preparar dados do criativo
