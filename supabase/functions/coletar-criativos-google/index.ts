@@ -254,14 +254,28 @@ serve(async (req) => {
               const ad = adGroupAd.ad;
               const metrics = result.metrics;
 
-              // Determinar tipo de criativo baseado no tipo do ad
+              // Determinar tipo de criativo e URL da mídia
               let tipoCriativo = "OUTRO";
+              let urlMidia = null;
+              
               if (ad.type === "VIDEO_AD" || ad.videoAd) {
                 tipoCriativo = "VIDEO";
-              } else if (ad.type === "IMAGE_AD" || ad.imageAd || ad.responsiveDisplayAd?.marketingImages) {
+                // Para vídeos do Google Ads, a URL geralmente não está disponível diretamente
+                urlMidia = ad.videoAd?.video?.id ? `https://www.youtube.com/watch?v=${ad.videoAd.video.id}` : null;
+              } else if (ad.type === "IMAGE_AD" || ad.imageAd) {
                 tipoCriativo = "IMAGEM";
+                urlMidia = ad.imageAd?.imageUrl || null;
+              } else if (ad.responsiveDisplayAd?.marketingImages) {
+                tipoCriativo = "IMAGEM";
+                urlMidia = ad.responsiveDisplayAd.marketingImages[0]?.fullSize?.url || null;
               } else if (ad.type === "DISCOVERY_CAROUSEL_AD" || ad.discoveryCarouselAd) {
                 tipoCriativo = "CARROSSEL";
+                // Para carrossel, pegar primeira imagem
+                const firstCard = ad.discoveryCarouselAd?.carouselCards?.[0];
+                urlMidia = firstCard?.squareMarketingImage?.fullSize?.url || null;
+              } else if (ad.appAd?.images) {
+                tipoCriativo = "IMAGEM";
+                urlMidia = ad.appAd.images[0]?.fullSize?.url || null;
               }
 
               // Determinar se está ativo
@@ -314,6 +328,7 @@ serve(async (req) => {
                 descricao: ad.name || null,
                 ativo: ativo,
                 url_final: urlFinal,
+                url_midia: urlMidia,
               };
 
               // Upsert do criativo (insere ou atualiza)

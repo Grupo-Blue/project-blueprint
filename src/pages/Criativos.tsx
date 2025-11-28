@@ -22,6 +22,7 @@ interface CampanhaCriativo {
     tipo: string;
     descricao: string | null;
     ativo: boolean;
+    url_midia: string | null;
   }>;
 }
 
@@ -89,7 +90,7 @@ const Criativos = () => {
       for (const camp of campanhasData || []) {
         const { data: criativosData, error: criativosError } = await supabase
           .from("criativo")
-          .select("id_criativo, id_criativo_externo, tipo, descricao, ativo")
+          .select("id_criativo, id_criativo_externo, tipo, descricao, ativo, url_midia")
           .eq("id_campanha", camp.id_campanha);
 
         if (criativosError) continue;
@@ -109,6 +110,7 @@ const Criativos = () => {
             tipo: c.tipo,
             descricao: c.descricao,
             ativo: c.ativo,
+            url_midia: c.url_midia,
           })) || [],
         });
       }
@@ -379,8 +381,6 @@ const Criativos = () => {
                     ) : (
                       <div className="space-y-2">
                         {campanha.criativos.map((criativo) => {
-                          const criativoUrl = getCriativoUrl(campanha.plataforma, criativo.id_criativo_externo);
-                          
                           return (
                             <div
                               key={criativo.id_criativo}
@@ -420,15 +420,15 @@ const Criativos = () => {
                                 <Badge variant={criativo.ativo ? "secondary" : "outline"}>
                                   {criativo.ativo ? "Ativo" : "Inativo"}
                                 </Badge>
-                                {criativoUrl && (
+                                {criativo.url_midia && (
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => window.open(criativoUrl, '_blank')}
+                                    onClick={() => window.open(criativo.url_midia!, '_blank')}
                                     className="gap-1"
                                   >
                                     <ExternalLink className="h-3 w-3" />
-                                    Ver
+                                    Ver Mídia
                                   </Button>
                                 )}
                               </div>
