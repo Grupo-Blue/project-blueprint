@@ -33,6 +33,9 @@ verify_jwt = false
 [functions.enriquecer-lead-mautic]
 verify_jwt = false
 
+[functions.enriquecer-leads-lote]
+verify_jwt = false
+
 [functions.importar-campanhas-meta]
 verify_jwt = false
 

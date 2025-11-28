@@ -873,6 +873,55 @@ export default function Integracoes() {
                       </div>
                     </div>
                   </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Enriqueça todos os leads existentes com dados comportamentais do Mautic (score, engajamento, tags, localização).
+                      </p>
+                      <Button 
+                        variant="secondary" 
+                        className="w-full"
+                        onClick={async () => {
+                          if (!window.confirm("Deseja enriquecer todos os leads com dados do Mautic? Isso pode levar alguns minutos.")) {
+                            return;
+                          }
+
+                          const integracaoId = integracao.id_integracao;
+                          setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
+                          
+                          try {
+                            toast.info("Processando enriquecimento em lote...");
+                            
+                            const { data, error } = await supabase.functions.invoke('enriquecer-leads-lote', {
+                              body: { 
+                                id_empresa: config.id_empresa
+                              }
+                            });
+
+                            if (error) throw error;
+
+                            if (data?.success) {
+                              toast.success(`Enriquecimento concluído! ${data.enriquecidos} de ${data.processados} leads enriquecidos. ${data.erros} erros.`);
+                            } else {
+                              toast.error(data?.message || "Erro ao enriquecer leads em lote");
+                            }
+                          } catch (error: any) {
+                            console.error('Erro ao enriquecer leads em lote:', error);
+                            toast.error(error.message || "Erro ao processar enriquecimento em lote");
+                          } finally {
+                            setTestingIntegracoes(prev => {
+                              const newSet = new Set(prev);
+                              newSet.delete(integracaoId);
+                              return newSet;
+                            });
+                          }
+                        }}
+                        disabled={testingIntegracoes.has(integracao.id_integracao)}
+                      >
+                        {testingIntegracoes.has(integracao.id_integracao) ? 'Processando...' : 'Enriquecer Todos os Leads'}
+                      </Button>
+                    </div>
+                  </CardContent>
                 </Card>
               );
             })
