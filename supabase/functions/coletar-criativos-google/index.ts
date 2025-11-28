@@ -271,15 +271,21 @@ serve(async (req) => {
                 // Google Ads retorna final_urls como array
                 if (ad.finalUrls && ad.finalUrls.length > 0) {
                   urlFinal = ad.finalUrls[0];
+                  console.log(`URL base extraída: ${urlFinal}`);
                   
-                  // Se houver tracking_url_template, combinar com a URL
+                  // Se houver tracking_url_template, ele contém parâmetros adicionais
+                  // mas a URL final já é a URL completa com parâmetros
+                  // O tracking template não precisa ser combinado aqui
                   if (ad.trackingUrlTemplate) {
-                    // O tracking template geralmente adiciona parâmetros à URL
-                    urlFinal = ad.trackingUrlTemplate.replace('{lpurl}', urlFinal);
+                    console.log(`Tracking template detectado: ${ad.trackingUrlTemplate}`);
                   }
                 }
+                
+                if (!urlFinal) {
+                  console.log(`⚠️ URL não capturada para criativo ${ad.id} (${ad.name})`);
+                }
               } catch (urlErr) {
-                console.log(`Não foi possível extrair URL do criativo ${ad.id}`);
+                console.error(`Erro ao extrair URL do criativo ${ad.id}:`, urlErr);
               }
 
               // Preparar dados do criativo
