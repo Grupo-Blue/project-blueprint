@@ -164,14 +164,22 @@ serve(async (req) => {
             for (const ad of adsData.data || []) {
               const creative = ad.creative;
               
-              // Determinar tipo de criativo
+              // Determinar tipo de criativo e URL da mídia
               let tipoCriativo = "OUTRO";
+              let urlMidia = null;
+              
               if (creative.video_id) {
                 tipoCriativo = "VIDEO";
+                // Para vídeos, usar thumbnail_url se disponível
+                urlMidia = creative.thumbnail_url || null;
               } else if (creative.image_url) {
                 tipoCriativo = "IMAGEM";
+                urlMidia = creative.image_url;
               } else if (creative.object_story_spec?.link_data?.child_attachments) {
                 tipoCriativo = "CARROSSEL";
+                // Para carrossel, pegar primeira imagem
+                const firstCard = creative.object_story_spec.link_data.child_attachments?.[0];
+                urlMidia = firstCard?.picture || null;
               }
 
               // Determinar se está ativo
@@ -232,6 +240,7 @@ serve(async (req) => {
                 descricao: ad.name || creative.name || null,
                 ativo: ativo,
                 url_final: urlFinal,
+                url_midia: urlMidia,
               };
 
               // Upsert do criativo (insere ou atualiza)
