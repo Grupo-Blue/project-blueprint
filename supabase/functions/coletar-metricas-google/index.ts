@@ -169,7 +169,7 @@ serve(async (req) => {
             AND segments.date = '${hoje}'
         `;
 
-        const apiUrl = `https://googleads.googleapis.com/v14/customers/${customerId}/googleAds:searchStream`;
+        const apiUrl = `https://googleads.googleapis.com/v14/customers/${customerId}/googleAds:search`;
         
         const metricsHeaders: Record<string, string> = {
           "Authorization": `Bearer ${access_token}`,
