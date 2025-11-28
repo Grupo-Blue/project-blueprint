@@ -32,10 +32,12 @@ interface CampanhaMetrica {
   vendas: number;
   ticket_medio: number;
   cac: number;
+  qtd_criativos?: number;
 }
 
 export default function DashboardTrafego() {
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
+  const [ordenacao, setOrdenacao] = useState<string>("verba_desc");
   const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
 
   // Usar data do filtro selecionado
@@ -94,19 +96,33 @@ export default function DashboardTrafego() {
           );
         }
 
-        return filteredData.map((m: any) => ({
-          id_campanha: m.id_campanha,
-          nome: m.campanha?.nome || "Campanha sem nome",
-          leads: m.leads,
-          verba_investida: m.verba_investida,
-          cpl: m.cpl,
-          reunioes: m.reunioes || 0,
-          mqls: m.mqls || 0,
-          levantadas: m.levantadas || 0,
-          vendas: m.vendas || 0,
-          ticket_medio: m.ticket_medio || 0,
-          cac: m.cac || 0,
-        })) as CampanhaMetrica[];
+        // Buscar quantidade de criativos para cada campanha
+        const campanhasComCriativos = await Promise.all(
+          filteredData.map(async (m: any) => {
+            const { count } = await supabase
+              .from("criativo")
+              .select("id_criativo", { count: "exact", head: true })
+              .eq("id_campanha", m.id_campanha)
+              .eq("ativo", true);
+
+            return {
+              id_campanha: m.id_campanha,
+              nome: m.campanha?.nome || "Campanha sem nome",
+              leads: m.leads,
+              verba_investida: m.verba_investida,
+              cpl: m.cpl,
+              reunioes: m.reunioes || 0,
+              mqls: m.mqls || 0,
+              levantadas: m.levantadas || 0,
+              vendas: m.vendas || 0,
+              ticket_medio: m.ticket_medio || 0,
+              cac: m.cac || 0,
+              qtd_criativos: count || 0,
+            };
+          })
+        );
+
+        return campanhasComCriativos as CampanhaMetrica[];
       }
 
       // Para outros filtros, busca todas as semanas do período
@@ -167,13 +183,27 @@ export default function DashboardTrafego() {
         return acc;
       }, {});
 
-      // Calcular CPL e CAC agregados
-      return Object.values(metricasAgregadas).map((m: any) => ({
-        ...m,
-        cpl: m.leads > 0 ? m.verba_investida / m.leads : null,
-        cac: m.vendas > 0 ? m.verba_investida / m.vendas : null,
-        ticket_medio: m.vendas > 0 ? (m.verba_investida * 3) / m.vendas : 0, // Aproximação
-      })) as CampanhaMetrica[];
+      // Buscar quantidade de criativos para cada campanha
+      const campanhasAgregadas = Object.values(metricasAgregadas);
+      const campanhasComCriativos = await Promise.all(
+        campanhasAgregadas.map(async (m: any) => {
+          const { count } = await supabase
+            .from("criativo")
+            .select("id_criativo", { count: "exact", head: true })
+            .eq("id_campanha", m.id_campanha)
+            .eq("ativo", true);
+
+          return {
+            ...m,
+            cpl: m.leads > 0 ? m.verba_investida / m.leads : null,
+            cac: m.vendas > 0 ? m.verba_investida / m.vendas : null,
+            ticket_medio: m.vendas > 0 ? (m.verba_investida * 3) / m.vendas : 0,
+            qtd_criativos: count || 0,
+          };
+        })
+      );
+
+      return campanhasComCriativos as CampanhaMetrica[];
     },
   });
 
@@ -211,6 +241,34 @@ export default function DashboardTrafego() {
   };
 
   const labelPeriodo = getLabelPeriodo();
+
+  // Ordenar campanhas conforme o filtro selecionado
+  const campanhasOrdenadas = campanhasMetricas?.slice().sort((a, b) => {
+    switch (ordenacao) {
+      case "verba_desc":
+        return b.verba_investida - a.verba_investida;
+      case "verba_asc":
+        return a.verba_investida - b.verba_investida;
+      case "leads_desc":
+        return b.leads - a.leads;
+      case "leads_asc":
+        return a.leads - b.leads;
+      case "cpl_desc":
+        return (b.cpl || 0) - (a.cpl || 0);
+      case "cpl_asc":
+        return (a.cpl || 0) - (b.cpl || 0);
+      case "criativos_desc":
+        return (b.qtd_criativos || 0) - (a.qtd_criativos || 0);
+      case "criativos_asc":
+        return (a.qtd_criativos || 0) - (b.qtd_criativos || 0);
+      case "nome_asc":
+        return a.nome.localeCompare(b.nome);
+      case "nome_desc":
+        return b.nome.localeCompare(a.nome);
+      default:
+        return 0;
+    }
+  });
 
   if (isLoading) {
     return (
@@ -428,16 +486,38 @@ export default function DashboardTrafego() {
         {/* Performance por Campanha */}
         <Card>
           <CardHeader>
-            <CardTitle>Performance por Campanha</CardTitle>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <CardTitle>Performance por Campanha</CardTitle>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Ordenar por:</span>
+                <Select value={ordenacao} onValueChange={setOrdenacao}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="verba_desc">Maior Verba</SelectItem>
+                    <SelectItem value="verba_asc">Menor Verba</SelectItem>
+                    <SelectItem value="leads_desc">Mais Leads</SelectItem>
+                    <SelectItem value="leads_asc">Menos Leads</SelectItem>
+                    <SelectItem value="cpl_desc">Maior CPL</SelectItem>
+                    <SelectItem value="cpl_asc">Menor CPL</SelectItem>
+                    <SelectItem value="criativos_desc">Mais Criativos</SelectItem>
+                    <SelectItem value="criativos_asc">Menos Criativos</SelectItem>
+                    <SelectItem value="nome_asc">Nome (A-Z)</SelectItem>
+                    <SelectItem value="nome_desc">Nome (Z-A)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {campanhasMetricas?.length === 0 ? (
+              {campanhasOrdenadas?.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
                   Nenhuma campanha encontrada
                 </p>
               ) : (
-                campanhasMetricas?.map((campanha) => (
+                campanhasOrdenadas?.map((campanha) => (
                   <div
                     key={campanha.id_campanha}
                     className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -445,9 +525,16 @@ export default function DashboardTrafego() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h3 className="font-semibold">{campanha.nome}</h3>
-                        <Badge variant="outline">
-                          CPL: R$ {campanha.cpl?.toFixed(2) || "N/A"}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">
+                            CPL: R$ {campanha.cpl?.toFixed(2) || "N/A"}
+                          </Badge>
+                          {campanha.qtd_criativos !== undefined && (
+                            <Badge variant="secondary">
+                              {campanha.qtd_criativos} criativos
+                            </Badge>
+                          )}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
