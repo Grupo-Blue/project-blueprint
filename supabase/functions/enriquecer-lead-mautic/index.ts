@@ -183,10 +183,11 @@ serve(async (req) => {
     }
 
     // Extrair dados estruturados
+    const pageHits = (contact as any).points?.page_hit || 0;
     const enrichedData: EnrichedLeadData = {
       id_mautic_contact: contactId,
       mautic_score: contact.points || 0,
-      mautic_page_hits: null, // Mautic não retorna diretamente page hits nesta API
+      mautic_page_hits: pageHits,
       mautic_last_active: contact.lastActive || null,
       mautic_first_visit: contact.dateIdentified || null,
       mautic_tags: contact.tags ? contact.tags.map(t => t.tag) : null,
