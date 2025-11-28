@@ -234,17 +234,85 @@ export default function DashboardTrafego() {
     },
   });
 
-  const totais = campanhasMetricas?.reduce(
-    (acc, c) => ({
-      verba: acc.verba + c.verba_investida,
-      leads: acc.leads + c.leads,
-      mqls: acc.mqls + c.mqls,
-      levantadas: acc.levantadas + c.levantadas,
-      reunioes: acc.reunioes + c.reunioes,
-      vendas: acc.vendas + c.vendas,
-    }),
-    { verba: 0, leads: 0, mqls: 0, levantadas: 0, reunioes: 0, vendas: 0 }
-  ) || { verba: 0, leads: 0, mqls: 0, levantadas: 0, reunioes: 0, vendas: 0 };
+  // Buscar totais gerais da empresa (não apenas soma das campanhas)
+  const { data: totaisGerais } = useQuery({
+    queryKey: ['totais-gerais-empresa', empresaSelecionada, tipoFiltro, semanaSelecionada, inicioMes, fimMes],
+    queryFn: async () => {
+      if (!empresaSelecionada) return { verba: 0, leads: 0, mqls: 0, levantadas: 0, reunioes: 0, vendas: 0 };
+
+      if (tipoFiltro === 'semana_especifica' && semanaSelecionada) {
+        // Para semana específica, buscar de empresa_semana_metricas
+        const { data, error } = await supabase
+          .from('empresa_semana_metricas')
+          .select('*')
+          .eq('id_empresa', empresaSelecionada)
+          .eq('id_semana', semanaSelecionada)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        return {
+          verba: data?.verba_investida || 0,
+          leads: data?.leads_total || 0,
+          mqls: data?.mqls || 0,
+          levantadas: data?.levantadas || 0,
+          reunioes: data?.reunioes || 0,
+          vendas: data?.vendas || 0,
+        };
+      } else {
+        // Para outros períodos, contar diretamente da tabela lead
+        const { data: leads, error } = await supabase
+          .from('lead')
+          .select('*')
+          .eq('id_empresa', empresaSelecionada)
+          .gte('data_criacao', inicioMes)
+          .lte('data_criacao', fimMes);
+
+        if (error) throw error;
+
+        // Buscar verba investida das campanhas da empresa
+        const { data: contas } = await supabase
+          .from('conta_anuncio')
+          .select('id_conta')
+          .eq('id_empresa', empresaSelecionada);
+
+        const contaIds = contas?.map(c => c.id_conta) || [];
+        let verba = 0;
+
+        if (contaIds.length > 0) {
+          const { data: campanhas } = await supabase
+            .from('campanha')
+            .select('id_campanha')
+            .in('id_conta', contaIds);
+
+          const campanhaIds = campanhas?.map(c => c.id_campanha) || [];
+
+          if (campanhaIds.length > 0) {
+            const { data: metricasDia } = await supabase
+              .from('campanha_metricas_dia')
+              .select('verba_investida')
+              .in('id_campanha', campanhaIds)
+              .gte('data', inicioMes)
+              .lte('data', fimMes);
+
+            verba = metricasDia?.reduce((sum, m) => sum + m.verba_investida, 0) || 0;
+          }
+        }
+
+        return {
+          verba,
+          leads: leads?.length || 0,
+          mqls: leads?.filter(l => l.is_mql).length || 0,
+          levantadas: leads?.filter(l => l.levantou_mao).length || 0,
+          reunioes: leads?.filter(l => l.tem_reuniao || l.reuniao_realizada).length || 0,
+          vendas: leads?.filter(l => l.venda_realizada).length || 0,
+        };
+      }
+    },
+    enabled: !!empresaSelecionada,
+  });
+
+  const totais = totaisGerais || { verba: 0, leads: 0, mqls: 0, levantadas: 0, reunioes: 0, vendas: 0 };
 
   const taxaMQL = totais.leads > 0 ? (totais.mqls / totais.leads) * 100 : 0;
   const taxaLevantada = totais.mqls > 0 ? (totais.levantadas / totais.mqls) * 100 : 0;
