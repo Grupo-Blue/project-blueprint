@@ -72,8 +72,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Buscar campanhas ativas da API do Meta
-        const campaignsUrl = `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?fields=id,name,status,objective&filtering=[{"field":"status","operator":"IN","value":["ACTIVE","PAUSED"]}]&access_token=${accessToken}`;
+        // Buscar campanhas da API do Meta (sem filtro na URL pois não é suportado)
+        const campaignsUrl = `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?fields=id,name,status,objective&access_token=${accessToken}`;
 
         const campaignsResponse = await fetch(campaignsUrl);
 
@@ -104,7 +104,10 @@ serve(async (req) => {
         }
 
         const campaignsData = await campaignsResponse.json();
-        const campanhas = campaignsData.data || [];
+        // Filtrar apenas campanhas ativas e pausadas no código
+        const campanhas = (campaignsData.data || []).filter(
+          (camp: any) => camp.status === "ACTIVE" || camp.status === "PAUSED"
+        );
         
         console.log(`Encontradas ${campanhas.length} campanhas para importar`);
 

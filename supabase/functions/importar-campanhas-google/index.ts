@@ -102,7 +102,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Query GAQL para buscar todas as campanhas
+        // Query GAQL para buscar campanhas
         const gaqlQuery = `
           SELECT 
             campaign.id,
@@ -110,11 +110,9 @@ serve(async (req) => {
             campaign.status,
             campaign.advertising_channel_type
           FROM campaign
-          WHERE campaign.status IN ('ENABLED', 'PAUSED')
-          ORDER BY campaign.name
         `;
 
-        const searchUrl = `https://googleads.googleapis.com/v16/customers/${customerId}/googleAds:search`;
+        const searchUrl = `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:search`;
 
         const searchResponse = await fetch(searchUrl, {
           method: "POST",
@@ -149,7 +147,12 @@ serve(async (req) => {
         }
 
         const searchData = await searchResponse.json();
-        const campanhas = searchData.results || [];
+        // Filtrar campanhas ativas e pausadas no código
+        const campanhas = (searchData.results || []).filter(
+          (result: any) => 
+            result.campaign.status === "ENABLED" || 
+            result.campaign.status === "PAUSED"
+        );
         
         console.log(`Encontradas ${campanhas.length} campanhas ativas para importar`);
 
