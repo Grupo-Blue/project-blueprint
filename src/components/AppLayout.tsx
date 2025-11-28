@@ -186,26 +186,6 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           </Button>
         </Link>
       )}
-      <Link to="/campanhas" onClick={() => setMobileMenuOpen(false)}>
-        <Button 
-          variant={location.pathname === "/campanhas" ? "secondary" : "ghost"} 
-          size="sm"
-          className="w-full justify-start hover:bg-accent transition-all"
-        >
-          <TrendingUp className="mr-2 h-4 w-4" />
-          Campanhas
-        </Button>
-      </Link>
-      <Link to="/criativos" onClick={() => setMobileMenuOpen(false)}>
-        <Button 
-          variant={location.pathname === "/criativos" ? "secondary" : "ghost"} 
-          size="sm"
-          className="w-full justify-start hover:bg-accent transition-all"
-        >
-          <Image className="mr-2 h-4 w-4" />
-          Criativos
-        </Button>
-      </Link>
       <Link to="/leads" onClick={() => setMobileMenuOpen(false)}>
         <Button 
           variant={location.pathname === "/leads" ? "secondary" : "ghost"} 
