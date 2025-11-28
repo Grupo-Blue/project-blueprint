@@ -13,11 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState } from "react";
 
 const Dashboard = () => {
-  const { semanaSelecionada } = usePeriodo();
+  const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("");
-  const mesAtual = new Date();
-  const inicioMes = startOfMonth(mesAtual);
-  const fimMes = endOfMonth(mesAtual);
+  
+  // Usar data do filtro selecionado
+  const dataReferencia = getDataReferencia();
+  const inicioMes = startOfMonth(dataReferencia);
+  const fimMes = endOfMonth(dataReferencia);
 
   // Buscar empresas
   const { data: empresas } = useQuery({
@@ -49,9 +51,9 @@ const Dashboard = () => {
     },
   });
 
-  // Buscar leads do mês atual
+  // Buscar leads do período selecionado
   const { data: leadsDoMes } = useQuery({
-    queryKey: ["leads-mes-atual", inicioMes, fimMes],
+    queryKey: ["leads-periodo", inicioMes.toISOString(), fimMes.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lead")
@@ -62,6 +64,24 @@ const Dashboard = () => {
       return data;
     },
   });
+
+  // Determinar label do período
+  const getLabelPeriodo = () => {
+    switch (tipoFiltro) {
+      case "mes_atual":
+        return "do Mês Atual";
+      case "mes_anterior":
+        return "do Mês Anterior";
+      case "data_especifica":
+        return `de ${format(dataReferencia, "MMMM/yyyy", { locale: ptBR })}`;
+      case "semana_especifica":
+        return "da Semana";
+      default:
+        return "do Período";
+    }
+  };
+
+  const labelPeriodo = getLabelPeriodo();
 
   const { data: semanaInfo } = useQuery({
     queryKey: ["semana-info", semanaSelecionada],
@@ -154,13 +174,13 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Leads do Mês</CardTitle>
+            <CardTitle className="text-sm font-medium">Leads {labelPeriodo}</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalLeads}</div>
             <p className="text-xs text-muted-foreground">
-              {totalLeads === 0 ? "Nenhum lead este mês" : `${format(inicioMes, "dd/MMM", { locale: ptBR })} - ${format(fimMes, "dd/MMM", { locale: ptBR })}`}
+              {totalLeads === 0 ? "Nenhum lead neste período" : `${format(inicioMes, "dd/MMM", { locale: ptBR })} - ${format(fimMes, "dd/MMM", { locale: ptBR })}`}
             </p>
           </CardContent>
         </Card>
@@ -189,7 +209,7 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Conversão do Mês</CardTitle>
+            <CardTitle className="text-sm font-medium">Conversão {labelPeriodo}</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
