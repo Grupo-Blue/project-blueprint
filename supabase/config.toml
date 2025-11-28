@@ -30,3 +30,12 @@ verify_jwt = true
 [functions.analise-inteligencia]
 verify_jwt = false
 
+[functions.enriquecer-lead-mautic]
+verify_jwt = false
+
+[functions.importar-campanhas-meta]
+verify_jwt = false
+
+[functions.importar-campanhas-google]
+verify_jwt = false
+
