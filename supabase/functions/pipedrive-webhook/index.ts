@@ -173,6 +173,32 @@ serve(async (req) => {
 
     console.log("UTM Parameters capturados:", { utmSource, utmMedium, utmCampaign, utmContent, utmTerm });
 
+    // Capturar email do contato (person)
+    let personEmail = null;
+    if (dealData.person_id) {
+      try {
+        // Buscar dados da pessoa via API do Pipedrive
+        const personUrl = `https://${domain}.pipedrive.com/api/v1/persons/${dealData.person_id}?api_token=${apiToken}`;
+        const personResponse = await fetch(personUrl);
+        
+        if (personResponse.ok) {
+          const personData = await personResponse.json();
+          if (personData.success && personData.data && personData.data.email) {
+            // Pegar o primeiro email
+            const emails = personData.data.email;
+            if (Array.isArray(emails) && emails.length > 0) {
+              personEmail = emails[0].value;
+            } else if (typeof emails === 'string') {
+              personEmail = emails;
+            }
+            console.log(`Email capturado: ${personEmail}`);
+          }
+        }
+      } catch (emailError) {
+        console.error("Erro ao buscar email da pessoa:", emailError);
+      }
+    }
+
     // Tentar vincular ao criativo usando utm_content (que deve conter o id_criativo_externo)
     let idCriativo = null;
     if (utmContent) {
@@ -213,6 +239,8 @@ serve(async (req) => {
       venda_realizada: vendaRealizada,
       data_venda: vendaRealizada ? (dealData.won_time || dealData.update_time) : null,
       valor_venda: valorDeal,
+      // Email capturado
+      email: personEmail,
       // Novos campos para rastreamento
       id_criativo: idCriativo,
       utm_source: utmSource,
@@ -241,11 +269,13 @@ serve(async (req) => {
       console.log(`Lead ${dealData.id} deletado com sucesso`);
     } else {
       // Deal foi adicionado ou atualizado - upsert
-      const { error: upsertError } = await supabase
+      const { data: upsertedLead, error: upsertError } = await supabase
         .from("lead")
         .upsert(leadData, { 
           onConflict: "id_lead_externo,id_empresa"
-        });
+        })
+        .select('id_lead')
+        .single();
 
       if (upsertError) {
         console.error("Erro ao salvar lead:", upsertError);
@@ -253,6 +283,82 @@ serve(async (req) => {
       }
 
       console.log(`Lead ${dealData.id} processado com sucesso (${event})`);
+
+      // Enriquecer lead com dados do Mautic (se email disponível)
+      if (personEmail && upsertedLead) {
+        console.log(`[Mautic] Iniciando enriquecimento para ${personEmail}`);
+        
+        try {
+          const { data: enrichmentData, error: enrichmentError } = await supabase.functions.invoke(
+            'enriquecer-lead-mautic',
+            {
+              body: { email: personEmail, id_empresa: idEmpresa }
+            }
+          );
+
+          if (enrichmentError) {
+            console.error('[Mautic] Erro ao chamar função de enriquecimento:', enrichmentError);
+          } else if (enrichmentData?.success && enrichmentData?.data) {
+            console.log('[Mautic] Dados de enriquecimento recebidos:', enrichmentData.data);
+            
+            const mauticData = enrichmentData.data;
+            
+            // Implementar fallback de UTMs: usar Mautic se Pipedrive não forneceu
+            const updateData: any = {
+              id_mautic_contact: mauticData.id_mautic_contact,
+              mautic_score: mauticData.mautic_score,
+              mautic_page_hits: mauticData.mautic_page_hits,
+              mautic_last_active: mauticData.mautic_last_active,
+              mautic_first_visit: mauticData.mautic_first_visit,
+              mautic_tags: mauticData.mautic_tags,
+              mautic_segments: mauticData.mautic_segments,
+              cidade_mautic: mauticData.cidade_mautic,
+              estado_mautic: mauticData.estado_mautic,
+            };
+
+            // Fallback de UTMs: se Pipedrive não tem, usar do Mautic
+            if (!utmSource && mauticData.utm_source_mautic) {
+              updateData.utm_source = mauticData.utm_source_mautic;
+              console.log('[Mautic] Fallback utm_source:', mauticData.utm_source_mautic);
+            }
+            if (!utmMedium && mauticData.utm_medium_mautic) {
+              updateData.utm_medium = mauticData.utm_medium_mautic;
+              console.log('[Mautic] Fallback utm_medium:', mauticData.utm_medium_mautic);
+            }
+            if (!utmCampaign && mauticData.utm_campaign_mautic) {
+              updateData.utm_campaign = mauticData.utm_campaign_mautic;
+              console.log('[Mautic] Fallback utm_campaign:', mauticData.utm_campaign_mautic);
+            }
+            if (!utmContent && mauticData.utm_content_mautic) {
+              updateData.utm_content = mauticData.utm_content_mautic;
+              console.log('[Mautic] Fallback utm_content:', mauticData.utm_content_mautic);
+            }
+            if (!utmTerm && mauticData.utm_term_mautic) {
+              updateData.utm_term = mauticData.utm_term_mautic;
+              console.log('[Mautic] Fallback utm_term:', mauticData.utm_term_mautic);
+            }
+
+            // Atualizar lead com dados enriquecidos
+            const { error: updateError } = await supabase
+              .from('lead')
+              .update(updateData)
+              .eq('id_lead', upsertedLead.id_lead);
+
+            if (updateError) {
+              console.error('[Mautic] Erro ao atualizar lead com dados enriquecidos:', updateError);
+            } else {
+              console.log(`[Mautic] Lead ${dealData.id} enriquecido com sucesso`);
+            }
+          } else {
+            console.log('[Mautic] Enriquecimento não retornou dados:', enrichmentData);
+          }
+        } catch (mauticError) {
+          console.error('[Mautic] Erro no processo de enriquecimento:', mauticError);
+          // Não falhar o webhook se o enriquecimento falhar
+        }
+      } else if (!personEmail) {
+        console.log('[Mautic] Email não disponível, enriquecimento pulado');
+      }
     }
 
     return new Response(
