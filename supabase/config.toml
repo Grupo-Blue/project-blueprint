@@ -27,3 +27,6 @@ verify_jwt = false
 [functions.gerar-sugestoes-acoes]
 verify_jwt = true
 
+[functions.analise-inteligencia]
+verify_jwt = false
+
