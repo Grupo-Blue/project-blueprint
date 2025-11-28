@@ -120,10 +120,13 @@ serve(async (req) => {
     const dealAberto = dealData.status === "open";
     const vendaRealizada = dealData.status === "won";
     
-    const isMql = dealAberto && dealData.stage_id !== null && dealData.stage_id > 1;
+    // Calcular flags de funil
     const levantouMao = dealAberto && dealData.stage_id !== null && dealData.stage_id > 2;
     const temReuniao = dealAberto && dealData.stage_id !== null && dealData.stage_id > 3;
     const reuniaoRealizada = dealAberto && dealData.stage_id !== null && dealData.stage_id > 4;
+    
+    // MQL: stage > 1 OU levantou a mão (quem levanta a mão é qualificado automaticamente)
+    const isMql = (dealAberto && dealData.stage_id !== null && dealData.stage_id > 1) || levantouMao;
     
     const urlPipedrive = `https://${domain}.pipedrive.com/deal/${dealData.id}`;
     const valorDeal = dealData.value ? parseFloat(dealData.value) : null;
@@ -325,12 +328,12 @@ serve(async (req) => {
             
             const mauticData = enrichmentData.data;
             
-            // Lógica de qualificação MQL: Score >= 50 OU PageHits >= 10
+            // Lógica de qualificação MQL: Score >= 50 OU PageHits >= 10 OU levantou_mao
             const score = mauticData.mautic_score || 0;
             const pageHits = mauticData.mautic_page_hits || 0;
-            const isMqlMautic = score >= 50 || pageHits >= 10;
+            const isMqlMautic = score >= 50 || pageHits >= 10 || leadData.levantou_mao;
             
-            console.log(`[Webhook] Qualificação MQL - Score: ${score}, PageHits: ${pageHits}, is_mql: ${isMqlMautic}`);
+            console.log(`[Webhook] Qualificação MQL - Score: ${score}, PageHits: ${pageHits}, levantou_mao: ${leadData.levantou_mao}, is_mql: ${isMqlMautic}`);
             
             // Implementar fallback de UTMs: usar Mautic se Pipedrive não forneceu
             const updateData: any = {

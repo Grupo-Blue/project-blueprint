@@ -28,7 +28,7 @@ serve(async (req) => {
     // Buscar todos os leads da empresa que têm email
     const { data: leads, error: leadsError } = await supabase
       .from('lead')
-      .select('id_lead, email, id_empresa, utm_source, utm_medium, utm_campaign, utm_content, utm_term')
+      .select('id_lead, email, id_empresa, utm_source, utm_medium, utm_campaign, utm_content, utm_term, levantou_mao')
       .eq('id_empresa', id_empresa)
       .not('email', 'is', null);
 
@@ -80,12 +80,12 @@ serve(async (req) => {
 
         // Se o enriquecimento foi bem-sucedido, atualizar o lead
         if (enrichmentData?.success && enrichmentData?.data) {
-          // Lógica de qualificação MQL: Score >= 50 OU PageHits >= 10
+          // Lógica de qualificação MQL: Score >= 50 OU PageHits >= 10 OU levantou_mao
           const score = enrichmentData.data.mautic_score || 0;
           const pageHits = enrichmentData.data.mautic_page_hits || 0;
-          const isMqlMautic = score >= 50 || pageHits >= 10;
+          const isMqlMautic = score >= 50 || pageHits >= 10 || lead.levantou_mao;
           
-          console.log(`[EnriquecerLote] Lead ${lead.email} - Score: ${score}, PageHits: ${pageHits}, is_mql: ${isMqlMautic}`);
+          console.log(`[EnriquecerLote] Lead ${lead.email} - Score: ${score}, PageHits: ${pageHits}, levantou_mao: ${lead.levantou_mao}, is_mql: ${isMqlMautic}`);
           
           const { error: updateError } = await supabase
             .from('lead')
