@@ -11,6 +11,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  const nomeCronjob = "coletar-criativos-meta";
+
   try {
     console.log("Iniciando coleta de criativos Meta Ads...");
 
@@ -119,8 +122,18 @@ serve(async (req) => {
         }
 
         // Para cada campanha, buscar os ads (criativos) com métricas
+        let requestCount = 0;
+        const MAX_REQUESTS_PER_BATCH = 10;
+        
         for (const campanha of campanhas || []) {
           try {
+            // Rate limiting: adicionar delay a cada N requisições
+            if (requestCount > 0 && requestCount % MAX_REQUESTS_PER_BATCH === 0) {
+              console.log(`⏱️ Rate limit: aguardando 2s após ${requestCount} requisições...`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            requestCount++;
+            
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
             // Endpoint da API do Meta para buscar ads com todos os campos de URL e UTM
@@ -193,6 +206,8 @@ serve(async (req) => {
 
               // Extrair URL final do anúncio e UTM parameters
               let urlFinal = null;
+              let isEngagementAd = false;
+              
               try {
                 console.log(`\n=== Processando criativo ${creative.id} (${ad.name}) ===`);
                 
@@ -238,13 +253,20 @@ serve(async (req) => {
                   }
                 }
                 
+                // Se não encontrou URL, pode ser anúncio de engajamento (post boost, etc)
                 if (!urlFinal) {
-                  console.log(`❌ ERRO: URL não capturada para criativo ${creative.id}`);
-                  console.log(`Debug - creative:`, JSON.stringify(creative, null, 2));
-                  console.log(`Debug - ad:`, JSON.stringify({ 
-                    url_tags: ad.url_tags, 
-                    tracking_specs: ad.tracking_specs 
-                  }, null, 2));
+                  // Verificar se é anúncio de engajamento (sem link externo)
+                  const isPostEngagement = ad.tracking_specs?.some((spec: any) => 
+                    spec['action.type']?.includes('post_engagement') || 
+                    spec['action.type']?.includes('post_interaction_gross')
+                  );
+                  
+                  if (isPostEngagement) {
+                    isEngagementAd = true;
+                    console.log(`ℹ️ Anúncio de engajamento sem URL externa - OK`);
+                  } else {
+                    console.log(`⚠️ URL não encontrada para criativo ${creative.id}`);
+                  }
                 }
               } catch (urlErr) {
                 console.error(`❌ Erro ao extrair URL do criativo ${creative.id}:`, urlErr);
@@ -344,6 +366,15 @@ serve(async (req) => {
 
     console.log("Coleta de criativos Meta Ads concluída");
 
+    // Registrar execução bem-sucedida
+    const duracao = Date.now() - startTime;
+    await supabase.from("cronjob_execucao").insert({
+      nome_cronjob: nomeCronjob,
+      status: "sucesso",
+      duracao_ms: duracao,
+      detalhes_execucao: { resultados }
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -354,6 +385,19 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Erro geral:", error);
+    
+    // Registrar execução com erro
+    const duracao = Date.now() - startTime;
+    await createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    ).from("cronjob_execucao").insert({
+      nome_cronjob: nomeCronjob,
+      status: "erro",
+      duracao_ms: duracao,
+      mensagem_erro: error instanceof Error ? error.message : String(error)
+    });
+    
     return new Response(
       JSON.stringify({
         success: false,

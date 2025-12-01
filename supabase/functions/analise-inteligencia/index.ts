@@ -258,6 +258,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  const nomeCronjob = "analise-inteligencia";
+
   try {
     // Aceitar corpo vazio (cronjob) ou com id_empresa específico
     let body: any = {};
@@ -324,8 +327,35 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
+    
+    // Registrar execução bem-sucedida
+    const duracao = Date.now() - startTime;
+    await supabase.from("cronjob_execucao").insert({
+      nome_cronjob: nomeCronjob,
+      status: "sucesso",
+      duracao_ms: duracao,
+      detalhes_execucao: { 
+        processadas: resultados.length,
+        resultados 
+      }
+    });
+    
   } catch (error) {
     console.error("Erro na função analise-inteligencia:", error);
+    
+    // Registrar execução com erro
+    const duracao = Date.now() - startTime;
+    const supabaseLog = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    await supabaseLog.from("cronjob_execucao").insert({
+      nome_cronjob: nomeCronjob,
+      status: "erro",
+      duracao_ms: duracao,
+      mensagem_erro: error instanceof Error ? error.message : String(error)
+    });
+    
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : "Erro desconhecido",
