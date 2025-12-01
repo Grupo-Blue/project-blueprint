@@ -9,13 +9,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInDays, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ptBR } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePeriodo } from "@/contexts/PeriodoContext";
+import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 
 const Leads = () => {
+  const { tipoFiltro, semanaSelecionada, getDataReferencia } = usePeriodo();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [stageFilter, setStageFilter] = useState<string[]>([]);
@@ -62,8 +65,39 @@ const Leads = () => {
     },
   });
 
+  // Buscar dados da semana se filtro for por semana
+  const { data: semanaData } = useQuery({
+    queryKey: ["semana", semanaSelecionada],
+    queryFn: async () => {
+      if (!semanaSelecionada) return null;
+      const { data, error } = await supabase
+        .from("semana")
+        .select("*")
+        .eq("id_semana", semanaSelecionada)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: tipoFiltro === "semana_especifica" && !!semanaSelecionada,
+  });
+
   // Filtrar leads
   const filteredLeads = leads?.filter((lead) => {
+    // Filtro de período
+    const leadDate = parseISO(lead.data_criacao);
+    let matchesPeriodo = true;
+
+    if (tipoFiltro === "semana_especifica" && semanaData) {
+      const dataInicio = parseISO(semanaData.data_inicio);
+      const dataFim = parseISO(semanaData.data_fim);
+      matchesPeriodo = leadDate >= dataInicio && leadDate <= dataFim;
+    } else {
+      const dataReferencia = getDataReferencia();
+      const inicioMes = startOfMonth(dataReferencia);
+      const fimMes = endOfMonth(dataReferencia);
+      matchesPeriodo = leadDate >= inicioMes && leadDate <= fimMes;
+    }
+
     const matchesSearch = 
       !searchTerm ||
       lead.nome_lead?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -93,7 +127,7 @@ const Leads = () => {
       (clienteStatusFilter === "ex_cliente" && lead.cliente_status === "ex_cliente") ||
       (clienteStatusFilter === "nao_cliente" && !lead.cliente_status);
 
-    return matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus;
+    return matchesPeriodo && matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus;
   });
 
   // Ordenação
@@ -238,11 +272,14 @@ const Leads = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Leads</h1>
-        <p className="text-muted-foreground">
-          Gerencie todos os leads sincronizados do Pipedrive
-        </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Leads</h1>
+          <p className="text-muted-foreground">
+            Gerencie todos os leads sincronizados do Pipedrive
+          </p>
+        </div>
+        <FiltroPeriodo />
       </div>
 
       {/* Stats Cards */}
