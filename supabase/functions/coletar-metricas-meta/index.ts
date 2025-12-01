@@ -11,6 +11,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  const nomeCronjob = "coletar-metricas-meta";
+  
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -188,6 +191,19 @@ serve(async (req) => {
       );
     }
     
+    // Registrar execução bem-sucedida
+    const duracao = Date.now() - startTime;
+    await supabase.from("cronjob_execucao").insert({
+      nome_cronjob: nomeCronjob,
+      status: "sucesso",
+      duracao_ms: duracao,
+      detalhes_execucao: { 
+        sucessos: sucessos.length, 
+        erros: erros.length,
+        resultados 
+      }
+    });
+    
     return new Response(
       JSON.stringify({ 
         message: `Coleta concluída: ${sucessos.length} sucesso(s), ${erros.length} erro(s)`, 
@@ -197,6 +213,19 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Erro na função:", error);
+    
+    // Registrar execução com erro
+    const duracao = Date.now() - startTime;
+    await createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    ).from("cronjob_execucao").insert({
+      nome_cronjob: nomeCronjob,
+      status: "erro",
+      duracao_ms: duracao,
+      mensagem_erro: error instanceof Error ? error.message : String(error)
+    });
+    
     return new Response(
       JSON.stringify({ error: String(error) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
