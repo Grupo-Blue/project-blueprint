@@ -573,6 +573,39 @@ export type Database = {
           },
         ]
       }
+      cronjob_execucao: {
+        Row: {
+          created_at: string
+          data_execucao: string
+          detalhes_execucao: Json | null
+          duracao_ms: number | null
+          id_execucao: string
+          mensagem_erro: string | null
+          nome_cronjob: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          data_execucao?: string
+          detalhes_execucao?: Json | null
+          duracao_ms?: number | null
+          id_execucao?: string
+          mensagem_erro?: string | null
+          nome_cronjob: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          data_execucao?: string
+          detalhes_execucao?: Json | null
+          duracao_ms?: number | null
+          id_execucao?: string
+          mensagem_erro?: string | null
+          nome_cronjob?: string
+          status?: string
+        }
+        Relationships: []
+      }
       empresa: {
         Row: {
           cac_maximo: number

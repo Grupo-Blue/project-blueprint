@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Play, Clock, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Play, Clock, CheckCircle2, XCircle, Loader2, History } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface CronjobConfig {
   name: string;
@@ -90,8 +93,32 @@ const CRONJOBS: CronjobConfig[] = [
 export function CronjobsMonitor() {
   const [executingJobs, setExecutingJobs] = useState<Set<string>>(new Set());
 
+  // Buscar histórico de execuções
+  const { data: historicoExecucoes, refetch: refetchHistorico } = useQuery({
+    queryKey: ["cronjob-execucoes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cronjob_execucao")
+        .select("*")
+        .order("data_execucao", { ascending: false })
+        .limit(100);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Agrupar execuções por cronjob (última execução de cada)
+  const ultimasExecucoes = historicoExecucoes?.reduce((acc, exec) => {
+    if (!acc[exec.nome_cronjob]) {
+      acc[exec.nome_cronjob] = exec;
+    }
+    return acc;
+  }, {} as Record<string, any>);
+
   const handleExecuteJob = async (job: CronjobConfig) => {
     setExecutingJobs(prev => new Set(prev).add(job.name));
+    const startTime = Date.now();
     
     try {
       const body = job.functionName === "enriquecer-leads-lote" 
@@ -102,17 +129,51 @@ export function CronjobsMonitor() {
         body
       });
 
+      const duracao = Date.now() - startTime;
+
       if (error) {
         console.error("Erro ao executar cronjob:", error);
+        
+        // Registrar erro no histórico
+        await supabase.from("cronjob_execucao").insert({
+          nome_cronjob: job.functionName,
+          status: "error",
+          duracao_ms: duracao,
+          mensagem_erro: error.message,
+          detalhes_execucao: { error: error.message }
+        });
+        
         toast.error(`Erro ao executar ${job.displayName}: ${error.message}`);
+        refetchHistorico();
         return;
       }
 
+      // Registrar sucesso no histórico
+      await supabase.from("cronjob_execucao").insert({
+        nome_cronjob: job.functionName,
+        status: "success",
+        duracao_ms: duracao,
+        detalhes_execucao: data
+      });
+
       console.log(`Resultado ${job.displayName}:`, data);
       toast.success(`${job.displayName} executada com sucesso!`);
+      refetchHistorico();
     } catch (error: any) {
+      const duracao = Date.now() - startTime;
       console.error("Erro inesperado:", error);
+      
+      // Registrar erro no histórico
+      await supabase.from("cronjob_execucao").insert({
+        nome_cronjob: job.functionName,
+        status: "error",
+        duracao_ms: duracao,
+        mensagem_erro: error.message,
+        detalhes_execucao: { error: error.message }
+      });
+      
       toast.error(`Erro inesperado ao executar ${job.displayName}: ${error.message}`);
+      refetchHistorico();
     } finally {
       setExecutingJobs(prev => {
         const newSet = new Set(prev);
@@ -137,6 +198,7 @@ export function CronjobsMonitor() {
         <div className="space-y-3">
           {CRONJOBS.map((job) => {
             const isExecuting = executingJobs.has(job.name);
+            const ultimaExecucao = ultimasExecucoes?.[job.functionName];
             
             return (
               <div
@@ -149,8 +211,42 @@ export function CronjobsMonitor() {
                     <Badge variant="outline" className="text-xs">
                       {job.schedule}
                     </Badge>
+                    {ultimaExecucao && (
+                      <Badge 
+                        variant={ultimaExecucao.status === "success" ? "default" : "destructive"}
+                        className="text-xs"
+                      >
+                        {ultimaExecucao.status === "success" ? (
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                        ) : (
+                          <XCircle className="w-3 h-3 mr-1" />
+                        )}
+                        {ultimaExecucao.status === "success" ? "Sucesso" : "Erro"}
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground">{job.description}</p>
+                  {ultimaExecucao && (
+                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                      <History className="w-3 h-3" />
+                      <span>
+                        Última execução: {formatDistanceToNow(new Date(ultimaExecucao.data_execucao), { 
+                          addSuffix: true,
+                          locale: ptBR 
+                        })}
+                      </span>
+                      {ultimaExecucao.duracao_ms && (
+                        <span className="ml-2">
+                          • Duração: {(ultimaExecucao.duracao_ms / 1000).toFixed(1)}s
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {ultimaExecucao?.status === "error" && ultimaExecucao.mensagem_erro && (
+                    <p className="text-xs text-destructive mt-1">
+                      Erro: {ultimaExecucao.mensagem_erro}
+                    </p>
+                  )}
                 </div>
                 
                 <Button

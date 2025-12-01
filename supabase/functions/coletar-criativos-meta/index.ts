@@ -124,7 +124,8 @@ serve(async (req) => {
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
             // Endpoint da API do Meta para buscar ads com todos os campos de URL e UTM
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec{link_data{link,call_to_action,picture,image_hash}},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,adset{targeting{url_tags}},insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
+            // Removido adset{targeting{url_tags}} pois o campo url_tags não existe no objeto targeting
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec{link_data{link,call_to_action,picture,image_hash}},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -213,12 +214,6 @@ serve(async (req) => {
                   if (ad.url_tags) {
                     console.log(`✓ URL tags no ad: ${ad.url_tags}`);
                     allUrlTags.push(ad.url_tags);
-                  }
-                  
-                  // 3. url_tags no adset targeting (se disponível)
-                  if (ad.adset?.targeting?.url_tags) {
-                    console.log(`✓ URL tags no adset: ${ad.adset.targeting.url_tags}`);
-                    allUrlTags.push(ad.adset.targeting.url_tags);
                   }
                   
                   // Combinar todos os parâmetros encontrados
