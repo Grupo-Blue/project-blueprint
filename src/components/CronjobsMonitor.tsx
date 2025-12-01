@@ -58,24 +58,31 @@ const CRONJOBS: CronjobConfig[] = [
     description: "Coleta criativos e suas métricas do Google Ads"
   },
   {
+    name: "sincronizar-notion",
+    displayName: "Sincronizar Notion",
+    functionName: "sincronizar-notion",
+    schedule: "05:30",
+    description: "Sincroniza clientes do Notion e atualiza flags"
+  },
+  {
     name: "sincronizar-pipedrive",
     displayName: "Sincronizar Pipedrive",
     functionName: "sincronizar-pipedrive",
-    schedule: "05:30",
+    schedule: "05:45",
     description: "Sincroniza leads e deals do Pipedrive"
   },
   {
     name: "sincronizar-tokeniza",
     displayName: "Sincronizar Tokeniza",
     functionName: "sincronizar-tokeniza",
-    schedule: "05:45",
+    schedule: "06:00",
     description: "Sincroniza pedidos da Tokeniza"
   },
   {
     name: "enriquecer-leads-lote",
     displayName: "Enriquecer Leads (Mautic)",
     functionName: "enriquecer-leads-lote",
-    schedule: "06:00",
+    schedule: "06:15",
     description: "Enriquece leads com dados do Mautic"
   }
 ];
