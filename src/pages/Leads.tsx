@@ -234,29 +234,29 @@ const Leads = () => {
     return null;
   };
 
-  // Calcular estatísticas
+  // Calcular estatísticas baseadas nos leads filtrados
   const stats = {
-    total: leads?.length || 0,
-    novos: leads?.filter(l => !l.is_mql).length || 0,
-    mqls: leads?.filter(l => l.is_mql).length || 0,
-    mqlsPorScore: leads?.filter(l => l.is_mql && (l.mautic_score || 0) >= 50).length || 0,
-    mqlsPorPageHits: leads?.filter(l => l.is_mql && (l.mautic_page_hits || 0) >= 10).length || 0,
-    mqlsPorAmbos: leads?.filter(l => l.is_mql && (l.mautic_score || 0) >= 50 && (l.mautic_page_hits || 0) >= 10).length || 0,
-    reunioes: leads?.filter(l => l.tem_reuniao).length || 0,
-    vendas: leads?.filter(l => l.venda_realizada).length || 0,
-    valorTotal: leads?.reduce((sum, l) => sum + (l.valor_venda || 0), 0) || 0,
-    taxaConversaoMQL: leads?.length ? ((leads.filter(l => l.is_mql).length / leads.length) * 100).toFixed(1) : "0",
-    taxaConversaoVenda: leads?.filter(l => l.is_mql).length ? 
-      ((leads.filter(l => l.venda_realizada).length / leads.filter(l => l.is_mql).length) * 100).toFixed(1) : "0",
+    total: filteredLeads?.length || 0,
+    novos: filteredLeads?.filter(l => !l.is_mql).length || 0,
+    mqls: filteredLeads?.filter(l => l.is_mql).length || 0,
+    mqlsPorScore: filteredLeads?.filter(l => l.is_mql && (l.mautic_score || 0) >= 50).length || 0,
+    mqlsPorPageHits: filteredLeads?.filter(l => l.is_mql && (l.mautic_page_hits || 0) >= 10).length || 0,
+    mqlsPorAmbos: filteredLeads?.filter(l => l.is_mql && (l.mautic_score || 0) >= 50 && (l.mautic_page_hits || 0) >= 10).length || 0,
+    reunioes: filteredLeads?.filter(l => l.tem_reuniao).length || 0,
+    vendas: filteredLeads?.filter(l => l.venda_realizada).length || 0,
+    valorTotal: filteredLeads?.reduce((sum, l) => sum + (l.valor_venda || 0), 0) || 0,
+    taxaConversaoMQL: filteredLeads?.length ? ((filteredLeads.filter(l => l.is_mql).length / filteredLeads.length) * 100).toFixed(1) : "0",
+    taxaConversaoVenda: filteredLeads?.filter(l => l.is_mql).length ? 
+      ((filteredLeads.filter(l => l.venda_realizada).length / filteredLeads.filter(l => l.is_mql).length) * 100).toFixed(1) : "0",
   };
 
-  // Calcular tempo médio no funil
-  const tempoMedioFunil = leads?.filter(l => l.venda_realizada && l.data_venda).reduce((acc, l) => {
+  // Calcular tempo médio no funil baseado nos leads filtrados
+  const tempoMedioFunil = filteredLeads?.filter(l => l.venda_realizada && l.data_venda).reduce((acc, l) => {
     const dias = differenceInDays(new Date(l.data_venda!), new Date(l.data_criacao));
     return acc + dias;
   }, 0) || 0;
-  const tempoMedio = leads?.filter(l => l.venda_realizada).length 
-    ? Math.round(tempoMedioFunil / leads.filter(l => l.venda_realizada).length)
+  const tempoMedio = filteredLeads?.filter(l => l.venda_realizada).length 
+    ? Math.round(tempoMedioFunil / filteredLeads.filter(l => l.venda_realizada).length)
     : 0;
 
   if (isLoading) {
