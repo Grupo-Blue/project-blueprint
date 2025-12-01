@@ -20,6 +20,7 @@ const Leads = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [stageFilter, setStageFilter] = useState<string[]>([]);
   const [scoreMinimo, setScoreMinimo] = useState<string>("");
+  const [clienteStatusFilter, setClienteStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -46,6 +47,12 @@ const Leads = () => {
             etapa,
             data_evento,
             observacao
+          ),
+          cliente_notion:id_cliente_notion (
+            nome,
+            status_cliente,
+            produtos_contratados,
+            anos_fiscais
           )
         `)
         .order("data_criacao", { ascending: false });
@@ -80,7 +87,13 @@ const Leads = () => {
       !scoreMinimo ||
       (lead.mautic_score !== null && lead.mautic_score !== undefined && lead.mautic_score >= parseInt(scoreMinimo));
 
-    return matchesSearch && matchesStatus && matchesStage && matchesScore;
+    const matchesClienteStatus =
+      clienteStatusFilter === "all" ||
+      (clienteStatusFilter === "cliente" && lead.cliente_status === "cliente") ||
+      (clienteStatusFilter === "ex_cliente" && lead.cliente_status === "ex_cliente") ||
+      (clienteStatusFilter === "nao_cliente" && !lead.cliente_status);
+
+    return matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus;
   });
 
   // Ordenação
@@ -349,6 +362,17 @@ const Leads = () => {
               <SelectItem value="perdido">Perdidos</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={clienteStatusFilter} onValueChange={handleFilterChange(setClienteStatusFilter)}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Status Cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="cliente">🟢 Clientes</SelectItem>
+              <SelectItem value="ex_cliente">🟡 Ex-Clientes</SelectItem>
+              <SelectItem value="nao_cliente">Não Clientes</SelectItem>
+            </SelectContent>
+          </Select>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-full sm:w-[200px] justify-between">
@@ -493,6 +517,50 @@ const Leads = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
+                          {/* Badge de Cliente/Ex-Cliente */}
+                          {lead.cliente_status === "cliente" && (lead as any).cliente_notion && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100 cursor-help">
+                                    🟢 Cliente
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="space-y-1 text-xs">
+                                    {(lead as any).cliente_notion?.produtos_contratados?.length > 0 && (
+                                      <p><strong>Produtos:</strong> {(lead as any).cliente_notion.produtos_contratados.join(', ')}</p>
+                                    )}
+                                    {(lead as any).cliente_notion?.anos_fiscais?.length > 0 && (
+                                      <p><strong>Anos Fiscais:</strong> {(lead as any).cliente_notion.anos_fiscais.join(', ')}</p>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          {lead.cliente_status === "ex_cliente" && (lead as any).cliente_notion && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 cursor-help">
+                                    🟡 Ex-Cliente
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="space-y-1 text-xs">
+                                    {(lead as any).cliente_notion?.produtos_contratados?.length > 0 && (
+                                      <p><strong>Produtos:</strong> {(lead as any).cliente_notion.produtos_contratados.join(', ')}</p>
+                                    )}
+                                    {(lead as any).cliente_notion?.anos_fiscais?.length > 0 && (
+                                      <p><strong>Anos Fiscais:</strong> {(lead as any).cliente_notion.anos_fiscais.join(', ')}</p>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          
                           {lead.stage_atual === "Perdido" && (
                             <Badge variant="destructive">Perdido</Badge>
                           )}

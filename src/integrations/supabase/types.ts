@@ -393,6 +393,57 @@ export type Database = {
           },
         ]
       }
+      cliente_notion: {
+        Row: {
+          anos_fiscais: Json | null
+          cpf_cnpj: string | null
+          created_at: string | null
+          data_nascimento: string | null
+          email: string | null
+          email_secundario: string | null
+          id_cliente: string
+          id_notion: string
+          last_edited_time: string | null
+          nome: string
+          produtos_contratados: Json | null
+          status_cliente: string
+          telefone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          anos_fiscais?: Json | null
+          cpf_cnpj?: string | null
+          created_at?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          email_secundario?: string | null
+          id_cliente?: string
+          id_notion: string
+          last_edited_time?: string | null
+          nome: string
+          produtos_contratados?: Json | null
+          status_cliente?: string
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          anos_fiscais?: Json | null
+          cpf_cnpj?: string | null
+          created_at?: string | null
+          data_nascimento?: string | null
+          email?: string | null
+          email_secundario?: string | null
+          id_cliente?: string
+          id_notion?: string
+          last_edited_time?: string | null
+          nome?: string
+          produtos_contratados?: Json | null
+          status_cliente?: string
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       conta_anuncio: {
         Row: {
           ativa: boolean
@@ -736,11 +787,13 @@ export type Database = {
       lead: {
         Row: {
           cidade_mautic: string | null
+          cliente_status: string | null
           created_at: string
           data_criacao: string
           data_venda: string | null
           email: string | null
           estado_mautic: string | null
+          id_cliente_notion: string | null
           id_criativo: string | null
           id_empresa: string
           id_lead: string
@@ -774,11 +827,13 @@ export type Database = {
         }
         Insert: {
           cidade_mautic?: string | null
+          cliente_status?: string | null
           created_at?: string
           data_criacao?: string
           data_venda?: string | null
           email?: string | null
           estado_mautic?: string | null
+          id_cliente_notion?: string | null
           id_criativo?: string | null
           id_empresa: string
           id_lead?: string
@@ -812,11 +867,13 @@ export type Database = {
         }
         Update: {
           cidade_mautic?: string | null
+          cliente_status?: string | null
           created_at?: string
           data_criacao?: string
           data_venda?: string | null
           email?: string | null
           estado_mautic?: string | null
+          id_cliente_notion?: string | null
           id_criativo?: string | null
           id_empresa?: string
           id_lead?: string
@@ -849,6 +906,13 @@ export type Database = {
           venda_realizada?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_id_cliente_notion_fkey"
+            columns: ["id_cliente_notion"]
+            isOneToOne: false
+            referencedRelation: "cliente_notion"
+            referencedColumns: ["id_cliente"]
+          },
           {
             foreignKeyName: "lead_id_criativo_fkey"
             columns: ["id_criativo"]
@@ -1161,6 +1225,7 @@ export type Database = {
         | "PIPEDRIVE"
         | "TOKENIZA"
         | "MAUTIC"
+        | "NOTION"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1305,6 +1370,7 @@ export const Constants = {
         "PIPEDRIVE",
         "TOKENIZA",
         "MAUTIC",
+        "NOTION",
       ],
     },
   },

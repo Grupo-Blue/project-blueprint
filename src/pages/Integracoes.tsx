@@ -60,6 +60,10 @@ export default function Integracoes() {
   const [mauticLogin, setMauticLogin] = useState("");
   const [mauticSenha, setMauticSenha] = useState("");
 
+  // Notion credentials
+  const [notionApiToken, setNotionApiToken] = useState("");
+  const [notionDatabaseId, setNotionDatabaseId] = useState("1d52e840ab4f80eeac8ad56aed5b5b6e");
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -103,6 +107,8 @@ export default function Integracoes() {
     setMauticUrlBase("");
     setMauticLogin("");
     setMauticSenha("");
+    setNotionApiToken("");
+    setNotionDatabaseId("1d52e840ab4f80eeac8ad56aed5b5b6e");
     setEditingId(null);
   };
 
@@ -134,6 +140,9 @@ export default function Integracoes() {
       setMauticUrlBase(config.url_base || "");
       setMauticLogin(config.login || "");
       setMauticSenha(config.senha || "");
+    } else if (integracao.tipo === "NOTION") {
+      setNotionApiToken(config.api_token || "");
+      setNotionDatabaseId(config.database_id || "1d52e840ab4f80eeac8ad56aed5b5b6e");
     }
     
     setEmpresaSelecionada(config.id_empresa || "");
@@ -177,6 +186,9 @@ export default function Integracoes() {
         case 'MAUTIC':
           functionNames = ['enriquecer-lead-mautic'];
           break;
+        case 'NOTION':
+          functionNames = ['sincronizar-notion'];
+          break;
         default:
           throw new Error('Tipo de integração não suportado');
       }
@@ -187,9 +199,12 @@ export default function Integracoes() {
       
       for (const functionName of functionNames) {
         // Para Mautic, precisamos de um email de teste
+        // Para Notion, não precisamos de parâmetros especiais
         const body = integracao.tipo === 'MAUTIC' 
           ? { email: 'teste@exemplo.com', id_empresa: (integracao.config_json as any).id_empresa }
-          : { integracao_id: integracaoId };
+          : integracao.tipo === 'NOTION'
+            ? {}
+            : { integracao_id: integracaoId };
           
         const { data, error } = await supabase.functions.invoke(functionName, {
           body
@@ -309,6 +324,16 @@ export default function Integracoes() {
         login: mauticLogin,
         senha: mauticSenha
       };
+    } else if (tipoIntegracao === "NOTION") {
+      if (!notionApiToken || !notionDatabaseId) {
+        toast.error("Preencha todos os campos obrigatórios");
+        return;
+      }
+      configJson = {
+        ...configJson,
+        api_token: notionApiToken,
+        database_id: notionDatabaseId
+      };
     }
 
     try {
@@ -385,6 +410,7 @@ export default function Integracoes() {
                     <SelectItem value="PIPEDRIVE">Pipedrive</SelectItem>
                     <SelectItem value="TOKENIZA">Tokeniza</SelectItem>
                     <SelectItem value="MAUTIC">Mautic</SelectItem>
+                    <SelectItem value="NOTION">Notion</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -586,6 +612,45 @@ export default function Integracoes() {
                 </>
               )}
 
+              {tipoIntegracao === "NOTION" && (
+                <>
+                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-900 dark:text-blue-100">Configuração Notion</AlertTitle>
+                    <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm space-y-2">
+                      <p><strong>Como configurar a integração:</strong></p>
+                      <ol className="list-decimal ml-4 space-y-1">
+                        <li>Acesse <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="underline">notion.so/my-integrations</a></li>
+                        <li>Crie uma nova integração (ex: "SGT")</li>
+                        <li>Copie o <strong>Internal Integration Secret</strong></li>
+                        <li>Compartilhe o database "Clientes" com a integração</li>
+                        <li>Cole o token no campo abaixo</li>
+                      </ol>
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-2">
+                    <Label>API Token (Integration Secret) *</Label>
+                    <Input
+                      type="password"
+                      value={notionApiToken}
+                      onChange={(e) => setNotionApiToken(e.target.value)}
+                      placeholder="secret_xxxxxxxxxxxxx"
+                    />
+                    <p className="text-xs text-muted-foreground">Internal Integration Secret do Notion</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Database ID *</Label>
+                    <Input
+                      value={notionDatabaseId}
+                      onChange={(e) => setNotionDatabaseId(e.target.value)}
+                      placeholder="1d52e840ab4f80eeac8ad56aed5b5b6e"
+                    />
+                    <p className="text-xs text-muted-foreground">ID do database de clientes no Notion</p>
+                  </div>
+                </>
+              )}
+
               <div className="flex items-center space-x-2">
                 <Switch checked={ativo} onCheckedChange={setAtivo} id="ativo" />
                 <Label htmlFor="ativo">Integração Ativa</Label>
@@ -615,6 +680,7 @@ export default function Integracoes() {
           <TabsTrigger value="pipedrive">Pipedrive</TabsTrigger>
           <TabsTrigger value="tokeniza">Tokeniza</TabsTrigger>
           <TabsTrigger value="mautic">Mautic</TabsTrigger>
+          <TabsTrigger value="notion">Notion</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meta" className="space-y-4">
@@ -989,6 +1055,56 @@ export default function Integracoes() {
                       </Button>
                     </div>
                   </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </TabsContent>
+
+        <TabsContent value="notion" className="space-y-4">
+          {integracoes.filter(i => i.tipo === "NOTION").length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Nenhuma integração Notion configurada
+              </CardContent>
+            </Card>
+          ) : (
+            integracoes.filter(i => i.tipo === "NOTION").map((integracao) => {
+              const config = integracao.config_json as any;
+              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              
+              return (
+                <Card key={integracao.id_integracao}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription>
+                          Database ID: {config.database_id}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                          {integracao.ativo ? 'Ativo' : 'Inativo'}
+                        </span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleTestIntegration(integracao)}
+                          disabled={testingIntegracoes.has(integracao.id_integracao)}
+                        >
+                          <TestTube2 className="w-4 h-4 mr-2" />
+                          {testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar'}
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
                 </Card>
               );
             })
