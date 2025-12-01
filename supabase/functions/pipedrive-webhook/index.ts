@@ -129,23 +129,24 @@ serve(async (req) => {
     }
     
     // Calcular flags de funil baseado no NOME do stage (não no ID numérico)
-    const levantouMao = dealAberto && stageAtual && [
-      "Contato Iniciado",
-      "Negociação", 
-      "Aguardando pagamento"
-    ].includes(stageAtual);
-    
-    const temReuniao = (dealAberto && stageAtual && [
-      "Negociação",
-      "Aguardando pagamento"
-    ].includes(stageAtual)) || vendaRealizada; // Vendas sempre tiveram reunião
-    
+    // IMPORTANTE: Hierarquia do funil - se tem reunião/venda, DEVE ter levantado mão
     const reuniaoRealizada = (dealAberto && stageAtual && [
       "Aguardando pagamento"
     ].includes(stageAtual)) || vendaRealizada; // Vendas sempre tiveram reunião
     
+    const temReuniao = (dealAberto && stageAtual && [
+      "Negociação",
+      "Aguardando pagamento"
+    ].includes(stageAtual)) || reuniaoRealizada; // Inclui todos que tiveram reunião realizada
+    
+    const levantouMao = (dealAberto && stageAtual && [
+      "Contato Iniciado",
+      "Negociação", 
+      "Aguardando pagamento"
+    ].includes(stageAtual)) || temReuniao || vendaRealizada; // Inclui todos que tiveram reunião ou venda
+    
     // MQL: qualquer stage além de "Lead" inicial, ou se levantou a mão
-    const isMql = (dealAberto && stageAtual && stageAtual !== "Lead") || levantouMao || vendaRealizada;
+    const isMql = (dealAberto && stageAtual && stageAtual !== "Lead") || levantouMao;
     
     const urlPipedrive = `https://${domain}.pipedrive.com/deal/${dealData.id}`;
     const valorDeal = dealData.value ? parseFloat(dealData.value) : null;
