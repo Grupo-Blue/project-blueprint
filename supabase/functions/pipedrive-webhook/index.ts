@@ -129,23 +129,30 @@ serve(async (req) => {
     }
     
     // Calcular flags de funil baseado no NOME do stage (não no ID numérico)
-    // IMPORTANTE: Hierarquia do funil - se tem reunião/venda, DEVE ter levantado mão
+    // IMPORTANTE: Hierarquia do funil - vendas ≤ reuniões ≤ levantadas ≤ MQLs ≤ leads
+    // Construir de baixo para cima para garantir hierarquia correta
+    
+    // Nível 5: Vendas (já calculado acima como vendaRealizada)
+    
+    // Nível 4: Reunião realizada (inclui todas as vendas)
     const reuniaoRealizada = (dealAberto && stageAtual && [
       "Aguardando pagamento"
-    ].includes(stageAtual)) || vendaRealizada; // Vendas sempre tiveram reunião
+    ].includes(stageAtual)) || vendaRealizada;
     
+    // Nível 3: Tem reunião agendada/em progresso (inclui reunião realizada)
     const temReuniao = (dealAberto && stageAtual && [
       "Negociação",
       "Aguardando pagamento"
-    ].includes(stageAtual)) || reuniaoRealizada; // Inclui todos que tiveram reunião realizada
+    ].includes(stageAtual)) || reuniaoRealizada;
     
+    // Nível 2: Levantou a mão (inclui todos que têm reunião)
     const levantouMao = (dealAberto && stageAtual && [
       "Contato Iniciado",
       "Negociação", 
       "Aguardando pagamento"
-    ].includes(stageAtual)) || temReuniao || vendaRealizada; // Inclui todos que tiveram reunião ou venda
+    ].includes(stageAtual)) || temReuniao;
     
-    // MQL: qualquer stage além de "Lead" inicial, ou se levantou a mão
+    // Nível 1: MQL (inclui todos que levantaram a mão)
     const isMql = (dealAberto && stageAtual && stageAtual !== "Lead") || levantouMao;
     
     const urlPipedrive = `https://${domain}.pipedrive.com/deal/${dealData.id}`;
