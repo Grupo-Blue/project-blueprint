@@ -9,28 +9,31 @@ const corsHeaders = {
 // Função para resolver placeholders dinâmicos do Meta nas URLs
 function resolverPlaceholders(url: string, contexto: {
   campaignName?: string;
+  campaignId?: string;
   adId?: string;
   adsetName?: string;
+  adsetId?: string;
   adName?: string;
 }): string {
   if (!url) return url;
   
   let urlResolvida = url;
   
-  // Substituir placeholders comuns do Meta
+  // Substituir placeholders comuns do Meta - campaign
   if (contexto.campaignName) {
     urlResolvida = urlResolvida.replace(/\{\{campaign\.name\}\}/gi, encodeURIComponent(contexto.campaignName));
     urlResolvida = urlResolvida.replace(/\{\{campaign_name\}\}/gi, encodeURIComponent(contexto.campaignName));
   }
   
+  if (contexto.campaignId) {
+    urlResolvida = urlResolvida.replace(/\{\{campaign\.id\}\}/gi, contexto.campaignId);
+    urlResolvida = urlResolvida.replace(/\{\{campaign_id\}\}/gi, contexto.campaignId);
+  }
+  
+  // Substituir placeholders - ad
   if (contexto.adId) {
     urlResolvida = urlResolvida.replace(/\{\{ad\.id\}\}/gi, contexto.adId);
     urlResolvida = urlResolvida.replace(/\{\{ad_id\}\}/gi, contexto.adId);
-  }
-  
-  if (contexto.adsetName) {
-    urlResolvida = urlResolvida.replace(/\{\{adset\.name\}\}/gi, encodeURIComponent(contexto.adsetName));
-    urlResolvida = urlResolvida.replace(/\{\{adset_name\}\}/gi, encodeURIComponent(contexto.adsetName));
   }
   
   if (contexto.adName) {
@@ -38,7 +41,81 @@ function resolverPlaceholders(url: string, contexto: {
     urlResolvida = urlResolvida.replace(/\{\{ad_name\}\}/gi, encodeURIComponent(contexto.adName));
   }
   
+  // Substituir placeholders - adset
+  if (contexto.adsetName) {
+    urlResolvida = urlResolvida.replace(/\{\{adset\.name\}\}/gi, encodeURIComponent(contexto.adsetName));
+    urlResolvida = urlResolvida.replace(/\{\{adset_name\}\}/gi, encodeURIComponent(contexto.adsetName));
+  }
+  
+  if (contexto.adsetId) {
+    urlResolvida = urlResolvida.replace(/\{\{adset\.id\}\}/gi, contexto.adsetId);
+    urlResolvida = urlResolvida.replace(/\{\{adset_id\}\}/gi, contexto.adsetId);
+  }
+  
   return urlResolvida;
+}
+
+// Função para extrair URL do HTML do preview
+function extrairURLdoPreviewHTML(html: string): string | null {
+  if (!html) return null;
+  
+  try {
+    // Procurar por href em links - padrão comum no preview HTML
+    const hrefMatches = html.match(/href=["']([^"']+)["']/gi);
+    if (hrefMatches) {
+      for (const match of hrefMatches) {
+        const url = match.replace(/href=["']/i, '').replace(/["']$/, '');
+        // Decodificar entidades HTML
+        const decodedUrl = url
+          .replace(/&amp;/g, '&')
+          .replace(/&#x3D;/g, '=')
+          .replace(/&#x2F;/g, '/');
+        
+        // Filtrar URLs válidas (ignorar javascript:, #, etc)
+        if (decodedUrl.startsWith('http') && !decodedUrl.includes('facebook.com/ads')) {
+          console.log(`✓ URL extraída do preview HTML: ${decodedUrl.substring(0, 100)}...`);
+          return decodedUrl;
+        }
+      }
+    }
+    
+    // Fallback: procurar por data-url ou data-href
+    const dataUrlMatch = html.match(/data-(?:url|href)=["']([^"']+)["']/i);
+    if (dataUrlMatch && dataUrlMatch[1]) {
+      const url = dataUrlMatch[1].replace(/&amp;/g, '&');
+      if (url.startsWith('http')) {
+        return url;
+      }
+    }
+  } catch (err) {
+    console.error("Erro ao extrair URL do preview HTML:", err);
+  }
+  
+  return null;
+}
+
+// Função para buscar preview do anúncio e extrair URL resolvida
+async function buscarURLdoPreview(adId: string, accessToken: string): Promise<string | null> {
+  try {
+    const previewUrl = `https://graph.facebook.com/v18.0/${adId}/previews?ad_format=MOBILE_FEED_STANDARD&access_token=${accessToken}`;
+    const response = await fetch(previewUrl);
+    
+    if (!response.ok) {
+      console.log(`⚠️ Preview não disponível para ad ${adId}: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    if (data.data && data.data.length > 0 && data.data[0].body) {
+      const html = data.data[0].body;
+      return extrairURLdoPreviewHTML(html);
+    }
+  } catch (err) {
+    console.error(`Erro ao buscar preview do ad ${adId}:`, err);
+  }
+  
+  return null;
 }
 
 serve(async (req) => {
@@ -50,7 +127,7 @@ serve(async (req) => {
   const nomeCronjob = "coletar-criativos-meta";
 
   try {
-    console.log("Iniciando coleta de criativos Meta Ads...");
+    console.log("Iniciando coleta de criativos Meta Ads (v2.0 - com preview)...");
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -171,9 +248,8 @@ serve(async (req) => {
             
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
-            // Endpoint da API do Meta para buscar ads com campos de URL válidos
-            // NOTA: website_urls e destination não existem na API - removidos
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,adset{name},creative{id,name,object_story_spec{link_data{link,call_to_action{type,value{link,app_link}},picture,image_hash,child_attachments{link,picture,call_to_action{type,value{link}}}}},asset_feed_spec{link_urls},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
+            // Endpoint da API do Meta para buscar ads com campos de URL - ADICIONADO preview_shareable_link
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,preview_shareable_link,adset{id,name},creative{id,name,object_story_spec{link_data{link,call_to_action{type,value{link,app_link}},picture,image_hash,child_attachments{link,picture,call_to_action{type,value{link}}}}},asset_feed_spec{link_urls},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -213,6 +289,7 @@ serve(async (req) => {
             for (const ad of adsData.data || []) {
               const creative = ad.creative;
               const adsetName = ad.adset?.name || null;
+              const adsetId = ad.adset?.id || null;
               
               // Determinar tipo de criativo e URL da mídia
               let tipoCriativo = "OUTRO";
@@ -236,18 +313,21 @@ serve(async (req) => {
               // Determinar se está ativo
               const ativo = ad.status === "ACTIVE";
 
-              // Extrair URL final do anúncio e UTM parameters - MELHORADO
+              // Extrair URL final do anúncio e UTM parameters - VERSÃO 2.0
               let urlFinal = null;
               let isEngagementAd = false;
+              let urlSource = "não encontrada";
               
               try {
                 console.log(`\n=== Processando ad ${ad.id} / criativo ${creative.id} (${ad.name}) ===`);
                 
-                // Contexto para resolução de placeholders
+                // Contexto para resolução de placeholders - AMPLIADO
                 const contextoPlaceholders = {
                   campaignName: campanha.nome,
+                  campaignId: campanha.id_campanha_externo,
                   adId: ad.id,
                   adsetName: adsetName,
+                  adsetId: adsetId,
                   adName: ad.name
                 };
                 
@@ -259,55 +339,76 @@ serve(async (req) => {
                   cta_type: creative.object_story_spec?.link_data?.call_to_action?.type || null,
                   cta_value: creative.object_story_spec?.link_data?.call_to_action?.value || null,
                   has_asset_feed_spec: !!creative.asset_feed_spec,
-                  asset_website_urls: creative.asset_feed_spec?.website_urls || null,
                   asset_link_urls: creative.asset_feed_spec?.link_urls || null,
                   has_child_attachments: !!creative.object_story_spec?.link_data?.child_attachments,
-                  child_attachments_count: creative.object_story_spec?.link_data?.child_attachments?.length || 0
+                  child_attachments_count: creative.object_story_spec?.link_data?.child_attachments?.length || 0,
+                  preview_shareable_link: ad.preview_shareable_link || null
                 })}`);
                 
-                // Prioridade 1: object_story_spec.link_data.link (URL base principal)
-                if (creative.object_story_spec?.link_data?.link) {
-                  urlFinal = creative.object_story_spec.link_data.link;
-                  console.log(`✓ URL base (link_data.link): ${urlFinal}`);
+                // === FASE 1: Tentar extrair URL do endpoint /previews ===
+                // Esta é a fonte mais confiável pois retorna URLs com placeholders JÁ RESOLVIDOS
+                console.log(`🔍 Fase 1: Buscando URL via /previews endpoint...`);
+                const previewUrl = await buscarURLdoPreview(ad.id, accessToken);
+                if (previewUrl) {
+                  urlFinal = previewUrl;
+                  urlSource = "preview_endpoint";
+                  console.log(`✓ URL obtida via preview (placeholders resolvidos): ${urlFinal.substring(0, 100)}...`);
                 }
                 
-                // Prioridade 2: call_to_action.value.link (URL no botão CTA - MUITO COMUM!)
-                if (!urlFinal && creative.object_story_spec?.link_data?.call_to_action?.value?.link) {
-                  urlFinal = creative.object_story_spec.link_data.call_to_action.value.link;
-                  console.log(`✓ URL base (CTA value.link): ${urlFinal}`);
-                }
-                
-                // Prioridade 3: asset_feed_spec.link_urls (para anúncios dinâmicos/carrosséis)
-                if (!urlFinal && creative.asset_feed_spec?.link_urls?.length > 0) {
-                  urlFinal = creative.asset_feed_spec.link_urls[0].website_url || creative.asset_feed_spec.link_urls[0];
-                  console.log(`✓ URL base (asset_feed_spec.link_urls): ${urlFinal}`);
-                }
-                
-                // Prioridade 6: child_attachments do carrossel
-                if (!urlFinal && creative.object_story_spec?.link_data?.child_attachments?.length > 0) {
-                  const firstAttachment = creative.object_story_spec.link_data.child_attachments[0];
-                  if (firstAttachment.link) {
-                    urlFinal = firstAttachment.link;
-                    console.log(`✓ URL base (carrossel): ${urlFinal}`);
-                  } else if (firstAttachment.call_to_action?.value?.link) {
-                    urlFinal = firstAttachment.call_to_action.value.link;
-                    console.log(`✓ URL base (carrossel CTA): ${urlFinal}`);
+                // === FASE 2: Fallback para campos tradicionais ===
+                if (!urlFinal) {
+                  console.log(`🔍 Fase 2: Buscando URL via campos tradicionais...`);
+                  
+                  // Prioridade 2a: object_story_spec.link_data.link (URL base principal)
+                  if (creative.object_story_spec?.link_data?.link) {
+                    urlFinal = creative.object_story_spec.link_data.link;
+                    urlSource = "link_data.link";
+                    console.log(`✓ URL base (link_data.link): ${urlFinal}`);
                   }
-                }
-                
-                // Prioridade 7: tracking_specs (contém URL com parâmetros)
-                if (!urlFinal && ad.tracking_specs && ad.tracking_specs.length > 0) {
-                  for (const trackingSpec of ad.tracking_specs) {
-                    if (trackingSpec.url && trackingSpec.url.includes('http')) {
-                      urlFinal = trackingSpec.url;
-                      console.log(`✓ URL extraída de tracking_specs: ${urlFinal}`);
-                      break;
+                  
+                  // Prioridade 2b: call_to_action.value.link (URL no botão CTA)
+                  if (!urlFinal && creative.object_story_spec?.link_data?.call_to_action?.value?.link) {
+                    urlFinal = creative.object_story_spec.link_data.call_to_action.value.link;
+                    urlSource = "cta_value.link";
+                    console.log(`✓ URL base (CTA value.link): ${urlFinal}`);
+                  }
+                  
+                  // Prioridade 2c: asset_feed_spec.link_urls (para anúncios dinâmicos)
+                  if (!urlFinal && creative.asset_feed_spec?.link_urls?.length > 0) {
+                    urlFinal = creative.asset_feed_spec.link_urls[0].website_url || creative.asset_feed_spec.link_urls[0];
+                    urlSource = "asset_feed_spec";
+                    console.log(`✓ URL base (asset_feed_spec.link_urls): ${urlFinal}`);
+                  }
+                  
+                  // Prioridade 2d: child_attachments do carrossel
+                  if (!urlFinal && creative.object_story_spec?.link_data?.child_attachments?.length > 0) {
+                    const firstAttachment = creative.object_story_spec.link_data.child_attachments[0];
+                    if (firstAttachment.link) {
+                      urlFinal = firstAttachment.link;
+                      urlSource = "carousel_link";
+                      console.log(`✓ URL base (carrossel): ${urlFinal}`);
+                    } else if (firstAttachment.call_to_action?.value?.link) {
+                      urlFinal = firstAttachment.call_to_action.value.link;
+                      urlSource = "carousel_cta";
+                      console.log(`✓ URL base (carrossel CTA): ${urlFinal}`);
+                    }
+                  }
+                  
+                  // Prioridade 2e: tracking_specs
+                  if (!urlFinal && ad.tracking_specs && ad.tracking_specs.length > 0) {
+                    for (const trackingSpec of ad.tracking_specs) {
+                      if (trackingSpec.url && trackingSpec.url.includes('http')) {
+                        urlFinal = trackingSpec.url;
+                        urlSource = "tracking_specs";
+                        console.log(`✓ URL extraída de tracking_specs: ${urlFinal}`);
+                        break;
+                      }
                     }
                   }
                 }
                 
-                // Adicionar UTM tags se tiver URL base
-                if (urlFinal) {
+                // === FASE 3: Adicionar UTM tags se tiver URL base (e não veio do preview) ===
+                if (urlFinal && urlSource !== "preview_endpoint") {
                   // Coletar url_tags de múltiplas fontes
                   const allUrlTags = [];
                   
@@ -332,12 +433,15 @@ serve(async (req) => {
                   
                   // Resolver placeholders dinâmicos do Meta
                   urlFinal = resolverPlaceholders(urlFinal, contextoPlaceholders);
-                  console.log(`✓ URL final após resolver placeholders: ${urlFinal}`);
-                  
-                  // Verificar se ainda tem placeholders não resolvidos
-                  if (urlFinal.includes('{{')) {
-                    console.log(`⚠️ URL ainda contém placeholders não resolvidos`);
-                  }
+                  console.log(`✓ URL final após resolver placeholders: ${urlFinal.substring(0, 150)}...`);
+                }
+                
+                // Log da fonte final da URL
+                console.log(`📌 Fonte da URL: ${urlSource}`);
+                
+                // Verificar se ainda tem placeholders não resolvidos
+                if (urlFinal && urlFinal.includes('{{')) {
+                  console.log(`⚠️ URL ainda contém placeholders não resolvidos`);
                 }
                 
                 // Se não encontrou URL, verificar se é anúncio de engajamento
@@ -363,7 +467,7 @@ serve(async (req) => {
               const criativoData = {
                 id_campanha: campanha.id_campanha,
                 id_criativo_externo: creative.id, // Creative ID
-                id_anuncio_externo: ad.id,        // Ad ID (NOVO!) - usado para match com utm_content
+                id_anuncio_externo: ad.id,        // Ad ID - usado para match com utm_content
                 tipo: tipoCriativo,
                 descricao: ad.name || creative.name || null,
                 ativo: ativo,
@@ -421,7 +525,7 @@ serve(async (req) => {
               if (metricasError) {
                 console.error("Erro ao salvar métricas do criativo:", metricasError);
               } else {
-                console.log(`✅ Criativo salvo: ${ad.name || ad.id} | Ad ID: ${ad.id} | Creative ID: ${creative.id} | R$ ${investimento.toFixed(2)}`);
+                console.log(`✅ Criativo salvo: ${ad.name || ad.id} | Ad ID: ${ad.id} | Creative ID: ${creative.id} | URL: ${urlSource} | R$ ${investimento.toFixed(2)}`);
               }
             }
 
@@ -451,7 +555,7 @@ serve(async (req) => {
       }
     }
 
-    console.log("Coleta de criativos Meta Ads concluída");
+    console.log("Coleta de criativos Meta Ads concluída (v2.0)");
 
     // Registrar execução bem-sucedida
     const duracao = Date.now() - startTime;
