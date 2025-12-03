@@ -35,6 +35,7 @@ export const ValidacaoUTM = () => {
           campanha:id_campanha (
             nome,
             objetivo,
+            ativa,
             conta_anuncio:id_conta (
               plataforma,
               empresa:id_empresa (nome)
@@ -45,7 +46,9 @@ export const ValidacaoUTM = () => {
         .eq("ativo", true);
       
       if (error) throw error;
-      return data;
+      
+      // Filtrar apenas criativos de campanhas ativas
+      return data?.filter(c => c.campanha?.ativa === true) || [];
     },
   });
 
@@ -227,7 +230,7 @@ export const ValidacaoUTM = () => {
               Validação de Rastreamento UTM
             </CardTitle>
             <CardDescription>
-              Status do rastreamento de criativos para leads (v2.0)
+              Status do rastreamento de criativos ativos em campanhas ativas (v2.0)
             </CardDescription>
           </div>
           <div className="flex gap-2">
