@@ -144,8 +144,10 @@ const Leads = () => {
 
   // Filtrar leads
   const filteredLeads = leads?.filter((lead) => {
-    // Filtro de período
-    const leadDate = parseISO(lead.data_criacao);
+    // Filtro de período - usar data_venda para vendas realizadas, senão data_criacao
+    const leadDate = lead.venda_realizada && lead.data_venda 
+      ? parseISO(lead.data_venda) 
+      : parseISO(lead.data_criacao);
     let matchesPeriodo = true;
 
     if (tipoFiltro === "semana_especifica" && semanaData) {
