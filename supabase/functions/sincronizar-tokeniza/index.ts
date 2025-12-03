@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const BATCH_SIZE = 500;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -19,7 +21,6 @@ serve(async (req) => {
   try {
     console.log("Iniciando sincronização Tokeniza...");
 
-    // Buscar token da API do ambiente
     const apiToken = Deno.env.get("TOKENIZA_API_TOKEN");
     if (!apiToken) {
       throw new Error("TOKENIZA_API_TOKEN não configurado");
@@ -27,7 +28,6 @@ serve(async (req) => {
 
     const baseUrl = "https://plataforma.tokeniza.com.br/api";
 
-    // Buscar todas as integrações Tokeniza ativas para identificar empresas
     const { data: integracoes, error: intError } = await supabase
       .from("integracao")
       .select("*")
@@ -45,9 +45,9 @@ serve(async (req) => {
     }
 
     const resultados = {
-      investimentos: { success: 0, error: 0, errors: [] as string[] },
-      vendas: { success: 0, error: 0, errors: [] as string[] },
-      leads: { success: 0, error: 0, errors: [] as string[] },
+      investimentos: { success: 0, error: 0 },
+      vendas: { success: 0, error: 0 },
+      leads: { success: 0, error: 0 },
     };
 
     const headers = {
@@ -69,8 +69,7 @@ serve(async (req) => {
         crowdfundingData = Array.isArray(data) ? data : (data.data || data.items || []);
         console.log(`Crowdfunding: ${crowdfundingData.length} registros encontrados`);
       } else {
-        const errorText = await crowdfundingResponse.text();
-        console.error(`Erro crowdfunding: ${crowdfundingResponse.status} - ${errorText}`);
+        console.error(`Erro crowdfunding: ${crowdfundingResponse.status}`);
       }
     } catch (e) {
       console.error("Erro ao buscar crowdfunding:", e);
@@ -89,8 +88,7 @@ serve(async (req) => {
         automaticSalesData = Array.isArray(data) ? data : (data.data || data.items || []);
         console.log(`Automatic Sales: ${automaticSalesData.length} registros encontrados`);
       } else {
-        const errorText = await automaticSalesResponse.text();
-        console.error(`Erro automatic-sales: ${automaticSalesResponse.status} - ${errorText}`);
+        console.error(`Erro automatic-sales: ${automaticSalesResponse.status}`);
       }
     } catch (e) {
       console.error("Erro ao buscar automatic-sales:", e);
@@ -102,194 +100,171 @@ serve(async (req) => {
       const idEmpresa = config.id_empresa;
 
       if (!idEmpresa) {
-        console.error("Integração sem id_empresa configurado:", integracao.id_integracao);
+        console.error("Integração sem id_empresa configurado");
         continue;
       }
 
       console.log(`Processando integração para empresa ${idEmpresa}`);
 
-      // ========== SALVAR INVESTIMENTOS (CROWDFUNDING) ==========
-      for (const inv of crowdfundingData) {
-        try {
-          const idExterno = inv.id;
-          if (!idExterno) continue;
+      // ========== SALVAR INVESTIMENTOS EM LOTES ==========
+      const investimentosData = crowdfundingData
+        .filter(inv => inv.id)
+        .map(inv => ({
+          id_externo: inv.id,
+          id_empresa: idEmpresa,
+          project_id: inv.project_id || null,
+          user_id_tokeniza: inv.user_id || null,
+          deposit_id: inv.deposit_id || null,
+          amount: parseFloat(inv.amount || "0"),
+          usd_amount: inv.usd_amount ? parseFloat(inv.usd_amount) : null,
+          status: inv.status || "UNKNOWN",
+          was_paid: inv.was_paid === true,
+          fin_operation: inv.fin_operation === true,
+          created_nft: inv.created_nft || null,
+          bank_of_brazil_entry_hash: inv.bank_of_brazil_entry_hash || null,
+          data_criacao: inv.created_at || new Date().toISOString(),
+          data_atualizacao: inv.last_update || null,
+        }));
 
-          const investimentoData = {
-            id_externo: idExterno,
-            id_empresa: idEmpresa,
-            project_id: inv.project_id || null,
-            user_id_tokeniza: inv.user_id || null,
-            deposit_id: inv.deposit_id || null,
-            amount: parseFloat(inv.amount || "0"),
-            usd_amount: inv.usd_amount ? parseFloat(inv.usd_amount) : null,
-            status: inv.status || "UNKNOWN",
-            was_paid: inv.was_paid === true,
-            fin_operation: inv.fin_operation === true,
-            created_nft: inv.created_nft || null,
-            bank_of_brazil_entry_hash: inv.bank_of_brazil_entry_hash || null,
-            data_criacao: inv.created_at || new Date().toISOString(),
-            data_atualizacao: inv.last_update || null,
-          };
+      for (let i = 0; i < investimentosData.length; i += BATCH_SIZE) {
+        const batch = investimentosData.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from("tokeniza_investimento")
+          .upsert(batch, { onConflict: "id_externo" });
 
-          const { error } = await supabase
-            .from("tokeniza_investimento")
-            .upsert(investimentoData, { onConflict: "id_externo" });
-
-          if (error) {
-            console.error(`Erro ao salvar investimento ${idExterno}:`, error);
-            resultados.investimentos.error++;
-            resultados.investimentos.errors.push(error.message);
-          } else {
-            resultados.investimentos.success++;
-          }
-        } catch (e) {
-          console.error("Erro ao processar investimento:", e);
-          resultados.investimentos.error++;
+        if (error) {
+          console.error(`Erro lote investimentos ${i}-${i + BATCH_SIZE}:`, error.message);
+          resultados.investimentos.error += batch.length;
+        } else {
+          resultados.investimentos.success += batch.length;
         }
       }
+      console.log(`Investimentos: ${resultados.investimentos.success} salvos`);
 
-      // ========== SALVAR VENDAS AUTOMÁTICAS ==========
-      for (const venda of automaticSalesData) {
-        try {
-          const idExterno = venda.id;
-          if (!idExterno) continue;
+      // ========== SALVAR VENDAS EM LOTES ==========
+      const vendasData = automaticSalesData
+        .filter(v => v.id)
+        .map(venda => ({
+          id_externo: venda.id,
+          id_empresa: idEmpresa,
+          user_id_tokeniza: venda.userId || null,
+          user_email: venda.userEmail || null,
+          user_wallet_id: venda.userWalletId || null,
+          external_id: venda.external_id || null,
+          unit_of_money: venda.unit_of_money || null,
+          unit_purchased: venda.unit_purchased || null,
+          store_id: venda.storeId || null,
+          status: venda.status || "UNKNOWN",
+          transaction_id: venda.transactionId || null,
+          payment_method: venda.paymentMethod || null,
+          total_amount: parseFloat(venda.totalAmount || "0"),
+          tokens_amount: venda.tokensAmount ? parseFloat(venda.tokensAmount) : null,
+          tax_amount: venda.tax_amount ? parseFloat(venda.tax_amount) : null,
+          shipping_amount: parseFloat(venda.shippingAmount || "0"),
+          quantity: parseInt(venda.quantity || "0"),
+          is_token_buy: venda.isTokenBuy === true,
+          is_ticket_buy: venda.isTicketBuy === true,
+          is_nft_buy: venda.isNftBuy === true,
+          was_paid: venda.wasPaid === true,
+          has_cashback: venda.has_cashback,
+          asset_id: venda.assetId || null,
+          nft_id: venda.nftId || null,
+          package_id: venda.packageId || null,
+          address_id: venda.address_id || null,
+          indication_reward_status: venda.indication_reward_status || null,
+          items: venda.items || [],
+          data_criacao: venda.createdAt || new Date().toISOString(),
+          data_expiracao: venda.expirationDate || null,
+          data_atualizacao: venda.updatedAt || null,
+        }));
 
-          const vendaData = {
-            id_externo: idExterno,
+      for (let i = 0; i < vendasData.length; i += BATCH_SIZE) {
+        const batch = vendasData.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from("tokeniza_venda")
+          .upsert(batch, { onConflict: "id_externo" });
+
+        if (error) {
+          console.error(`Erro lote vendas ${i}-${i + BATCH_SIZE}:`, error.message);
+          resultados.vendas.error += batch.length;
+        } else {
+          resultados.vendas.success += batch.length;
+        }
+      }
+      console.log(`Vendas: ${resultados.vendas.success} salvas`);
+
+      // ========== CRIAR LEADS EM LOTES ==========
+      // Leads de vendas pagas com email
+      const leadsVendas = automaticSalesData
+        .filter(v => v.id && v.wasPaid && v.userEmail)
+        .map(venda => {
+          const isPaid = venda.status === "finished" || venda.status === "completed";
+          return {
             id_empresa: idEmpresa,
-            user_id_tokeniza: venda.userId || null,
-            user_email: venda.userEmail || null,
-            user_wallet_id: venda.userWalletId || null,
-            external_id: venda.external_id || null,
-            unit_of_money: venda.unit_of_money || null,
-            unit_purchased: venda.unit_purchased || null,
-            store_id: venda.storeId || null,
-            status: venda.status || "UNKNOWN",
-            transaction_id: venda.transactionId || null,
-            payment_method: venda.paymentMethod || null,
-            total_amount: parseFloat(venda.totalAmount || "0"),
-            tokens_amount: venda.tokensAmount ? parseFloat(venda.tokensAmount) : null,
-            tax_amount: venda.tax_amount ? parseFloat(venda.tax_amount) : null,
-            shipping_amount: parseFloat(venda.shippingAmount || "0"),
-            quantity: parseInt(venda.quantity || "0"),
-            is_token_buy: venda.isTokenBuy === true,
-            is_ticket_buy: venda.isTicketBuy === true,
-            is_nft_buy: venda.isNftBuy === true,
-            was_paid: venda.wasPaid === true,
-            has_cashback: venda.has_cashback,
-            asset_id: venda.assetId || null,
-            nft_id: venda.nftId || null,
-            package_id: venda.packageId || null,
-            address_id: venda.address_id || null,
-            indication_reward_status: venda.indication_reward_status || null,
-            items: venda.items || [],
+            id_lead_externo: `tokeniza_venda_${venda.id}`,
             data_criacao: venda.createdAt || new Date().toISOString(),
-            data_expiracao: venda.expirationDate || null,
-            data_atualizacao: venda.updatedAt || null,
+            origem_canal: "OUTRO" as const,
+            origem_campanha: "tokeniza",
+            email: venda.userEmail,
+            nome_lead: null,
+            is_mql: true,
+            levantou_mao: true,
+            tem_reuniao: false,
+            reuniao_realizada: false,
+            venda_realizada: isPaid,
+            data_venda: isPaid ? (venda.updatedAt || venda.createdAt) : null,
+            valor_venda: isPaid ? parseFloat(venda.totalAmount || "0") : null,
           };
+        });
 
-          const { error } = await supabase
-            .from("tokeniza_venda")
-            .upsert(vendaData, { onConflict: "id_externo" });
-
-          if (error) {
-            console.error(`Erro ao salvar venda ${idExterno}:`, error);
-            resultados.vendas.error++;
-            resultados.vendas.errors.push(error.message);
-          } else {
-            resultados.vendas.success++;
-
-            // Se a venda foi paga e tem email, criar/atualizar lead
-            if (venda.wasPaid && venda.userEmail) {
-              const isPaid = venda.status === "finished" || venda.status === "completed";
-              
-              const leadData = {
-                id_empresa: idEmpresa,
-                id_lead_externo: `tokeniza_venda_${idExterno}`,
-                data_criacao: venda.createdAt || new Date().toISOString(),
-                origem_canal: "OUTRO" as const,
-                origem_campanha: "tokeniza",
-                email: venda.userEmail,
-                nome_lead: null,
-                is_mql: true,
-                levantou_mao: true,
-                tem_reuniao: false,
-                reuniao_realizada: false,
-                venda_realizada: isPaid,
-                data_venda: isPaid ? (venda.updatedAt || venda.createdAt) : null,
-                valor_venda: isPaid ? parseFloat(venda.totalAmount || "0") : null,
-              };
-
-              const { error: leadError } = await supabase
-                .from("lead")
-                .upsert(leadData, { onConflict: "id_lead_externo" });
-
-              if (leadError) {
-                console.error(`Erro ao criar lead para venda ${idExterno}:`, leadError);
-                resultados.leads.error++;
-              } else {
-                resultados.leads.success++;
-              }
-            }
-          }
-        } catch (e) {
-          console.error("Erro ao processar venda:", e);
-          resultados.vendas.error++;
-        }
-      }
-
-      // ========== CRIAR LEADS PARA INVESTIMENTOS PAGOS ==========
-      for (const inv of crowdfundingData) {
-        try {
-          const idExterno = inv.id;
-          if (!idExterno) continue;
-
+      // Leads de investimentos pagos
+      const leadsInvestimentos = crowdfundingData
+        .filter(inv => {
           const isPaid = inv.status === "FINISHED" || inv.status === "PAID" || inv.was_paid === true;
-          
-          if (isPaid) {
-            const leadData = {
-              id_empresa: idEmpresa,
-              id_lead_externo: `tokeniza_inv_${idExterno}`,
-              data_criacao: inv.created_at || new Date().toISOString(),
-              origem_canal: "OUTRO" as const,
-              origem_campanha: "tokeniza_crowdfunding",
-              is_mql: true,
-              levantou_mao: true,
-              tem_reuniao: false,
-              reuniao_realizada: false,
-              venda_realizada: true,
-              data_venda: inv.last_update || inv.created_at,
-              valor_venda: parseFloat(inv.amount || "0"),
-            };
+          return inv.id && isPaid;
+        })
+        .map(inv => ({
+          id_empresa: idEmpresa,
+          id_lead_externo: `tokeniza_inv_${inv.id}`,
+          data_criacao: inv.created_at || new Date().toISOString(),
+          origem_canal: "OUTRO" as const,
+          origem_campanha: "tokeniza_crowdfunding",
+          is_mql: true,
+          levantou_mao: true,
+          tem_reuniao: false,
+          reuniao_realizada: false,
+          venda_realizada: true,
+          data_venda: inv.last_update || inv.created_at,
+          valor_venda: parseFloat(inv.amount || "0"),
+        }));
 
-            const { error: leadError } = await supabase
-              .from("lead")
-              .upsert(leadData, { onConflict: "id_lead_externo" });
+      const allLeads = [...leadsVendas, ...leadsInvestimentos];
+      
+      for (let i = 0; i < allLeads.length; i += BATCH_SIZE) {
+        const batch = allLeads.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from("lead")
+          .upsert(batch, { onConflict: "id_lead_externo" });
 
-            if (leadError) {
-              console.error(`Erro ao criar lead para investimento ${idExterno}:`, leadError);
-              resultados.leads.error++;
-            } else {
-              resultados.leads.success++;
-            }
-          }
-        } catch (e) {
-          console.error("Erro ao criar lead de investimento:", e);
-          resultados.leads.error++;
+        if (error) {
+          console.error(`Erro lote leads ${i}-${i + BATCH_SIZE}:`, error.message);
+          resultados.leads.error += batch.length;
+        } else {
+          resultados.leads.success += batch.length;
         }
       }
+      console.log(`Leads: ${resultados.leads.success} criados`);
     }
 
     const duracao = Date.now() - startTime;
     const totalErrors = resultados.investimentos.error + resultados.vendas.error + resultados.leads.error;
-    const totalSuccess = resultados.investimentos.success + resultados.vendas.success + resultados.leads.success;
 
     // Registrar execução do cronjob
     await supabase.from("cronjob_execucao").insert({
       nome_cronjob: "sincronizar-tokeniza",
-      status: totalErrors > 0 && totalSuccess === 0 ? "error" : "success",
+      status: totalErrors > 0 ? "partial" : "success",
       duracao_ms: duracao,
-      mensagem_erro: totalErrors > 0 ? [...resultados.investimentos.errors, ...resultados.vendas.errors].slice(0, 3).join("; ") : null,
+      mensagem_erro: totalErrors > 0 ? `${totalErrors} registros com erro` : null,
       detalhes_execucao: {
         crowdfunding_encontrados: crowdfundingData.length,
         automatic_sales_encontrados: automaticSalesData.length,
@@ -302,28 +277,11 @@ serve(async (req) => {
       },
     });
 
-    console.log(`Sincronização Tokeniza concluída em ${duracao}ms`);
-    console.log(`Investimentos: ${resultados.investimentos.success} sucesso, ${resultados.investimentos.error} erros`);
-    console.log(`Vendas: ${resultados.vendas.success} sucesso, ${resultados.vendas.error} erros`);
-    console.log(`Leads: ${resultados.leads.success} sucesso, ${resultados.leads.error} erros`);
-    
-    if (totalErrors > 0 && totalSuccess === 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Erro ao sincronizar com Tokeniza",
-          resultados 
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    console.log(`Sincronização concluída em ${duracao}ms`);
     
     return new Response(
       JSON.stringify({ 
-        message: `Sincronização concluída`,
-        dados: {
-          crowdfunding: crowdfundingData.length,
-          automaticSales: automaticSalesData.length,
-        },
+        message: `Sincronização concluída em ${Math.round(duracao/1000)}s`,
         resultados 
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -332,7 +290,6 @@ serve(async (req) => {
     const duracao = Date.now() - startTime;
     console.error("Erro na função:", error);
 
-    // Registrar erro
     await supabase.from("cronjob_execucao").insert({
       nome_cronjob: "sincronizar-tokeniza",
       status: "error",
