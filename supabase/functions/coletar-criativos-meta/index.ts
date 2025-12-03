@@ -101,18 +101,34 @@ async function buscarURLdoPreview(adId: string, accessToken: string): Promise<st
     const response = await fetch(previewUrl);
     
     if (!response.ok) {
-      console.log(`⚠️ Preview não disponível para ad ${adId}: ${response.status}`);
+      const errorText = await response.text();
+      console.log(`⚠️ Preview erro para ad ${adId}: ${response.status} - ${errorText.substring(0, 200)}`);
       return null;
     }
     
     const data = await response.json();
     
+    // LOG DETALHADO: mostrar estrutura da resposta do preview
+    console.log(`📦 Preview response para ad ${adId}: has_data=${!!data.data}, data_length=${data.data?.length || 0}, has_body=${!!data.data?.[0]?.body}, body_length=${data.data?.[0]?.body?.length || 0}`);
+    
     if (data.data && data.data.length > 0 && data.data[0].body) {
       const html = data.data[0].body;
-      return extrairURLdoPreviewHTML(html);
+      
+      // LOG: mostrar amostra do HTML para debug
+      console.log(`📄 Preview HTML amostra (primeiros 500 chars): ${html.substring(0, 500).replace(/\n/g, ' ')}`);
+      
+      const extractedUrl = extrairURLdoPreviewHTML(html);
+      if (extractedUrl) {
+        console.log(`✅ URL extraída do preview HTML: ${extractedUrl.substring(0, 150)}`);
+      } else {
+        console.log(`⚠️ Nenhuma URL válida encontrada no preview HTML`);
+      }
+      return extractedUrl;
+    } else {
+      console.log(`⚠️ Preview retornou estrutura inesperada para ad ${adId}`);
     }
   } catch (err) {
-    console.error(`Erro ao buscar preview do ad ${adId}:`, err);
+    console.error(`❌ Erro ao buscar preview do ad ${adId}:`, err);
   }
   
   return null;
