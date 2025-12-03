@@ -848,6 +848,15 @@ export type Database = {
           reuniao_realizada: boolean
           stage_atual: string | null
           tem_reuniao: boolean
+          tokeniza_carrinho_abandonado: boolean | null
+          tokeniza_investidor: boolean | null
+          tokeniza_primeiro_investimento: string | null
+          tokeniza_projetos: Json | null
+          tokeniza_qtd_investimentos: number | null
+          tokeniza_ultimo_investimento: string | null
+          tokeniza_user_id: string | null
+          tokeniza_valor_carrinho: number | null
+          tokeniza_valor_investido: number | null
           updated_at: string
           url_pipedrive: string | null
           utm_campaign: string | null
@@ -888,6 +897,15 @@ export type Database = {
           reuniao_realizada?: boolean
           stage_atual?: string | null
           tem_reuniao?: boolean
+          tokeniza_carrinho_abandonado?: boolean | null
+          tokeniza_investidor?: boolean | null
+          tokeniza_primeiro_investimento?: string | null
+          tokeniza_projetos?: Json | null
+          tokeniza_qtd_investimentos?: number | null
+          tokeniza_ultimo_investimento?: string | null
+          tokeniza_user_id?: string | null
+          tokeniza_valor_carrinho?: number | null
+          tokeniza_valor_investido?: number | null
           updated_at?: string
           url_pipedrive?: string | null
           utm_campaign?: string | null
@@ -928,6 +946,15 @@ export type Database = {
           reuniao_realizada?: boolean
           stage_atual?: string | null
           tem_reuniao?: boolean
+          tokeniza_carrinho_abandonado?: boolean | null
+          tokeniza_investidor?: boolean | null
+          tokeniza_primeiro_investimento?: string | null
+          tokeniza_projetos?: Json | null
+          tokeniza_qtd_investimentos?: number | null
+          tokeniza_ultimo_investimento?: string | null
+          tokeniza_user_id?: string | null
+          tokeniza_valor_carrinho?: number | null
+          tokeniza_valor_investido?: number | null
           updated_at?: string
           url_pipedrive?: string | null
           utm_campaign?: string | null
@@ -1273,6 +1300,48 @@ export type Database = {
             referencedColumns: ["id_empresa"]
           },
         ]
+      }
+      tokeniza_usuario: {
+        Row: {
+          cnpj: string | null
+          cpf: string | null
+          created_at: string
+          data_cadastro: string | null
+          email: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          phone: string | null
+          updated_at: string
+          user_id_tokeniza: string
+        }
+        Insert: {
+          cnpj?: string | null
+          cpf?: string | null
+          created_at?: string
+          data_cadastro?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id_tokeniza: string
+        }
+        Update: {
+          cnpj?: string | null
+          cpf?: string | null
+          created_at?: string
+          data_cadastro?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id_tokeniza?: string
+        }
+        Relationships: []
       }
       tokeniza_venda: {
         Row: {
