@@ -96,26 +96,24 @@ export default function DashboardDirecao() {
       const dataInicioStr = format(dataInicio, "yyyy-MM-dd");
       const dataFimStr = format(dataFimQuery, "yyyy-MM-dd");
 
-      // Queries paralelas - muito mais rápido!
-      const [empresasResult, leadsResult, vendasResult, contasResult] = await Promise.all([
-        // 1. Todas empresas com limites
+      // TODAS as queries em paralelo - máxima eficiência
+      const [empresasResult, leadsResult, vendasResult, contasResult, campanhasResult, metricasResult] = await Promise.all([
         supabase.from("empresa").select("id_empresa, nome, cpl_maximo, cac_maximo"),
-        
-        // 2. Todos leads do período (por data_criacao)
         supabase.from("lead")
-          .select("id_lead, id_empresa, is_mql, levantou_mao, tem_reuniao, reuniao_realizada")
+          .select("id_lead, id_empresa")
           .gte("data_criacao", dataInicioStr)
           .lte("data_criacao", dataFimStr + "T23:59:59"),
-        
-        // 3. Todas vendas do período (por data_venda)
         supabase.from("lead")
           .select("id_lead, id_empresa, valor_venda")
           .eq("venda_realizada", true)
           .gte("data_venda", dataInicioStr)
           .lte("data_venda", dataFimStr + "T23:59:59"),
-        
-        // 4. Todas contas de anúncio com empresa
-        supabase.from("conta_anuncio").select("id_conta, id_empresa")
+        supabase.from("conta_anuncio").select("id_conta, id_empresa"),
+        supabase.from("campanha").select("id_campanha, id_conta"),
+        supabase.from("campanha_metricas_dia")
+          .select("id_campanha, verba_investida")
+          .gte("data", dataInicioStr)
+          .lte("data", dataFimStr)
       ]);
 
       if (empresasResult.error) throw empresasResult.error;
@@ -124,39 +122,15 @@ export default function DashboardDirecao() {
       const todosLeads = leadsResult.data || [];
       const todasVendas = vendasResult.data || [];
       const todasContas = contasResult.data || [];
-
-      // Buscar campanhas e métricas de verba em paralelo
-      const contaIds = todasContas.map(c => c.id_conta);
-      
-      const [campanhasResult, metricasResult] = await Promise.all([
-        contaIds.length > 0 
-          ? supabase.from("campanha").select("id_campanha, id_conta").in("id_conta", contaIds)
-          : Promise.resolve({ data: [], error: null }),
-        Promise.resolve({ data: [], error: null }) // placeholder
-      ]);
-
       const todasCampanhas = campanhasResult.data || [];
-      const campanhaIds = todasCampanhas.map(c => c.id_campanha);
+      const metricasVerba = metricasResult.data || [];
 
-      // Buscar métricas de verba
-      let metricasVerba: { id_campanha: string; verba_investida: number }[] = [];
-      if (campanhaIds.length > 0) {
-        const { data } = await supabase
-          .from("campanha_metricas_dia")
-          .select("id_campanha, verba_investida")
-          .in("id_campanha", campanhaIds)
-          .gte("data", dataInicioStr)
-          .lte("data", dataFimStr);
-        metricasVerba = data || [];
-      }
-
-      // Criar mapa de campanha -> conta -> empresa
+      // Mapa campanha -> empresa (via conta)
+      const contaToEmpresa = new Map(todasContas.map(c => [c.id_conta, c.id_empresa]));
       const campanhaToEmpresa = new Map<string, string>();
       todasCampanhas.forEach(camp => {
-        const conta = todasContas.find(c => c.id_conta === camp.id_conta);
-        if (conta) {
-          campanhaToEmpresa.set(camp.id_campanha, conta.id_empresa);
-        }
+        const empresaId = contaToEmpresa.get(camp.id_conta);
+        if (empresaId) campanhaToEmpresa.set(camp.id_campanha, empresaId);
       });
 
       // Agregar verba por empresa
@@ -168,43 +142,33 @@ export default function DashboardDirecao() {
         }
       });
 
-      // Agregar leads por empresa
+      // Agregar leads e vendas por empresa
       const leadsByEmpresa = new Map<string, number>();
-      todosLeads.forEach(l => {
-        leadsByEmpresa.set(l.id_empresa, (leadsByEmpresa.get(l.id_empresa) || 0) + 1);
-      });
-
-      // Agregar vendas por empresa
+      todosLeads.forEach(l => leadsByEmpresa.set(l.id_empresa, (leadsByEmpresa.get(l.id_empresa) || 0) + 1));
+      
       const vendasByEmpresa = new Map<string, number>();
-      todasVendas.forEach(v => {
-        vendasByEmpresa.set(v.id_empresa, (vendasByEmpresa.get(v.id_empresa) || 0) + 1);
-      });
+      todasVendas.forEach(v => vendasByEmpresa.set(v.id_empresa, (vendasByEmpresa.get(v.id_empresa) || 0) + 1));
 
-      // Filtrar empresas se necessário
+      // Filtrar empresas
       const empresasFiltradas = empresaSelecionada && empresaSelecionada !== "todas"
         ? todasEmpresas.filter(e => e.id_empresa === empresaSelecionada)
         : todasEmpresas;
 
-      // Montar resultados
-      const resultados: EmpresaMetrica[] = empresasFiltradas.map(empresa => {
-        const verba = verbaByEmpresa.get(empresa.id_empresa) || 0;
-        const leads = leadsByEmpresa.get(empresa.id_empresa) || 0;
-        const vendas = vendasByEmpresa.get(empresa.id_empresa) || 0;
-
-        return {
-          id_empresa: empresa.id_empresa,
-          nome: empresa.nome,
-          verba_investida: verba,
-          leads_total: leads,
-          cpl: leads > 0 ? verba / leads : null,
-          cac: vendas > 0 ? verba / vendas : null,
-          vendas,
-          cpl_maximo: empresa.cpl_maximo,
-          cac_maximo: empresa.cac_maximo,
-        };
-      });
-
-      return resultados;
+      return empresasFiltradas.map(empresa => ({
+        id_empresa: empresa.id_empresa,
+        nome: empresa.nome,
+        verba_investida: verbaByEmpresa.get(empresa.id_empresa) || 0,
+        leads_total: leadsByEmpresa.get(empresa.id_empresa) || 0,
+        cpl: (leadsByEmpresa.get(empresa.id_empresa) || 0) > 0 
+          ? (verbaByEmpresa.get(empresa.id_empresa) || 0) / (leadsByEmpresa.get(empresa.id_empresa) || 1) 
+          : null,
+        cac: (vendasByEmpresa.get(empresa.id_empresa) || 0) > 0 
+          ? (verbaByEmpresa.get(empresa.id_empresa) || 0) / (vendasByEmpresa.get(empresa.id_empresa) || 1) 
+          : null,
+        vendas: vendasByEmpresa.get(empresa.id_empresa) || 0,
+        cpl_maximo: empresa.cpl_maximo,
+        cac_maximo: empresa.cac_maximo,
+      }));
     },
   });
 
