@@ -276,22 +276,37 @@ serve(async (req) => {
       console.log(`⚠ Deal não tem person_id associado`);
     }
 
-    // Tentar vincular ao criativo usando utm_content (que deve conter o id_criativo_externo)
+    // Tentar vincular ao criativo usando utm_content
+    // utm_content pode conter o Ad ID (id_anuncio_externo) ou Creative ID (id_criativo_externo)
     let idCriativo = null;
     if (utmContent) {
       try {
-        const { data: criativo } = await supabase
+        // Prioridade 1: Buscar por Ad ID (id_anuncio_externo) - mais comum no utm_content do Meta
+        const { data: criativoPorAdId } = await supabase
           .from("criativo")
           .select("id_criativo")
-          .eq("id_criativo_externo", utmContent)
+          .eq("id_anuncio_externo", utmContent)
           .eq("ativo", true)
           .maybeSingle();
         
-        if (criativo) {
-          idCriativo = criativo.id_criativo;
-          console.log(`Criativo vinculado: ${idCriativo} (utm_content: ${utmContent})`);
+        if (criativoPorAdId) {
+          idCriativo = criativoPorAdId.id_criativo;
+          console.log(`✓ Criativo vinculado por Ad ID: ${idCriativo} (utm_content: ${utmContent})`);
         } else {
-          console.log(`Nenhum criativo encontrado para utm_content: ${utmContent}`);
+          // Prioridade 2: Buscar por Creative ID (id_criativo_externo)
+          const { data: criativoPorCreativeId } = await supabase
+            .from("criativo")
+            .select("id_criativo")
+            .eq("id_criativo_externo", utmContent)
+            .eq("ativo", true)
+            .maybeSingle();
+          
+          if (criativoPorCreativeId) {
+            idCriativo = criativoPorCreativeId.id_criativo;
+            console.log(`✓ Criativo vinculado por Creative ID: ${idCriativo} (utm_content: ${utmContent})`);
+          } else {
+            console.log(`⚠️ Nenhum criativo encontrado para utm_content: ${utmContent} (buscado em id_anuncio_externo e id_criativo_externo)`);
+          }
         }
       } catch (criativoError) {
         console.error("Erro ao buscar criativo:", criativoError);
@@ -417,6 +432,41 @@ serve(async (req) => {
             if (!utmContent && mauticData.utm_content_mautic) {
               updateData.utm_content = mauticData.utm_content_mautic;
               console.log('[Mautic] Fallback utm_content:', mauticData.utm_content_mautic);
+              
+              // Segunda tentativa de match com criativo usando utm_content do Mautic
+              if (!idCriativo) {
+                try {
+                  const mauticUtmContent = mauticData.utm_content_mautic;
+                  
+                  // Buscar por Ad ID primeiro
+                  const { data: criativoPorAdId } = await supabase
+                    .from("criativo")
+                    .select("id_criativo")
+                    .eq("id_anuncio_externo", mauticUtmContent)
+                    .eq("ativo", true)
+                    .maybeSingle();
+                  
+                  if (criativoPorAdId) {
+                    updateData.id_criativo = criativoPorAdId.id_criativo;
+                    console.log(`[Mautic] Criativo vinculado por Ad ID (fallback): ${criativoPorAdId.id_criativo}`);
+                  } else {
+                    // Buscar por Creative ID
+                    const { data: criativoPorCreativeId } = await supabase
+                      .from("criativo")
+                      .select("id_criativo")
+                      .eq("id_criativo_externo", mauticUtmContent)
+                      .eq("ativo", true)
+                      .maybeSingle();
+                    
+                    if (criativoPorCreativeId) {
+                      updateData.id_criativo = criativoPorCreativeId.id_criativo;
+                      console.log(`[Mautic] Criativo vinculado por Creative ID (fallback): ${criativoPorCreativeId.id_criativo}`);
+                    }
+                  }
+                } catch (matchError) {
+                  console.error('[Mautic] Erro ao buscar criativo com fallback:', matchError);
+                }
+              }
             }
             if (!utmTerm && mauticData.utm_term_mautic) {
               updateData.utm_term = mauticData.utm_term_mautic;
