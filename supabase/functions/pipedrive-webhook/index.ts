@@ -132,25 +132,57 @@ serve(async (req) => {
     // IMPORTANTE: Hierarquia do funil - vendas ≤ reuniões ≤ levantadas ≤ MQLs ≤ leads
     // Construir de baixo para cima para garantir hierarquia correta
     
+    // Mapeamento por pipeline:
+    // Blue (pipeline 5): Lead → Contato Iniciado → Negociação → Aguardando pagamento → Vendido
+    // Tokeniza (pipeline 9): Lead → Contato Iniciado → Contato Estabelecido → Apresentação → Cadastrado na Plataforma → Forecasting → Carteira
+    
+    // Stages que indicam REUNIÃO REALIZADA (nível 4)
+    const stagesReuniaoRealizada = [
+      // Blue
+      "Aguardando pagamento",
+      // Tokeniza  
+      "Cadastrado na Plataforma",
+      "Forecasting",
+      "Carteira"
+    ];
+    
+    // Stages que indicam TEM REUNIÃO (nível 3)
+    const stagesTemReuniao = [
+      // Blue
+      "Negociação",
+      "Aguardando pagamento",
+      // Tokeniza
+      "Apresentação",
+      "Cadastrado na Plataforma",
+      "Forecasting",
+      "Carteira"
+    ];
+    
+    // Stages que indicam LEVANTOU MÃO (nível 2)
+    const stagesLevantouMao = [
+      // Blue
+      "Contato Iniciado",
+      "Negociação", 
+      "Aguardando pagamento",
+      // Tokeniza
+      "Contato Iniciado",
+      "Contato Estabelecido",
+      "Apresentação",
+      "Cadastrado na Plataforma",
+      "Forecasting",
+      "Carteira"
+    ];
+    
     // Nível 5: Vendas (já calculado acima como vendaRealizada)
     
     // Nível 4: Reunião realizada (inclui todas as vendas)
-    const reuniaoRealizada = (dealAberto && stageAtual && [
-      "Aguardando pagamento"
-    ].includes(stageAtual)) || vendaRealizada;
+    const reuniaoRealizada = (dealAberto && stageAtual && stagesReuniaoRealizada.includes(stageAtual)) || vendaRealizada;
     
     // Nível 3: Tem reunião agendada/em progresso (inclui reunião realizada)
-    const temReuniao = (dealAberto && stageAtual && [
-      "Negociação",
-      "Aguardando pagamento"
-    ].includes(stageAtual)) || reuniaoRealizada;
+    const temReuniao = (dealAberto && stageAtual && stagesTemReuniao.includes(stageAtual)) || reuniaoRealizada;
     
     // Nível 2: Levantou a mão (inclui todos que têm reunião)
-    const levantouMao = (dealAberto && stageAtual && [
-      "Contato Iniciado",
-      "Negociação", 
-      "Aguardando pagamento"
-    ].includes(stageAtual)) || temReuniao;
+    const levantouMao = (dealAberto && stageAtual && stagesLevantouMao.includes(stageAtual)) || temReuniao;
     
     // Nível 1: MQL (inclui todos que levantaram a mão)
     const isMql = (dealAberto && stageAtual && stageAtual !== "Lead") || levantouMao;
