@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
     for (const empresa of empresas || []) {
       console.log(`Processando empresa: ${empresa.nome}`);
 
-      // Buscar leads da empresa na semana
+      // Buscar leads da empresa criados na semana (para contagem de leads, MQLs, etc.)
       const { data: leads, error: leadsError } = await supabase
         .from('lead')
         .select('*')
@@ -91,14 +91,29 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Buscar vendas realizadas na semana (por data_venda, não data_criacao)
+      const { data: vendasNaSemana, error: vendasError } = await supabase
+        .from('lead')
+        .select('*')
+        .eq('id_empresa', empresa.id_empresa)
+        .eq('venda_realizada', true)
+        .gte('data_venda', semana.data_inicio)
+        .lte('data_venda', semana.data_fim);
+
+      if (vendasError) {
+        console.error(`Erro ao buscar vendas da empresa ${empresa.nome}:`, vendasError);
+      }
+
       const leads_total = leads?.length || 0;
       const mqls = leads?.filter(l => l.is_mql).length || 0;
       const levantadas = leads?.filter(l => l.levantou_mao).length || 0;
       const reunioes = leads?.filter(l => l.tem_reuniao || l.reuniao_realizada).length || 0;
-      const vendas = leads?.filter(l => l.venda_realizada).length || 0;
+      
+      // Usar vendas por data_venda, não por data_criacao
+      const vendas = vendasNaSemana?.length || 0;
 
-      // Calcular ticket médio
-      const vendasComValor = leads?.filter(l => l.venda_realizada && l.valor_venda) || [];
+      // Calcular ticket médio das vendas realizadas na semana
+      const vendasComValor = vendasNaSemana?.filter(l => l.valor_venda) || [];
       const somaVendas = vendasComValor.reduce((sum, l) => sum + (l.valor_venda || 0), 0);
       const ticket_medio = vendas > 0 ? somaVendas / vendas : null;
 
