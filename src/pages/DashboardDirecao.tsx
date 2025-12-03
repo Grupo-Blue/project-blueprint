@@ -69,20 +69,22 @@ export default function DashboardDirecao() {
     },
     enabled: !!semanaSelecionada,
     staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: empresas } = useQuery({
-    queryKey: ["empresas"],
+    queryKey: ["empresas-direcao"],
     queryFn: async () => {
       const { data, error } = await supabase.from("empresa").select("*");
       if (error) throw error;
       return data;
     },
     staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: metricas, isLoading } = useQuery({
-    queryKey: ["metricas-direcao-realtime", tipoFiltro, semanaSelecionada, dataInicioStr, dataFimStr, empresaSelecionada],
+    queryKey: ["metricas-direcao", tipoFiltro, semanaSelecionada, dataInicioStr, dataFimStr, empresaSelecionada],
     queryFn: async () => {
       // Determinar datas do período
       let dataInicioQuery = dataInicioStr;
@@ -101,6 +103,8 @@ export default function DashboardDirecao() {
         }
       }
 
+      console.log("[DashboardDirecao] Período:", dataInicioQuery, "até", dataFimQuery);
+
       // TODAS as queries em paralelo - máxima eficiência
       const [empresasResult, leadsResult, vendasResult, contasResult, campanhasResult, metricasResult] = await Promise.all([
         supabase.from("empresa").select("id_empresa, nome, cpl_maximo, cac_maximo"),
@@ -116,7 +120,7 @@ export default function DashboardDirecao() {
         supabase.from("conta_anuncio").select("id_conta, id_empresa"),
         supabase.from("campanha").select("id_campanha, id_conta"),
         supabase.from("campanha_metricas_dia")
-          .select("id_campanha, verba_investida")
+          .select("id_campanha, verba_investida, data")
           .gte("data", dataInicioQuery)
           .lte("data", dataFimQuery)
       ]);
@@ -130,6 +134,9 @@ export default function DashboardDirecao() {
       const todasCampanhas = campanhasResult.data || [];
       const metricasVerba = metricasResult.data || [];
 
+      console.log("[DashboardDirecao] Registros de verba encontrados:", metricasVerba.length);
+      console.log("[DashboardDirecao] Total verba bruta:", metricasVerba.reduce((sum, m) => sum + Number(m.verba_investida), 0));
+
       // Mapa campanha -> empresa (via conta)
       const contaToEmpresa = new Map(todasContas.map(c => [c.id_conta, c.id_empresa]));
       const campanhaToEmpresa = new Map<string, string>();
@@ -138,14 +145,21 @@ export default function DashboardDirecao() {
         if (empresaId) campanhaToEmpresa.set(camp.id_campanha, empresaId);
       });
 
-      // Agregar verba por empresa
+      // Agregar verba por empresa - com log de debug
       const verbaByEmpresa = new Map<string, number>();
+      let verbaOrfao = 0;
       metricasVerba.forEach(m => {
         const empresaId = campanhaToEmpresa.get(m.id_campanha);
         if (empresaId) {
           verbaByEmpresa.set(empresaId, (verbaByEmpresa.get(empresaId) || 0) + Number(m.verba_investida));
+        } else {
+          verbaOrfao += Number(m.verba_investida);
         }
       });
+      
+      if (verbaOrfao > 0) {
+        console.warn("[DashboardDirecao] Verba sem empresa mapeada:", verbaOrfao);
+      }
 
       // Agregar leads e vendas por empresa
       const leadsByEmpresa = new Map<string, number>();
@@ -159,7 +173,7 @@ export default function DashboardDirecao() {
         ? todasEmpresas.filter(e => e.id_empresa === empresaSelecionada)
         : todasEmpresas;
 
-      return empresasFiltradas.map(empresa => ({
+      const resultado = empresasFiltradas.map(empresa => ({
         id_empresa: empresa.id_empresa,
         nome: empresa.nome,
         verba_investida: verbaByEmpresa.get(empresa.id_empresa) || 0,
@@ -174,12 +188,17 @@ export default function DashboardDirecao() {
         cpl_maximo: empresa.cpl_maximo,
         cac_maximo: empresa.cac_maximo,
       }));
+
+      console.log("[DashboardDirecao] Resultado final por empresa:", resultado.map(r => ({ nome: r.nome, verba: r.verba_investida })));
+      
+      return resultado;
     },
-    staleTime: 30 * 1000, // Cache por 30 segundos
+    staleTime: 60 * 1000, // Cache por 60 segundos
+    refetchOnWindowFocus: false,
   });
 
   const { data: acoesAprovacao } = useQuery({
-    queryKey: ["acoes-pendentes", empresaSelecionada],
+    queryKey: ["acoes-pendentes-direcao", empresaSelecionada],
     queryFn: async () => {
       let query = supabase
         .from("acao")
@@ -201,10 +220,12 @@ export default function DashboardDirecao() {
       if (error) throw error;
       return data;
     },
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: ultimosAprendizados } = useQuery({
-    queryKey: ["ultimos-aprendizados", empresaSelecionada],
+    queryKey: ["ultimos-aprendizados-direcao", empresaSelecionada],
     queryFn: async () => {
       let query = supabase
         .from("aprendizado_semana")
@@ -226,6 +247,8 @@ export default function DashboardDirecao() {
       if (error) throw error;
       return data;
     },
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const totais = metricas?.reduce(
