@@ -441,8 +441,31 @@ serve(async (req) => {
           console.error('[Mautic] Erro no processo de enriquecimento:', mauticError);
           // Não falhar o webhook se o enriquecimento falhar
         }
+
+        // Enriquecer lead com dados do Tokeniza (cross-company)
+        try {
+          console.log(`[Tokeniza] Iniciando enriquecimento para ${personEmail}`);
+          
+          const { data: tokenizaData, error: tokenizaError } = await supabase.functions.invoke(
+            'enriquecer-leads-tokeniza',
+            {
+              body: { email: personEmail }
+            }
+          );
+
+          if (tokenizaError) {
+            console.error('[Tokeniza] Erro ao chamar função de enriquecimento:', tokenizaError);
+          } else if (tokenizaData?.success) {
+            console.log(`[Tokeniza] Lead enriquecido: investidor=${tokenizaData.totalInvestidores > 0}, valor=R$ ${tokenizaData.totalEnriquecidos}`);
+          } else {
+            console.log('[Tokeniza] Enriquecimento não retornou sucesso:', tokenizaData);
+          }
+        } catch (tokenizaError) {
+          console.error('[Tokeniza] Erro no processo de enriquecimento:', tokenizaError);
+          // Não falhar o webhook se o enriquecimento falhar
+        }
       } else if (!personEmail) {
-        console.log('[Mautic] Email não disponível, enriquecimento pulado');
+        console.log('[Mautic/Tokeniza] Email não disponível, enriquecimento pulado');
       }
     }
 
