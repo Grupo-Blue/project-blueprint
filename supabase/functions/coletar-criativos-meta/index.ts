@@ -171,9 +171,9 @@ serve(async (req) => {
             
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
-            // Endpoint da API do Meta para buscar ads com TODOS os campos possíveis de URL
-            // Incluindo asset_feed_spec para carrosséis e adset info
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,adset{name},creative{id,name,object_story_spec{link_data{link,call_to_action,picture,image_hash,child_attachments}},asset_feed_spec{link_urls},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
+            // Endpoint da API do Meta para buscar ads com campos de URL válidos
+            // NOTA: website_urls e destination não existem na API - removidos
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,adset{name},creative{id,name,object_story_spec{link_data{link,call_to_action{type,value{link,app_link}},picture,image_hash,child_attachments{link,picture,call_to_action{type,value{link}}}}},asset_feed_spec{link_urls},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -251,28 +251,51 @@ serve(async (req) => {
                   adName: ad.name
                 };
                 
+                // LOG: mostrar estrutura completa do creative para debug
+                console.log(`📋 Estrutura creative: ${JSON.stringify({
+                  has_object_story_spec: !!creative.object_story_spec,
+                  has_link_data: !!creative.object_story_spec?.link_data,
+                  link: creative.object_story_spec?.link_data?.link || null,
+                  cta_type: creative.object_story_spec?.link_data?.call_to_action?.type || null,
+                  cta_value: creative.object_story_spec?.link_data?.call_to_action?.value || null,
+                  has_asset_feed_spec: !!creative.asset_feed_spec,
+                  asset_website_urls: creative.asset_feed_spec?.website_urls || null,
+                  asset_link_urls: creative.asset_feed_spec?.link_urls || null,
+                  has_child_attachments: !!creative.object_story_spec?.link_data?.child_attachments,
+                  child_attachments_count: creative.object_story_spec?.link_data?.child_attachments?.length || 0
+                })}`);
+                
                 // Prioridade 1: object_story_spec.link_data.link (URL base principal)
                 if (creative.object_story_spec?.link_data?.link) {
                   urlFinal = creative.object_story_spec.link_data.link;
                   console.log(`✓ URL base (link_data.link): ${urlFinal}`);
                 }
                 
-                // Prioridade 2: asset_feed_spec.link_urls (para anúncios dinâmicos/carrosséis)
-                if (!urlFinal && creative.asset_feed_spec?.link_urls?.length > 0) {
-                  urlFinal = creative.asset_feed_spec.link_urls[0].website_url || creative.asset_feed_spec.link_urls[0];
-                  console.log(`✓ URL base (asset_feed_spec): ${urlFinal}`);
+                // Prioridade 2: call_to_action.value.link (URL no botão CTA - MUITO COMUM!)
+                if (!urlFinal && creative.object_story_spec?.link_data?.call_to_action?.value?.link) {
+                  urlFinal = creative.object_story_spec.link_data.call_to_action.value.link;
+                  console.log(`✓ URL base (CTA value.link): ${urlFinal}`);
                 }
                 
-                // Prioridade 3: child_attachments do carrossel
+                // Prioridade 3: asset_feed_spec.link_urls (para anúncios dinâmicos/carrosséis)
+                if (!urlFinal && creative.asset_feed_spec?.link_urls?.length > 0) {
+                  urlFinal = creative.asset_feed_spec.link_urls[0].website_url || creative.asset_feed_spec.link_urls[0];
+                  console.log(`✓ URL base (asset_feed_spec.link_urls): ${urlFinal}`);
+                }
+                
+                // Prioridade 6: child_attachments do carrossel
                 if (!urlFinal && creative.object_story_spec?.link_data?.child_attachments?.length > 0) {
                   const firstAttachment = creative.object_story_spec.link_data.child_attachments[0];
                   if (firstAttachment.link) {
                     urlFinal = firstAttachment.link;
                     console.log(`✓ URL base (carrossel): ${urlFinal}`);
+                  } else if (firstAttachment.call_to_action?.value?.link) {
+                    urlFinal = firstAttachment.call_to_action.value.link;
+                    console.log(`✓ URL base (carrossel CTA): ${urlFinal}`);
                   }
                 }
                 
-                // Prioridade 4: tracking_specs (contém URL com parâmetros)
+                // Prioridade 7: tracking_specs (contém URL com parâmetros)
                 if (!urlFinal && ad.tracking_specs && ad.tracking_specs.length > 0) {
                   for (const trackingSpec of ad.tracking_specs) {
                     if (trackingSpec.url && trackingSpec.url.includes('http')) {
