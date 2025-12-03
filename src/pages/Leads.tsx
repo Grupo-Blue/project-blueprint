@@ -313,7 +313,7 @@ const Leads = () => {
     mqls: filteredLeads?.filter(l => l.is_mql).length || 0,
     reunioes: filteredLeads?.filter(l => l.tem_reuniao).length || 0,
     vendas: filteredLeads?.filter(l => l.venda_realizada).length || 0,
-    valorTotal: filteredLeads?.reduce((sum, l) => sum + (l.valor_venda || 0), 0) || 0,
+    valorTotal: filteredLeads?.filter(l => l.venda_realizada).reduce((sum, l) => sum + (l.valor_venda || 0), 0) || 0,
     investidores: filteredLeads?.filter(l => (l as any).tokeniza_investidor).length || 0,
     valorInvestido: filteredLeads?.reduce((sum, l) => sum + ((l as any).tokeniza_valor_investido || 0), 0) || 0,
     carrinhos: filteredLeads?.filter(l => (l as any).tokeniza_carrinho_abandonado).length || 0,
