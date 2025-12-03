@@ -6,6 +6,41 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Função para resolver placeholders dinâmicos do Meta nas URLs
+function resolverPlaceholders(url: string, contexto: {
+  campaignName?: string;
+  adId?: string;
+  adsetName?: string;
+  adName?: string;
+}): string {
+  if (!url) return url;
+  
+  let urlResolvida = url;
+  
+  // Substituir placeholders comuns do Meta
+  if (contexto.campaignName) {
+    urlResolvida = urlResolvida.replace(/\{\{campaign\.name\}\}/gi, encodeURIComponent(contexto.campaignName));
+    urlResolvida = urlResolvida.replace(/\{\{campaign_name\}\}/gi, encodeURIComponent(contexto.campaignName));
+  }
+  
+  if (contexto.adId) {
+    urlResolvida = urlResolvida.replace(/\{\{ad\.id\}\}/gi, contexto.adId);
+    urlResolvida = urlResolvida.replace(/\{\{ad_id\}\}/gi, contexto.adId);
+  }
+  
+  if (contexto.adsetName) {
+    urlResolvida = urlResolvida.replace(/\{\{adset\.name\}\}/gi, encodeURIComponent(contexto.adsetName));
+    urlResolvida = urlResolvida.replace(/\{\{adset_name\}\}/gi, encodeURIComponent(contexto.adsetName));
+  }
+  
+  if (contexto.adName) {
+    urlResolvida = urlResolvida.replace(/\{\{ad\.name\}\}/gi, encodeURIComponent(contexto.adName));
+    urlResolvida = urlResolvida.replace(/\{\{ad_name\}\}/gi, encodeURIComponent(contexto.adName));
+  }
+  
+  return urlResolvida;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -136,9 +171,9 @@ serve(async (req) => {
             
             console.log(`Buscando criativos e investimento da campanha ${campanha.nome}`);
 
-            // Endpoint da API do Meta para buscar ads com todos os campos de URL e UTM
-            // Removido adset{targeting{url_tags}} pois o campo url_tags não existe no objeto targeting
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,creative{id,name,object_story_spec{link_data{link,call_to_action,picture,image_hash}},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
+            // Endpoint da API do Meta para buscar ads com TODOS os campos possíveis de URL
+            // Incluindo asset_feed_spec para carrosséis e adset info
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,adset{name},creative{id,name,object_story_spec{link_data{link,call_to_action,picture,image_hash,child_attachments}},asset_feed_spec{link_urls},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags},effective_object_story_id,url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -177,6 +212,7 @@ serve(async (req) => {
             // Processar cada ad (criativo) com métricas de hoje
             for (const ad of adsData.data || []) {
               const creative = ad.creative;
+              const adsetName = ad.adset?.name || null;
               
               // Determinar tipo de criativo e URL da mídia
               let tipoCriativo = "OUTRO";
@@ -184,19 +220,15 @@ serve(async (req) => {
               
               if (creative.video_id) {
                 tipoCriativo = "VIDEO";
-                // Para vídeos, usar thumbnail_url se disponível
                 urlMidia = creative.thumbnail_url || null;
               } else if (creative.object_story_spec?.link_data?.picture) {
-                // Prioridade 1: picture do object_story_spec (imagem completa)
                 tipoCriativo = "IMAGEM";
                 urlMidia = creative.object_story_spec.link_data.picture;
               } else if (creative.image_url) {
-                // Prioridade 2: image_url (pode ser thumbnail)
                 tipoCriativo = "IMAGEM";
                 urlMidia = creative.image_url;
               } else if (creative.object_story_spec?.link_data?.child_attachments) {
                 tipoCriativo = "CARROSSEL";
-                // Para carrossel, pegar primeira imagem
                 const firstCard = creative.object_story_spec.link_data.child_attachments?.[0];
                 urlMidia = firstCard?.picture || null;
               }
@@ -204,19 +236,56 @@ serve(async (req) => {
               // Determinar se está ativo
               const ativo = ad.status === "ACTIVE";
 
-              // Extrair URL final do anúncio e UTM parameters
+              // Extrair URL final do anúncio e UTM parameters - MELHORADO
               let urlFinal = null;
               let isEngagementAd = false;
               
               try {
-                console.log(`\n=== Processando criativo ${creative.id} (${ad.name}) ===`);
+                console.log(`\n=== Processando ad ${ad.id} / criativo ${creative.id} (${ad.name}) ===`);
                 
-                // Prioridade 1: object_story_spec.link_data.link (URL base)
+                // Contexto para resolução de placeholders
+                const contextoPlaceholders = {
+                  campaignName: campanha.nome,
+                  adId: ad.id,
+                  adsetName: adsetName,
+                  adName: ad.name
+                };
+                
+                // Prioridade 1: object_story_spec.link_data.link (URL base principal)
                 if (creative.object_story_spec?.link_data?.link) {
                   urlFinal = creative.object_story_spec.link_data.link;
-                  console.log(`✓ URL base extraída: ${urlFinal}`);
-                  
-                  // Coletar url_tags de múltiplas fontes e combinar
+                  console.log(`✓ URL base (link_data.link): ${urlFinal}`);
+                }
+                
+                // Prioridade 2: asset_feed_spec.link_urls (para anúncios dinâmicos/carrosséis)
+                if (!urlFinal && creative.asset_feed_spec?.link_urls?.length > 0) {
+                  urlFinal = creative.asset_feed_spec.link_urls[0].website_url || creative.asset_feed_spec.link_urls[0];
+                  console.log(`✓ URL base (asset_feed_spec): ${urlFinal}`);
+                }
+                
+                // Prioridade 3: child_attachments do carrossel
+                if (!urlFinal && creative.object_story_spec?.link_data?.child_attachments?.length > 0) {
+                  const firstAttachment = creative.object_story_spec.link_data.child_attachments[0];
+                  if (firstAttachment.link) {
+                    urlFinal = firstAttachment.link;
+                    console.log(`✓ URL base (carrossel): ${urlFinal}`);
+                  }
+                }
+                
+                // Prioridade 4: tracking_specs (contém URL com parâmetros)
+                if (!urlFinal && ad.tracking_specs && ad.tracking_specs.length > 0) {
+                  for (const trackingSpec of ad.tracking_specs) {
+                    if (trackingSpec.url && trackingSpec.url.includes('http')) {
+                      urlFinal = trackingSpec.url;
+                      console.log(`✓ URL extraída de tracking_specs: ${urlFinal}`);
+                      break;
+                    }
+                  }
+                }
+                
+                // Adicionar UTM tags se tiver URL base
+                if (urlFinal) {
+                  // Coletar url_tags de múltiplas fontes
                   const allUrlTags = [];
                   
                   // 1. url_tags no criativo
@@ -236,46 +305,42 @@ serve(async (req) => {
                     const combinedTags = allUrlTags.join('&');
                     const separator = urlFinal.includes('?') ? '&' : '?';
                     urlFinal = `${urlFinal}${separator}${combinedTags}`;
-                    console.log(`✓ URL completa com UTMs: ${urlFinal}`);
-                  } else {
-                    console.log(`⚠️ Nenhum url_tags encontrado - URL sem UTMs`);
                   }
-                }
-                // Prioridade 2: tracking_specs (contém URL com parâmetros)
-                else if (ad.tracking_specs && ad.tracking_specs.length > 0) {
-                  console.log(`Tentando extrair de tracking_specs...`);
-                  for (const trackingSpec of ad.tracking_specs) {
-                    if (trackingSpec.url && trackingSpec.url.includes('http')) {
-                      urlFinal = trackingSpec.url;
-                      console.log(`✓ URL extraída de tracking_specs: ${urlFinal}`);
-                      break;
-                    }
+                  
+                  // Resolver placeholders dinâmicos do Meta
+                  urlFinal = resolverPlaceholders(urlFinal, contextoPlaceholders);
+                  console.log(`✓ URL final após resolver placeholders: ${urlFinal}`);
+                  
+                  // Verificar se ainda tem placeholders não resolvidos
+                  if (urlFinal.includes('{{')) {
+                    console.log(`⚠️ URL ainda contém placeholders não resolvidos`);
                   }
                 }
                 
-                // Se não encontrou URL, pode ser anúncio de engajamento (post boost, etc)
+                // Se não encontrou URL, verificar se é anúncio de engajamento
                 if (!urlFinal) {
-                  // Verificar se é anúncio de engajamento (sem link externo)
                   const isPostEngagement = ad.tracking_specs?.some((spec: any) => 
                     spec['action.type']?.includes('post_engagement') || 
-                    spec['action.type']?.includes('post_interaction_gross')
+                    spec['action.type']?.includes('post_interaction_gross') ||
+                    spec['action.type']?.includes('video_view')
                   );
                   
                   if (isPostEngagement) {
                     isEngagementAd = true;
-                    console.log(`ℹ️ Anúncio de engajamento sem URL externa - OK`);
+                    console.log(`ℹ️ Anúncio de engajamento/vídeo sem URL externa - OK`);
                   } else {
-                    console.log(`⚠️ URL não encontrada para criativo ${creative.id}`);
+                    console.log(`⚠️ URL não encontrada para ad ${ad.id}`);
                   }
                 }
               } catch (urlErr) {
-                console.error(`❌ Erro ao extrair URL do criativo ${creative.id}:`, urlErr);
+                console.error(`❌ Erro ao extrair URL do ad ${ad.id}:`, urlErr);
               }
 
-              // Preparar dados do criativo
+              // Preparar dados do criativo - INCLUINDO id_anuncio_externo (Ad ID)
               const criativoData = {
                 id_campanha: campanha.id_campanha,
-                id_criativo_externo: creative.id,
+                id_criativo_externo: creative.id, // Creative ID
+                id_anuncio_externo: ad.id,        // Ad ID (NOVO!) - usado para match com utm_content
                 tipo: tipoCriativo,
                 descricao: ad.name || creative.name || null,
                 ativo: ativo,
@@ -310,7 +375,6 @@ serve(async (req) => {
                 cliques = parseInt(metricas.clicks || "0");
                 investimento = parseFloat(metricas.spend || "0");
                 
-                // Buscar leads das actions
                 const leadAction = metricas.actions?.find((a: any) => a.action_type === "lead");
                 if (leadAction) {
                   leads = parseInt(leadAction.value || "0");
@@ -334,7 +398,7 @@ serve(async (req) => {
               if (metricasError) {
                 console.error("Erro ao salvar métricas do criativo:", metricasError);
               } else {
-                console.log(`Criativo ${ad.name || ad.id} salvo com métricas: R$ ${investimento.toFixed(2)}, ${impressoes} impressões, ${cliques} cliques, ${leads} leads`);
+                console.log(`✅ Criativo salvo: ${ad.name || ad.id} | Ad ID: ${ad.id} | Creative ID: ${creative.id} | R$ ${investimento.toFixed(2)}`);
               }
             }
 

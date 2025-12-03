@@ -490,6 +490,7 @@ export type Database = {
           ativo: boolean
           created_at: string
           descricao: string | null
+          id_anuncio_externo: string | null
           id_campanha: string
           id_criativo: string
           id_criativo_externo: string
@@ -502,6 +503,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
+          id_anuncio_externo?: string | null
           id_campanha: string
           id_criativo?: string
           id_criativo_externo: string
@@ -514,6 +516,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           descricao?: string | null
+          id_anuncio_externo?: string | null
           id_campanha?: string
           id_criativo?: string
           id_criativo_externo?: string
