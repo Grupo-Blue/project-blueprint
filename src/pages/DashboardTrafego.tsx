@@ -39,6 +39,7 @@ import { usePeriodo } from "@/contexts/PeriodoContext";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
@@ -332,27 +333,62 @@ function CriativosQuery({ campanhaId, plataforma, urlEsperadaCampanha }: { campa
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              {criativo.url_preview && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(criativo.url_preview!, '_blank')}
-                  className="gap-1"
-                >
-                  <Eye className="h-3 w-3" />
-                  Preview
-                </Button>
-              )}
               {criativo.url_midia && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(criativo.url_midia!, '_blank')}
-                  className="gap-1"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Ver Mídia
-                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      title="Ver mídia"
+                    >
+                      <Image className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-2" side="left">
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground text-center">Prévia da mídia (pode não carregar)</p>
+                      <div className="relative bg-muted rounded-lg overflow-hidden min-h-[200px] flex items-center justify-center">
+                        <img 
+                          src={criativo.url_midia} 
+                          alt="Prévia do criativo"
+                          className="max-w-full max-h-[300px] object-contain"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const fallback = target.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                        <div className="hidden flex-col items-center justify-center gap-2 p-4 text-center">
+                          <Image className="h-8 w-8 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">Imagem bloqueada pelo Facebook</p>
+                          <p className="text-xs text-muted-foreground">Use "Ver no Facebook" para visualizar</p>
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+              {criativo.url_preview && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(criativo.url_preview!, '_blank')}
+                        className="gap-1"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Ver no Facebook
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Abre o criativo no Facebook (pode requerer login)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
           </div>
