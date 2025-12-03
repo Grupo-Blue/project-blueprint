@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   TrendingUp, 
   TrendingDown, 
@@ -37,13 +37,23 @@ interface EmpresaMetrica {
 }
 
 export default function DashboardDirecao() {
-  const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
+  const { semanaSelecionada, getDataReferencia, tipoFiltro, dataEspecifica } = usePeriodo();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
 
-  // Usar data do filtro selecionado
-  const dataReferencia = getDataReferencia();
-  const inicioMes = startOfMonth(dataReferencia);
-  const fimMes = endOfMonth(dataReferencia);
+  // ESTABILIZAR datas com useMemo para evitar recálculos a cada render
+  const { dataInicioStr, dataFimStr, dataReferencia } = useMemo(() => {
+    const dataRef = getDataReferencia();
+    const inicioMes = startOfMonth(dataRef);
+    const fimMes = endOfMonth(dataRef);
+    const hoje = new Date();
+    const dataFinal = fimMes > hoje ? hoje : fimMes;
+    
+    return {
+      dataInicioStr: format(inicioMes, "yyyy-MM-dd"),
+      dataFimStr: format(dataFinal, "yyyy-MM-dd"),
+      dataReferencia: dataRef
+    };
+  }, [tipoFiltro, dataEspecifica, semanaSelecionada]);
 
   const { data: semanaAtual } = useQuery({
     queryKey: ["semana-info-direcao", semanaSelecionada],
@@ -58,6 +68,7 @@ export default function DashboardDirecao() {
       return data;
     },
     enabled: !!semanaSelecionada,
+    staleTime: 60 * 1000,
   });
 
   const { data: empresas } = useQuery({
@@ -67,18 +78,15 @@ export default function DashboardDirecao() {
       if (error) throw error;
       return data;
     },
+    staleTime: 60 * 1000,
   });
 
-  // Calcular data final como hoje (não fim do mês)
-  const hoje = new Date();
-  const dataFim = fimMes > hoje ? hoje : fimMes;
-
   const { data: metricas, isLoading } = useQuery({
-    queryKey: ["metricas-direcao-realtime", tipoFiltro, semanaSelecionada, inicioMes.toISOString(), dataFim.toISOString(), empresaSelecionada],
+    queryKey: ["metricas-direcao-realtime", tipoFiltro, semanaSelecionada, dataInicioStr, dataFimStr, empresaSelecionada],
     queryFn: async () => {
       // Determinar datas do período
-      let dataInicio: Date = inicioMes;
-      let dataFimQuery: Date = dataFim;
+      let dataInicioQuery = dataInicioStr;
+      let dataFimQuery = dataFimStr;
 
       if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
         const { data: semana } = await supabase
@@ -88,32 +96,29 @@ export default function DashboardDirecao() {
           .single();
         
         if (semana) {
-          dataInicio = new Date(semana.data_inicio);
-          dataFimQuery = new Date(semana.data_fim);
+          dataInicioQuery = semana.data_inicio;
+          dataFimQuery = semana.data_fim;
         }
       }
-
-      const dataInicioStr = format(dataInicio, "yyyy-MM-dd");
-      const dataFimStr = format(dataFimQuery, "yyyy-MM-dd");
 
       // TODAS as queries em paralelo - máxima eficiência
       const [empresasResult, leadsResult, vendasResult, contasResult, campanhasResult, metricasResult] = await Promise.all([
         supabase.from("empresa").select("id_empresa, nome, cpl_maximo, cac_maximo"),
         supabase.from("lead")
           .select("id_lead, id_empresa")
-          .gte("data_criacao", dataInicioStr)
-          .lte("data_criacao", dataFimStr + "T23:59:59"),
+          .gte("data_criacao", dataInicioQuery)
+          .lte("data_criacao", dataFimQuery + "T23:59:59"),
         supabase.from("lead")
           .select("id_lead, id_empresa, valor_venda")
           .eq("venda_realizada", true)
-          .gte("data_venda", dataInicioStr)
-          .lte("data_venda", dataFimStr + "T23:59:59"),
+          .gte("data_venda", dataInicioQuery)
+          .lte("data_venda", dataFimQuery + "T23:59:59"),
         supabase.from("conta_anuncio").select("id_conta, id_empresa"),
         supabase.from("campanha").select("id_campanha, id_conta"),
         supabase.from("campanha_metricas_dia")
           .select("id_campanha, verba_investida")
-          .gte("data", dataInicioStr)
-          .lte("data", dataFimStr)
+          .gte("data", dataInicioQuery)
+          .lte("data", dataFimQuery)
       ]);
 
       if (empresasResult.error) throw empresasResult.error;
@@ -170,6 +175,7 @@ export default function DashboardDirecao() {
         cac_maximo: empresa.cac_maximo,
       }));
     },
+    staleTime: 30 * 1000, // Cache por 30 segundos
   });
 
   const { data: acoesAprovacao } = useQuery({
