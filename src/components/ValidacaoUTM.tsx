@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2, XCircle, ExternalLink, RefreshCw, Link2, Unlink, Info } from "lucide-react";
+import { AlertCircle, CheckCircle2, XCircle, ExternalLink, RefreshCw, Link2, Unlink, Info, FileQuestion, Globe, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -34,6 +34,7 @@ export const ValidacaoUTM = () => {
           url_final,
           campanha:id_campanha (
             nome,
+            objetivo,
             conta_anuncio:id_conta (
               plataforma,
               empresa:id_empresa (nome)
@@ -89,7 +90,7 @@ export const ValidacaoUTM = () => {
 
       await Promise.all(promises);
       
-      toast.success("Criativos recoletados com sucesso!");
+      toast.success("Criativos recoletados com sucesso! (v2.0 - com preview)");
       refetch();
     } catch (error) {
       console.error("Erro ao recoletar criativos:", error);
@@ -139,14 +140,42 @@ export const ValidacaoUTM = () => {
     return url.includes('{{') || url.includes('%7B%7B');
   };
 
+  // Verificar se URL é de serviço externo (Google Drive, etc)
+  const isURLExterna = (url: string | null) => {
+    if (!url) return false;
+    return url.includes('drive.google.com') || 
+           url.includes('docs.google.com') || 
+           url.includes('dropbox.com') ||
+           url.includes('sharepoint.com');
+  };
+
+  // Detectar se é anúncio de engajamento (sem URL esperada)
+  const isEngagementAd = (criativo: any) => {
+    const objetivo = criativo.campanha?.objetivo;
+    const engagementObjectives = [
+      'POST_ENGAGEMENT', 'VIDEO_VIEWS', 'BRAND_AWARENESS', 
+      'REACH', 'PAGE_LIKES', 'EVENT_RESPONSES'
+    ];
+    return objetivo && engagementObjectives.includes(objetivo);
+  };
+
   // Criativos com URL e UTM configurada
   const criativosComUTMnaURL = criativos?.filter(c => verificarUTMnaURL(c.url_final)) || [];
   
   // Criativos sem URL capturada
   const criativosSemURL = criativos?.filter(c => !c.url_final) || [];
   
+  // Criativos sem URL que são de engajamento (OK não ter URL)
+  const criativosSemURLEngajamento = criativosSemURL.filter(c => isEngagementAd(c));
+  
+  // Criativos sem URL que deveriam ter (problema real)
+  const criativosSemURLProblema = criativosSemURL.filter(c => !isEngagementAd(c));
+  
   // Criativos com URL mas sem UTM
   const criativosComURLSemUTM = criativos?.filter(c => c.url_final && !verificarUTMnaURL(c.url_final)) || [];
+  
+  // Criativos com URL externa (Google Drive, etc)
+  const criativosURLExterna = criativos?.filter(c => isURLExterna(c.url_final)) || [];
   
   // Criativos com placeholders não resolvidos
   const criativosComPlaceholders = criativos?.filter(c => temPlaceholdersNaoResolvidos(c.url_final)) || [];
@@ -172,8 +201,12 @@ export const ValidacaoUTM = () => {
     .sort(([,a], [,b]) => b - a)
     .slice(0, 5);
   
-  const porcentagemComUTMnaURL = criativos && criativos.length > 0
-    ? (criativosComUTMnaURL.length / criativos.length) * 100
+  // Calcular percentuais
+  const totalCriativos = criativos?.length || 0;
+  const criativosComURLValida = totalCriativos - criativosSemURLEngajamento.length;
+  
+  const porcentagemComUTMnaURL = criativosComURLValida > 0
+    ? (criativosComUTMnaURL.length / criativosComURLValida) * 100
     : 0;
     
   const porcentagemMatchLeads = leadsComUtm && leadsComUtm.length > 0
@@ -194,7 +227,7 @@ export const ValidacaoUTM = () => {
               Validação de Rastreamento UTM
             </CardTitle>
             <CardDescription>
-              Status do rastreamento de criativos para leads
+              Status do rastreamento de criativos para leads (v2.0)
             </CardDescription>
           </div>
           <div className="flex gap-2">
@@ -214,57 +247,61 @@ export const ValidacaoUTM = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Métricas principais */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Criativos Ativos</p>
-            <p className="text-2xl font-bold">{criativos?.length || 0}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          <div className="text-center p-2 bg-muted rounded-lg">
+            <p className="text-xs text-muted-foreground">Criativos Ativos</p>
+            <p className="text-xl font-bold">{criativos?.length || 0}</p>
           </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Com UTM na URL</p>
-            <p className="text-2xl font-bold text-blue-600">{criativosComUTMnaURL.length}</p>
+          <div className="text-center p-2 bg-blue-50 dark:bg-blue-950 rounded-lg">
+            <p className="text-xs text-muted-foreground">Com UTM na URL</p>
+            <p className="text-xl font-bold text-blue-600">{criativosComUTMnaURL.length}</p>
           </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Sem URL/UTM</p>
-            <p className="text-2xl font-bold text-yellow-600">{criativosSemURL.length + criativosComURLSemUTM.length}</p>
+          <div className="text-center p-2 bg-yellow-50 dark:bg-yellow-950 rounded-lg">
+            <p className="text-xs text-muted-foreground">Sem URL (problema)</p>
+            <p className="text-xl font-bold text-yellow-600">{criativosSemURLProblema.length}</p>
           </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Com Leads</p>
-            <p className="text-2xl font-bold text-green-600">{criativosComLeads.length}</p>
+          <div className="text-center p-2 bg-muted rounded-lg">
+            <p className="text-xs text-muted-foreground">Engajamento (OK)</p>
+            <p className="text-xl font-bold text-muted-foreground">{criativosSemURLEngajamento.length}</p>
           </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Leads c/ Match</p>
-            <p className="text-2xl font-bold text-green-600">{leadsComMatch.length}</p>
+          <div className="text-center p-2 bg-green-50 dark:bg-green-950 rounded-lg">
+            <p className="text-xs text-muted-foreground">Com Leads</p>
+            <p className="text-xl font-bold text-green-600">{criativosComLeads.length}</p>
           </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Leads s/ Match</p>
-            <p className="text-2xl font-bold text-red-600">{leadsSemMatch.length}</p>
+          <div className="text-center p-2 bg-green-50 dark:bg-green-950 rounded-lg">
+            <p className="text-xs text-muted-foreground">Leads c/ Match</p>
+            <p className="text-xl font-bold text-green-600">{leadsComMatch.length}</p>
+          </div>
+          <div className="text-center p-2 bg-red-50 dark:bg-red-950 rounded-lg">
+            <p className="text-xs text-muted-foreground">Leads s/ Match</p>
+            <p className="text-xl font-bold text-red-600">{leadsSemMatch.length}</p>
           </div>
         </div>
 
         {/* Alertas e detalhes */}
         <Accordion type="single" collapsible className="w-full">
-          {criativosSemURL.length > 0 && (
+          {criativosSemURLProblema.length > 0 && (
             <AccordionItem value="sem-url">
               <AccordionTrigger className="text-yellow-600">
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  {criativosSemURL.length} criativo{criativosSemURL.length !== 1 ? 's' : ''} sem URL capturada
+                  <FileQuestion className="h-4 w-4" />
+                  {criativosSemURLProblema.length} criativo{criativosSemURLProblema.length !== 1 ? 's' : ''} sem URL capturada (problema)
                 </div>
               </AccordionTrigger>
               <AccordionContent>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Podem ser anúncios de engajamento (vídeo, post boost) que não têm link externo, ou a API não retornou a URL.
+                  Estes criativos deveriam ter URL mas não foi possível capturá-la. A v2.0 usa o endpoint /previews do Meta para obter URLs com placeholders resolvidos.
                 </p>
                 <div className="max-h-48 overflow-y-auto space-y-1">
-                  {criativosSemURL.slice(0, 10).map((c: any) => (
+                  {criativosSemURLProblema.slice(0, 10).map((c: any) => (
                     <div key={c.id_criativo} className="text-xs flex items-center gap-2 p-2 bg-muted rounded">
                       <Badge variant="outline" className="text-[10px]">{c.tipo}</Badge>
                       <span className="truncate flex-1">{c.descricao || c.id_criativo_externo}</span>
                       <code className="text-[10px] text-muted-foreground">Ad: {c.id_anuncio_externo || 'N/A'}</code>
                     </div>
                   ))}
-                  {criativosSemURL.length > 10 && (
-                    <p className="text-xs text-muted-foreground">... e mais {criativosSemURL.length - 10}</p>
+                  {criativosSemURLProblema.length > 10 && (
+                    <p className="text-xs text-muted-foreground">... e mais {criativosSemURLProblema.length - 10}</p>
                   )}
                 </div>
                 <div className="flex gap-2 mt-3">
@@ -275,8 +312,60 @@ export const ValidacaoUTM = () => {
                     disabled={isRefreshing}
                   >
                     <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    Recoletar
+                    Recoletar (v2.0)
                   </Button>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+
+          {criativosSemURLEngajamento.length > 0 && (
+            <AccordionItem value="engajamento">
+              <AccordionTrigger className="text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Video className="h-4 w-4" />
+                  {criativosSemURLEngajamento.length} criativo{criativosSemURLEngajamento.length !== 1 ? 's' : ''} de engajamento (sem URL - OK)
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Anúncios de engajamento (vídeo views, brand awareness, etc.) não têm URL de destino externa - isso é esperado.
+                </p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {criativosSemURLEngajamento.slice(0, 5).map((c: any) => (
+                    <div key={c.id_criativo} className="text-xs flex items-center gap-2 p-2 bg-muted rounded">
+                      <Badge variant="secondary" className="text-[10px]">{c.tipo}</Badge>
+                      <span className="truncate flex-1">{c.descricao || c.id_criativo_externo}</span>
+                      <Badge variant="outline" className="text-[10px]">{c.campanha?.objetivo || 'N/A'}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+
+          {criativosURLExterna.length > 0 && (
+            <AccordionItem value="url-externa">
+              <AccordionTrigger className="text-orange-600">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  {criativosURLExterna.length} criativo{criativosURLExterna.length !== 1 ? 's' : ''} com URL externa (Google Drive, etc)
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Estes criativos apontam para serviços externos como Google Drive em vez de landing pages. UTM tracking não funciona nesses casos.
+                </p>
+                <div className="max-h-48 overflow-y-auto space-y-1">
+                  {criativosURLExterna.slice(0, 10).map((c: any) => (
+                    <div key={c.id_criativo} className="text-xs p-2 bg-muted rounded">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant="outline" className="text-[10px]">{c.tipo}</Badge>
+                        <span className="truncate flex-1">{c.descricao || c.id_criativo_externo}</span>
+                      </div>
+                      <code className="text-[10px] text-orange-600 break-all">{c.url_final}</code>
+                    </div>
+                  ))}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -292,7 +381,7 @@ export const ValidacaoUTM = () => {
               </AccordionTrigger>
               <AccordionContent>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Configure os parâmetros UTM diretamente nos anúncios das plataformas (Meta/Google).
+                  Configure os parâmetros UTM diretamente nos anúncios das plataformas (Meta/Google). Use utm_content com o Ad ID para rastreamento.
                 </p>
                 <div className="max-h-48 overflow-y-auto space-y-1">
                   {criativosComURLSemUTM.slice(0, 10).map((c: any) => (
@@ -301,7 +390,7 @@ export const ValidacaoUTM = () => {
                         <Badge variant="outline" className="text-[10px]">{c.tipo}</Badge>
                         <span className="truncate flex-1">{c.descricao || c.id_criativo_externo}</span>
                       </div>
-                      <code className="text-[10px] text-muted-foreground break-all">{c.url_final}</code>
+                      <code className="text-[10px] text-muted-foreground break-all">{c.url_final?.substring(0, 100)}...</code>
                     </div>
                   ))}
                 </div>
@@ -324,7 +413,7 @@ export const ValidacaoUTM = () => {
               </AccordionTrigger>
               <AccordionContent>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Algumas URLs contêm placeholders dinâmicos do Meta (ex: {"{{campaign.name}}"}) que não foram resolvidos.
+                  A v2.0 usa o endpoint /previews para resolver placeholders. Se ainda aparecem, pode ser um erro na API ou campanha inativa.
                 </p>
                 <div className="max-h-48 overflow-y-auto space-y-1">
                   {criativosComPlaceholders.slice(0, 5).map((c: any) => (
@@ -347,8 +436,8 @@ export const ValidacaoUTM = () => {
               </AccordionTrigger>
               <AccordionContent>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Esses leads têm utm_content preenchido, mas não foi possível encontrar o criativo correspondente no banco.
-                  O sistema busca por Ad ID e Creative ID.
+                  O sistema busca por Ad ID (id_anuncio_externo) e Creative ID (id_criativo_externo). 
+                  O utm_content no Pipedrive deve conter um desses IDs numéricos.
                 </p>
                 {topUtmContentsSemMatch.length > 0 && (
                   <div className="mb-3">
@@ -356,7 +445,7 @@ export const ValidacaoUTM = () => {
                     <div className="space-y-1">
                       {topUtmContentsSemMatch.map(([utmContent, count]) => (
                         <div key={utmContent} className="text-xs flex items-center justify-between p-2 bg-muted rounded">
-                          <code className="text-muted-foreground">{utmContent}</code>
+                          <code className="text-muted-foreground truncate max-w-[200px]">{utmContent}</code>
                           <Badge variant="secondary">{count} lead{count !== 1 ? 's' : ''}</Badge>
                         </div>
                       ))}
@@ -392,7 +481,7 @@ export const ValidacaoUTM = () => {
             disabled={isRefreshing}
           >
             <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Recoletar Criativos
+            Recoletar (v2.0)
           </Button>
           <Button variant="outline" size="sm" onClick={() => navigate("/guia-utm")}>
             Ver Guia UTM
