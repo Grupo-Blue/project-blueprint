@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CriativoAlertCard } from "@/components/CriativoAlertCard";
-import { AlertTriangle, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink, Copy, ChevronDown } from "lucide-react";
+import { AlertTriangle, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink, Copy, ChevronDown, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -28,6 +28,7 @@ interface CampanhaCriativo {
     descricao: string | null;
     ativo: boolean;
     url_midia: string | null;
+    url_preview: string | null;
   }>;
 }
 
@@ -94,7 +95,7 @@ const Criativos = () => {
       for (const camp of campanhasData || []) {
         const { data: criativosData, error: criativosError } = await supabase
           .from("criativo")
-          .select("id_criativo, id_criativo_externo, tipo, descricao, ativo, url_midia")
+          .select("id_criativo, id_criativo_externo, tipo, descricao, ativo, url_midia, url_preview")
           .eq("id_campanha", camp.id_campanha);
 
         if (criativosError) continue;
@@ -115,6 +116,7 @@ const Criativos = () => {
             descricao: c.descricao,
             ativo: c.ativo,
             url_midia: c.url_midia,
+            url_preview: c.url_preview,
           })) || [],
         });
       }
@@ -424,6 +426,18 @@ const Criativos = () => {
                                 <Badge variant={criativo.ativo ? "secondary" : "outline"}>
                                   {criativo.ativo ? "Ativo" : "Inativo"}
                                 </Badge>
+                                {criativo.url_preview && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(criativo.url_preview!, '_blank')}
+                                    className="gap-1"
+                                    title="Ver preview do criativo no Facebook"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                    Ver Preview
+                                  </Button>
+                                )}
                                 {criativo.url_midia && (
                                   <Button
                                     variant="outline"

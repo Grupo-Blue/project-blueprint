@@ -479,7 +479,7 @@ serve(async (req) => {
                 console.error(`❌ Erro ao extrair URL do ad ${ad.id}:`, urlErr);
               }
 
-              // Preparar dados do criativo - INCLUINDO id_anuncio_externo (Ad ID)
+              // Preparar dados do criativo - INCLUINDO id_anuncio_externo (Ad ID) e url_preview
               const criativoData = {
                 id_campanha: campanha.id_campanha,
                 id_criativo_externo: creative.id, // Creative ID
@@ -489,6 +489,7 @@ serve(async (req) => {
                 ativo: ativo,
                 url_final: urlFinal,
                 url_midia: urlMidia,
+                url_preview: ad.preview_shareable_link || null, // Link para ver o criativo no Facebook
               };
 
               // Upsert do criativo (insere ou atualiza)

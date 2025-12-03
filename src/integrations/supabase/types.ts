@@ -498,6 +498,7 @@ export type Database = {
           updated_at: string
           url_final: string | null
           url_midia: string | null
+          url_preview: string | null
         }
         Insert: {
           ativo?: boolean
@@ -511,6 +512,7 @@ export type Database = {
           updated_at?: string
           url_final?: string | null
           url_midia?: string | null
+          url_preview?: string | null
         }
         Update: {
           ativo?: boolean
@@ -524,6 +526,7 @@ export type Database = {
           updated_at?: string
           url_final?: string | null
           url_midia?: string | null
+          url_preview?: string | null
         }
         Relationships: [
           {
