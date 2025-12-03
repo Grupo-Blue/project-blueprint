@@ -69,90 +69,123 @@ export default function DashboardDirecao() {
     },
   });
 
+  // Calcular data final como hoje (não fim do mês)
+  const hoje = new Date();
+  const dataFim = fimMes > hoje ? hoje : fimMes;
+
   const { data: metricas, isLoading } = useQuery({
-    queryKey: ["metricas-direcao", tipoFiltro, semanaSelecionada, inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada],
+    queryKey: ["metricas-direcao-realtime", tipoFiltro, semanaSelecionada, inicioMes.toISOString(), dataFim.toISOString(), empresaSelecionada],
     queryFn: async () => {
-      // Se for filtro de semana específica, busca só aquela semana
-      if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
-        let query = supabase
-          .from("empresa_semana_metricas")
-          .select(`
-            *,
-            empresa:id_empresa (nome, cpl_maximo, cac_maximo)
-          `)
-          .eq("id_semana", semanaSelecionada);
-
-        if (empresaSelecionada && empresaSelecionada !== "todas") {
-          query = query.eq("id_empresa", empresaSelecionada);
-        }
-
-        const { data, error } = await query;
-        if (error) throw error;
-        
-        return data.map((m: any) => ({
-          id_empresa: m.id_empresa,
-          nome: m.empresa.nome,
-          verba_investida: m.verba_investida,
-          leads_total: m.leads_total,
-          cpl: m.cpl,
-          cac: m.cac,
-          vendas: m.vendas,
-          cpl_maximo: m.empresa.cpl_maximo,
-          cac_maximo: m.empresa.cac_maximo,
-        })) as EmpresaMetrica[];
-      }
-
-      // Para outros filtros, busca todas as semanas do período
-      const { data: semanas, error: semanasError } = await supabase
-        .from("semana")
-        .select("id_semana")
-        .gte("data_inicio", inicioMes.toISOString())
-        .lte("data_fim", fimMes.toISOString());
+      // Buscar todas as empresas com seus limites
+      const { data: todasEmpresas, error: empresasError } = await supabase
+        .from("empresa")
+        .select("id_empresa, nome, cpl_maximo, cac_maximo");
       
-      if (semanasError) throw semanasError;
-      if (!semanas || semanas.length === 0) return [];
+      if (empresasError) throw empresasError;
+      
+      const empresasFiltradas = empresaSelecionada && empresaSelecionada !== "todas"
+        ? todasEmpresas?.filter(e => e.id_empresa === empresaSelecionada)
+        : todasEmpresas;
 
-      let query = supabase
-        .from("empresa_semana_metricas")
-        .select(`
-          *,
-          empresa:id_empresa (nome, cpl_maximo, cac_maximo)
-        `)
-        .in("id_semana", semanas.map(s => s.id_semana));
+      if (!empresasFiltradas || empresasFiltradas.length === 0) return [];
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        query = query.eq("id_empresa", empresaSelecionada);
+      // Determinar datas do período
+      let dataInicio: Date;
+      let dataFimQuery: Date;
+
+      if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
+        const { data: semana } = await supabase
+          .from("semana")
+          .select("data_inicio, data_fim")
+          .eq("id_semana", semanaSelecionada)
+          .single();
+        
+        if (semana) {
+          dataInicio = new Date(semana.data_inicio);
+          dataFimQuery = new Date(semana.data_fim);
+        } else {
+          dataInicio = inicioMes;
+          dataFimQuery = dataFim;
+        }
+      } else {
+        dataInicio = inicioMes;
+        dataFimQuery = dataFim;
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const dataInicioStr = format(dataInicio, "yyyy-MM-dd");
+      const dataFimStr = format(dataFimQuery, "yyyy-MM-dd");
 
-      // Agregar métricas por empresa
-      const metricasAgregadas = data.reduce((acc: any, m: any) => {
-        const empresaId = m.id_empresa;
-        if (!acc[empresaId]) {
-          acc[empresaId] = {
-            id_empresa: empresaId,
-            nome: m.empresa.nome,
-            verba_investida: 0,
-            leads_total: 0,
-            vendas: 0,
-            cpl_maximo: m.empresa.cpl_maximo,
-            cac_maximo: m.empresa.cac_maximo,
-          };
+      const resultados: EmpresaMetrica[] = [];
+
+      for (const empresa of empresasFiltradas) {
+        // Buscar leads criados no período
+        const { data: leads } = await supabase
+          .from("lead")
+          .select("id_lead, is_mql, levantou_mao, tem_reuniao, reuniao_realizada, venda_realizada, valor_venda, data_venda")
+          .eq("id_empresa", empresa.id_empresa)
+          .gte("data_criacao", dataInicioStr)
+          .lte("data_criacao", dataFimStr + "T23:59:59");
+
+        // Buscar vendas realizadas no período (por data_venda)
+        const { data: vendas } = await supabase
+          .from("lead")
+          .select("id_lead, valor_venda")
+          .eq("id_empresa", empresa.id_empresa)
+          .eq("venda_realizada", true)
+          .gte("data_venda", dataInicioStr)
+          .lte("data_venda", dataFimStr + "T23:59:59");
+
+        // Buscar contas de anúncio da empresa
+        const { data: contas } = await supabase
+          .from("conta_anuncio")
+          .select("id_conta")
+          .eq("id_empresa", empresa.id_empresa);
+
+        let verba_investida = 0;
+
+        if (contas && contas.length > 0) {
+          const contaIds = contas.map(c => c.id_conta);
+          
+          // Buscar campanhas das contas
+          const { data: campanhas } = await supabase
+            .from("campanha")
+            .select("id_campanha")
+            .in("id_conta", contaIds);
+
+          if (campanhas && campanhas.length > 0) {
+            const campanhaIds = campanhas.map(c => c.id_campanha);
+            
+            // Buscar métricas diárias das campanhas no período
+            const { data: metricasDia } = await supabase
+              .from("campanha_metricas_dia")
+              .select("verba_investida")
+              .in("id_campanha", campanhaIds)
+              .gte("data", dataInicioStr)
+              .lte("data", dataFimStr);
+
+            verba_investida = metricasDia?.reduce((sum, m) => sum + Number(m.verba_investida), 0) || 0;
+          }
         }
-        acc[empresaId].verba_investida += m.verba_investida;
-        acc[empresaId].leads_total += m.leads_total;
-        acc[empresaId].vendas += m.vendas;
-        return acc;
-      }, {});
 
-      // Calcular CPL e CAC agregados
-      return Object.values(metricasAgregadas).map((m: any) => ({
-        ...m,
-        cpl: m.leads_total > 0 ? m.verba_investida / m.leads_total : null,
-        cac: m.vendas > 0 ? m.verba_investida / m.vendas : null,
-      })) as EmpresaMetrica[];
+        const leads_total = leads?.length || 0;
+        const vendasTotal = vendas?.length || 0;
+        const cpl = leads_total > 0 ? verba_investida / leads_total : null;
+        const cac = vendasTotal > 0 ? verba_investida / vendasTotal : null;
+
+        resultados.push({
+          id_empresa: empresa.id_empresa,
+          nome: empresa.nome,
+          verba_investida,
+          leads_total,
+          cpl,
+          cac,
+          vendas: vendasTotal,
+          cpl_maximo: empresa.cpl_maximo,
+          cac_maximo: empresa.cac_maximo,
+        });
+      }
+
+      return resultados;
     },
   });
 
