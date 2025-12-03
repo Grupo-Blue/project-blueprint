@@ -54,3 +54,5 @@ verify_jwt = true
 [functions.gerar-sugestoes-aprendizados]
 verify_jwt = true
 
+[functions.detectar-discrepancias-utm]
+verify_jwt = false

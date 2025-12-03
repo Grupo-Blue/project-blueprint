@@ -147,6 +147,66 @@ export type Database = {
           },
         ]
       }
+      alerta_utm: {
+        Row: {
+          created_at: string | null
+          data_deteccao: string | null
+          data_resolucao: string | null
+          detalhes: Json | null
+          id_alerta: string
+          id_campanha: string
+          id_criativo: string
+          resolvido: boolean | null
+          tipo_discrepancia: string
+          updated_at: string | null
+          url_capturada: string | null
+          url_esperada: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_deteccao?: string | null
+          data_resolucao?: string | null
+          detalhes?: Json | null
+          id_alerta?: string
+          id_campanha: string
+          id_criativo: string
+          resolvido?: boolean | null
+          tipo_discrepancia: string
+          updated_at?: string | null
+          url_capturada?: string | null
+          url_esperada?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data_deteccao?: string | null
+          data_resolucao?: string | null
+          detalhes?: Json | null
+          id_alerta?: string
+          id_campanha?: string
+          id_criativo?: string
+          resolvido?: boolean | null
+          tipo_discrepancia?: string
+          updated_at?: string | null
+          url_capturada?: string | null
+          url_esperada?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerta_utm_id_campanha_fkey"
+            columns: ["id_campanha"]
+            isOneToOne: false
+            referencedRelation: "campanha"
+            referencedColumns: ["id_campanha"]
+          },
+          {
+            foreignKeyName: "alerta_utm_id_criativo_fkey"
+            columns: ["id_criativo"]
+            isOneToOne: false
+            referencedRelation: "criativo"
+            referencedColumns: ["id_criativo"]
+          },
+        ]
+      }
       analise_inteligencia: {
         Row: {
           analise_texto: string
