@@ -667,13 +667,24 @@ const Criativos = () => {
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)} disabled={salvando}>
-              Cancelar
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setUrlEsperadaInput("")} 
+              disabled={salvando || !urlEsperadaInput.trim()}
+              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+            >
+              <Link2Off className="h-4 w-4 mr-2" />
+              Limpar URL (herdar da campanha)
             </Button>
-            <Button onClick={handleSalvarUrlEsperada} disabled={salvando}>
-              {salvando ? "Salvando..." : "Salvar"}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setModalOpen(false)} disabled={salvando}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSalvarUrlEsperada} disabled={salvando}>
+                {salvando ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
