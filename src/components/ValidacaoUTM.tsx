@@ -696,7 +696,7 @@ export const ValidacaoUTM = () => {
           <Button variant="outline" size="sm" onClick={() => navigate("/guia-utm")}>
             Guia UTM
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate("/campanhas/cadastro")}>
+          <Button variant="outline" size="sm" onClick={() => navigate("/campanhas-cadastro")}>
             Cadastrar URLs
           </Button>
           <Button variant="outline" size="sm" onClick={() => navigate("/campanhas")}>
