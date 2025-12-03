@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CriativoAlertCard } from "@/components/CriativoAlertCard";
-import { AlertTriangle, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink, Copy, ChevronDown, Eye } from "lucide-react";
+import { AlertTriangle, RefreshCw, Image, Video, Grid3x3, FileQuestion, Download, ExternalLink, Copy, ChevronDown, Eye, Link2, Pencil, Link2Off } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -13,6 +13,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 interface CampanhaCriativo {
   id_campanha: string;
@@ -21,6 +31,7 @@ interface CampanhaCriativo {
   plataforma: string;
   criativos_ativos: number;
   total_criativos: number;
+  url_esperada_campanha: string | null;
   criativos: Array<{
     id_criativo: string;
     id_criativo_externo: string;
@@ -29,7 +40,18 @@ interface CampanhaCriativo {
     ativo: boolean;
     url_midia: string | null;
     url_preview: string | null;
+    url_esperada: string | null;
   }>;
+}
+
+interface CriativoParaEditar {
+  id_criativo: string;
+  id_criativo_externo: string;
+  tipo: string;
+  descricao: string | null;
+  url_esperada: string | null;
+  url_esperada_campanha: string | null;
+  nome_campanha: string;
 }
 
 const getTipoIcon = (tipo: string) => {
@@ -55,18 +77,13 @@ const getTipoLabel = (tipo: string) => {
   return labels[tipo] || tipo;
 };
 
-const getCriativoUrl = (plataforma: string, idExterno: string) => {
-  if (plataforma === "META") {
-    return `https://business.facebook.com/adsmanager/manage/ads?act=${idExterno.split('_')[0]}&selected_ad_ids=${idExterno}`;
-  } else if (plataforma === "GOOGLE") {
-    return `https://ads.google.com/aw/ads?campaignId=${idExterno}`;
-  }
-  return null;
-};
-
 const Criativos = () => {
   const { toast } = useToast();
   const [syncingCreatives, setSyncingCreatives] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [criativoEditando, setCriativoEditando] = useState<CriativoParaEditar | null>(null);
+  const [urlEsperadaInput, setUrlEsperadaInput] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
   // Buscar campanhas com criativos
   const { data: campanhas, isLoading, refetch } = useQuery({
@@ -77,6 +94,7 @@ const Criativos = () => {
         .select(`
           id_campanha,
           nome,
+          url_esperada,
           conta_anuncio!inner (
             id_empresa,
             plataforma,
@@ -95,7 +113,7 @@ const Criativos = () => {
       for (const camp of campanhasData || []) {
         const { data: criativosData, error: criativosError } = await supabase
           .from("criativo")
-          .select("id_criativo, id_criativo_externo, tipo, descricao, ativo, url_midia, url_preview")
+          .select("id_criativo, id_criativo_externo, tipo, descricao, ativo, url_midia, url_preview, url_esperada")
           .eq("id_campanha", camp.id_campanha);
 
         if (criativosError) continue;
@@ -109,6 +127,7 @@ const Criativos = () => {
           plataforma: (camp as any).conta_anuncio?.plataforma || "OUTRO",
           criativos_ativos: criativosAtivos,
           total_criativos: criativosData?.length || 0,
+          url_esperada_campanha: camp.url_esperada,
           criativos: criativosData?.map((c) => ({
             id_criativo: c.id_criativo,
             id_criativo_externo: c.id_criativo_externo,
@@ -117,6 +136,7 @@ const Criativos = () => {
             ativo: c.ativo,
             url_midia: c.url_midia,
             url_preview: c.url_preview,
+            url_esperada: c.url_esperada,
           })) || [],
         });
       }
@@ -145,6 +165,64 @@ const Criativos = () => {
       title: "ID copiado!",
       description: "Use este ID no parâmetro utm_content dos seus anúncios",
     });
+  };
+
+  const handleAbrirModal = (criativo: CampanhaCriativo["criativos"][0], campanha: CampanhaCriativo) => {
+    setCriativoEditando({
+      id_criativo: criativo.id_criativo,
+      id_criativo_externo: criativo.id_criativo_externo,
+      tipo: criativo.tipo,
+      descricao: criativo.descricao,
+      url_esperada: criativo.url_esperada,
+      url_esperada_campanha: campanha.url_esperada_campanha,
+      nome_campanha: campanha.nome_campanha,
+    });
+    setUrlEsperadaInput(criativo.url_esperada || "");
+    setModalOpen(true);
+  };
+
+  const handleSalvarUrlEsperada = async () => {
+    if (!criativoEditando) return;
+    
+    setSalvando(true);
+    try {
+      const { error } = await supabase
+        .from("criativo")
+        .update({ url_esperada: urlEsperadaInput.trim() || null })
+        .eq("id_criativo", criativoEditando.id_criativo);
+
+      if (error) throw error;
+
+      toast({
+        title: "URL salva com sucesso!",
+        description: urlEsperadaInput.trim() 
+          ? "O criativo agora usa URL própria" 
+          : "O criativo agora herda a URL da campanha",
+      });
+      
+      setModalOpen(false);
+      setCriativoEditando(null);
+      await refetch();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  // Função para determinar o status da URL do criativo
+  const getUrlStatus = (criativo: CampanhaCriativo["criativos"][0], urlCampanha: string | null) => {
+    if (criativo.url_esperada) {
+      return { icon: <Pencil className="h-3 w-3" />, label: "URL própria", color: "text-blue-600" };
+    }
+    if (urlCampanha) {
+      return { icon: <Link2 className="h-3 w-3" />, label: "Herdando", color: "text-muted-foreground" };
+    }
+    return { icon: <Link2Off className="h-3 w-3" />, label: "Sem URL", color: "text-amber-600" };
   };
 
   const handleSyncCreatives = async () => {
@@ -377,6 +455,9 @@ const Criativos = () => {
                         </CardTitle>
                         <CardDescription>
                           {campanha.empresa} • {campanha.criativos_ativos} criativos ativos de {campanha.total_criativos} total
+                          {campanha.url_esperada_campanha && (
+                            <span className="ml-2 text-blue-600">• URL campanha configurada</span>
+                          )}
                         </CardDescription>
                       </div>
                     </div>
@@ -387,10 +468,12 @@ const Criativos = () => {
                     ) : (
                       <div className="space-y-2">
                         {campanha.criativos.map((criativo) => {
+                          const urlStatus = getUrlStatus(criativo, campanha.url_esperada_campanha);
                           return (
                             <div
                               key={criativo.id_criativo}
-                              className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                              className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                              onClick={() => handleAbrirModal(criativo, campanha)}
                             >
                               <div className="flex items-center gap-3 flex-1">
                                 <div className="flex items-center gap-2">
@@ -408,7 +491,10 @@ const Criativos = () => {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => handleCopyId(criativo.id_criativo_externo)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCopyId(criativo.id_criativo_externo);
+                                      }}
                                       className="h-6 w-6 p-0"
                                       title="Copiar ID"
                                     >
@@ -423,6 +509,11 @@ const Criativos = () => {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
+                                {/* Indicador de status da URL */}
+                                <div className={`flex items-center gap-1 text-xs ${urlStatus.color}`} title={urlStatus.label}>
+                                  {urlStatus.icon}
+                                  <span className="hidden sm:inline">{urlStatus.label}</span>
+                                </div>
                                 <Badge variant={criativo.ativo ? "secondary" : "outline"}>
                                   {criativo.ativo ? "Ativo" : "Inativo"}
                                 </Badge>
@@ -430,7 +521,10 @@ const Criativos = () => {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => window.open(criativo.url_preview!, '_blank')}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      window.open(criativo.url_preview!, '_blank');
+                                    }}
                                     className="gap-1"
                                     title="Ver preview do criativo no Facebook"
                                   >
@@ -442,7 +536,10 @@ const Criativos = () => {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => window.open(criativo.url_midia!, '_blank')}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      window.open(criativo.url_midia!, '_blank');
+                                    }}
                                     className="gap-1"
                                   >
                                     <ExternalLink className="h-3 w-3" />
@@ -462,6 +559,124 @@ const Criativos = () => {
           )}
         </div>
       </main>
+
+      {/* Modal de edição de URL esperada */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {criativoEditando && getTipoIcon(criativoEditando.tipo)}
+              Editar URL Esperada
+            </DialogTitle>
+            <DialogDescription>
+              Configure a URL esperada para validação de UTMs deste criativo
+            </DialogDescription>
+          </DialogHeader>
+
+          {criativoEditando && (
+            <div className="space-y-4">
+              {/* Info do criativo */}
+              <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Campanha:</span>{" "}
+                  <strong>{criativoEditando.nome_campanha}</strong>
+                </p>
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Tipo:</span>{" "}
+                  {getTipoLabel(criativoEditando.tipo)}
+                </p>
+                <p className="text-sm">
+                  <span className="text-muted-foreground">ID Externo:</span>{" "}
+                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                    {criativoEditando.id_criativo_externo}
+                  </code>
+                </p>
+                {criativoEditando.descricao && (
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Descrição:</span>{" "}
+                    {criativoEditando.descricao}
+                  </p>
+                )}
+              </div>
+
+              {/* URL da campanha (referência) */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Link2 className="h-4 w-4 text-muted-foreground" />
+                  URL da Campanha (herdada)
+                </Label>
+                {criativoEditando.url_esperada_campanha ? (
+                  <div className="p-3 rounded-lg border bg-muted/30">
+                    <p className="text-sm font-mono break-all">
+                      {criativoEditando.url_esperada_campanha}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      📝 Se deixar o campo abaixo vazio, o criativo usará esta URL
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-lg border border-dashed bg-amber-50 dark:bg-amber-950/20">
+                    <p className="text-sm text-amber-700 dark:text-amber-400">
+                      ⚠️ Nenhuma URL configurada na campanha
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Configure uma URL abaixo ou cadastre na campanha
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* URL específica do criativo */}
+              <div className="space-y-2">
+                <Label htmlFor="url-esperada" className="flex items-center gap-2">
+                  <Pencil className="h-4 w-4 text-blue-600" />
+                  URL Específica do Criativo (override)
+                </Label>
+                <Textarea
+                  id="url-esperada"
+                  placeholder="https://seusite.com.br/pagina?utm_source=meta&utm_medium=cpc&utm_campaign=nome..."
+                  value={urlEsperadaInput}
+                  onChange={(e) => setUrlEsperadaInput(e.target.value)}
+                  className="font-mono text-sm min-h-[100px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  ✨ Se preenchido, esta URL sobrescreve a URL da campanha para este criativo
+                </p>
+              </div>
+
+              {/* Status atual */}
+              <div className="p-3 rounded-lg border bg-card">
+                <p className="text-sm font-medium mb-1">Status Atual:</p>
+                {urlEsperadaInput.trim() ? (
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <Pencil className="h-4 w-4" />
+                    <span>Usando URL PRÓPRIA do criativo</span>
+                  </div>
+                ) : criativoEditando.url_esperada_campanha ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Link2 className="h-4 w-4" />
+                    <span>Usando URL da CAMPANHA (herdada)</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-amber-600">
+                    <Link2Off className="h-4 w-4" />
+                    <span>Nenhuma URL configurada</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalOpen(false)} disabled={salvando}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSalvarUrlEsperada} disabled={salvando}>
+              {salvando ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
