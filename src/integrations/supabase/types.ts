@@ -253,6 +253,7 @@ export type Database = {
           nome: string
           objetivo: string | null
           updated_at: string
+          url_esperada: string | null
         }
         Insert: {
           ativa?: boolean
@@ -264,6 +265,7 @@ export type Database = {
           nome: string
           objetivo?: string | null
           updated_at?: string
+          url_esperada?: string | null
         }
         Update: {
           ativa?: boolean
@@ -275,6 +277,7 @@ export type Database = {
           nome?: string
           objetivo?: string | null
           updated_at?: string
+          url_esperada?: string | null
         }
         Relationships: [
           {
@@ -496,6 +499,7 @@ export type Database = {
           id_criativo_externo: string
           tipo: Database["public"]["Enums"]["tipo_criativo"]
           updated_at: string
+          url_esperada: string | null
           url_final: string | null
           url_midia: string | null
           url_preview: string | null
@@ -510,6 +514,7 @@ export type Database = {
           id_criativo_externo: string
           tipo: Database["public"]["Enums"]["tipo_criativo"]
           updated_at?: string
+          url_esperada?: string | null
           url_final?: string | null
           url_midia?: string | null
           url_preview?: string | null
@@ -524,6 +529,7 @@ export type Database = {
           id_criativo_externo?: string
           tipo?: Database["public"]["Enums"]["tipo_criativo"]
           updated_at?: string
+          url_esperada?: string | null
           url_final?: string | null
           url_midia?: string | null
           url_preview?: string | null

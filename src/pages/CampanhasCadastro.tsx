@@ -17,6 +17,7 @@ interface Campanha {
   nome: string;
   id_campanha_externo: string;
   objetivo: string | null;
+  url_esperada: string | null;
   ativa: boolean;
   data_criacao: string;
   created_at: string;
@@ -47,6 +48,7 @@ export default function CampanhasCadastro() {
   const [nome, setNome] = useState("");
   const [idCampanhaExterno, setIdCampanhaExterno] = useState("");
   const [objetivo, setObjetivo] = useState("");
+  const [urlEsperada, setUrlEsperada] = useState("");
   const [ativa, setAtiva] = useState(true);
 
   useEffect(() => {
@@ -84,6 +86,7 @@ export default function CampanhasCadastro() {
     setNome("");
     setIdCampanhaExterno("");
     setObjetivo("");
+    setUrlEsperada("");
     setAtiva(true);
     setEditingCampanha(null);
   };
@@ -94,6 +97,7 @@ export default function CampanhasCadastro() {
     setNome(campanha.nome);
     setIdCampanhaExterno(campanha.id_campanha_externo);
     setObjetivo(campanha.objetivo || "");
+    setUrlEsperada(campanha.url_esperada || "");
     setAtiva(campanha.ativa);
     setDialogOpen(true);
   };
@@ -135,6 +139,7 @@ export default function CampanhasCadastro() {
         nome,
         id_campanha_externo: idCampanhaExterno,
         objetivo: objetivo || null,
+        url_esperada: urlEsperada || null,
         ativa,
       };
 
@@ -266,8 +271,23 @@ export default function CampanhasCadastro() {
                       value={objetivo}
                       onChange={(e) => setObjetivo(e.target.value)}
                       placeholder="Ex: Aumentar vendas do produto X em 30%"
+                      rows={2}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="urlEsperada">URL de Destino Esperada (com UTMs)</Label>
+                    <Textarea
+                      id="urlEsperada"
+                      value={urlEsperada}
+                      onChange={(e) => setUrlEsperada(e.target.value)}
+                      placeholder="https://seusite.com.br/pagina?utm_source=facebook&utm_medium=cpc&utm_campaign=nome_campanha&utm_content={{ad.id}}"
                       rows={3}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Cole aqui a URL completa com todos os parâmetros UTM que você configurou nos anúncios. 
+                      O sistema usará essa URL como referência para validar se os UTMs estão configurados corretamente.
+                    </p>
                   </div>
 
                   <div className="flex items-center space-x-2">
@@ -328,6 +348,12 @@ export default function CampanhasCadastro() {
                   <div className="text-sm">
                     <span className="text-muted-foreground">Objetivo:</span>
                     <p className="text-xs mt-1">{campanha.objetivo}</p>
+                  </div>
+                )}
+                {campanha.url_esperada && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">URL Esperada:</span>
+                    <p className="text-xs mt-1 truncate text-blue-600">{campanha.url_esperada}</p>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
