@@ -24,9 +24,23 @@ const Leads = () => {
   const [stageFilter, setStageFilter] = useState<string[]>([]);
   const [scoreMinimo, setScoreMinimo] = useState<string>("");
   const [clienteStatusFilter, setClienteStatusFilter] = useState<string>("all");
+  const [empresaFilter, setEmpresaFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  // Buscar empresas
+  const { data: empresas } = useQuery({
+    queryKey: ["empresas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("empresa")
+        .select("id_empresa, nome")
+        .order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const availableStages = [
     { value: "Lead", label: "Lead" },
@@ -127,7 +141,11 @@ const Leads = () => {
       (clienteStatusFilter === "ex_cliente" && lead.cliente_status === "ex_cliente") ||
       (clienteStatusFilter === "nao_cliente" && !lead.cliente_status);
 
-    return matchesPeriodo && matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus;
+    const matchesEmpresa = 
+      empresaFilter === "all" || 
+      lead.id_empresa === empresaFilter;
+
+    return matchesPeriodo && matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus && matchesEmpresa;
   });
 
   // Ordenação
@@ -375,11 +393,27 @@ const Leads = () => {
         <CardHeader>
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
+        <CardContent className="flex flex-col sm:flex-row gap-4 flex-wrap">
+          <Select value={empresaFilter} onValueChange={handleFilterChange(setEmpresaFilter)}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                <SelectValue placeholder="Empresa" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Empresas</SelectItem>
+              {empresas?.map((empresa) => (
+                <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
+                  {empresa.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex-1 relative min-w-[200px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nome, organização ou empresa..."
+              placeholder="Buscar por nome, organização..."
               value={searchTerm}
               onChange={(e) => handleFilterChange(setSearchTerm)(e.target.value)}
               className="pl-9"
