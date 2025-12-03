@@ -1206,6 +1206,193 @@ export type Database = {
         }
         Relationships: []
       }
+      tokeniza_investimento: {
+        Row: {
+          amount: number
+          bank_of_brazil_entry_hash: string | null
+          created_at: string
+          created_nft: string | null
+          data_atualizacao: string | null
+          data_criacao: string
+          deposit_id: string | null
+          fin_operation: boolean | null
+          id: string
+          id_empresa: string
+          id_externo: string
+          project_id: string | null
+          status: string
+          updated_at: string
+          usd_amount: number | null
+          user_id_tokeniza: string | null
+          was_paid: boolean | null
+        }
+        Insert: {
+          amount?: number
+          bank_of_brazil_entry_hash?: string | null
+          created_at?: string
+          created_nft?: string | null
+          data_atualizacao?: string | null
+          data_criacao?: string
+          deposit_id?: string | null
+          fin_operation?: boolean | null
+          id?: string
+          id_empresa: string
+          id_externo: string
+          project_id?: string | null
+          status: string
+          updated_at?: string
+          usd_amount?: number | null
+          user_id_tokeniza?: string | null
+          was_paid?: boolean | null
+        }
+        Update: {
+          amount?: number
+          bank_of_brazil_entry_hash?: string | null
+          created_at?: string
+          created_nft?: string | null
+          data_atualizacao?: string | null
+          data_criacao?: string
+          deposit_id?: string | null
+          fin_operation?: boolean | null
+          id?: string
+          id_empresa?: string
+          id_externo?: string
+          project_id?: string | null
+          status?: string
+          updated_at?: string
+          usd_amount?: number | null
+          user_id_tokeniza?: string | null
+          was_paid?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tokeniza_investimento_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      tokeniza_venda: {
+        Row: {
+          address_id: string | null
+          asset_id: string | null
+          created_at: string
+          data_atualizacao: string | null
+          data_criacao: string
+          data_expiracao: string | null
+          external_id: string | null
+          has_cashback: boolean | null
+          id: string
+          id_empresa: string
+          id_externo: string
+          indication_reward_status: string | null
+          is_nft_buy: boolean | null
+          is_ticket_buy: boolean | null
+          is_token_buy: boolean | null
+          items: Json | null
+          nft_id: string | null
+          package_id: string | null
+          payment_method: string | null
+          quantity: number | null
+          shipping_amount: number | null
+          status: string
+          store_id: string | null
+          tax_amount: number | null
+          tokens_amount: number | null
+          total_amount: number
+          transaction_id: string | null
+          unit_of_money: string | null
+          unit_purchased: string | null
+          updated_at: string
+          user_email: string | null
+          user_id_tokeniza: string | null
+          user_wallet_id: string | null
+          was_paid: boolean | null
+        }
+        Insert: {
+          address_id?: string | null
+          asset_id?: string | null
+          created_at?: string
+          data_atualizacao?: string | null
+          data_criacao?: string
+          data_expiracao?: string | null
+          external_id?: string | null
+          has_cashback?: boolean | null
+          id?: string
+          id_empresa: string
+          id_externo: string
+          indication_reward_status?: string | null
+          is_nft_buy?: boolean | null
+          is_ticket_buy?: boolean | null
+          is_token_buy?: boolean | null
+          items?: Json | null
+          nft_id?: string | null
+          package_id?: string | null
+          payment_method?: string | null
+          quantity?: number | null
+          shipping_amount?: number | null
+          status: string
+          store_id?: string | null
+          tax_amount?: number | null
+          tokens_amount?: number | null
+          total_amount?: number
+          transaction_id?: string | null
+          unit_of_money?: string | null
+          unit_purchased?: string | null
+          updated_at?: string
+          user_email?: string | null
+          user_id_tokeniza?: string | null
+          user_wallet_id?: string | null
+          was_paid?: boolean | null
+        }
+        Update: {
+          address_id?: string | null
+          asset_id?: string | null
+          created_at?: string
+          data_atualizacao?: string | null
+          data_criacao?: string
+          data_expiracao?: string | null
+          external_id?: string | null
+          has_cashback?: boolean | null
+          id?: string
+          id_empresa?: string
+          id_externo?: string
+          indication_reward_status?: string | null
+          is_nft_buy?: boolean | null
+          is_ticket_buy?: boolean | null
+          is_token_buy?: boolean | null
+          items?: Json | null
+          nft_id?: string | null
+          package_id?: string | null
+          payment_method?: string | null
+          quantity?: number | null
+          shipping_amount?: number | null
+          status?: string
+          store_id?: string | null
+          tax_amount?: number | null
+          tokens_amount?: number | null
+          total_amount?: number
+          transaction_id?: string | null
+          unit_of_money?: string | null
+          unit_purchased?: string | null
+          updated_at?: string
+          user_email?: string | null
+          user_id_tokeniza?: string | null
+          user_wallet_id?: string | null
+          was_paid?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tokeniza_venda_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
