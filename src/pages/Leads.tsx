@@ -56,6 +56,7 @@ const Leads = () => {
   const [clienteStatusFilter, setClienteStatusFilter] = useState<string>("all");
   const [empresaFilter, setEmpresaFilter] = useState<string>("all");
   const [investidorFilter, setInvestidorFilter] = useState<string>("all");
+  const [origemFilter, setOrigemFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -201,7 +202,13 @@ const Leads = () => {
       (investidorFilter === "carrinho" && (lead as any).tokeniza_carrinho_abandonado === true) ||
       (investidorFilter === "nao_investidor" && !(lead as any).tokeniza_investidor && !(lead as any).tokeniza_carrinho_abandonado);
 
-    return matchesPeriodo && matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus && matchesEmpresa && matchesInvestidor;
+    const matchesOrigem =
+      origemFilter === "all" ||
+      (origemFilter === "pago" && (lead as any).lead_pago === true) ||
+      (origemFilter === "organico" && (lead as any).origem_tipo === "ORGANICO") ||
+      (origemFilter === "manual" && ((lead as any).origem_tipo === "MANUAL" || !(lead as any).origem_tipo));
+
+    return matchesPeriodo && matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus && matchesEmpresa && matchesInvestidor && matchesOrigem;
   });
 
   // Ordenação
@@ -317,6 +324,9 @@ const Leads = () => {
     investidores: filteredLeads?.filter(l => (l as any).tokeniza_investidor).length || 0,
     valorInvestido: filteredLeads?.reduce((sum, l) => sum + ((l as any).tokeniza_valor_investido || 0), 0) || 0,
     carrinhos: filteredLeads?.filter(l => (l as any).tokeniza_carrinho_abandonado).length || 0,
+    leadsPagos: filteredLeads?.filter(l => (l as any).lead_pago).length || 0,
+    leadsOrganicos: filteredLeads?.filter(l => (l as any).origem_tipo === 'ORGANICO').length || 0,
+    leadsManuais: filteredLeads?.filter(l => (l as any).origem_tipo === 'MANUAL' || !(l as any).origem_tipo).length || 0,
     taxaConversaoMQL: filteredLeads?.length ? ((filteredLeads.filter(l => l.is_mql).length / filteredLeads.length) * 100).toFixed(1) : "0",
     taxaConversaoVenda: filteredLeads?.filter(l => l.is_mql).length ? 
       ((filteredLeads.filter(l => l.venda_realizada).length / filteredLeads.filter(l => l.is_mql).length) * 100).toFixed(1) : "0",
@@ -357,7 +367,9 @@ const Leads = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">{stats.mqls} MQLs</p>
+            <p className="text-xs text-muted-foreground">
+              🎯 {stats.leadsPagos} pagos | 📧 {stats.leadsOrganicos} org | ✋ {stats.leadsManuais} man
+            </p>
           </CardContent>
         </Card>
 
@@ -480,6 +492,21 @@ const Leads = () => {
               <SelectItem value="investidor">💰 Investidores</SelectItem>
               <SelectItem value="carrinho">🛒 Carrinho</SelectItem>
               <SelectItem value="nao_investidor">Não Investidor</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={origemFilter} onValueChange={handleFilterChange(setOrigemFilter)}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                <SelectValue placeholder="Origem" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas Origens</SelectItem>
+              <SelectItem value="pago">🎯 Pagos</SelectItem>
+              <SelectItem value="organico">📧 Orgânicos</SelectItem>
+              <SelectItem value="manual">✋ Manuais</SelectItem>
             </SelectContent>
           </Select>
 
@@ -615,22 +642,37 @@ const Leads = () => {
 
                           {/* Origem */}
                           <TableCell>
-                            {origem ? (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="cursor-help">
-                                      {origem.icon} {origem.label}
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="text-xs">{lead.utm_medium || 'N/A'}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            ) : (
-                              <Badge variant="secondary" className="text-xs">Não rastreado</Badge>
-                            )}
+                            <div className="flex flex-col gap-1">
+                              {/* Badge de tipo de origem */}
+                              {(lead as any).lead_pago ? (
+                                <Badge className="bg-primary/10 text-primary hover:bg-primary/20 text-xs w-fit">
+                                  🎯 Pago
+                                </Badge>
+                              ) : (lead as any).origem_tipo === 'ORGANICO' ? (
+                                <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs w-fit">
+                                  📧 Orgânico
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs w-fit">
+                                  ✋ Manual
+                                </Badge>
+                              )}
+                              {/* Badge de canal */}
+                              {origem && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge variant="outline" className="cursor-help text-xs w-fit">
+                                        {origem.icon} {origem.label}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="text-xs">{lead.utm_medium || 'N/A'}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
                           </TableCell>
 
                           {/* Campanha */}

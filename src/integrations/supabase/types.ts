@@ -905,6 +905,7 @@ export type Database = {
           id_lead_externo: string | null
           id_mautic_contact: string | null
           is_mql: boolean
+          lead_pago: boolean | null
           levantou_mao: boolean
           mautic_first_visit: string | null
           mautic_last_active: string | null
@@ -916,6 +917,7 @@ export type Database = {
           organizacao: string | null
           origem_campanha: string | null
           origem_canal: Database["public"]["Enums"]["canal_origem"] | null
+          origem_tipo: Database["public"]["Enums"]["origem_lead"] | null
           pipeline_id: string | null
           reuniao_realizada: boolean
           stage_atual: string | null
@@ -954,6 +956,7 @@ export type Database = {
           id_lead_externo?: string | null
           id_mautic_contact?: string | null
           is_mql?: boolean
+          lead_pago?: boolean | null
           levantou_mao?: boolean
           mautic_first_visit?: string | null
           mautic_last_active?: string | null
@@ -965,6 +968,7 @@ export type Database = {
           organizacao?: string | null
           origem_campanha?: string | null
           origem_canal?: Database["public"]["Enums"]["canal_origem"] | null
+          origem_tipo?: Database["public"]["Enums"]["origem_lead"] | null
           pipeline_id?: string | null
           reuniao_realizada?: boolean
           stage_atual?: string | null
@@ -1003,6 +1007,7 @@ export type Database = {
           id_lead_externo?: string | null
           id_mautic_contact?: string | null
           is_mql?: boolean
+          lead_pago?: boolean | null
           levantou_mao?: boolean
           mautic_first_visit?: string | null
           mautic_last_active?: string | null
@@ -1014,6 +1019,7 @@ export type Database = {
           organizacao?: string | null
           origem_campanha?: string | null
           origem_canal?: Database["public"]["Enums"]["canal_origem"] | null
+          origem_tipo?: Database["public"]["Enums"]["origem_lead"] | null
           pipeline_id?: string | null
           reuniao_realizada?: boolean
           stage_atual?: string | null
@@ -1572,6 +1578,7 @@ export type Database = {
       app_role: "admin" | "direcao" | "trafego" | "sdr"
       canal_origem: "META" | "GOOGLE" | "ORGANICO" | "OUTRO"
       categoria_acao: "A" | "B" | "C"
+      origem_lead: "PAGO" | "ORGANICO" | "INDICACAO" | "LISTA" | "MANUAL"
       perfil_usuario: "TRAFEGO" | "SDR_COMERCIAL" | "DIRECAO" | "ADMIN"
       plataforma_midia: "META" | "GOOGLE"
       resultado_hipotese: "VALIDADA" | "REFUTADA" | "INCONCLUSIVA"
@@ -1717,6 +1724,7 @@ export const Constants = {
       app_role: ["admin", "direcao", "trafego", "sdr"],
       canal_origem: ["META", "GOOGLE", "ORGANICO", "OUTRO"],
       categoria_acao: ["A", "B", "C"],
+      origem_lead: ["PAGO", "ORGANICO", "INDICACAO", "LISTA", "MANUAL"],
       perfil_usuario: ["TRAFEGO", "SDR_COMERCIAL", "DIRECAO", "ADMIN"],
       plataforma_midia: ["META", "GOOGLE"],
       resultado_hipotese: ["VALIDADA", "REFUTADA", "INCONCLUSIVA"],
