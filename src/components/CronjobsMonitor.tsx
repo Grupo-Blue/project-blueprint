@@ -100,7 +100,7 @@ const CRONJOBS: CronjobConfig[] = [
     displayName: "Calcular Métricas Diárias",
     functionName: "calcular-metricas-diarias",
     schedule: "02:00",
-    description: "Calcula métricas diárias de empresas e campanhas"
+    description: "Calcula métricas diárias de empresas (CPL, CAC, leads, vendas)"
   }
 ];
 
