@@ -22,6 +22,7 @@ import { CriativosFadiga } from "@/components/dashboard/CriativosFadiga";
 import { AlertasAnomalias } from "@/components/dashboard/AlertasAnomalias";
 import { PacingOrcamento } from "@/components/dashboard/PacingOrcamento";
 import { TempoCiclo } from "@/components/dashboard/TempoCiclo";
+import { MetricasMultiRede } from "@/components/dashboard/MetricasMultiRede";
 
 const Dashboard = () => {
   const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
@@ -321,6 +322,13 @@ const Dashboard = () => {
       {empresaSelecionada && (
         <div className="mb-6 md:mb-8">
           <CriativosFadiga empresaId={empresaSelecionada} />
+        </div>
+      )}
+
+      {/* Métricas Multi-Rede (Redes Sociais) */}
+      {empresaSelecionada && (
+        <div className="mb-6 md:mb-8">
+          <MetricasMultiRede empresaId={empresaSelecionada} dataReferencia={dataReferencia} />
         </div>
       )}
 

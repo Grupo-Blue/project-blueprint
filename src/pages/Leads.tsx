@@ -199,16 +199,28 @@ const Leads = () => {
       (investidorFilter === "carrinho" && (lead as any).tokeniza_carrinho_abandonado === true) ||
       (investidorFilter === "nao_investidor" && !(lead as any).tokeniza_investidor && !(lead as any).tokeniza_carrinho_abandonado);
 
-    const isInstagramBio = lead.utm_source && 
-      (lead.utm_source.toLowerCase().includes('instagram') || lead.utm_source.toLowerCase().includes('linktree')) && 
-      !(lead as any).lead_pago;
+    // Helpers para identificar origem por rede social (apenas orgânicos)
+    const utmSource = (lead.utm_source || '').toLowerCase();
+    const isOrganic = !(lead as any).lead_pago;
+    
+    const isInstagramBio = isOrganic && (utmSource.includes('instagram') || utmSource.includes('linktree'));
+    const isFacebookBio = isOrganic && (utmSource.includes('facebook') || utmSource.includes('fb')) && !utmSource.includes('ads');
+    const isLinkedIn = isOrganic && utmSource.includes('linkedin');
+    const isTikTokBio = isOrganic && utmSource.includes('tiktok');
+    const isYouTube = isOrganic && utmSource.includes('youtube');
+    const isTwitter = isOrganic && (utmSource.includes('twitter') || utmSource.includes('x.com'));
     
     const matchesOrigem =
       origemFilter === "all" ||
       (origemFilter === "pago" && (lead as any).lead_pago === true) ||
       (origemFilter === "organico" && (lead as any).origem_tipo === "ORGANICO") ||
       (origemFilter === "manual" && ((lead as any).origem_tipo === "MANUAL" || !(lead as any).origem_tipo)) ||
-      (origemFilter === "instagram_bio" && isInstagramBio);
+      (origemFilter === "instagram_bio" && isInstagramBio) ||
+      (origemFilter === "facebook_bio" && isFacebookBio) ||
+      (origemFilter === "linkedin" && isLinkedIn) ||
+      (origemFilter === "tiktok_bio" && isTikTokBio) ||
+      (origemFilter === "youtube" && isYouTube) ||
+      (origemFilter === "twitter" && isTwitter);
 
     return matchesPeriodo && matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus && matchesEmpresa && matchesInvestidor && matchesOrigem;
   });
@@ -508,8 +520,13 @@ const Leads = () => {
               <SelectItem value="all">Todas Origens</SelectItem>
               <SelectItem value="pago">🎯 Pagos</SelectItem>
               <SelectItem value="organico">📧 Orgânicos</SelectItem>
-              <SelectItem value="instagram_bio">📲 Instagram Bio</SelectItem>
               <SelectItem value="manual">✋ Manuais</SelectItem>
+              <SelectItem value="instagram_bio">📸 Instagram Bio</SelectItem>
+              <SelectItem value="facebook_bio">📘 Facebook Bio</SelectItem>
+              <SelectItem value="linkedin">💼 LinkedIn</SelectItem>
+              <SelectItem value="tiktok_bio">🎵 TikTok Bio</SelectItem>
+              <SelectItem value="youtube">📺 YouTube</SelectItem>
+              <SelectItem value="twitter">🐦 Twitter/X</SelectItem>
             </SelectContent>
           </Select>
 

@@ -1417,6 +1417,62 @@ export type Database = {
           },
         ]
       }
+      social_metricas_dia: {
+        Row: {
+          alcance: number
+          cliques_website: number
+          created_at: string
+          data: string
+          engajamento: number
+          id_empresa: string
+          id_metrica: string
+          impressoes: number
+          novos_seguidores: number
+          rede_social: Database["public"]["Enums"]["rede_social"]
+          seguidores_total: number
+          updated_at: string
+          visitas_perfil: number
+        }
+        Insert: {
+          alcance?: number
+          cliques_website?: number
+          created_at?: string
+          data: string
+          engajamento?: number
+          id_empresa: string
+          id_metrica?: string
+          impressoes?: number
+          novos_seguidores?: number
+          rede_social: Database["public"]["Enums"]["rede_social"]
+          seguidores_total?: number
+          updated_at?: string
+          visitas_perfil?: number
+        }
+        Update: {
+          alcance?: number
+          cliques_website?: number
+          created_at?: string
+          data?: string
+          engajamento?: number
+          id_empresa?: string
+          id_metrica?: string
+          impressoes?: number
+          novos_seguidores?: number
+          rede_social?: Database["public"]["Enums"]["rede_social"]
+          seguidores_total?: number
+          updated_at?: string
+          visitas_perfil?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_metricas_dia_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       tokeniza_investimento: {
         Row: {
           amount: number
@@ -1723,6 +1779,13 @@ export type Database = {
       origem_lead: "PAGO" | "ORGANICO" | "INDICACAO" | "LISTA" | "MANUAL"
       perfil_usuario: "TRAFEGO" | "SDR_COMERCIAL" | "DIRECAO" | "ADMIN"
       plataforma_midia: "META" | "GOOGLE"
+      rede_social:
+        | "INSTAGRAM"
+        | "FACEBOOK"
+        | "LINKEDIN"
+        | "TIKTOK"
+        | "YOUTUBE"
+        | "TWITTER"
       resultado_hipotese: "VALIDADA" | "REFUTADA" | "INCONCLUSIVA"
       status_acao: "PENDENTE" | "APROVADA" | "REPROVADA" | "EXECUTADA"
       status_aprovacao: "APROVADA" | "REPROVADA"
@@ -1870,6 +1933,14 @@ export const Constants = {
       origem_lead: ["PAGO", "ORGANICO", "INDICACAO", "LISTA", "MANUAL"],
       perfil_usuario: ["TRAFEGO", "SDR_COMERCIAL", "DIRECAO", "ADMIN"],
       plataforma_midia: ["META", "GOOGLE"],
+      rede_social: [
+        "INSTAGRAM",
+        "FACEBOOK",
+        "LINKEDIN",
+        "TIKTOK",
+        "YOUTUBE",
+        "TWITTER",
+      ],
       resultado_hipotese: ["VALIDADA", "REFUTADA", "INCONCLUSIVA"],
       status_acao: ["PENDENTE", "APROVADA", "REPROVADA", "EXECUTADA"],
       status_aprovacao: ["APROVADA", "REPROVADA"],
