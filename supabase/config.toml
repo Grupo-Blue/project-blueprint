@@ -6,9 +6,6 @@ verify_jwt = false
 [functions.coletar-metricas-google]
 verify_jwt = false
 
-[functions.calcular-metricas-semanais]
-verify_jwt = false
-
 [functions.calcular-metricas-diarias]
 verify_jwt = false
 
