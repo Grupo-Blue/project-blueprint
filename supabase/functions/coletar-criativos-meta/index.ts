@@ -145,8 +145,8 @@ async function buscarURLdoPreview(adId: string, accessToken: string): Promise<st
 // NOVA: Função para buscar URL via endpoint /adcreatives com campos adicionais
 async function buscarURLdoAdCreative(creativeId: string, accessToken: string): Promise<{ url: string | null; source: string }> {
   try {
-    // Campos adicionais para buscar URL
-    const creativeUrl = `https://graph.facebook.com/v18.0/${creativeId}?fields=id,name,object_story_spec,link_url,website_url,link_destination_display_url,effective_object_story_id,page_welcome_message,template_url,template_url_spec,degrees_of_freedom_spec&access_token=${accessToken}`;
+    // Campos adicionais para buscar URL (website_url não existe para AdCreative)
+    const creativeUrl = `https://graph.facebook.com/v18.0/${creativeId}?fields=id,name,object_story_spec,link_url,link_destination_display_url,effective_object_story_id,page_welcome_message,template_url,template_url_spec,degrees_of_freedom_spec&access_token=${accessToken}`;
     
     const response = await fetch(creativeUrl);
     if (!response.ok) {
@@ -157,7 +157,6 @@ async function buscarURLdoAdCreative(creativeId: string, accessToken: string): P
     const data = await response.json();
     console.log(`📋 AdCreative campos adicionais: ${JSON.stringify({
       has_link_url: !!data.link_url,
-      has_website_url: !!data.website_url,
       has_link_destination: !!data.link_destination_display_url,
       has_template_url: !!data.template_url,
       has_template_url_spec: !!data.template_url_spec,
@@ -168,11 +167,6 @@ async function buscarURLdoAdCreative(creativeId: string, accessToken: string): P
     if (data.link_url) {
       console.log(`✓ URL encontrada em link_url: ${data.link_url}`);
       return { url: data.link_url, source: "adcreative_link_url" };
-    }
-    
-    if (data.website_url) {
-      console.log(`✓ URL encontrada em website_url: ${data.website_url}`);
-      return { url: data.website_url, source: "adcreative_website_url" };
     }
     
     if (data.link_destination_display_url) {
@@ -474,8 +468,8 @@ serve(async (req) => {
             const campaignObjective = campanhaObjectives[campanha.id_campanha_externo] || campanha.objetivo;
             console.log(`\n📢 Buscando criativos da campanha ${campanha.nome} (objetivo: ${campaignObjective})`);
 
-            // Campos expandidos para capturar mais informações de URL
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,preview_shareable_link,adset{id,name,destination_type,optimization_goal,promoted_object},creative{id,name,object_story_spec{link_data{link,call_to_action{type,value{link,app_link}},picture,image_hash,child_attachments{link,picture,call_to_action{type,value{link}}}}},asset_feed_spec{link_urls},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags,link_url,website_url},effective_object_story_id,url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
+            // Campos expandidos para capturar mais informações de URL (website_url removido - não existe para AdCreative)
+            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,preview_shareable_link,adset{id,name,destination_type,optimization_goal,promoted_object},creative{id,name,object_story_spec{link_data{link,call_to_action{type,value{link,app_link}},picture,image_hash,child_attachments{link,picture,call_to_action{type,value{link}}}}},asset_feed_spec{link_urls},effective_object_story_id,image_url,image_hash,video_id,thumbnail_url,url_tags,link_url},effective_object_story_id,url_tags,tracking_specs,insights.date_preset(today){impressions,clicks,spend,actions}&access_token=${accessToken}`;
 
             const adsResponse = await fetch(adsUrl);
 
@@ -561,7 +555,6 @@ serve(async (req) => {
                   cta_type: creative.object_story_spec?.link_data?.call_to_action?.type || null,
                   has_asset_feed_spec: !!creative.asset_feed_spec,
                   creative_link_url: creative.link_url || null,
-                  creative_website_url: creative.website_url || null,
                   adset_destination_type: adsetDestinationType,
                   adset_optimization: adsetOptimization,
                   preview_shareable_link: ad.preview_shareable_link || null
