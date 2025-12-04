@@ -15,6 +15,134 @@ interface MetricoolConfig {
   id_empresa: string;
 }
 
+// Configuração de métricas por rede social
+const REDES_CONFIG: Record<string, {
+  prefixo: string;
+  metricas: { nome: string; campo: string }[];
+  dbRede: string;
+}> = {
+  INSTAGRAM: {
+    prefixo: 'ig',
+    metricas: [
+      { nome: 'Followers', campo: 'seguidores_total' },
+      { nome: 'ProfileViews', campo: 'visitas_perfil' },
+      { nome: 'WebsiteClicks', campo: 'cliques_website' },
+      { nome: 'Reach', campo: 'alcance' },
+      { nome: 'Impressions', campo: 'impressoes' },
+    ],
+    dbRede: 'INSTAGRAM',
+  },
+  FACEBOOK: {
+    prefixo: 'fb',
+    metricas: [
+      { nome: 'PageFollowers', campo: 'seguidores_total' },
+      { nome: 'PageViews', campo: 'visitas_perfil' },
+      { nome: 'WebsiteClicks', campo: 'cliques_website' },
+      { nome: 'Reach', campo: 'alcance' },
+      { nome: 'Impressions', campo: 'impressoes' },
+    ],
+    dbRede: 'FACEBOOK',
+  },
+  LINKEDIN: {
+    prefixo: 'li',
+    metricas: [
+      { nome: 'Followers', campo: 'seguidores_total' },
+      { nome: 'ProfileViews', campo: 'visitas_perfil' },
+      { nome: 'WebsiteClicks', campo: 'cliques_website' },
+      { nome: 'Reach', campo: 'alcance' },
+      { nome: 'Impressions', campo: 'impressoes' },
+    ],
+    dbRede: 'LINKEDIN',
+  },
+  TIKTOK: {
+    prefixo: 'tk',
+    metricas: [
+      { nome: 'Followers', campo: 'seguidores_total' },
+      { nome: 'ProfileViews', campo: 'visitas_perfil' },
+      { nome: 'VideoViews', campo: 'alcance' },
+      { nome: 'Engagement', campo: 'engajamento' },
+    ],
+    dbRede: 'TIKTOK',
+  },
+  YOUTUBE: {
+    prefixo: 'yt',
+    metricas: [
+      { nome: 'Subscribers', campo: 'seguidores_total' },
+      { nome: 'Views', campo: 'alcance' },
+      { nome: 'WatchTime', campo: 'impressoes' },
+      { nome: 'Engagement', campo: 'engajamento' },
+    ],
+    dbRede: 'YOUTUBE',
+  },
+  TWITTER: {
+    prefixo: 'tw',
+    metricas: [
+      { nome: 'Followers', campo: 'seguidores_total' },
+      { nome: 'ProfileViews', campo: 'visitas_perfil' },
+      { nome: 'UrlClicks', campo: 'cliques_website' },
+      { nome: 'Impressions', campo: 'impressoes' },
+    ],
+    dbRede: 'TWITTER',
+  },
+};
+
+async function coletarMetricasRede(
+  config: MetricoolConfig,
+  headers: Record<string, string>,
+  redeConfig: typeof REDES_CONFIG[string],
+  redeName: string,
+  initDate: string,
+  endDate: string
+): Promise<Map<string, Record<string, number>>> {
+  const metricasPorData = new Map<string, Record<string, number>>();
+
+  console.log(`  📊 Coletando métricas ${redeName}...`);
+
+  for (const metrica of redeConfig.metricas) {
+    try {
+      const url = `${METRICOOL_API_BASE}/${config.user_id}/${config.blog_id}/stats/timeline/${redeConfig.prefixo}${metrica.nome}?initDate=${initDate}&endDate=${endDate}`;
+      const resp = await fetch(url, { headers });
+      
+      if (resp.ok) {
+        const data = await resp.json();
+        
+        let valorAnterior = 0;
+        for (const item of (data || [])) {
+          const dataStr = item.date;
+          if (!metricasPorData.has(dataStr)) {
+            metricasPorData.set(dataStr, {
+              seguidores_total: 0,
+              novos_seguidores: 0,
+              visitas_perfil: 0,
+              cliques_website: 0,
+              alcance: 0,
+              impressoes: 0,
+              engajamento: 0,
+            });
+          }
+          
+          const metricas = metricasPorData.get(dataStr)!;
+          metricas[metrica.campo] = item.value || 0;
+          
+          // Calcular novos seguidores se for métrica de seguidores
+          if (metrica.campo === 'seguidores_total') {
+            metricas.novos_seguidores = valorAnterior > 0 ? (item.value || 0) - valorAnterior : 0;
+            valorAnterior = item.value || 0;
+          }
+        }
+        
+        console.log(`    ✅ ${metrica.nome}: ${data?.length || 0} registros`);
+      } else {
+        console.log(`    ⚠️ ${metrica.nome}: não disponível (${resp.status})`);
+      }
+    } catch (error) {
+      console.log(`    ⚠️ ${metrica.nome}: erro ao coletar`, error);
+    }
+  }
+
+  return metricasPorData;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -26,7 +154,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    console.log("🚀 Iniciando sincronização Metricool...");
+    console.log("🚀 Iniciando sincronização Metricool (Multi-Rede)...");
 
     // Buscar todas as integrações Metricool ativas
     const { data: integracoes, error: intError } = await supabase
@@ -70,158 +198,89 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         };
 
-        // 1. Coletar métricas de seguidores
-        console.log("📈 Coletando métricas de seguidores...");
-        const followersUrl = `${METRICOOL_API_BASE}/${config.user_id}/${config.blog_id}/stats/timeline/igFollowers?initDate=${initDate}&endDate=${endDate}`;
-        
-        const followersResp = await fetch(followersUrl, { headers });
-        
-        if (!followersResp.ok) {
-          const errorText = await followersResp.text();
-          console.error(`❌ Erro ao buscar seguidores: ${followersResp.status} - ${errorText}`);
-          throw new Error(`Erro API Metricool (seguidores): ${followersResp.status}`);
-        }
+        const redesProcessadas: string[] = [];
+        let totalMetricas = 0;
 
-        const followersData = await followersResp.json();
-        console.log(`✅ Dados de seguidores recebidos: ${followersData?.length || 0} registros`);
+        // Iterar sobre todas as redes configuradas
+        for (const [redeName, redeConfig] of Object.entries(REDES_CONFIG)) {
+          try {
+            console.log(`\n🌐 Processando ${redeName}...`);
+            
+            const metricasPorData = await coletarMetricasRede(
+              config,
+              headers,
+              redeConfig,
+              redeName,
+              initDate,
+              endDate
+            );
 
-        // 2. Coletar visitas ao perfil
-        console.log("👀 Coletando visitas ao perfil...");
-        const profileViewsUrl = `${METRICOOL_API_BASE}/${config.user_id}/${config.blog_id}/stats/timeline/igProfileViews?initDate=${initDate}&endDate=${endDate}`;
-        
-        const profileViewsResp = await fetch(profileViewsUrl, { headers });
-        const profileViewsData = profileViewsResp.ok ? await profileViewsResp.json() : [];
-        console.log(`✅ Visitas ao perfil: ${profileViewsData?.length || 0} registros`);
+            if (metricasPorData.size > 0) {
+              redesProcessadas.push(redeName);
+              totalMetricas += metricasPorData.size;
 
-        // 3. Coletar cliques no website
-        console.log("🔗 Coletando cliques no website...");
-        const websiteClicksUrl = `${METRICOOL_API_BASE}/${config.user_id}/${config.blog_id}/stats/timeline/igWebsiteClicks?initDate=${initDate}&endDate=${endDate}`;
-        
-        const websiteClicksResp = await fetch(websiteClicksUrl, { headers });
-        const websiteClicksData = websiteClicksResp.ok ? await websiteClicksResp.json() : [];
-        console.log(`✅ Cliques website: ${websiteClicksData?.length || 0} registros`);
+              // Salvar na tabela genérica social_metricas_dia
+              for (const [data, metricas] of metricasPorData) {
+                const { error: upsertError } = await supabase
+                  .from('social_metricas_dia')
+                  .upsert({
+                    id_empresa: empresaId,
+                    rede_social: redeConfig.dbRede,
+                    data,
+                    ...metricas,
+                    updated_at: new Date().toISOString(),
+                  }, {
+                    onConflict: 'id_empresa,rede_social,data'
+                  });
 
-        // 4. Coletar alcance
-        console.log("📢 Coletando alcance...");
-        const reachUrl = `${METRICOOL_API_BASE}/${config.user_id}/${config.blog_id}/stats/timeline/igReach?initDate=${initDate}&endDate=${endDate}`;
-        
-        const reachResp = await fetch(reachUrl, { headers });
-        const reachData = reachResp.ok ? await reachResp.json() : [];
-        console.log(`✅ Alcance: ${reachData?.length || 0} registros`);
+                if (upsertError) {
+                  console.error(`  ⚠️ Erro ao salvar ${redeName} ${data}:`, upsertError.message);
+                }
+              }
 
-        // 5. Coletar impressões
-        console.log("👁️ Coletando impressões...");
-        const impressionsUrl = `${METRICOOL_API_BASE}/${config.user_id}/${config.blog_id}/stats/timeline/igImpressions?initDate=${initDate}&endDate=${endDate}`;
-        
-        const impressionsResp = await fetch(impressionsUrl, { headers });
-        const impressionsData = impressionsResp.ok ? await impressionsResp.json() : [];
-        console.log(`✅ Impressões: ${impressionsData?.length || 0} registros`);
+              // Também salvar na tabela instagram_metricas_dia para compatibilidade
+              if (redeName === 'INSTAGRAM') {
+                for (const [data, metricas] of metricasPorData) {
+                  await supabase
+                    .from('instagram_metricas_dia')
+                    .upsert({
+                      id_empresa: empresaId,
+                      data,
+                      seguidores_total: metricas.seguidores_total,
+                      novos_seguidores: metricas.novos_seguidores,
+                      visitas_perfil: metricas.visitas_perfil,
+                      cliques_website: metricas.cliques_website,
+                      alcance: metricas.alcance,
+                      impressoes: metricas.impressoes,
+                      updated_at: new Date().toISOString(),
+                    }, {
+                      onConflict: 'id_empresa,data'
+                    });
+                }
+              }
 
-        // Consolidar dados por data
-        const metricasPorData = new Map<string, {
-          seguidores_total: number;
-          novos_seguidores: number;
-          visitas_perfil: number;
-          cliques_website: number;
-          alcance: number;
-          impressoes: number;
-        }>();
-
-        // Processar seguidores (estrutura: [{date: "YYYY-MM-DD", value: number}])
-        let seguidoresAnterior = 0;
-        for (const item of (followersData || [])) {
-          const data = item.date;
-          if (!metricasPorData.has(data)) {
-            metricasPorData.set(data, {
-              seguidores_total: 0,
-              novos_seguidores: 0,
-              visitas_perfil: 0,
-              cliques_website: 0,
-              alcance: 0,
-              impressoes: 0,
-            });
-          }
-          const metricas = metricasPorData.get(data)!;
-          metricas.seguidores_total = item.value || 0;
-          metricas.novos_seguidores = seguidoresAnterior > 0 ? (item.value || 0) - seguidoresAnterior : 0;
-          seguidoresAnterior = item.value || 0;
-        }
-
-        // Processar visitas ao perfil
-        for (const item of (profileViewsData || [])) {
-          const data = item.date;
-          if (!metricasPorData.has(data)) {
-            metricasPorData.set(data, {
-              seguidores_total: 0,
-              novos_seguidores: 0,
-              visitas_perfil: 0,
-              cliques_website: 0,
-              alcance: 0,
-              impressoes: 0,
-            });
-          }
-          metricasPorData.get(data)!.visitas_perfil = item.value || 0;
-        }
-
-        // Processar cliques website
-        for (const item of (websiteClicksData || [])) {
-          const data = item.date;
-          if (metricasPorData.has(data)) {
-            metricasPorData.get(data)!.cliques_website = item.value || 0;
+              console.log(`  ✅ ${redeName}: ${metricasPorData.size} registros salvos`);
+            } else {
+              console.log(`  ℹ️ ${redeName}: sem dados disponíveis`);
+            }
+          } catch (redeError) {
+            console.log(`  ❌ ${redeName}: erro ao processar`, redeError);
           }
         }
 
-        // Processar alcance
-        for (const item of (reachData || [])) {
-          const data = item.date;
-          if (metricasPorData.has(data)) {
-            metricasPorData.get(data)!.alcance = item.value || 0;
-          }
-        }
-
-        // Processar impressões
-        for (const item of (impressionsData || [])) {
-          const data = item.date;
-          if (metricasPorData.has(data)) {
-            metricasPorData.get(data)!.impressoes = item.value || 0;
-          }
-        }
-
-        // Upsert métricas no banco
-        console.log(`💾 Salvando ${metricasPorData.size} registros de métricas...`);
-        
-        for (const [data, metricas] of metricasPorData) {
-          const { error: upsertError } = await supabase
-            .from('instagram_metricas_dia')
-            .upsert({
-              id_empresa: empresaId,
-              data,
-              ...metricas,
-              updated_at: new Date().toISOString(),
-            }, {
-              onConflict: 'id_empresa,data'
-            });
-
-          if (upsertError) {
-            console.error(`⚠️ Erro ao salvar métrica ${data}:`, upsertError.message);
-          }
-        }
-
-        // 6. Coletar SmartLinks (se disponível)
-        console.log("🔗 Coletando SmartLinks...");
+        // Coletar SmartLinks (se disponível)
+        console.log("\n🔗 Coletando SmartLinks...");
         try {
           const smartlinksUrl = `${METRICOOL_API_BASE}/${config.user_id}/${config.blog_id}/smartlinks/stats?initDate=${initDate}&endDate=${endDate}`;
-          
           const smartlinksResp = await fetch(smartlinksUrl, { headers });
           
           if (smartlinksResp.ok) {
             const smartlinksData = await smartlinksResp.json();
             console.log(`✅ SmartLinks: ${smartlinksData?.length || 0} registros`);
 
-            // Processar SmartLinks
             for (const smartlink of (smartlinksData || [])) {
               for (const stat of (smartlink.stats || [])) {
-                const { error: slError } = await supabase
+                await supabase
                   .from('smartlink_cliques')
                   .upsert({
                     id_empresa: empresaId,
@@ -234,23 +293,20 @@ serve(async (req) => {
                   }, {
                     onConflict: 'id_empresa,smartlink_id,data'
                   });
-
-                if (slError) {
-                  console.error(`⚠️ Erro ao salvar SmartLink:`, slError.message);
-                }
               }
             }
           } else {
-            console.log("ℹ️ SmartLinks não disponível ou sem dados");
+            console.log("ℹ️ SmartLinks não disponível");
           }
         } catch (slError) {
-          console.log("ℹ️ Endpoint de SmartLinks não acessível:", slError);
+          console.log("ℹ️ SmartLinks não acessível:", slError);
         }
 
         resultados.push({
           empresa_id: empresaId,
           status: "success",
-          metricas_processadas: metricasPorData.size,
+          redes_processadas: redesProcessadas,
+          total_metricas: totalMetricas,
         });
 
       } catch (empresaError: any) {
@@ -275,10 +331,10 @@ serve(async (req) => {
       detalhes_execucao: { resultados },
     });
 
-    console.log(`\n✅ Sincronização Metricool concluída em ${duracao}ms`);
+    console.log(`\n✅ Sincronização Multi-Rede concluída em ${duracao}ms`);
 
     return new Response(JSON.stringify({
-      message: "Sincronização concluída",
+      message: "Sincronização Multi-Rede concluída",
       duracao_ms: duracao,
       resultados,
     }), {
@@ -288,7 +344,6 @@ serve(async (req) => {
   } catch (error: any) {
     console.error("❌ Erro geral:", error.message);
     
-    // Registrar erro no cronjob
     await supabase.from('cronjob_execucao').insert({
       nome_cronjob: 'sincronizar-metricool',
       status: 'error',
