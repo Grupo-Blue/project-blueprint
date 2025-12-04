@@ -327,6 +327,30 @@ const Leads = () => {
     return null;
   };
 
+  // Helper para contar leads por rede social
+  const countByRedeSocial = (leads: any[] | undefined) => {
+    if (!leads) return { instagram: 0, facebook: 0, linkedin: 0, tiktok: 0, youtube: 0, twitter: 0 };
+    
+    return leads.reduce((acc, lead) => {
+      const utmSource = (lead.utm_source || '').toLowerCase();
+      const isOrganic = !(lead as any).lead_pago;
+      
+      if (isOrganic) {
+        if (utmSource.includes('instagram') || utmSource.includes('linktree')) acc.instagram++;
+        else if ((utmSource.includes('facebook') || utmSource.includes('fb')) && !utmSource.includes('ads')) acc.facebook++;
+        else if (utmSource.includes('linkedin')) acc.linkedin++;
+        else if (utmSource.includes('tiktok')) acc.tiktok++;
+        else if (utmSource.includes('youtube')) acc.youtube++;
+        else if (utmSource.includes('twitter') || utmSource.includes('x.com')) acc.twitter++;
+      }
+      
+      return acc;
+    }, { instagram: 0, facebook: 0, linkedin: 0, tiktok: 0, youtube: 0, twitter: 0 });
+  };
+
+  const redesSociais = countByRedeSocial(filteredLeads);
+  const totalRedesSociais = redesSociais.instagram + redesSociais.facebook + redesSociais.linkedin + redesSociais.tiktok + redesSociais.youtube + redesSociais.twitter;
+
   // Calcular estatísticas
   const stats = {
     total: filteredLeads?.length || 0,
@@ -344,6 +368,8 @@ const Leads = () => {
     taxaConversaoMQL: filteredLeads?.length ? ((filteredLeads.filter(l => l.is_mql).length / filteredLeads.length) * 100).toFixed(1) : "0",
     taxaConversaoVenda: filteredLeads?.filter(l => l.is_mql).length ? 
       ((filteredLeads.filter(l => l.venda_realizada).length / filteredLeads.filter(l => l.is_mql).length) * 100).toFixed(1) : "0",
+    redesSociais,
+    totalRedesSociais,
   };
 
   if (isLoading) {
@@ -445,6 +471,72 @@ const Leads = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Leads por Rede Social */}
+      {stats.totalRedesSociais > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Leads por Rede Social (Orgânicos)
+            </CardTitle>
+            <CardDescription>
+              Total: {stats.totalRedesSociais} leads de redes sociais
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
+              {stats.redesSociais.instagram > 0 && (
+                <div className="flex flex-col items-center p-3 rounded-lg bg-gradient-to-br from-pink-500/10 to-purple-500/10 border border-pink-500/20">
+                  <span className="text-2xl mb-1">📱</span>
+                  <span className="text-lg font-bold">{stats.redesSociais.instagram}</span>
+                  <span className="text-xs text-muted-foreground">Instagram</span>
+                </div>
+              )}
+              {stats.redesSociais.facebook > 0 && (
+                <div className="flex flex-col items-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <span className="text-2xl mb-1">📘</span>
+                  <span className="text-lg font-bold">{stats.redesSociais.facebook}</span>
+                  <span className="text-xs text-muted-foreground">Facebook</span>
+                </div>
+              )}
+              {stats.redesSociais.linkedin > 0 && (
+                <div className="flex flex-col items-center p-3 rounded-lg bg-sky-500/10 border border-sky-500/20">
+                  <span className="text-2xl mb-1">💼</span>
+                  <span className="text-lg font-bold">{stats.redesSociais.linkedin}</span>
+                  <span className="text-xs text-muted-foreground">LinkedIn</span>
+                </div>
+              )}
+              {stats.redesSociais.tiktok > 0 && (
+                <div className="flex flex-col items-center p-3 rounded-lg bg-slate-500/10 border border-slate-500/20">
+                  <span className="text-2xl mb-1">🎵</span>
+                  <span className="text-lg font-bold">{stats.redesSociais.tiktok}</span>
+                  <span className="text-xs text-muted-foreground">TikTok</span>
+                </div>
+              )}
+              {stats.redesSociais.youtube > 0 && (
+                <div className="flex flex-col items-center p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <span className="text-2xl mb-1">📺</span>
+                  <span className="text-lg font-bold">{stats.redesSociais.youtube}</span>
+                  <span className="text-xs text-muted-foreground">YouTube</span>
+                </div>
+              )}
+              {stats.redesSociais.twitter > 0 && (
+                <div className="flex flex-col items-center p-3 rounded-lg bg-slate-800/10 border border-slate-800/20">
+                  <span className="text-2xl mb-1">🐦</span>
+                  <span className="text-lg font-bold">{stats.redesSociais.twitter}</span>
+                  <span className="text-xs text-muted-foreground">Twitter/X</span>
+                </div>
+              )}
+              {stats.totalRedesSociais === 0 && (
+                <div className="col-span-full text-center text-muted-foreground py-4">
+                  Nenhum lead de redes sociais no período
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filtros */}
       <Card>
