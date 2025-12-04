@@ -726,6 +726,71 @@ export type Database = {
         }
         Relationships: []
       }
+      empresa_metricas_dia: {
+        Row: {
+          cac: number | null
+          cpl: number | null
+          created_at: string | null
+          data: string
+          id_empresa: string
+          id_metricas_dia: string
+          leads_pagos: number | null
+          leads_total: number | null
+          levantadas: number | null
+          mqls: number | null
+          reunioes: number | null
+          ticket_medio: number | null
+          updated_at: string | null
+          valor_vendas: number | null
+          vendas: number | null
+          verba_investida: number | null
+        }
+        Insert: {
+          cac?: number | null
+          cpl?: number | null
+          created_at?: string | null
+          data: string
+          id_empresa: string
+          id_metricas_dia?: string
+          leads_pagos?: number | null
+          leads_total?: number | null
+          levantadas?: number | null
+          mqls?: number | null
+          reunioes?: number | null
+          ticket_medio?: number | null
+          updated_at?: string | null
+          valor_vendas?: number | null
+          vendas?: number | null
+          verba_investida?: number | null
+        }
+        Update: {
+          cac?: number | null
+          cpl?: number | null
+          created_at?: string | null
+          data?: string
+          id_empresa?: string
+          id_metricas_dia?: string
+          leads_pagos?: number | null
+          leads_total?: number | null
+          levantadas?: number | null
+          mqls?: number | null
+          reunioes?: number | null
+          ticket_medio?: number | null
+          updated_at?: string | null
+          valor_vendas?: number | null
+          vendas?: number | null
+          verba_investida?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresa_metricas_dia_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       empresa_semana_metricas: {
         Row: {
           cac: number | null

@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.calcular-metricas-semanais]
 verify_jwt = false
 
+[functions.calcular-metricas-diarias]
+verify_jwt = false
+
 [functions.sincronizar-pipedrive]
 verify_jwt = false
 
@@ -58,4 +61,10 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.sincronizar-metricool]
+verify_jwt = false
+
+[functions.enriquecer-leads-tokeniza]
+verify_jwt = false
+
+[functions.importar-usuarios-tokeniza]
 verify_jwt = false
