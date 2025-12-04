@@ -213,15 +213,15 @@ export function CronjobsMonitor() {
                     </Badge>
                     {ultimaExecucao && (
                       <Badge 
-                        variant={ultimaExecucao.status === "success" ? "default" : "destructive"}
+                        variant={ultimaExecucao.status === "success" || ultimaExecucao.status === "sucesso" ? "default" : "destructive"}
                         className="text-xs"
                       >
-                        {ultimaExecucao.status === "success" ? (
+                        {ultimaExecucao.status === "success" || ultimaExecucao.status === "sucesso" ? (
                           <CheckCircle2 className="w-3 h-3 mr-1" />
                         ) : (
                           <XCircle className="w-3 h-3 mr-1" />
                         )}
-                        {ultimaExecucao.status === "success" ? "Sucesso" : "Erro"}
+                        {ultimaExecucao.status === "success" || ultimaExecucao.status === "sucesso" ? "Sucesso" : "Erro"}
                       </Badge>
                     )}
                   </div>
@@ -242,7 +242,7 @@ export function CronjobsMonitor() {
                       )}
                     </div>
                   )}
-                  {ultimaExecucao?.status === "error" && ultimaExecucao.mensagem_erro && (
+                  {ultimaExecucao?.status !== "success" && ultimaExecucao?.status !== "sucesso" && ultimaExecucao?.mensagem_erro && (
                     <p className="text-xs text-destructive mt-1">
                       Erro: {ultimaExecucao.mensagem_erro}
                     </p>
