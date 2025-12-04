@@ -110,6 +110,7 @@ const Leads = () => {
             anos_fiscais
           )
         `)
+        .or("merged.is.null,merged.eq.false")
         .order("data_criacao", { ascending: false });
 
       if (error) throw error;
