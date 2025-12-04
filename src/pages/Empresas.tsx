@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, Edit, History, DollarSign, Target, TrendingUp, AlertTriangle, Calendar } from "lucide-react";
+import { Building2, Plus, Edit, History, DollarSign, Target, TrendingUp, AlertTriangle, Calendar, Wallet } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Separator } from "@/components/ui/separator";
@@ -25,6 +25,7 @@ interface Empresa {
   margem_minima_percentual: number;
   dias_alerta_cpl: number;
   semanas_alerta_cac: number;
+  meta_verba_mensal: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -56,6 +57,7 @@ export default function Empresas() {
     margem_minima_percentual: "",
     dias_alerta_cpl: "3",
     semanas_alerta_cac: "2",
+    meta_verba_mensal: "",
   });
 
   const { data: empresas, isLoading } = useQuery({
@@ -101,6 +103,7 @@ export default function Empresas() {
         margem_minima_percentual: parseFloat(dados.margem_minima_percentual),
         dias_alerta_cpl: parseInt(dados.dias_alerta_cpl),
         semanas_alerta_cac: parseInt(dados.semanas_alerta_cac),
+        meta_verba_mensal: dados.meta_verba_mensal ? parseFloat(dados.meta_verba_mensal) : null,
       });
       if (error) throw error;
     },
@@ -128,6 +131,7 @@ export default function Empresas() {
           margem_minima_percentual: parseFloat(dados.margem_minima_percentual),
           dias_alerta_cpl: parseInt(dados.dias_alerta_cpl),
           semanas_alerta_cac: parseInt(dados.semanas_alerta_cac),
+          meta_verba_mensal: dados.meta_verba_mensal ? parseFloat(dados.meta_verba_mensal) : null,
         })
         .eq("id_empresa", empresaSelecionada.id_empresa);
 
@@ -153,6 +157,7 @@ export default function Empresas() {
       margem_minima_percentual: "",
       dias_alerta_cpl: "3",
       semanas_alerta_cac: "2",
+      meta_verba_mensal: "",
     });
     setModo("criar");
   };
@@ -174,6 +179,7 @@ export default function Empresas() {
       margem_minima_percentual: empresa.margem_minima_percentual.toString(),
       dias_alerta_cpl: empresa.dias_alerta_cpl.toString(),
       semanas_alerta_cac: empresa.semanas_alerta_cac.toString(),
+      meta_verba_mensal: empresa.meta_verba_mensal?.toString() || "",
     });
     setModo("editar");
     setDialogAberto(true);
@@ -376,6 +382,28 @@ export default function Empresas() {
                   </div>
                 </div>
 
+                <Separator />
+                <div className="space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Wallet className="h-5 w-5 text-primary" />
+                    Orçamento
+                  </h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="meta_verba_mensal">Meta de Verba Mensal (R$)</Label>
+                    <Input
+                      id="meta_verba_mensal"
+                      type="number"
+                      step="0.01"
+                      value={formData.meta_verba_mensal}
+                      onChange={(e) => setFormData({ ...formData, meta_verba_mensal: e.target.value })}
+                      placeholder="Ex: 10000.00"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Orçamento mensal total de mídia paga para esta empresa
+                    </p>
+                  </div>
+                </div>
+
                 <Button
                   className="w-full"
                   onClick={handleSubmit}
@@ -419,9 +447,17 @@ export default function Empresas() {
                         <Building2 className="h-6 w-6 text-primary" />
                         {empresa.nome}
                       </CardTitle>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        Criada em {format(new Date(empresa.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Criada em {format(new Date(empresa.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                        </div>
+                        {empresa.meta_verba_mensal && empresa.meta_verba_mensal > 0 && (
+                          <Badge variant="secondary" className="flex items-center gap-1">
+                            <Wallet className="h-3 w-3" />
+                            R$ {empresa.meta_verba_mensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-2">
