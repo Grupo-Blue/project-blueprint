@@ -17,6 +17,9 @@ import { KPIsHistoricos } from "@/components/dashboard/KPIsHistoricos";
 import { DistribuicaoEmpresa } from "@/components/dashboard/DistribuicaoEmpresa";
 import { CoorteQualidade } from "@/components/dashboard/CoorteQualidade";
 import { TrackingScore } from "@/components/dashboard/TrackingScore";
+import { ROIProfitability } from "@/components/dashboard/ROIProfitability";
+import { CriativosFadiga } from "@/components/dashboard/CriativosFadiga";
+import { AlertasAnomalias } from "@/components/dashboard/AlertasAnomalias";
 
 const Dashboard = () => {
   const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
@@ -283,6 +286,27 @@ const Dashboard = () => {
       <div className="mb-6 md:mb-8">
         <TrackingScore empresaId={empresaSelecionada} />
       </div>
+
+      {/* FASE 2: Alertas de Anomalias */}
+      {empresaSelecionada && (
+        <div className="mb-6 md:mb-8">
+          <AlertasAnomalias empresaId={empresaSelecionada} />
+        </div>
+      )}
+
+      {/* FASE 2: ROI e Lucratividade */}
+      {empresaSelecionada && (
+        <div className="mb-6 md:mb-8">
+          <ROIProfitability empresaId={empresaSelecionada} />
+        </div>
+      )}
+
+      {/* FASE 2: Fadiga de Criativos */}
+      {empresaSelecionada && (
+        <div className="mb-6 md:mb-8">
+          <CriativosFadiga empresaId={empresaSelecionada} />
+        </div>
+      )}
 
       {/* IA Intelligence */}
       <div className="mb-6 md:mb-8">
