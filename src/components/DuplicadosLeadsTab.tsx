@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Merge, Users, DollarSign, Calendar, Mail, ExternalLink, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Merge, Users, DollarSign, Calendar, Mail, ExternalLink, Loader2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -21,6 +21,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+const TOKENIZA_EMPRESA_ID = "61b5ffeb-fbbc-47c1-8ced-152bb647ed20";
 
 interface DuplicadoGrupo {
   email: string;
@@ -58,9 +60,23 @@ const DuplicadosLeadsTab = () => {
 
   const podeMergear = userRoles?.some(role => ['admin', 'direcao', 'sdr'].includes(role));
 
+  // Buscar emails ignorados
+  const { data: emailsIgnorados } = useQuery({
+    queryKey: ["merge-ignorados"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("merge_ignorado")
+        .select("email")
+        .eq("id_empresa", TOKENIZA_EMPRESA_ID);
+      
+      if (error) throw error;
+      return new Set((data || []).map(i => i.email?.toLowerCase()));
+    },
+  });
+
   // Buscar leads duplicados (mesmo email, apenas Tokeniza)
   const { data: duplicados, isLoading, refetch } = useQuery({
-    queryKey: ["leads-duplicados"],
+    queryKey: ["leads-duplicados", emailsIgnorados],
     queryFn: async () => {
       // Buscar apenas leads da Tokeniza não merged com email
       const { data: leads, error } = await supabase
@@ -69,7 +85,7 @@ const DuplicadosLeadsTab = () => {
           *,
           empresa:id_empresa (nome)
         `)
-        .eq("id_empresa", "61b5ffeb-fbbc-47c1-8ced-152bb647ed20") // Apenas Tokeniza
+        .eq("id_empresa", TOKENIZA_EMPRESA_ID)
         .not("email", "is", null)
         .or("merged.is.null,merged.eq.false")
         .order("data_criacao", { ascending: false });
@@ -88,10 +104,13 @@ const DuplicadosLeadsTab = () => {
         }
       });
 
-      // Filtrar apenas emails que têm AMBOS tipos (Pipedrive e Tokeniza)
+      // Filtrar apenas emails que têm AMBOS tipos (Pipedrive e Tokeniza) e não foram ignorados
       const duplicadosComAmbos: DuplicadoGrupo[] = [];
       
       Object.entries(gruposPorEmail).forEach(([email, leadsGrupo]) => {
+        // Pular emails ignorados
+        if (emailsIgnorados?.has(email.toLowerCase())) return;
+        
         const leadsPipedrive = leadsGrupo.filter(l => !l.id_lead_externo?.startsWith('tokeniza_'));
         const leadsTokeniza = leadsGrupo.filter(l => l.id_lead_externo?.startsWith('tokeniza_'));
         
@@ -113,6 +132,7 @@ const DuplicadosLeadsTab = () => {
       // Ordenar por valor total (maior primeiro)
       return duplicadosComAmbos.sort((a, b) => b.valorTotalTokeniza - a.valorTotalTokeniza);
     },
+    enabled: emailsIgnorados !== undefined,
   });
 
   // Mutation para fazer o merge
@@ -204,6 +224,40 @@ const DuplicadosLeadsTab = () => {
     onError: (error: any) => {
       toast({
         title: "Erro ao fazer merge",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation para ignorar merge
+  const ignorarMutation = useMutation({
+    mutationFn: async ({ email }: { email: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { error } = await supabase
+        .from("merge_ignorado")
+        .insert({
+          email: email.toLowerCase(),
+          id_empresa: TOKENIZA_EMPRESA_ID,
+          ignorado_por: user.id,
+        });
+
+      if (error) throw error;
+      return { email };
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Sugestão ignorada",
+        description: `O email ${data.email} não aparecerá mais nas sugestões.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["leads-duplicados"] });
+      queryClient.invalidateQueries({ queryKey: ["merge-ignorados"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao ignorar",
         description: error.message,
         variant: "destructive",
       });
@@ -472,8 +526,21 @@ const DuplicadosLeadsTab = () => {
                     </div>
                   )}
 
-                  {/* Botão de Merge */}
-                  <div className="flex justify-end">
+                  {/* Botões de Ação */}
+                  <div className="flex justify-end gap-2">
+                    <Button 
+                      variant="outline"
+                      onClick={() => ignorarMutation.mutate({ email: grupo.email })}
+                      disabled={!podeMergear || ignorarMutation.isPending}
+                      className="gap-2"
+                    >
+                      {ignorarMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                      Ignorar
+                    </Button>
                     <Button 
                       onClick={() => handleMergeClick(grupo.email)}
                       disabled={!selectedPrincipal[grupo.email] || !podeMergear || mergeMutation.isPending}
@@ -490,7 +557,7 @@ const DuplicadosLeadsTab = () => {
 
                   {!podeMergear && (
                     <p className="text-xs text-destructive">
-                      ⚠️ Apenas Admin, Direção e SDR podem fazer merge de leads.
+                      ⚠️ Apenas Admin, Direção e SDR podem fazer merge ou ignorar sugestões.
                     </p>
                   )}
                 </CardContent>
