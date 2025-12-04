@@ -969,6 +969,10 @@ export type Database = {
           mautic_score: number | null
           mautic_segments: Json | null
           mautic_tags: Json | null
+          merged: boolean | null
+          merged_at: string | null
+          merged_by: string | null
+          merged_into_lead_id: string | null
           nome_lead: string | null
           organizacao: string | null
           origem_campanha: string | null
@@ -1024,6 +1028,10 @@ export type Database = {
           mautic_score?: number | null
           mautic_segments?: Json | null
           mautic_tags?: Json | null
+          merged?: boolean | null
+          merged_at?: string | null
+          merged_by?: string | null
+          merged_into_lead_id?: string | null
           nome_lead?: string | null
           organizacao?: string | null
           origem_campanha?: string | null
@@ -1079,6 +1087,10 @@ export type Database = {
           mautic_score?: number | null
           mautic_segments?: Json | null
           mautic_tags?: Json | null
+          merged?: boolean | null
+          merged_at?: string | null
+          merged_by?: string | null
+          merged_into_lead_id?: string | null
           nome_lead?: string | null
           organizacao?: string | null
           origem_campanha?: string | null
@@ -1129,6 +1141,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "empresa"
             referencedColumns: ["id_empresa"]
+          },
+          {
+            foreignKeyName: "lead_merged_into_lead_id_fkey"
+            columns: ["merged_into_lead_id"]
+            isOneToOne: false
+            referencedRelation: "lead"
+            referencedColumns: ["id_lead"]
           },
         ]
       }

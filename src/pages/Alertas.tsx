@@ -3,12 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCard } from "@/components/AlertCard";
-import { AlertTriangle, RefreshCw, Link2, CheckCircle2, ExternalLink } from "lucide-react";
+import { AlertTriangle, RefreshCw, Link2, CheckCircle2, ExternalLink, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import DuplicadosLeadsTab from "@/components/DuplicadosLeadsTab";
 interface EmpresaMetrica {
   empresa: string;
   id_empresa: string;
@@ -121,6 +121,39 @@ const Alertas = () => {
     },
   });
 
+  // Contar leads duplicados
+  const { data: duplicadosCount } = useQuery({
+    queryKey: ["leads-duplicados-count"],
+    queryFn: async () => {
+      const { data: leads, error } = await supabase
+        .from("lead")
+        .select("email, id_lead_externo")
+        .not("email", "is", null)
+        .or("merged.is.null,merged.eq.false");
+
+      if (error) throw error;
+
+      // Agrupar por email e contar quantos têm Pipedrive + Tokeniza
+      const gruposPorEmail: Record<string, { pipedrive: number; tokeniza: number }> = {};
+      leads?.forEach(lead => {
+        const email = lead.email?.toLowerCase().trim();
+        if (email) {
+          if (!gruposPorEmail[email]) {
+            gruposPorEmail[email] = { pipedrive: 0, tokeniza: 0 };
+          }
+          if (lead.id_lead_externo?.startsWith('tokeniza_')) {
+            gruposPorEmail[email].tokeniza++;
+          } else {
+            gruposPorEmail[email].pipedrive++;
+          }
+        }
+      });
+
+      // Contar emails com ambos tipos
+      return Object.values(gruposPorEmail).filter(g => g.pipedrive > 0 && g.tokeniza > 0).length;
+    },
+  });
+
   // Processar alertas de métricas
   const alertas: EmpresaMetrica[] = metricas
     ?.filter((m: any) => {
@@ -206,6 +239,7 @@ const Alertas = () => {
 
   const totalAlertasMetricas = alertas.length;
   const totalAlertasUTM = alertasUTM?.length || 0;
+  const totalDuplicados = duplicadosCount || 0;
 
   if (isLoading) {
     return (
@@ -240,14 +274,14 @@ const Alertas = () => {
       </div>
 
       {/* Resumo Geral */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Alertas</CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalAlertasMetricas + totalAlertasUTM}</div>
+            <div className="text-2xl font-bold">{totalAlertasMetricas + totalAlertasUTM + totalDuplicados}</div>
             <p className="text-xs text-muted-foreground">Alertas ativos</p>
           </CardContent>
         </Card>
@@ -276,8 +310,19 @@ const Alertas = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Leads Duplicados</CardTitle>
+            <Users className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalDuplicados}</div>
+            <p className="text-xs text-muted-foreground">Emails para merge</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Status</CardTitle>
-            {totalAlertasMetricas + totalAlertasUTM === 0 ? (
+            {totalAlertasMetricas + totalAlertasUTM + totalDuplicados === 0 ? (
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             ) : (
               <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -285,10 +330,10 @@ const Alertas = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {totalAlertasMetricas + totalAlertasUTM === 0 ? "OK" : "Atenção"}
+              {totalAlertasMetricas + totalAlertasUTM + totalDuplicados === 0 ? "OK" : "Atenção"}
             </div>
             <p className="text-xs text-muted-foreground">
-              {totalAlertasMetricas + totalAlertasUTM === 0 
+              {totalAlertasMetricas + totalAlertasUTM + totalDuplicados === 0 
                 ? "Tudo em ordem" 
                 : "Requer ação"}
             </p>
@@ -306,6 +351,10 @@ const Alertas = () => {
           <TabsTrigger value="metricas" className="gap-2">
             <AlertTriangle className="h-4 w-4" />
             Métricas ({totalAlertasMetricas})
+          </TabsTrigger>
+          <TabsTrigger value="duplicados" className="gap-2">
+            <Users className="h-4 w-4" />
+            Duplicados ({totalDuplicados})
           </TabsTrigger>
         </TabsList>
 
@@ -455,6 +504,11 @@ const Alertas = () => {
               )}
             </div>
           )}
+        </TabsContent>
+
+        {/* Tab Duplicados */}
+        <TabsContent value="duplicados" className="space-y-4">
+          <DuplicadosLeadsTab />
         </TabsContent>
       </Tabs>
     </div>
