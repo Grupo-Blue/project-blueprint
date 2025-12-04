@@ -108,28 +108,34 @@ async function coletarMetricasRede(
           let dataStr: string | null = null;
           let valorMetrica: number = 0;
           
-          // Verificar se é formato array [valor, timestamp] ou [timestamp, valor]
+          // Verificar se é formato array [data/timestamp, valor] - API Metricool retorna STRINGS!
           if (Array.isArray(item)) {
-            console.log(`    📋 Item é array: ${JSON.stringify(item)}`);
             if (item.length >= 2) {
-              // Tentar detectar qual é timestamp e qual é valor
-              const primeiro = item[0];
-              const segundo = item[1];
+              // API Metricool retorna arrays de strings: ["timestamp", "valor"] ou ["YYYYMMDD", "valor"]
+              const primeiroStr = String(item[0]);
+              const segundoStr = String(item[1]);
+              const primeiroNum = parseFloat(primeiroStr);
+              const segundoNum = parseFloat(segundoStr);
               
-              // Se o primeiro for um número grande (timestamp unix em ms), é formato [timestamp, valor]
-              if (typeof primeiro === 'number' && primeiro > 1000000000000) {
-                dataStr = new Date(primeiro).toISOString().split('T')[0];
-                valorMetrica = segundo || 0;
+              // Se o primeiro for um timestamp unix grande (13+ dígitos), é formato [timestamp, valor]
+              if (primeiroStr.length >= 13 && !isNaN(primeiroNum) && primeiroNum > 1000000000000) {
+                dataStr = new Date(primeiroNum).toISOString().split('T')[0];
+                valorMetrica = segundoNum || 0;
               }
-              // Se o segundo for um número grande, é formato [valor, timestamp]
-              else if (typeof segundo === 'number' && segundo > 1000000000000) {
-                dataStr = new Date(segundo).toISOString().split('T')[0];
-                valorMetrica = primeiro || 0;
+              // Se o primeiro for data YYYYMMDD (8 dígitos numéricos)
+              else if (primeiroStr.length === 8 && /^\d{8}$/.test(primeiroStr)) {
+                dataStr = primeiroStr;
+                valorMetrica = segundoNum || 0;
               }
-              // Se o primeiro for string de data
-              else if (typeof primeiro === 'string') {
-                dataStr = primeiro;
-                valorMetrica = segundo || 0;
+              // Se o segundo for timestamp
+              else if (segundoStr.length >= 13 && !isNaN(segundoNum) && segundoNum > 1000000000000) {
+                dataStr = new Date(segundoNum).toISOString().split('T')[0];
+                valorMetrica = primeiroNum || 0;
+              }
+              // Fallback: primeiro é data string, segundo é valor
+              else {
+                dataStr = primeiroStr;
+                valorMetrica = segundoNum || 0;
               }
             }
           } else if (typeof item === 'object' && item !== null) {
