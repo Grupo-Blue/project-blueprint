@@ -53,9 +53,11 @@ export const TempoCiclo = ({ empresaId }: TempoCicloProps) => {
   // Buscar leads dos últimos 3 meses com datas de transição
   const tresMesesAtras = subMonths(dataReferencia, 3);
 
-  const { data: leads, isLoading, error } = useQuery({
+  const { data: leads, isLoading, error, isFetching } = useQuery({
     queryKey: ["leads-ciclo", empresaId, tresMesesAtras.toISOString()],
     queryFn: async () => {
+      if (!empresaId) return [];
+      
       const { data, error } = await supabase
         .from("lead")
         .select("id_lead, data_criacao, data_mql, data_levantou_mao, data_reuniao, data_venda, venda_realizada, is_mql, levantou_mao, tem_reuniao, reuniao_realizada")
@@ -63,10 +65,14 @@ export const TempoCiclo = ({ empresaId }: TempoCicloProps) => {
         .gte("data_criacao", tresMesesAtras.toISOString())
         .order("data_criacao", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro ao buscar leads para ciclo:", error);
+        throw error;
+      }
       return (data || []) as LeadComDatas[];
     },
-    enabled: !!empresaId,
+    enabled: !!empresaId && empresaId.length > 0,
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
   // Calcular tempos de ciclo
@@ -152,7 +158,7 @@ export const TempoCiclo = ({ empresaId }: TempoCicloProps) => {
   const temDadosSuficientes = temposLeadVenda.length >= 3 || chartData.some(d => d.amostra >= 3);
   const temDatasTransicao = leads?.some(l => l.data_mql || l.data_levantou_mao || l.data_reuniao);
 
-  if (isLoading) {
+  if (isLoading || isFetching) {
     return (
       <Card>
         <CardHeader>
