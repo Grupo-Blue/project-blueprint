@@ -86,13 +86,11 @@ export function DistribuicaoEmpresa() {
   const dadosGasto = typedDistribuicao.map((d) => ({
     name: d.nome,
     value: d.gasto,
-    percent: totalGasto > 0 ? (d.gasto / totalGasto) * 100 : 0,
   }));
 
   const dadosVendas = typedDistribuicao.map((d) => ({
     name: d.nome,
     value: d.vendas,
-    percent: totalVendas > 0 ? (d.vendas / totalVendas) * 100 : 0,
   }));
 
   // Detectar alertas de queima de capital
