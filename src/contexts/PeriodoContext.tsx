@@ -1,15 +1,14 @@
 import React, { createContext, useContext, useState } from "react";
 
-export type TipoFiltroPeriodo = "mes_atual" | "mes_anterior" | "data_especifica" | "semana_especifica";
+export type TipoFiltroPeriodo = "mes_atual" | "mes_anterior" | "data_especifica";
 
 interface PeriodoContextType {
   tipoFiltro: TipoFiltroPeriodo;
   dataEspecifica: Date | null;
-  semanaSelecionada: string | null;
   setTipoFiltro: (tipo: TipoFiltroPeriodo) => void;
   setDataEspecifica: (data: Date | null) => void;
-  setSemanaSelecionada: (semana: string | null) => void;
   getDataReferencia: () => Date;
+  getInicioFim: () => { inicio: Date; fim: Date };
 }
 
 const PeriodoContext = createContext<PeriodoContextType | undefined>(undefined);
@@ -17,7 +16,6 @@ const PeriodoContext = createContext<PeriodoContextType | undefined>(undefined);
 export function PeriodoProvider({ children }: { children: React.ReactNode }) {
   const [tipoFiltro, setTipoFiltro] = useState<TipoFiltroPeriodo>("mes_atual");
   const [dataEspecifica, setDataEspecifica] = useState<Date | null>(null);
-  const [semanaSelecionada, setSemanaSelecionada] = useState<string | null>(null);
 
   const getDataReferencia = () => {
     const hoje = new Date();
@@ -36,16 +34,22 @@ export function PeriodoProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const getInicioFim = () => {
+    const dataRef = getDataReferencia();
+    const inicio = new Date(dataRef.getFullYear(), dataRef.getMonth(), 1);
+    const fim = new Date(dataRef.getFullYear(), dataRef.getMonth() + 1, 0);
+    return { inicio, fim };
+  };
+
   return (
     <PeriodoContext.Provider
       value={{
         tipoFiltro,
         dataEspecifica,
-        semanaSelecionada,
         setTipoFiltro,
         setDataEspecifica,
-        setSemanaSelecionada,
         getDataReferencia,
+        getInicioFim,
       }}
     >
       {children}

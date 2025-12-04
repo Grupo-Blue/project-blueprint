@@ -25,7 +25,7 @@ import { TempoCiclo } from "@/components/dashboard/TempoCiclo";
 import { MetricasMultiRede } from "@/components/dashboard/MetricasMultiRede";
 
 const Dashboard = () => {
-  const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
+  const { getDataReferencia, tipoFiltro } = usePeriodo();
   const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("");
   
@@ -77,8 +77,6 @@ const Dashboard = () => {
         return "do Mês Anterior";
       case "data_especifica":
         return `de ${format(dataReferencia, "MMMM/yyyy", { locale: ptBR })}`;
-      case "semana_especifica":
-        return "da Semana";
       default:
         return "do Período";
     }
@@ -86,52 +84,18 @@ const Dashboard = () => {
 
   const labelPeriodo = getLabelPeriodo();
 
-  const { data: semanaInfo } = useQuery({
-    queryKey: ["semana-info", semanaSelecionada],
-    queryFn: async () => {
-      if (!semanaSelecionada) return null;
-      const { data, error } = await supabase
-        .from("semana")
-        .select("*")
-        .eq("id_semana", semanaSelecionada)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!semanaSelecionada,
-  });
-
-  const { data: metricasSemanais } = useQuery({
-    queryKey: ["metricas-dashboard", tipoFiltro, semanaSelecionada, inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada],
+  // Buscar métricas diárias do período
+  const { data: metricasDiarias } = useQuery({
+    queryKey: ["metricas-dashboard-diarias", inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada],
     queryFn: async () => {
       if (!empresaSelecionada) return null;
       
-      // Se for filtro de semana específica, busca só aquela semana
-      if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
-        const { data, error } = await supabase
-          .from("empresa_semana_metricas")
-          .select("*, semana(*)")
-          .eq("id_semana", semanaSelecionada)
-          .eq("id_empresa", empresaSelecionada);
-        if (error) throw error;
-        return data;
-      }
-      
-      // Para outros filtros, busca todas as semanas do período
-      const { data: semanas, error: semanasError } = await supabase
-        .from("semana")
-        .select("id_semana")
-        .gte("data_inicio", inicioMes.toISOString())
-        .lte("data_fim", fimMes.toISOString());
-      
-      if (semanasError) throw semanasError;
-      if (!semanas || semanas.length === 0) return null;
-      
       const { data, error } = await supabase
-        .from("empresa_semana_metricas")
-        .select("*, semana(*)")
-        .in("id_semana", semanas.map(s => s.id_semana))
-        .eq("id_empresa", empresaSelecionada);
+        .from("empresa_metricas_dia")
+        .select("*")
+        .eq("id_empresa", empresaSelecionada)
+        .gte("data", format(inicioMes, "yyyy-MM-dd"))
+        .lte("data", format(fimMes, "yyyy-MM-dd"));
       
       if (error) throw error;
       return data;
@@ -159,10 +123,10 @@ const Dashboard = () => {
   const totalVendas = leadsDoMes?.filter((l) => l.venda_realizada).length || 0;
   const taxaConversao = totalLeads > 0 ? (totalVendas / totalLeads) * 100 : 0;
 
-  const totaisMetricas = metricasSemanais?.reduce(
+  const totaisMetricas = metricasDiarias?.reduce(
     (acc, m) => ({
-      verba: acc.verba + m.verba_investida,
-      leads: acc.leads + m.leads_total,
+      verba: acc.verba + Number(m.verba_investida || 0),
+      leads: acc.leads + (m.leads_total || 0),
     }),
     { verba: 0, leads: 0 }
   ) || { verba: 0, leads: 0 };
@@ -241,10 +205,8 @@ const Dashboard = () => {
                 : "R$ 0,00"}
             </div>
             <p className="text-xs text-muted-foreground">
-              {metricasSemanais && metricasSemanais.length > 0 
-                ? (tipoFiltro === "semana_especifica" 
-                    ? `Semana ${semanaInfo?.numero_semana}/${semanaInfo?.ano}`
-                    : labelPeriodo)
+              {metricasDiarias && metricasDiarias.length > 0 
+                ? labelPeriodo
                 : "Sem métricas no período"}
             </p>
           </CardContent>

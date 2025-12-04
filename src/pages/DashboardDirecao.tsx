@@ -41,7 +41,7 @@ interface EmpresaMetrica {
 }
 
 export default function DashboardDirecao() {
-  const { semanaSelecionada, getDataReferencia, tipoFiltro, dataEspecifica } = usePeriodo();
+  const { getDataReferencia, tipoFiltro, dataEspecifica } = usePeriodo();
   const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
 
@@ -65,24 +65,7 @@ export default function DashboardDirecao() {
       dataFimStr: format(dataFinal, "yyyy-MM-dd"),
       dataReferencia: dataRef
     };
-  }, [tipoFiltro, dataEspecifica, semanaSelecionada]);
-
-  const { data: semanaAtual } = useQuery({
-    queryKey: ["semana-info-direcao", semanaSelecionada],
-    queryFn: async () => {
-      if (!semanaSelecionada) return null;
-      const { data, error } = await supabase
-        .from("semana")
-        .select("*")
-        .eq("id_semana", semanaSelecionada)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!semanaSelecionada,
-    staleTime: 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
+  }, [tipoFiltro, dataEspecifica]);
 
   const { data: empresas } = useQuery({
     queryKey: ["empresas-direcao"],
@@ -96,26 +79,9 @@ export default function DashboardDirecao() {
   });
 
   const { data: metricas, isLoading } = useQuery({
-    queryKey: ["metricas-direcao", tipoFiltro, semanaSelecionada, dataInicioStr, dataFimStr, empresaSelecionada],
+    queryKey: ["metricas-direcao", tipoFiltro, dataInicioStr, dataFimStr, empresaSelecionada],
     queryFn: async () => {
-      // Determinar datas do período
-      let dataInicioQuery = dataInicioStr;
-      let dataFimQuery = dataFimStr;
-
-      if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
-        const { data: semana } = await supabase
-          .from("semana")
-          .select("data_inicio, data_fim")
-          .eq("id_semana", semanaSelecionada)
-          .single();
-        
-        if (semana) {
-          dataInicioQuery = semana.data_inicio;
-          dataFimQuery = semana.data_fim;
-        }
-      }
-
-      console.log("[DashboardDirecao] Período:", dataInicioQuery, "até", dataFimQuery);
+      console.log("[DashboardDirecao] Período:", dataInicioStr, "até", dataFimStr);
 
       // TODAS as queries em paralelo - máxima eficiência
       const [empresasResult, leadsResult, leadsPagosResult, vendasResult, contasResult, campanhasResult, metricasResult] = await Promise.all([
@@ -123,25 +89,25 @@ export default function DashboardDirecao() {
         // Leads TOTAIS (para contagem geral)
         supabase.from("lead")
           .select("id_lead, id_empresa")
-          .gte("data_criacao", dataInicioQuery)
-          .lte("data_criacao", dataFimQuery + "T23:59:59"),
+          .gte("data_criacao", dataInicioStr)
+          .lte("data_criacao", dataFimStr + "T23:59:59"),
         // Leads PAGOS (para CPL correto)
         supabase.from("lead")
           .select("id_lead, id_empresa")
           .eq("lead_pago", true)
-          .gte("data_criacao", dataInicioQuery)
-          .lte("data_criacao", dataFimQuery + "T23:59:59"),
+          .gte("data_criacao", dataInicioStr)
+          .lte("data_criacao", dataFimStr + "T23:59:59"),
         supabase.from("lead")
           .select("id_lead, id_empresa, valor_venda")
           .eq("venda_realizada", true)
-          .gte("data_venda", dataInicioQuery)
-          .lte("data_venda", dataFimQuery + "T23:59:59"),
+          .gte("data_venda", dataInicioStr)
+          .lte("data_venda", dataFimStr + "T23:59:59"),
         supabase.from("conta_anuncio").select("id_conta, id_empresa"),
         supabase.from("campanha").select("id_campanha, id_conta"),
         supabase.from("campanha_metricas_dia")
           .select("id_campanha, verba_investida, data")
-          .gte("data", dataInicioQuery)
-          .lte("data", dataFimQuery)
+          .gte("data", dataInicioStr)
+          .lte("data", dataFimStr)
       ]);
 
       if (empresasResult.error) throw empresasResult.error;
@@ -304,8 +270,6 @@ export default function DashboardDirecao() {
         return "Mês Anterior";
       case "data_especifica":
         return format(dataReferencia, "MMMM/yyyy", { locale: ptBR });
-      case "semana_especifica":
-        return semanaAtual ? `Semana ${semanaAtual.numero_semana}/${semanaAtual.ano}` : "Semana";
       default:
         return "Período";
     }

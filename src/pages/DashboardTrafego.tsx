@@ -533,7 +533,7 @@ export default function DashboardTrafego() {
   const [syncingCreatives, setSyncingCreatives] = useState(false);
   const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState<{ id: string; nome: string } | null>(null);
-  const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
+  const { getDataReferencia, tipoFiltro } = usePeriodo();
 
   // Usar data do filtro selecionado
   const dataReferencia = getDataReferencia();
@@ -547,21 +547,6 @@ export default function DashboardTrafego() {
       if (error) throw error;
       return data;
     },
-  });
-
-  const { data: semanaAtual } = useQuery({
-    queryKey: ["semana-info-trafego", semanaSelecionada],
-    queryFn: async () => {
-      if (!semanaSelecionada) return null;
-      const { data, error } = await supabase
-        .from("semana")
-        .select("*")
-        .eq("id_semana", semanaSelecionada)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!semanaSelecionada,
   });
 
   // Query para distribuição de MQLs por critério
@@ -591,124 +576,71 @@ export default function DashboardTrafego() {
   });
 
   const { data: campanhasMetricas, isLoading } = useQuery({
-    queryKey: ["campanhas-metricas", tipoFiltro, semanaSelecionada, inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada, filtroStatusCampanha],
+    queryKey: ["campanhas-metricas", tipoFiltro, inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada, filtroStatusCampanha],
     queryFn: async () => {
-      // Se for filtro de semana específica, busca só aquela semana
-      if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
-        let query = supabase
-          .from("campanha_semana_metricas")
-          .select(`
-            *,
-            campanha:id_campanha (
-              nome, 
-              id_conta,
-              ativa,
-              url_esperada,
-              conta_anuncio:id_conta (id_empresa, plataforma)
-            )
-          `)
-          .eq("id_semana", semanaSelecionada);
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        let filteredData = data;
-        if (empresaSelecionada !== "todas") {
-          filteredData = data.filter((m: any) => 
-            m.campanha?.conta_anuncio?.id_empresa === empresaSelecionada
-          );
-        }
-
-        // Filtrar por status da campanha
-        if (filtroStatusCampanha !== "todas") {
-          const statusFiltro = filtroStatusCampanha === "ativas";
-          filteredData = filteredData.filter((m: any) => 
-            m.campanha?.ativa === statusFiltro
-          );
-        }
-
-        // Buscar quantidade de criativos para cada campanha
-        const campanhasComCriativos = await Promise.all(
-          filteredData.map(async (m: any) => {
-            const { count } = await supabase
-              .from("criativo")
-              .select("id_criativo", { count: "exact", head: true })
-              .eq("id_campanha", m.id_campanha)
-              .eq("ativo", true);
-
-            return {
-              id_campanha: m.id_campanha,
-              nome: m.campanha?.nome || "Campanha sem nome",
-              leads: m.leads,
-              verba_investida: m.verba_investida,
-              cpl: m.cpl,
-              reunioes: m.reunioes || 0,
-              mqls: m.mqls || 0,
-              levantadas: m.levantadas || 0,
-              vendas: m.vendas || 0,
-              ticket_medio: m.ticket_medio || 0,
-              cac: m.cac || 0,
-              qtd_criativos: count || 0,
-              plataforma: m.campanha?.conta_anuncio?.plataforma || "OUTRO",
-              url_esperada: m.campanha?.url_esperada || null,
-            };
-          })
-        );
-
-        return campanhasComCriativos as CampanhaMetrica[];
-      }
-
-      // Para outros filtros, busca todas as semanas do período
-      const { data: semanas, error: semanasError } = await supabase
-        .from("semana")
-        .select("id_semana")
-        .gte("data_inicio", inicioMes.toISOString())
-        .lte("data_fim", fimMes.toISOString());
-      
-      if (semanasError) throw semanasError;
-      if (!semanas || semanas.length === 0) return [];
-
-      let query = supabase
-        .from("campanha_semana_metricas")
+      // Buscar métricas diárias de campanhas no período
+      const { data: metricasDia, error: metricasError } = await supabase
+        .from("campanha_metricas_dia")
         .select(`
-          *,
-          campanha:id_campanha (
-            nome, 
-            id_conta,
-            ativa,
-            url_esperada,
-            conta_anuncio:id_conta (id_empresa, plataforma)
-          )
+          id_campanha,
+          leads,
+          verba_investida,
+          cliques,
+          impressoes,
+          data
         `)
-        .in("id_semana", semanas.map(s => s.id_semana));
+        .gte("data", format(inicioMes, "yyyy-MM-dd"))
+        .lte("data", format(fimMes, "yyyy-MM-dd"));
+      
+      if (metricasError) throw metricasError;
+      if (!metricasDia || metricasDia.length === 0) return [];
 
-      const { data, error } = await query;
-      if (error) throw error;
+      // Buscar dados das campanhas
+      const campanhaIds = [...new Set(metricasDia.map(m => m.id_campanha))];
+      const { data: campanhas, error: campanhasError } = await supabase
+        .from("campanha")
+        .select(`
+          id_campanha,
+          nome,
+          ativa,
+          url_esperada,
+          conta_anuncio:id_conta (id_empresa, plataforma)
+        `)
+        .in("id_campanha", campanhaIds);
+      
+      if (campanhasError) throw campanhasError;
 
-      let filteredData = data;
+      // Criar mapa de campanhas
+      const campanhaMap = new Map(campanhas?.map(c => [c.id_campanha, c]) || []);
+
+      // Filtrar por empresa
+      let filteredCampanhaIds = campanhaIds;
       if (empresaSelecionada !== "todas") {
-        filteredData = data.filter((m: any) => 
-          m.campanha?.conta_anuncio?.id_empresa === empresaSelecionada
-        );
+        filteredCampanhaIds = campanhaIds.filter(id => {
+          const camp = campanhaMap.get(id);
+          return (camp as any)?.conta_anuncio?.id_empresa === empresaSelecionada;
+        });
       }
 
       // Filtrar por status da campanha
       if (filtroStatusCampanha !== "todas") {
         const statusFiltro = filtroStatusCampanha === "ativas";
-        filteredData = filteredData.filter((m: any) => 
-          m.campanha?.ativa === statusFiltro
-        );
+        filteredCampanhaIds = filteredCampanhaIds.filter(id => {
+          const camp = campanhaMap.get(id);
+          return camp?.ativa === statusFiltro;
+        });
       }
 
       // Agregar métricas por campanha
-      const metricasAgregadas = filteredData.reduce((acc: any, m: any) => {
-        const campanhaId = m.id_campanha;
-        if (!acc[campanhaId]) {
-          acc[campanhaId] = {
-            id_campanha: campanhaId,
-            nome: m.campanha?.nome || "Campanha sem nome",
-            plataforma: m.campanha?.conta_anuncio?.plataforma || "OUTRO",
-            url_esperada: m.campanha?.url_esperada || null,
+      const metricasAgregadas: Record<string, any> = {};
+      metricasDia.filter(m => filteredCampanhaIds.includes(m.id_campanha)).forEach(m => {
+        if (!metricasAgregadas[m.id_campanha]) {
+          const camp = campanhaMap.get(m.id_campanha);
+          metricasAgregadas[m.id_campanha] = {
+            id_campanha: m.id_campanha,
+            nome: camp?.nome || "Campanha sem nome",
+            plataforma: (camp as any)?.conta_anuncio?.plataforma || "OUTRO",
+            url_esperada: camp?.url_esperada || null,
             leads: 0,
             verba_investida: 0,
             reunioes: 0,
@@ -719,14 +651,9 @@ export default function DashboardTrafego() {
             cac: 0,
           };
         }
-        acc[campanhaId].leads += m.leads;
-        acc[campanhaId].verba_investida += m.verba_investida;
-        acc[campanhaId].reunioes += m.reunioes || 0;
-        acc[campanhaId].mqls += m.mqls || 0;
-        acc[campanhaId].levantadas += m.levantadas || 0;
-        acc[campanhaId].vendas += m.vendas || 0;
-        return acc;
-      }, {});
+        metricasAgregadas[m.id_campanha].leads += m.leads || 0;
+        metricasAgregadas[m.id_campanha].verba_investida += Number(m.verba_investida || 0);
+      });
 
       // Buscar quantidade de criativos para cada campanha
       const campanhasAgregadas = Object.values(metricasAgregadas);
@@ -758,7 +685,6 @@ export default function DashboardTrafego() {
       "totais-gerais-empresa",
       empresaSelecionada,
       tipoFiltro,
-      semanaSelecionada,
       inicioMes.toISOString(),
       fimMes.toISOString(),
     ],
@@ -777,27 +703,6 @@ export default function DashboardTrafego() {
         if (empresaSelecionada === "todas") return registros || [];
         return (registros || []).filter((r) => r.id_empresa === empresaSelecionada);
       };
-
-      if (tipoFiltro === "semana_especifica" && semanaSelecionada) {
-        // Para semana específica, usar tabela agregada por empresa
-        const { data, error } = await supabase
-          .from("empresa_semana_metricas")
-          .select("*")
-          .eq("id_semana", semanaSelecionada);
-
-        if (error) throw error;
-
-        const registros = filtrarPorEmpresa(data || []);
-
-        return registros.reduce((acc, r) => ({
-          verba: acc.verba + (r.verba_investida || 0),
-          leads: acc.leads + (r.leads_total || 0),
-          mqls: acc.mqls + (r.mqls || 0),
-          levantadas: acc.levantadas + (r.levantadas || 0),
-          reunioes: acc.reunioes + (r.reunioes || 0),
-          vendas: acc.vendas + (r.vendas || 0),
-        }), baseTotais);
-      }
 
       // Para outros períodos, contar diretamente da tabela lead
       let leadsQuery = supabase
@@ -941,8 +846,6 @@ export default function DashboardTrafego() {
         return "Mês Anterior";
       case "data_especifica":
         return format(dataReferencia, "MMMM/yyyy", { locale: ptBR });
-      case "semana_especifica":
-        return semanaAtual ? `Semana ${semanaAtual.numero_semana}/${semanaAtual.ano}` : "Semana";
       default:
         return "Período";
     }

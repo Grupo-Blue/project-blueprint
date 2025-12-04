@@ -1,10 +1,8 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePeriodo, TipoFiltroPeriodo } from "@/contexts/PeriodoContext";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -12,72 +10,16 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 
 export function FiltroPeriodo() {
-  const { tipoFiltro, dataEspecifica, semanaSelecionada, setTipoFiltro, setDataEspecifica, setSemanaSelecionada, getDataReferencia } = usePeriodo();
+  const { tipoFiltro, dataEspecifica, setTipoFiltro, setDataEspecifica, getDataReferencia } = usePeriodo();
 
   const dataReferencia = getDataReferencia();
-  const inicioMes = startOfMonth(dataReferencia);
-  const fimMes = endOfMonth(dataReferencia);
-
-  // Debug: log do estado atual
-  React.useEffect(() => {
-    console.log("FiltroPeriodo - Estado atual:", {
-      tipoFiltro,
-      dataReferencia: format(dataReferencia, "MMMM yyyy", { locale: ptBR }),
-      dataEspecifica: dataEspecifica ? format(dataEspecifica, "MMMM yyyy", { locale: ptBR }) : null,
-      semanaSelecionada,
-    });
-  }, [tipoFiltro, dataReferencia, dataEspecifica, semanaSelecionada]);
-
-  // Buscar semanas disponíveis do mês de referência
-  const { data: semanas } = useQuery({
-    queryKey: ["semanas-disponiveis", inicioMes.toISOString(), fimMes.toISOString()],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("semana")
-        .select("*")
-        .gte("data_inicio", inicioMes.toISOString())
-        .lte("data_fim", fimMes.toISOString())
-        .order("ano", { ascending: false })
-        .order("numero_semana", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Buscar a semana mais recente com métricas
-  const { data: semanaAtual } = useQuery({
-    queryKey: ["semana-atual-filtro"],
-    queryFn: async () => {
-      const { data: metricasComSemana, error } = await supabase
-        .from("empresa_semana_metricas")
-        .select("id_semana")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (error) throw error;
-      return metricasComSemana?.id_semana;
-    },
-  });
-
-  // Definir semana automaticamente quando mudar para semana_especifica
-  React.useEffect(() => {
-    if (tipoFiltro === "semana_especifica" && !semanaSelecionada && semanas && semanas.length > 0) {
-      // Selecionar a semana mais recente do mês
-      setSemanaSelecionada(semanas[0].id_semana);
-    }
-  }, [semanas, semanaSelecionada, setSemanaSelecionada, tipoFiltro]);
 
   const handleTipoChange = (value: string) => {
     const novoTipo = value as TipoFiltroPeriodo;
     setTipoFiltro(novoTipo);
     
-    // Resetar valores ao mudar tipo
     if (novoTipo !== "data_especifica") {
       setDataEspecifica(null);
-    }
-    if (novoTipo !== "semana_especifica") {
-      setSemanaSelecionada(null);
     }
   };
 
@@ -85,7 +27,6 @@ export function FiltroPeriodo() {
     <div className="flex items-center gap-3 flex-wrap">
       <CalendarIcon className="h-4 w-4 text-muted-foreground" />
       
-      {/* Seletor de tipo de período */}
       <Select value={tipoFiltro} onValueChange={handleTipoChange}>
         <SelectTrigger className="w-[180px]">
           <SelectValue placeholder="Selecione o período" />
@@ -94,11 +35,9 @@ export function FiltroPeriodo() {
           <SelectItem value="mes_atual">Mês Atual</SelectItem>
           <SelectItem value="mes_anterior">Mês Anterior</SelectItem>
           <SelectItem value="data_especifica">Mês Específico</SelectItem>
-          <SelectItem value="semana_especifica">Semana Específica</SelectItem>
         </SelectContent>
       </Select>
 
-      {/* Calendário para data específica */}
       {tipoFiltro === "data_especifica" && (
         <Popover>
           <PopoverTrigger asChild>
@@ -127,24 +66,9 @@ export function FiltroPeriodo() {
         </Popover>
       )}
 
-      {/* Seletor de semanas */}
-      {tipoFiltro === "semana_especifica" && semanas && (
-        <Select
-          value={semanaSelecionada || undefined}
-          onValueChange={setSemanaSelecionada}
-        >
-          <SelectTrigger className="w-[320px]">
-            <SelectValue placeholder="Selecione a semana" />
-          </SelectTrigger>
-          <SelectContent className="bg-background z-50 max-h-[300px]">
-            {semanas.map((semana) => (
-              <SelectItem key={semana.id_semana} value={semana.id_semana}>
-                Semana {semana.numero_semana}/{semana.ano} ({format(new Date(semana.data_inicio), "dd/MMM", { locale: ptBR })} - {format(new Date(semana.data_fim), "dd/MMM", { locale: ptBR })})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+      <span className="text-sm text-muted-foreground">
+        {format(dataReferencia, "MMMM yyyy", { locale: ptBR })}
+      </span>
     </div>
   );
 }
