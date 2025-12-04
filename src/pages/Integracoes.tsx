@@ -64,6 +64,11 @@ export default function Integracoes() {
   const [notionApiToken, setNotionApiToken] = useState("");
   const [notionDatabaseId, setNotionDatabaseId] = useState("1d52e840ab4f80eeac8ad56aed5b5b6e");
 
+  // Metricool credentials
+  const [metricoolUserToken, setMetricoolUserToken] = useState("");
+  const [metricoolUserId, setMetricoolUserId] = useState("");
+  const [metricoolBlogId, setMetricoolBlogId] = useState("");
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -109,6 +114,9 @@ export default function Integracoes() {
     setMauticSenha("");
     setNotionApiToken("");
     setNotionDatabaseId("1d52e840ab4f80eeac8ad56aed5b5b6e");
+    setMetricoolUserToken("");
+    setMetricoolUserId("");
+    setMetricoolBlogId("");
     setEditingId(null);
   };
 
@@ -143,6 +151,10 @@ export default function Integracoes() {
     } else if (integracao.tipo === "NOTION") {
       setNotionApiToken(config.api_token || "");
       setNotionDatabaseId(config.database_id || "1d52e840ab4f80eeac8ad56aed5b5b6e");
+    } else if (integracao.tipo === "METRICOOL") {
+      setMetricoolUserToken(config.user_token || "");
+      setMetricoolUserId(config.user_id || "");
+      setMetricoolBlogId(config.blog_id || "");
     }
     
     setEmpresaSelecionada(config.id_empresa || "");
@@ -188,6 +200,9 @@ export default function Integracoes() {
           break;
         case 'NOTION':
           functionNames = ['sincronizar-notion'];
+          break;
+        case 'METRICOOL':
+          functionNames = ['sincronizar-metricool'];
           break;
         default:
           throw new Error('Tipo de integração não suportado');
@@ -334,6 +349,17 @@ export default function Integracoes() {
         api_token: notionApiToken,
         database_id: notionDatabaseId
       };
+    } else if (tipoIntegracao === "METRICOOL") {
+      if (!metricoolUserToken || !metricoolUserId || !metricoolBlogId) {
+        toast.error("Preencha todos os campos obrigatórios");
+        return;
+      }
+      configJson = {
+        ...configJson,
+        user_token: metricoolUserToken,
+        user_id: metricoolUserId,
+        blog_id: metricoolBlogId
+      };
     }
 
     try {
@@ -411,6 +437,7 @@ export default function Integracoes() {
                     <SelectItem value="TOKENIZA">Tokeniza</SelectItem>
                     <SelectItem value="MAUTIC">Mautic</SelectItem>
                     <SelectItem value="NOTION">Notion</SelectItem>
+                    <SelectItem value="METRICOOL">Metricool</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -651,6 +678,45 @@ export default function Integracoes() {
                 </>
               )}
 
+              {tipoIntegracao === "METRICOOL" && (
+                <>
+                  <Alert className="bg-pink-50 dark:bg-pink-950 border-pink-200 dark:border-pink-800">
+                    <AlertCircle className="h-4 w-4 text-pink-600" />
+                    <AlertTitle className="text-pink-900 dark:text-pink-100">Configuração Metricool</AlertTitle>
+                    <AlertDescription className="text-pink-800 dark:text-pink-200 text-sm space-y-2">
+                      <p><strong>Métricas de Instagram para campanhas de awareness</strong></p>
+                      <p>Acesse app.metricool.com → Configurações → API para obter suas credenciais.</p>
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-2">
+                    <Label>User Token *</Label>
+                    <Input
+                      type="password"
+                      value={metricoolUserToken}
+                      onChange={(e) => setMetricoolUserToken(e.target.value)}
+                      placeholder="Seu token de autenticação"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>User ID *</Label>
+                    <Input
+                      value={metricoolUserId}
+                      onChange={(e) => setMetricoolUserId(e.target.value)}
+                      placeholder="ID do usuário Metricool"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Blog ID *</Label>
+                    <Input
+                      value={metricoolBlogId}
+                      onChange={(e) => setMetricoolBlogId(e.target.value)}
+                      placeholder="ID do blog/marca no Metricool"
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="flex items-center space-x-2">
                 <Switch checked={ativo} onCheckedChange={setAtivo} id="ativo" />
                 <Label htmlFor="ativo">Integração Ativa</Label>
@@ -681,6 +747,7 @@ export default function Integracoes() {
           <TabsTrigger value="tokeniza">Tokeniza</TabsTrigger>
           <TabsTrigger value="mautic">Mautic</TabsTrigger>
           <TabsTrigger value="notion">Notion</TabsTrigger>
+          <TabsTrigger value="metricool">Metricool</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meta" className="space-y-4">
@@ -1081,6 +1148,56 @@ export default function Integracoes() {
                         <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
                         <CardDescription>
                           Database ID: {config.database_id}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                          {integracao.ativo ? 'Ativo' : 'Inativo'}
+                        </span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleTestIntegration(integracao)}
+                          disabled={testingIntegracoes.has(integracao.id_integracao)}
+                        >
+                          <TestTube2 className="w-4 h-4 mr-2" />
+                          {testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar'}
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })
+          )}
+        </TabsContent>
+
+        <TabsContent value="metricool" className="space-y-4">
+          {integracoes.filter(i => i.tipo === "METRICOOL").length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Nenhuma integração Metricool configurada
+              </CardContent>
+            </Card>
+          ) : (
+            integracoes.filter(i => i.tipo === "METRICOOL").map((integracao) => {
+              const config = integracao.config_json as any;
+              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              
+              return (
+                <Card key={integracao.id_integracao}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription>
+                          User ID: {config.user_id} | Blog ID: {config.blog_id}
                         </CardDescription>
                       </div>
                       <div className="flex items-center space-x-2">
