@@ -94,6 +94,13 @@ const CRONJOBS: CronjobConfig[] = [
     functionName: "sincronizar-metricool",
     schedule: "04:00",
     description: "Coleta métricas do Instagram e SmartLinks do Metricool"
+  },
+  {
+    name: "calcular-metricas-diarias",
+    displayName: "Calcular Métricas Diárias",
+    functionName: "calcular-metricas-diarias",
+    schedule: "02:00",
+    description: "Calcula métricas diárias de empresas e campanhas"
   }
 ];
 
