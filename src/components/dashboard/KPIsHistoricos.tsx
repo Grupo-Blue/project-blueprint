@@ -6,7 +6,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { TrendingUp, TrendingDown, Users, DollarSign, Target, Wallet } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useState } from "react";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MetricaComInfo } from "@/components/ui/MetricaComInfo";
 
@@ -22,78 +22,91 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
     queryFn: async () => {
       const mesesAtras = periodo === "6meses" ? 6 : 2;
       const dataInicio = startOfMonth(subMonths(new Date(), mesesAtras - 1));
+      const dataFim = new Date();
 
-      const { data: semanas, error: semanasError } = await supabase
-        .from("semana")
-        .select("id_semana, data_inicio, numero_semana, ano")
-        .gte("data_inicio", dataInicio.toISOString())
-        .order("data_inicio", { ascending: true });
-
-      if (semanasError) throw semanasError;
-      if (!semanas || semanas.length === 0) return [];
-
-      const { data: metricas, error } = await supabase
-        .from("empresa_semana_metricas")
-        .select("*, semana!inner(data_inicio, numero_semana, ano)")
+      const { data, error } = await supabase
+        .from("empresa_metricas_dia")
+        .select("*")
         .eq("id_empresa", empresaId)
-        .in("id_semana", semanas.map(s => s.id_semana))
-        .order("semana(data_inicio)", { ascending: true });
+        .gte("data", format(dataInicio, "yyyy-MM-dd"))
+        .lte("data", format(dataFim, "yyyy-MM-dd"))
+        .order("data", { ascending: true });
 
       if (error) throw error;
-      return metricas || [];
+      return data || [];
     },
     enabled: !!empresaId,
   });
 
-  // Processar dados para os gráficos
-  const dadosProcessados = metricasHistoricas?.map((m: any) => ({
-    semana: `S${m.semana.numero_semana}`,
-    leads: m.leads_total,
-    cpl: m.cpl || (m.leads_total > 0 ? m.verba_investida / m.leads_total : 0),
-    conversao: m.leads_total > 0 ? (m.vendas / m.leads_total) * 100 : 0,
-    verba: m.verba_investida,
-    mes: format(new Date(m.semana.data_inicio), "MMM", { locale: ptBR }),
-  })) || [];
+  // Agrupar dados por semana para visualização mais clara
+  const dadosAgrupados = (() => {
+    if (!metricasHistoricas || metricasHistoricas.length === 0) return [];
 
-  // Calcular totais e variações
+    const porSemana: Record<string, any> = {};
+    
+    metricasHistoricas.forEach((m) => {
+      const data = new Date(m.data);
+      // Agrupar por semana ISO
+      const semanaKey = format(data, "yyyy-'W'ww");
+      const semanaLabel = `S${format(data, "ww")}`;
+      
+      if (!porSemana[semanaKey]) {
+        porSemana[semanaKey] = {
+          semana: semanaLabel,
+          mes: format(data, "MMM", { locale: ptBR }),
+          leads: 0,
+          verba: 0,
+          vendas: 0,
+          dias: 0,
+        };
+      }
+      
+      porSemana[semanaKey].leads += m.leads_total || 0;
+      porSemana[semanaKey].verba += Number(m.verba_investida) || 0;
+      porSemana[semanaKey].vendas += m.vendas || 0;
+      porSemana[semanaKey].dias++;
+    });
+
+    return Object.values(porSemana).map((s: any) => ({
+      ...s,
+      cpl: s.leads > 0 ? s.verba / s.leads : 0,
+      conversao: s.leads > 0 ? (s.vendas / s.leads) * 100 : 0,
+    }));
+  })();
+
+  // Calcular totais e variações por mês
   const mesAtual = new Date().getMonth();
   const mesAnterior = mesAtual - 1;
 
-  const dadosMesAtual = dadosProcessados.filter((d: any) => {
-    const dataItem = metricasHistoricas?.find((m: any) => `S${m.semana.numero_semana}` === d.semana);
-    if (!dataItem) return false;
-    return new Date(dataItem.semana.data_inicio).getMonth() === mesAtual;
-  });
+  const dadosMesAtual = metricasHistoricas?.filter((m) => 
+    new Date(m.data).getMonth() === mesAtual
+  ) || [];
 
-  const dadosMesAnterior = dadosProcessados.filter((d: any) => {
-    const dataItem = metricasHistoricas?.find((m: any) => `S${m.semana.numero_semana}` === d.semana);
-    if (!dataItem) return false;
-    return new Date(dataItem.semana.data_inicio).getMonth() === mesAnterior;
-  });
+  const dadosMesAnterior = metricasHistoricas?.filter((m) => 
+    new Date(m.data).getMonth() === mesAnterior
+  ) || [];
 
-  const calcularTotal = (dados: any[], campo: string) => 
-    dados.reduce((acc, d) => acc + (d[campo] || 0), 0);
+  const calcularTotalDia = (dados: any[], campo: string) => 
+    dados.reduce((acc, d) => acc + (Number(d[campo]) || 0), 0);
 
-  const calcularMedia = (dados: any[], campo: string) => {
-    const total = calcularTotal(dados, campo);
-    return dados.length > 0 ? total / dados.length : 0;
-  };
-
-  const leadsAtual = calcularTotal(dadosMesAtual, "leads");
-  const leadsAnterior = calcularTotal(dadosMesAnterior, "leads");
+  const leadsAtual = calcularTotalDia(dadosMesAtual, "leads_total");
+  const leadsAnterior = calcularTotalDia(dadosMesAnterior, "leads_total");
   const variacaoLeads = leadsAnterior > 0 ? ((leadsAtual - leadsAnterior) / leadsAnterior) * 100 : 0;
 
-  const cplAtual = calcularMedia(dadosMesAtual, "cpl");
-  const cplAnterior = calcularMedia(dadosMesAnterior, "cpl");
+  const verbaAtual = calcularTotalDia(dadosMesAtual, "verba_investida");
+  const verbaAnterior = calcularTotalDia(dadosMesAnterior, "verba_investida");
+  const variacaoVerba = verbaAnterior > 0 ? ((verbaAtual - verbaAnterior) / verbaAnterior) * 100 : 0;
+
+  const vendasAtual = calcularTotalDia(dadosMesAtual, "vendas");
+  const vendasAnterior = calcularTotalDia(dadosMesAnterior, "vendas");
+
+  const cplAtual = leadsAtual > 0 ? verbaAtual / leadsAtual : 0;
+  const cplAnterior = leadsAnterior > 0 ? verbaAnterior / leadsAnterior : 0;
   const variacaoCpl = cplAnterior > 0 ? ((cplAtual - cplAnterior) / cplAnterior) * 100 : 0;
 
-  const conversaoAtual = calcularMedia(dadosMesAtual, "conversao");
-  const conversaoAnterior = calcularMedia(dadosMesAnterior, "conversao");
+  const conversaoAtual = leadsAtual > 0 ? (vendasAtual / leadsAtual) * 100 : 0;
+  const conversaoAnterior = leadsAnterior > 0 ? (vendasAnterior / leadsAnterior) * 100 : 0;
   const variacaoConversao = conversaoAnterior > 0 ? ((conversaoAtual - conversaoAnterior) / conversaoAnterior) * 100 : 0;
-
-  const verbaAtual = calcularTotal(dadosMesAtual, "verba");
-  const verbaAnterior = calcularTotal(dadosMesAnterior, "verba");
-  const variacaoVerba = verbaAnterior > 0 ? ((verbaAtual - verbaAnterior) / verbaAnterior) * 100 : 0;
 
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -209,7 +222,7 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
           valor={leadsAtual}
           variacao={variacaoLeads}
           icon={Users}
-          dados={dadosProcessados}
+          dados={dadosAgrupados}
           dataKey="leads"
           info="Total de leads gerados no período selecionado."
         />
@@ -218,7 +231,7 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
           valor={formatCurrency(cplAtual)}
           variacao={variacaoCpl}
           icon={DollarSign}
-          dados={dadosProcessados}
+          dados={dadosAgrupados}
           dataKey="cpl"
           formatValue={(v) => formatCurrency(v)}
           invertVariacao={true}
@@ -229,7 +242,7 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
           valor={`${conversaoAtual.toFixed(1)}%`}
           variacao={variacaoConversao}
           icon={Target}
-          dados={dadosProcessados}
+          dados={dadosAgrupados}
           dataKey="conversao"
           formatValue={(v) => `${v.toFixed(1)}%`}
           info="Taxa de conversão de leads em vendas. Quanto maior, melhor."
@@ -239,7 +252,7 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
           valor={formatCurrency(verbaAtual)}
           variacao={variacaoVerba}
           icon={Wallet}
-          dados={dadosProcessados}
+          dados={dadosAgrupados}
           dataKey="verba"
           formatValue={(v) => formatCurrency(v)}
           info="Total investido em mídia paga (Meta + Google Ads) no período."

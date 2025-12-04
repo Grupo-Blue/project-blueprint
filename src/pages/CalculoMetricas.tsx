@@ -3,65 +3,53 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Calculator, Play, CheckCircle, AlertCircle, Calendar, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function CalculoMetricas() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [semanaSelecionada, setSemanaSelecionada] = useState<string>("latest");
-
-  const { data: semanas } = useQuery({
-    queryKey: ["semanas-calculo"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("semana")
-        .select("*")
-        .order("ano", { ascending: false })
-        .order("numero_semana", { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data;
-    },
-  });
+  const [dataSelecionada, setDataSelecionada] = useState<string>(
+    format(subDays(new Date(), 1), "yyyy-MM-dd")
+  );
 
   const { data: ultimosCalculos } = useQuery({
-    queryKey: ["ultimos-calculos"],
+    queryKey: ["ultimos-calculos-diarios"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("empresa_semana_metricas")
+        .from("empresa_metricas_dia")
         .select(`
           *,
-          empresa:id_empresa (nome),
-          semana:id_semana (numero_semana, ano)
+          empresa:id_empresa (nome)
         `)
+        .order("data", { ascending: false })
         .order("updated_at", { ascending: false })
-        .limit(10);
+        .limit(15);
       if (error) throw error;
       return data;
     },
   });
 
   const calcularMetricasMutation = useMutation({
-    mutationFn: async (id_semana?: string) => {
-      const { data, error } = await supabase.functions.invoke('calcular-metricas-semanais', {
-        body: { id_semana },
+    mutationFn: async (data?: string) => {
+      const { data: result, error } = await supabase.functions.invoke('calcular-metricas-diarias', {
+        body: { data },
       });
 
       if (error) throw error;
-      return data;
+      return result;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["ultimos-calculos"] });
+      queryClient.invalidateQueries({ queryKey: ["ultimos-calculos-diarios"] });
       queryClient.invalidateQueries({ queryKey: ["metricas-direcao"] });
-      queryClient.invalidateQueries({ queryKey: ["campanhas-metricas"] });
+      queryClient.invalidateQueries({ queryKey: ["metricas-diarias"] });
       toast({
         title: "Métricas calculadas",
-        description: `Processadas ${data.empresas_processadas} empresas e ${data.campanhas_processadas} campanhas`,
+        description: `Processadas ${data.empresas_processadas} empresas para ${data.data_calculada}`,
       });
     },
     onError: (error: any) => {
@@ -74,7 +62,7 @@ export default function CalculoMetricas() {
   });
 
   const handleCalcular = () => {
-    calcularMetricasMutation.mutate(semanaSelecionada === "latest" ? undefined : semanaSelecionada);
+    calcularMetricasMutation.mutate(dataSelecionada);
   };
 
   return (
@@ -83,7 +71,7 @@ export default function CalculoMetricas() {
         <div>
           <h1 className="text-4xl font-bold text-foreground">Motor de Métricas</h1>
           <p className="text-muted-foreground mt-2">
-            Cálculo automático de métricas semanais e funil de conversão
+            Cálculo automático de métricas diárias por empresa
           </p>
         </div>
 
@@ -92,27 +80,23 @@ export default function CalculoMetricas() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
-              Calcular Métricas Semanais
+              Calcular Métricas Diárias
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">
-                Semana (deixe em branco para calcular a semana mais recente)
+                Data para cálculo
               </label>
-              <Select value={semanaSelecionada} onValueChange={setSemanaSelecionada}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Semana mais recente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="latest">Semana mais recente</SelectItem>
-                  {semanas?.map((s) => (
-                    <SelectItem key={s.id_semana} value={s.id_semana}>
-                      Semana {s.numero_semana}/{s.ano} ({format(new Date(s.data_inicio), "dd/MM", { locale: ptBR })} - {format(new Date(s.data_fim), "dd/MM", { locale: ptBR })})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                type="date"
+                value={dataSelecionada}
+                onChange={(e) => setDataSelecionada(e.target.value)}
+                max={format(new Date(), "yyyy-MM-dd")}
+              />
+              <p className="text-xs text-muted-foreground">
+                Por padrão, calcula métricas do dia anterior. Você pode selecionar qualquer data passada.
+              </p>
             </div>
 
             <div className="bg-muted/50 p-4 rounded-lg space-y-2">
@@ -121,12 +105,12 @@ export default function CalculoMetricas() {
                 O que será calculado:
               </h4>
               <ul className="text-sm text-muted-foreground space-y-1 ml-6">
-                <li>• Verba investida por empresa e campanha</li>
-                <li>• Total de leads gerados</li>
+                <li>• Verba investida por empresa (soma das campanhas)</li>
+                <li>• Total de leads gerados no dia</li>
+                <li>• Leads pagos (oriundos de campanhas)</li>
+                <li>• MQLs, Levantadas, Reuniões e Vendas</li>
                 <li>• CPL (Custo por Lead) e CAC (Custo de Aquisição)</li>
-                <li>• Funil completo: MQLs, Levantadas, Reuniões, Vendas</li>
                 <li>• Ticket médio de vendas</li>
-                <li>• Taxas de conversão em cada etapa</li>
               </ul>
             </div>
 
@@ -159,24 +143,25 @@ export default function CalculoMetricas() {
               ) : (
                 ultimosCalculos?.map((calculo: any) => (
                   <div
-                    key={`${calculo.id_empresa}-${calculo.id_semana}`}
+                    key={calculo.id_metricas_dia}
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-3">
                         <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="font-medium">{calculo.empresa.nome}</span>
+                        <span className="font-medium">{calculo.empresa?.nome}</span>
                         <Badge variant="outline">
-                          Semana {calculo.semana.numero_semana}/{calculo.semana.ano}
+                          {format(new Date(calculo.data), "dd/MM/yyyy", { locale: ptBR })}
                         </Badge>
                       </div>
                       <div className="text-sm text-muted-foreground ml-7">
-                        {calculo.leads_total} leads • R$ {calculo.verba_investida.toLocaleString("pt-BR")} investidos
-                        {calculo.cpl && ` • CPL: R$ ${calculo.cpl.toFixed(2)}`}
+                        {calculo.leads_total} leads • R$ {Number(calculo.verba_investida || 0).toLocaleString("pt-BR")} investidos
+                        {calculo.cpl && ` • CPL: R$ ${Number(calculo.cpl).toFixed(2)}`}
+                        {calculo.vendas > 0 && ` • ${calculo.vendas} vendas`}
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {format(new Date(calculo.updated_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      {format(new Date(calculo.updated_at), "dd/MM HH:mm", { locale: ptBR })}
                     </div>
                   </div>
                 ))
@@ -195,14 +180,15 @@ export default function CalculoMetricas() {
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p>
-              <strong>Cálculo Manual:</strong> Use o botão acima para calcular métricas de qualquer semana.
+              <strong>Cálculo Manual:</strong> Use o botão acima para calcular métricas de qualquer data.
             </p>
             <p>
-              <strong>Automação (Opcional):</strong> Configure um cron job para executar automaticamente:
+              <strong>Automação:</strong> As métricas diárias são calculadas automaticamente todos os dias às 2 AM UTC.
             </p>
             <ul className="list-disc list-inside ml-4 space-y-1 text-muted-foreground">
-              <li>Toda segunda-feira para calcular a semana anterior</li>
-              <li>Diariamente para atualizar métricas da semana atual</li>
+              <li>Calcula métricas do dia anterior para todas as empresas</li>
+              <li>Agrega dados de campanhas, leads e vendas</li>
+              <li>Dashboards são atualizados automaticamente</li>
             </ul>
           </CardContent>
         </Card>
