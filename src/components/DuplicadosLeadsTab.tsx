@@ -58,17 +58,18 @@ const DuplicadosLeadsTab = () => {
 
   const podeMergear = userRoles?.some(role => ['admin', 'direcao', 'sdr'].includes(role));
 
-  // Buscar leads duplicados (mesmo email, Pipedrive + Tokeniza)
+  // Buscar leads duplicados (mesmo email, apenas Tokeniza)
   const { data: duplicados, isLoading, refetch } = useQuery({
     queryKey: ["leads-duplicados"],
     queryFn: async () => {
-      // Buscar todos os leads não merged com email
+      // Buscar apenas leads da Tokeniza não merged com email
       const { data: leads, error } = await supabase
         .from("lead")
         .select(`
           *,
           empresa:id_empresa (nome)
         `)
+        .eq("id_empresa", "61b5ffeb-fbbc-47c1-8ced-152bb647ed20") // Apenas Tokeniza
         .not("email", "is", null)
         .or("merged.is.null,merged.eq.false")
         .order("data_criacao", { ascending: false });
@@ -130,37 +131,43 @@ const DuplicadosLeadsTab = () => {
       const leadsTokeniza = grupo.leadsTokeniza;
 
       // Consolidar dados Tokeniza
-      const valorTotalTokeniza = leadsTokeniza.reduce((sum, l) => sum + (l.valor_venda || 0), 0);
+      const valorTotalInvestido = leadsTokeniza.reduce((sum, l) => sum + (l.valor_venda || 0), 0);
       const qtdInvestimentos = leadsTokeniza.length;
-      const ultimaVenda = leadsTokeniza
+      
+      // Ordenar por data de venda para pegar a última compra
+      const leadsOrdenados = leadsTokeniza
         .filter(l => l.data_venda)
-        .sort((a, b) => new Date(b.data_venda).getTime() - new Date(a.data_venda).getTime())[0]?.data_venda;
+        .sort((a, b) => new Date(b.data_venda).getTime() - new Date(a.data_venda).getTime());
+      
+      const ultimaCompra = leadsOrdenados[0];
+      const valorUltimaCompra = ultimaCompra?.valor_venda || 0;
+      const dataUltimaCompra = ultimaCompra?.data_venda;
+      
       const primeiroInvestimento = leadsTokeniza
         .filter(l => l.data_venda)
         .sort((a, b) => new Date(a.data_venda).getTime() - new Date(b.data_venda).getTime())[0]?.data_venda;
       
       // Extrair projetos únicos
       const projetos = [...new Set(leadsTokeniza.map(l => l.tokeniza_projeto_nome).filter(Boolean))];
-      const ultimoProjeto = leadsTokeniza
-        .filter(l => l.data_venda && l.tokeniza_projeto_nome)
-        .sort((a, b) => new Date(b.data_venda).getTime() - new Date(a.data_venda).getTime())[0]?.tokeniza_projeto_nome;
+      const ultimoProjeto = ultimaCompra?.tokeniza_projeto_nome;
 
       // 1. Atualizar lead principal com dados consolidados
       const { error: updateError } = await supabase
         .from("lead")
         .update({
-          // Dados Tokeniza sempre sobrescrevem
-          valor_venda: valorTotalTokeniza,
-          data_venda: ultimaVenda || leadPrincipal.data_venda,
-          venda_realizada: valorTotalTokeniza > 0,
-          tokeniza_investidor: valorTotalTokeniza > 0,
-          tokeniza_valor_investido: valorTotalTokeniza,
+          // valor_venda = valor da última compra (não soma)
+          valor_venda: valorUltimaCompra,
+          data_venda: dataUltimaCompra || leadPrincipal.data_venda,
+          venda_realizada: valorUltimaCompra > 0,
+          tokeniza_investidor: valorTotalInvestido > 0,
+          // tokeniza_valor_investido = soma total de todos investimentos
+          tokeniza_valor_investido: valorTotalInvestido,
           tokeniza_qtd_investimentos: qtdInvestimentos,
           tokeniza_projetos: projetos,
           tokeniza_projeto_nome: ultimoProjeto,
           tokeniza_primeiro_investimento: primeiroInvestimento,
-          tokeniza_ultimo_investimento: ultimaVenda,
-          tokeniza_carrinho_abandonado: false, // Se já investiu, não é carrinho abandonado
+          tokeniza_ultimo_investimento: dataUltimaCompra,
+          tokeniza_carrinho_abandonado: false,
         })
         .eq("id_lead", leadPrincipalId);
 
@@ -256,7 +263,7 @@ const DuplicadosLeadsTab = () => {
         <CardHeader>
           <CardTitle>Nenhum Lead Duplicado</CardTitle>
           <CardDescription>
-            Não há emails com leads duplicados entre Pipedrive e Tokeniza.
+            Não há emails com leads duplicados na Tokeniza.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -279,7 +286,7 @@ const DuplicadosLeadsTab = () => {
       <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
         <AlertTriangle className="h-5 w-5 text-amber-600" />
         <span className="text-sm">
-          <strong>{duplicados.length} emails</strong> com leads duplicados detectados (Pipedrive + Tokeniza)
+          <strong>{duplicados.length} emails</strong> com leads duplicados detectados (apenas Tokeniza)
         </span>
       </div>
 
@@ -430,7 +437,12 @@ const DuplicadosLeadsTab = () => {
                               {principal?.mautic_score && <p><strong>Mautic:</strong> Score {principal.mautic_score}</p>}
                               <p><strong>Stage:</strong> {principal?.stage_atual || '-'}</p>
                               <p className="text-green-600 dark:text-green-400">
-                                <strong>Valor Venda:</strong> R$ {grupo.valorTotalTokeniza.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (sempre Tokeniza)
+                                <strong>Última Compra:</strong> R$ {(grupo.leadsTokeniza
+                                  .filter(l => l.data_venda)
+                                  .sort((a, b) => new Date(b.data_venda).getTime() - new Date(a.data_venda).getTime())[0]?.valor_venda || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                              <p className="text-muted-foreground">
+                                <strong>Total Investido:</strong> R$ {grupo.valorTotalTokeniza.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                               </p>
                               <p className="text-green-600 dark:text-green-400">
                                 <strong>Data Venda:</strong> {grupo.leadsTokeniza
@@ -485,11 +497,14 @@ const DuplicadosLeadsTab = () => {
               <p>
                 Você está prestes a consolidar <strong>{grupoParaMerge?.totalLeads || 0} leads</strong> em um único registro.
               </p>
-              {leadPrincipalPreview && (
+              {leadPrincipalPreview && grupoParaMerge && (
                 <div className="p-3 bg-muted rounded-lg text-sm">
                   <p><strong>Lead Principal:</strong> {leadPrincipalPreview.nome_lead || 'Sem nome'}</p>
                   <p><strong>Email:</strong> {grupoParaMerge?.email}</p>
-                  <p><strong>Valor Final:</strong> R$ {grupoParaMerge?.valorTotalTokeniza.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  <p><strong>Última Compra:</strong> R$ {(grupoParaMerge.leadsTokeniza
+                    .filter(l => l.data_venda)
+                    .sort((a, b) => new Date(b.data_venda).getTime() - new Date(a.data_venda).getTime())[0]?.valor_venda || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  <p><strong>Total Investido:</strong> R$ {grupoParaMerge?.valorTotalTokeniza.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                 </div>
               )}
               <p className="text-amber-600 dark:text-amber-400">
