@@ -3,9 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from "recharts";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { subMonths, startOfMonth } from "date-fns";
+import { MetricaComInfo } from "@/components/ui/MetricaComInfo";
 
 const COLORS = [
   "hsl(var(--primary))",
@@ -121,6 +122,7 @@ export function DistribuicaoEmpresa() {
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
+  // CustomLabel - percent do Recharts já vem como 0-1, então multiplicamos por 100
   const CustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
     if (percent < 0.05) return null;
     const RADIAN = Math.PI / 180;
@@ -149,7 +151,10 @@ export function DistribuicaoEmpresa() {
           🥧 Distribuição Gasto vs Resultado
         </CardTitle>
         <CardDescription>
-          Comparação % do gasto vs % das vendas por empresa (últimos 6 meses)
+          <MetricaComInfo 
+            label="Comparação % do gasto vs % das vendas por empresa (últimos 6 meses)"
+            info="Mostra como o investimento em mídia está distribuído entre empresas comparado com a distribuição de vendas. Alertas são gerados quando uma empresa consome mais % do orçamento do que gera em vendas."
+          />
         </CardDescription>
       </CardHeader>
       <CardContent>

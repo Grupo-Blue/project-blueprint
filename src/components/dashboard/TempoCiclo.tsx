@@ -40,12 +40,20 @@ const calcularMedia = (valores: number[]): number => {
 
 export const TempoCiclo = ({ empresaId }: TempoCicloProps) => {
   const { getDataReferencia } = usePeriodo();
-  const dataReferencia = getDataReferencia();
+  
+  // Usar data de referência com fallback para hoje
+  let dataReferencia: Date;
+  try {
+    const ref = getDataReferencia();
+    dataReferencia = ref instanceof Date && !isNaN(ref.getTime()) ? ref : new Date();
+  } catch {
+    dataReferencia = new Date();
+  }
   
   // Buscar leads dos últimos 3 meses com datas de transição
   const tresMesesAtras = subMonths(dataReferencia, 3);
 
-  const { data: leads, isLoading } = useQuery({
+  const { data: leads, isLoading, error } = useQuery({
     queryKey: ["leads-ciclo", empresaId, tresMesesAtras.toISOString()],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -56,7 +64,7 @@ export const TempoCiclo = ({ empresaId }: TempoCicloProps) => {
         .order("data_criacao", { ascending: false });
 
       if (error) throw error;
-      return data as LeadComDatas[];
+      return (data || []) as LeadComDatas[];
     },
     enabled: !!empresaId,
   });
@@ -156,6 +164,30 @@ export const TempoCiclo = ({ empresaId }: TempoCicloProps) => {
         <CardContent>
           <div className="flex items-center justify-center h-48">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Mostrar estado vazio se não há leads ou se houve erro
+  if (error || !leads || leads.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Tempo de Ciclo de Vendas
+          </CardTitle>
+          <CardDescription>
+            Mediana de dias entre etapas do funil
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <Clock className="h-12 w-12 mx-auto mb-2 opacity-30" />
+            <p>Sem leads no período selecionado</p>
+            <p className="text-sm mt-1">Selecione outra empresa ou período</p>
           </div>
         </CardContent>
       </Card>
