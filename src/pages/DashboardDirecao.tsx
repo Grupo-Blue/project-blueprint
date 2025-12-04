@@ -25,6 +25,7 @@ import { usePeriodo } from "@/contexts/PeriodoContext";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { useUserEmpresas } from "@/hooks/useUserEmpresas";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
+import { MetricasSociaisExecutivo } from "@/components/dashboard/MetricasSociaisExecutivo";
 
 interface EmpresaMetrica {
   id_empresa: string;
@@ -459,6 +460,12 @@ export default function DashboardDirecao() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Métricas de Awareness - Redes Sociais */}
+        <MetricasSociaisExecutivo 
+          empresaId={empresaSelecionada !== "todas" ? empresaSelecionada : undefined}
+          dataReferencia={dataReferencia}
+        />
 
         {/* Métricas por Empresa */}
         <Card>
