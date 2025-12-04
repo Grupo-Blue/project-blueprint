@@ -55,6 +55,21 @@ serve(async (req) => {
     });
     console.log(`Projetos mapeados: ${Object.keys(projetoNomeMap).length}`);
 
+    // Buscar dados de usuários para enriquecer leads com nome e email
+    const { data: usuarios } = await supabase
+      .from("tokeniza_usuario")
+      .select("user_id_tokeniza, first_name, last_name, email");
+    
+    const usuarioMap: Record<string, { first_name: string | null; last_name: string | null; email: string | null }> = {};
+    usuarios?.forEach(u => {
+      usuarioMap[u.user_id_tokeniza] = {
+        first_name: u.first_name,
+        last_name: u.last_name,
+        email: u.email,
+      };
+    });
+    console.log(`Usuários mapeados: ${Object.keys(usuarioMap).length}`);
+
     const resultados = {
       investimentos: { success: 0, error: 0 },
       vendas: { success: 0, error: 0 },
