@@ -97,24 +97,72 @@ async function coletarMetricasRede(
       if (resp.ok) {
         const data = await resp.json();
         
+        // DEBUG: Logar estrutura do primeiro item para entender o formato da API
+        if (data && data.length > 0) {
+          console.log(`    📋 Estrutura do primeiro item: ${JSON.stringify(data[0])}`);
+          console.log(`    📋 Tipo do item: ${typeof data[0]}, É array: ${Array.isArray(data[0])}`);
+        }
+        
         let valorAnterior = 0;
         for (const item of (data || [])) {
-          // Pular itens sem data válida
-          if (!item.date) {
-            console.log(`    ⚠️ Item sem data válida, pulando...`);
+          let dataStr: string | null = null;
+          let valorMetrica: number = 0;
+          
+          // Verificar se é formato array [valor, timestamp] ou [timestamp, valor]
+          if (Array.isArray(item)) {
+            console.log(`    📋 Item é array: ${JSON.stringify(item)}`);
+            if (item.length >= 2) {
+              // Tentar detectar qual é timestamp e qual é valor
+              const primeiro = item[0];
+              const segundo = item[1];
+              
+              // Se o primeiro for um número grande (timestamp unix em ms), é formato [timestamp, valor]
+              if (typeof primeiro === 'number' && primeiro > 1000000000000) {
+                dataStr = new Date(primeiro).toISOString().split('T')[0];
+                valorMetrica = segundo || 0;
+              }
+              // Se o segundo for um número grande, é formato [valor, timestamp]
+              else if (typeof segundo === 'number' && segundo > 1000000000000) {
+                dataStr = new Date(segundo).toISOString().split('T')[0];
+                valorMetrica = primeiro || 0;
+              }
+              // Se o primeiro for string de data
+              else if (typeof primeiro === 'string') {
+                dataStr = primeiro;
+                valorMetrica = segundo || 0;
+              }
+            }
+          } else if (typeof item === 'object' && item !== null) {
+            // Formato objeto - tentar múltiplos nomes de campo para data
+            const possiveisData = item.date || item.datetime || item.day || item.timestamp || item.time || item.d;
+            valorMetrica = item.value ?? item.val ?? item.v ?? item.count ?? 0;
+            
+            if (possiveisData) {
+              // Se for número (timestamp unix)
+              if (typeof possiveisData === 'number') {
+                // Verificar se é ms ou segundos
+                const ts = possiveisData > 1000000000000 ? possiveisData : possiveisData * 1000;
+                dataStr = new Date(ts).toISOString().split('T')[0];
+              } else {
+                dataStr = String(possiveisData);
+              }
+            }
+          }
+          
+          // Se não encontrou data, logar e pular
+          if (!dataStr) {
+            console.log(`    ⚠️ Item sem data válida: ${JSON.stringify(item).substring(0, 150)}`);
             continue;
           }
           
-          // A data pode vir em formato YYYYMMDD ou YYYY-MM-DD
-          let dataStr = String(item.date);
+          // Converter YYYYMMDD para YYYY-MM-DD se necessário
           if (dataStr.length === 8 && !dataStr.includes('-')) {
-            // Converter YYYYMMDD para YYYY-MM-DD
             dataStr = `${dataStr.substring(0, 4)}-${dataStr.substring(4, 6)}-${dataStr.substring(6, 8)}`;
           }
           
           // Validar formato final da data (YYYY-MM-DD)
           if (!/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) {
-            console.log(`    ⚠️ Formato de data inválido: ${dataStr}, pulando...`);
+            console.log(`    ⚠️ Formato de data inválido após conversão: ${dataStr}`);
             continue;
           }
           
@@ -131,12 +179,12 @@ async function coletarMetricasRede(
           }
           
           const metricas = metricasPorData.get(dataStr)!;
-          metricas[metrica.campo] = item.value || 0;
+          metricas[metrica.campo] = valorMetrica;
           
           // Calcular novos seguidores se for métrica de seguidores
           if (metrica.campo === 'seguidores_total') {
-            metricas.novos_seguidores = valorAnterior > 0 ? (item.value || 0) - valorAnterior : 0;
-            valorAnterior = item.value || 0;
+            metricas.novos_seguidores = valorAnterior > 0 ? valorMetrica - valorAnterior : 0;
+            valorAnterior = valorMetrica;
           }
         }
         
