@@ -49,6 +49,12 @@ const getUtmQuality = (lead: any) => {
   return { status: 'ausente', badge: '🔴', label: 'Ausente' };
 };
 
+// Helper para identificar produto Blue
+const getProdutoBlue = (nomeLead: string | null): string | null => {
+  if (!nomeLead) return null;
+  return nomeLead.toLowerCase().includes('consultoria') ? 'Consultoria' : 'IR Cripto';
+};
+
 const Leads = () => {
   const { tipoFiltro, semanaSelecionada, getDataReferencia } = usePeriodo();
   const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
@@ -898,9 +904,13 @@ const Leads = () => {
                                 <span className="font-mono font-semibold">
                                   {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.valor_venda)}
                                 </span>
-                                {(lead as any).tokeniza_projeto_nome && (
+                                {(lead as any).tokeniza_projeto_nome ? (
                                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                                     📦 {(lead as any).tokeniza_projeto_nome}
+                                  </span>
+                                ) : (lead as any).empresa?.nome?.toLowerCase().includes('blue') && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    📋 {getProdutoBlue(lead.nome_lead)}
                                   </span>
                                 )}
                               </div>
