@@ -54,36 +54,6 @@ const Dashboard = () => {
     },
   });
 
-  // Buscar leads do período selecionado
-  const { data: leadsDoMes } = useQuery({
-    queryKey: ["leads-periodo", inicioMes.toISOString(), fimMes.toISOString()],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("lead")
-        .select("id_lead, venda_realizada, valor_venda")
-        .gte("data_criacao", inicioMes.toISOString())
-        .lte("data_criacao", fimMes.toISOString());
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Determinar label do período
-  const getLabelPeriodo = () => {
-    switch (tipoFiltro) {
-      case "mes_atual":
-        return "do Mês Atual";
-      case "mes_anterior":
-        return "do Mês Anterior";
-      case "data_especifica":
-        return `de ${format(dataReferencia, "MMMM/yyyy", { locale: ptBR })}`;
-      default:
-        return "do Período";
-    }
-  };
-
-  const labelPeriodo = getLabelPeriodo();
-
   // Buscar métricas diárias do período
   const { data: metricasDiarias } = useQuery({
     queryKey: ["metricas-dashboard-diarias", inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada],
@@ -103,6 +73,32 @@ const Dashboard = () => {
     enabled: !!empresaSelecionada,
   });
 
+  // Estatísticas calculadas das métricas diárias
+  const totaisMetricas = metricasDiarias?.reduce(
+    (acc, m) => ({
+      verba: acc.verba + Number(m.verba_investida || 0),
+      leads: acc.leads + (m.leads_total || 0),
+      vendas: acc.vendas + (m.vendas || 0),
+    }),
+    { verba: 0, leads: 0, vendas: 0 }
+  ) || { verba: 0, leads: 0, vendas: 0 };
+
+  // Determinar label do período
+  const getLabelPeriodo = () => {
+    switch (tipoFiltro) {
+      case "mes_atual":
+        return "do Mês Atual";
+      case "mes_anterior":
+        return "do Mês Anterior";
+      case "data_especifica":
+        return `de ${format(dataReferencia, "MMMM/yyyy", { locale: ptBR })}`;
+      default:
+        return "do Período";
+    }
+  };
+
+  const labelPeriodo = getLabelPeriodo();
+
   // Loading state
   if (loadingEmpresas) {
     return (
@@ -117,20 +113,11 @@ const Dashboard = () => {
     return <SemAcessoEmpresas />;
   }
 
-  // Calcular estatísticas
+  // Calcular estatísticas a partir das métricas diárias agregadas
   const totalCampanhas = campanhas?.length || 0;
-  const totalLeads = leadsDoMes?.length || 0;
-  const totalVendas = leadsDoMes?.filter((l) => l.venda_realizada).length || 0;
+  const totalLeads = totaisMetricas.leads;
+  const totalVendas = totaisMetricas.vendas;
   const taxaConversao = totalLeads > 0 ? (totalVendas / totalLeads) * 100 : 0;
-
-  const totaisMetricas = metricasDiarias?.reduce(
-    (acc, m) => ({
-      verba: acc.verba + Number(m.verba_investida || 0),
-      leads: acc.leads + (m.leads_total || 0),
-    }),
-    { verba: 0, leads: 0 }
-  ) || { verba: 0, leads: 0 };
-
   const cplMedio = totaisMetricas.leads > 0 ? totaisMetricas.verba / totaisMetricas.leads : 0;
 
   return (
