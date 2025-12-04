@@ -1222,6 +1222,41 @@ export type Database = {
         }
         Relationships: []
       }
+      merge_ignorado: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          id_empresa: string
+          ignorado_por: string
+          motivo: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          id_empresa: string
+          ignorado_por: string
+          motivo?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          id_empresa?: string
+          ignorado_por?: string
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merge_ignorado_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           aprovado: boolean
