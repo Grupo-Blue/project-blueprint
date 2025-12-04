@@ -87,6 +87,13 @@ const CRONJOBS: CronjobConfig[] = [
     functionName: "enriquecer-leads-lote",
     schedule: "06:15",
     description: "Enriquece leads com dados do Mautic"
+  },
+  {
+    name: "sincronizar-metricool",
+    displayName: "Sincronizar Metricool",
+    functionName: "sincronizar-metricool",
+    schedule: "04:00",
+    description: "Coleta métricas do Instagram e SmartLinks do Metricool"
   }
 ];
 
