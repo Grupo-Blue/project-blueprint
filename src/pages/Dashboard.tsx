@@ -13,6 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useState, useEffect } from "react";
 import { useUserEmpresas } from "@/hooks/useUserEmpresas";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
+import { KPIsHistoricos } from "@/components/dashboard/KPIsHistoricos";
+import { DistribuicaoEmpresa } from "@/components/dashboard/DistribuicaoEmpresa";
+import { CoorteQualidade } from "@/components/dashboard/CoorteQualidade";
+import { TrackingScore } from "@/components/dashboard/TrackingScore";
 
 const Dashboard = () => {
   const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
@@ -254,10 +258,38 @@ const Dashboard = () => {
         </Card>
       </div>
 
+      {/* NOVA SEÇÃO: KPIs Históricos */}
+      {empresaSelecionada && (
+        <div className="mb-6 md:mb-8">
+          <KPIsHistoricos empresaId={empresaSelecionada} />
+        </div>
+      )}
+
+      {/* NOVA SEÇÃO: Distribuição por Empresa (visível quando há múltiplas empresas) */}
+      {empresasPermitidas.length > 1 && (
+        <div className="mb-6 md:mb-8">
+          <DistribuicaoEmpresa />
+        </div>
+      )}
+
+      {/* NOVA SEÇÃO: Coorte de Qualidade */}
+      {empresaSelecionada && (
+        <div className="mb-6 md:mb-8">
+          <CoorteQualidade empresaId={empresaSelecionada} />
+        </div>
+      )}
+
+      {/* NOVA SEÇÃO: Tracking Score */}
+      <div className="mb-6 md:mb-8">
+        <TrackingScore empresaId={empresaSelecionada} />
+      </div>
+
+      {/* IA Intelligence */}
       <div className="mb-6 md:mb-8">
         {empresaSelecionada && <InteligenciaIA empresaId={empresaSelecionada} />}
       </div>
 
+      {/* ValidacaoUTM detalhado */}
       <ValidacaoUTM />
     </>
   );
