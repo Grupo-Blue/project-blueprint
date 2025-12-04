@@ -1164,6 +1164,13 @@ export default function DashboardTrafego() {
           </Card>
         </div>
 
+        {/* Métricas de Awareness (Instagram/Metricool) */}
+        <MetricasAwareness 
+          empresaId={empresaSelecionada === "todas" ? null : empresaSelecionada} 
+          dataInicio={inicioMes} 
+          dataFim={fimMes} 
+        />
+
         {/* Funil de Conversão Visual */}
         <Card>
           <CardHeader>
