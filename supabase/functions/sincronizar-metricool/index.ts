@@ -15,72 +15,60 @@ interface MetricoolConfig {
   id_empresa: string;
 }
 
-// Configuração de métricas por rede social
+// Configuração de métricas por rede social - nomes CORRETOS da API Metricool
 const REDES_CONFIG: Record<string, {
-  prefixo: string;
   metricas: { nome: string; campo: string }[];
   dbRede: string;
 }> = {
   INSTAGRAM: {
-    prefixo: 'ig',
     metricas: [
-      { nome: 'Followers', campo: 'seguidores_total' },
-      { nome: 'ProfileViews', campo: 'visitas_perfil' },
-      { nome: 'WebsiteClicks', campo: 'cliques_website' },
-      { nome: 'Reach', campo: 'alcance' },
-      { nome: 'Impressions', campo: 'impressoes' },
+      { nome: 'igFollowers', campo: 'seguidores_total' },
+      { nome: 'igprofile_views', campo: 'visitas_perfil' },
+      { nome: 'igwebsite_clicks', campo: 'cliques_website' },
+      { nome: 'igreach', campo: 'alcance' },
+      { nome: 'igimpressions', campo: 'impressoes' },
     ],
     dbRede: 'INSTAGRAM',
   },
   FACEBOOK: {
-    prefixo: 'fb',
     metricas: [
-      { nome: 'PageFollowers', campo: 'seguidores_total' },
-      { nome: 'PageViews', campo: 'visitas_perfil' },
-      { nome: 'WebsiteClicks', campo: 'cliques_website' },
-      { nome: 'Reach', campo: 'alcance' },
-      { nome: 'Impressions', campo: 'impressoes' },
+      { nome: 'facebookLikes', campo: 'seguidores_total' },
+      { nome: 'pageViews', campo: 'visitas_perfil' },
+      { nome: 'dailyClicks', campo: 'cliques_website' },
+      { nome: 'pageImpressions', campo: 'alcance' },
+      { nome: 'dailyImpressions', campo: 'impressoes' },
     ],
     dbRede: 'FACEBOOK',
   },
   LINKEDIN: {
-    prefixo: 'li',
     metricas: [
-      { nome: 'Followers', campo: 'seguidores_total' },
-      { nome: 'ProfileViews', campo: 'visitas_perfil' },
-      { nome: 'WebsiteClicks', campo: 'cliques_website' },
-      { nome: 'Reach', campo: 'alcance' },
-      { nome: 'Impressions', campo: 'impressoes' },
+      { nome: 'inFollowers', campo: 'seguidores_total' },
+      { nome: 'inCliks', campo: 'cliques_website' },
+      { nome: 'inCompanyImpressions', campo: 'impressoes' },
     ],
     dbRede: 'LINKEDIN',
   },
   TIKTOK: {
-    prefixo: 'tk',
     metricas: [
-      { nome: 'Followers', campo: 'seguidores_total' },
-      { nome: 'ProfileViews', campo: 'visitas_perfil' },
-      { nome: 'VideoViews', campo: 'alcance' },
-      { nome: 'Engagement', campo: 'engajamento' },
+      { nome: 'tiktokFollowers', campo: 'seguidores_total' },
+      { nome: 'tiktokVideoViews', campo: 'alcance' },
+      { nome: 'tiktokProfileViews', campo: 'visitas_perfil' },
     ],
     dbRede: 'TIKTOK',
   },
   YOUTUBE: {
-    prefixo: 'yt',
     metricas: [
-      { nome: 'Subscribers', campo: 'seguidores_total' },
-      { nome: 'Views', campo: 'alcance' },
-      { nome: 'WatchTime', campo: 'impressoes' },
-      { nome: 'Engagement', campo: 'engajamento' },
+      { nome: 'yttotalSubscribers', campo: 'seguidores_total' },
+      { nome: 'ytviews', campo: 'alcance' },
+      { nome: 'ytestimatedMinutesWatched', campo: 'impressoes' },
     ],
     dbRede: 'YOUTUBE',
   },
   TWITTER: {
-    prefixo: 'tw',
     metricas: [
-      { nome: 'Followers', campo: 'seguidores_total' },
-      { nome: 'ProfileViews', campo: 'visitas_perfil' },
-      { nome: 'UrlClicks', campo: 'cliques_website' },
-      { nome: 'Impressions', campo: 'impressoes' },
+      { nome: 'twitterFollowers', campo: 'seguidores_total' },
+      { nome: 'twFavorites', campo: 'engajamento' },
+      { nome: 'twImpressions', campo: 'impressoes' },
     ],
     dbRede: 'TWITTER',
   },
@@ -100,7 +88,10 @@ async function coletarMetricasRede(
 
   for (const metrica of redeConfig.metricas) {
     try {
-      const url = `${METRICOOL_API_BASE}/${config.user_id}/${config.blog_id}/stats/timeline/${redeConfig.prefixo}${metrica.nome}?initDate=${initDate}&endDate=${endDate}`;
+      // CORREÇÃO: URL com query parameters e formato correto
+      const url = `${METRICOOL_API_BASE}/stats/timeline/${metrica.nome}?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}`;
+      
+      console.log(`    🔗 URL: ${url}`);
       const resp = await fetch(url, { headers });
       
       if (resp.ok) {
@@ -108,7 +99,13 @@ async function coletarMetricasRede(
         
         let valorAnterior = 0;
         for (const item of (data || [])) {
-          const dataStr = item.date;
+          // A data pode vir em formato YYYYMMDD ou YYYY-MM-DD
+          let dataStr = item.date;
+          if (dataStr && dataStr.length === 8) {
+            // Converter YYYYMMDD para YYYY-MM-DD
+            dataStr = `${dataStr.substring(0, 4)}-${dataStr.substring(4, 6)}-${dataStr.substring(6, 8)}`;
+          }
+          
           if (!metricasPorData.has(dataStr)) {
             metricasPorData.set(dataStr, {
               seguidores_total: 0,
@@ -133,7 +130,8 @@ async function coletarMetricasRede(
         
         console.log(`    ✅ ${metrica.nome}: ${data?.length || 0} registros`);
       } else {
-        console.log(`    ⚠️ ${metrica.nome}: não disponível (${resp.status})`);
+        const errorText = await resp.text();
+        console.log(`    ⚠️ ${metrica.nome}: não disponível (${resp.status}) - ${errorText}`);
       }
     } catch (error) {
       console.log(`    ⚠️ ${metrica.nome}: erro ao coletar`, error);
@@ -189,8 +187,11 @@ serve(async (req) => {
         const trintaDiasAtras = new Date();
         trintaDiasAtras.setDate(hoje.getDate() - 30);
         
-        const initDate = trintaDiasAtras.toISOString().split('T')[0];
-        const endDate = hoje.toISOString().split('T')[0];
+        // CORREÇÃO: Formato de data YYYYMMDD (sem hífens)
+        const initDate = trintaDiasAtras.toISOString().split('T')[0].replace(/-/g, '');
+        const endDate = hoje.toISOString().split('T')[0].replace(/-/g, '');
+        
+        console.log(`  📅 Período: ${initDate} a ${endDate}`);
 
         // Headers de autenticação Metricool
         const headers = {
@@ -271,7 +272,9 @@ serve(async (req) => {
         // Coletar SmartLinks (se disponível)
         console.log("\n🔗 Coletando SmartLinks...");
         try {
-          const smartlinksUrl = `${METRICOOL_API_BASE}/${config.user_id}/${config.blog_id}/smartlinks/stats?initDate=${initDate}&endDate=${endDate}`;
+          // CORREÇÃO: URL com query parameters
+          const smartlinksUrl = `${METRICOOL_API_BASE}/smartlinks/stats?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}`;
+          console.log(`  🔗 URL SmartLinks: ${smartlinksUrl}`);
           const smartlinksResp = await fetch(smartlinksUrl, { headers });
           
           if (smartlinksResp.ok) {
@@ -280,6 +283,12 @@ serve(async (req) => {
 
             for (const smartlink of (smartlinksData || [])) {
               for (const stat of (smartlink.stats || [])) {
+                // Converter data YYYYMMDD para YYYY-MM-DD se necessário
+                let dataStr = stat.date;
+                if (dataStr && dataStr.length === 8) {
+                  dataStr = `${dataStr.substring(0, 4)}-${dataStr.substring(4, 6)}-${dataStr.substring(6, 8)}`;
+                }
+                
                 await supabase
                   .from('smartlink_cliques')
                   .upsert({
@@ -287,7 +296,7 @@ serve(async (req) => {
                     smartlink_id: smartlink.id,
                     smartlink_nome: smartlink.name,
                     smartlink_url: smartlink.url,
-                    data: stat.date,
+                    data: dataStr,
                     cliques: stat.clicks || 0,
                     updated_at: new Date().toISOString(),
                   }, {
@@ -296,7 +305,8 @@ serve(async (req) => {
               }
             }
           } else {
-            console.log("ℹ️ SmartLinks não disponível");
+            const errorText = await smartlinksResp.text();
+            console.log(`ℹ️ SmartLinks não disponível (${smartlinksResp.status}) - ${errorText}`);
           }
         } catch (slError) {
           console.log("ℹ️ SmartLinks não acessível:", slError);
