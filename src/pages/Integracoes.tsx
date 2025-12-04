@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ValidacaoUTM } from "@/components/ValidacaoUTM";
 import { ImportarCampanhas } from "@/components/ImportarCampanhas";
 import { CronjobsMonitor } from "@/components/CronjobsMonitor";
+import { TokenizaProjetosManager } from "@/components/TokenizaProjetosManager";
 import type { Database } from "@/integrations/supabase/types";
 
 type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
@@ -1021,6 +1022,11 @@ export default function Integracoes() {
                 </Card>
               );
             })
+          )}
+
+          {/* Gerenciador de Projetos Tokeniza */}
+          {integracoes.filter(i => i.tipo === "TOKENIZA").length > 0 && (
+            <TokenizaProjetosManager />
           )}
         </TabsContent>
 

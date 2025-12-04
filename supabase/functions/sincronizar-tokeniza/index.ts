@@ -44,6 +44,17 @@ serve(async (req) => {
       );
     }
 
+    // Buscar mapeamento de projetos para nomes
+    const { data: projetosMapeados } = await supabase
+      .from("tokeniza_projeto")
+      .select("project_id, nome");
+    
+    const projetoNomeMap: Record<string, string> = {};
+    projetosMapeados?.forEach(p => {
+      projetoNomeMap[p.project_id] = p.nome;
+    });
+    console.log(`Projetos mapeados: ${Object.keys(projetoNomeMap).length}`);
+
     const resultados = {
       investimentos: { success: 0, error: 0 },
       vendas: { success: 0, error: 0 },
@@ -214,10 +225,11 @@ serve(async (req) => {
             venda_realizada: isPaid,
             data_venda: isPaid ? (venda.updatedAt || venda.createdAt) : null,
             valor_venda: isPaid ? parseFloat(venda.totalAmount || "0") : null,
+            tokeniza_projeto_nome: null, // Vendas não têm project_id
           };
         });
 
-      // Leads de investimentos pagos
+      // Leads de investimentos pagos - incluindo nome do projeto
       const leadsInvestimentos = crowdfundingData
         .filter(inv => {
           const isPaid = inv.status === "FINISHED" || inv.status === "PAID" || inv.was_paid === true;
@@ -236,6 +248,8 @@ serve(async (req) => {
           venda_realizada: true,
           data_venda: inv.last_update || inv.created_at,
           valor_venda: parseFloat(inv.amount || "0"),
+          // Buscar nome do projeto no mapa
+          tokeniza_projeto_nome: inv.project_id ? (projetoNomeMap[inv.project_id] || null) : null,
         }));
 
       const allLeads = [...leadsVendas, ...leadsInvestimentos];
@@ -274,6 +288,7 @@ serve(async (req) => {
         vendas_erros: resultados.vendas.error,
         leads_criados: resultados.leads.success,
         leads_erros: resultados.leads.error,
+        projetos_mapeados: Object.keys(projetoNomeMap).length,
       },
     });
 

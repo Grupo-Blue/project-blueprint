@@ -892,11 +892,18 @@ const Leads = () => {
                           </TableCell>
 
                           {/* Valor */}
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-right">
                             {lead.valor_venda ? (
-                              <span className="font-semibold">
-                                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.valor_venda)}
-                              </span>
+                              <div className="flex flex-col items-end">
+                                <span className="font-mono font-semibold">
+                                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.valor_venda)}
+                                </span>
+                                {(lead as any).tokeniza_projeto_nome && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    📦 {(lead as any).tokeniza_projeto_nome}
+                                  </span>
+                                )}
+                              </div>
                             ) : <span className="text-muted-foreground">-</span>}
                           </TableCell>
 
