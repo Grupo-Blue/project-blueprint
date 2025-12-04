@@ -199,11 +199,16 @@ const Leads = () => {
       (investidorFilter === "carrinho" && (lead as any).tokeniza_carrinho_abandonado === true) ||
       (investidorFilter === "nao_investidor" && !(lead as any).tokeniza_investidor && !(lead as any).tokeniza_carrinho_abandonado);
 
+    const isInstagramBio = lead.utm_source && 
+      (lead.utm_source.toLowerCase().includes('instagram') || lead.utm_source.toLowerCase().includes('linktree')) && 
+      !(lead as any).lead_pago;
+    
     const matchesOrigem =
       origemFilter === "all" ||
       (origemFilter === "pago" && (lead as any).lead_pago === true) ||
       (origemFilter === "organico" && (lead as any).origem_tipo === "ORGANICO") ||
-      (origemFilter === "manual" && ((lead as any).origem_tipo === "MANUAL" || !(lead as any).origem_tipo));
+      (origemFilter === "manual" && ((lead as any).origem_tipo === "MANUAL" || !(lead as any).origem_tipo)) ||
+      (origemFilter === "instagram_bio" && isInstagramBio);
 
     return matchesPeriodo && matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus && matchesEmpresa && matchesInvestidor && matchesOrigem;
   });
@@ -503,6 +508,7 @@ const Leads = () => {
               <SelectItem value="all">Todas Origens</SelectItem>
               <SelectItem value="pago">🎯 Pagos</SelectItem>
               <SelectItem value="organico">📧 Orgânicos</SelectItem>
+              <SelectItem value="instagram_bio">📲 Instagram Bio</SelectItem>
               <SelectItem value="manual">✋ Manuais</SelectItem>
             </SelectContent>
           </Select>
