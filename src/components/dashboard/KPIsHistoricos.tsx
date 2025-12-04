@@ -8,6 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useState } from "react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { MetricaComInfo } from "@/components/ui/MetricaComInfo";
 
 interface KPIsHistoricosProps {
   empresaId: string;
@@ -113,6 +114,7 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
     dataKey,
     formatValue,
     invertVariacao = false,
+    info,
   }: {
     titulo: string;
     valor: string | number;
@@ -122,13 +124,16 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
     dataKey: string;
     formatValue?: (v: number) => string;
     invertVariacao?: boolean;
+    info: string;
   }) => {
     const isPositivo = invertVariacao ? variacao < 0 : variacao > 0;
     
     return (
       <Card className="relative overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">{titulo}</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            <MetricaComInfo label={titulo} info={info} />
+          </CardTitle>
           <Icon className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -206,6 +211,7 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
           icon={Users}
           dados={dadosProcessados}
           dataKey="leads"
+          info="Total de leads gerados no período selecionado."
         />
         <MiniKPICard
           titulo="CPL Médio"
@@ -216,6 +222,7 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
           dataKey="cpl"
           formatValue={(v) => formatCurrency(v)}
           invertVariacao={true}
+          info="Custo Por Lead médio. Quanto menor, melhor. Calculado: Verba / Leads."
         />
         <MiniKPICard
           titulo="Conversão"
@@ -225,6 +232,7 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
           dados={dadosProcessados}
           dataKey="conversao"
           formatValue={(v) => `${v.toFixed(1)}%`}
+          info="Taxa de conversão de leads em vendas. Quanto maior, melhor."
         />
         <MiniKPICard
           titulo="Verba Investida"
@@ -234,6 +242,7 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
           dados={dadosProcessados}
           dataKey="verba"
           formatValue={(v) => formatCurrency(v)}
+          info="Total investido em mídia paga (Meta + Google Ads) no período."
         />
       </div>
     </div>

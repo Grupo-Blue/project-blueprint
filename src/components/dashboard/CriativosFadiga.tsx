@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,8 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, LineChart, Line
 import { Flame, TrendingDown, TrendingUp, AlertTriangle, Zap } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { differenceInDays } from "date-fns";
+import { CriativoDetalhesModal } from "./CriativoDetalhesModal";
+import { MetricaComInfo } from "@/components/ui/MetricaComInfo";
 
 interface CriativosFadigaProps {
   empresaId?: string;
@@ -24,9 +27,15 @@ interface CriativoPerformance {
   cpl: number | null;
   idade: number;
   fatigado: boolean;
+  urlPreview?: string;
+  urlMidia?: string;
+  tipo?: string;
 }
 
 export function CriativosFadiga({ empresaId }: CriativosFadigaProps) {
+  const [selectedCriativo, setSelectedCriativo] = useState<CriativoPerformance | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
   const { data: criativosData, isLoading } = useQuery({
     queryKey: ["criativos-fadiga", empresaId],
     queryFn: async () => {
@@ -38,6 +47,9 @@ export function CriativosFadiga({ empresaId }: CriativosFadigaProps) {
           descricao,
           created_at,
           ativo,
+          tipo,
+          url_preview,
+          url_midia,
           campanha:id_campanha(
             nome,
             conta_anuncio:id_conta(id_empresa)
@@ -120,7 +132,10 @@ export function CriativosFadiga({ empresaId }: CriativosFadigaProps) {
           ctr,
           cpl,
           idade,
-          fatigado
+          fatigado,
+          urlPreview: c.url_preview,
+          urlMidia: c.url_midia,
+          tipo: c.tipo
         };
       }).filter((c: CriativoPerformance) => c.verba > 0);
 
@@ -215,21 +230,37 @@ export function CriativosFadiga({ empresaId }: CriativosFadigaProps) {
             {/* Resumo de fadiga */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-3 rounded-lg bg-muted/50 text-center">
-                <div className="text-xs text-muted-foreground">Criativos Ativos</div>
+                <MetricaComInfo 
+                  label="Criativos Ativos" 
+                  info="Total de criativos atualmente ativos nas campanhas."
+                  className="text-xs text-muted-foreground justify-center"
+                />
                 <div className="text-xl font-bold">{criativosData.criativos.length}</div>
               </div>
               <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/20 text-center">
-                <div className="text-xs text-muted-foreground">Fatigados</div>
+                <MetricaComInfo 
+                  label="Fatigados" 
+                  info="Criativos com CTR em queda de mais de 20%. Indicam desgaste junto ao público."
+                  className="text-xs text-muted-foreground justify-center"
+                />
                 <div className="text-xl font-bold text-red-600">{criativosData.fatigados.length}</div>
               </div>
               <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 text-center">
-                <div className="text-xs text-muted-foreground">% Verba Fatigados</div>
+                <MetricaComInfo 
+                  label="% Verba Fatigados" 
+                  info="Percentual do investimento total sendo gasto em criativos fatigados (dinheiro potencialmente desperdiçado)."
+                  className="text-xs text-muted-foreground justify-center"
+                />
                 <div className="text-xl font-bold text-orange-600">
                   {criativosData.percentFatigados.toFixed(1)}%
                 </div>
               </div>
               <div className="p-3 rounded-lg bg-muted/50 text-center">
-                <div className="text-xs text-muted-foreground">Verba em Fatigados</div>
+                <MetricaComInfo 
+                  label="Verba em Fatigados" 
+                  info="Valor absoluto investido em criativos fatigados."
+                  className="text-xs text-muted-foreground justify-center"
+                />
                 <div className="text-lg font-bold">{formatCurrency(criativosData.verbaTotalFatigados)}</div>
               </div>
             </div>
@@ -244,7 +275,11 @@ export function CriativosFadiga({ empresaId }: CriativosFadigaProps) {
                 </h4>
                 <div className="space-y-1">
                   {criativosData.melhores.map((c, i) => (
-                    <div key={c.id} className="flex items-center justify-between p-2 rounded bg-green-50 dark:bg-green-950/20 text-sm">
+                    <div 
+                      key={c.id} 
+                      className="flex items-center justify-between p-2 rounded bg-green-50 dark:bg-green-950/20 text-sm cursor-pointer hover:bg-green-100 dark:hover:bg-green-950/40 transition-colors"
+                      onClick={() => { setSelectedCriativo(c); setModalOpen(true); }}
+                    >
                       <div className="flex items-center gap-2 min-w-0">
                         <Badge variant="outline" className="shrink-0">{i + 1}</Badge>
                         <span className="truncate">{c.descricao.substring(0, 30)}...</span>
@@ -265,7 +300,11 @@ export function CriativosFadiga({ empresaId }: CriativosFadigaProps) {
                 </h4>
                 <div className="space-y-1">
                   {criativosData.piores.map((c, i) => (
-                    <div key={c.id} className="flex items-center justify-between p-2 rounded bg-red-50 dark:bg-red-950/20 text-sm">
+                    <div 
+                      key={c.id} 
+                      className="flex items-center justify-between p-2 rounded bg-red-50 dark:bg-red-950/20 text-sm cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors"
+                      onClick={() => { setSelectedCriativo(c); setModalOpen(true); }}
+                    >
                       <div className="flex items-center gap-2 min-w-0">
                         <Badge variant="outline" className="shrink-0">{i + 1}</Badge>
                         <span className="truncate">{c.descricao.substring(0, 30)}...</span>
@@ -315,7 +354,11 @@ export function CriativosFadiga({ empresaId }: CriativosFadigaProps) {
                 </h4>
                 <div className="space-y-1 text-sm">
                   {criativosData.fatigados.slice(0, 5).map((c) => (
-                    <div key={c.id} className="flex justify-between">
+                    <div 
+                      key={c.id} 
+                      className="flex justify-between cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/40 p-1 rounded transition-colors"
+                      onClick={() => { setSelectedCriativo(c); setModalOpen(true); }}
+                    >
                       <span className="truncate">{c.descricao.substring(0, 40)}...</span>
                       <span className="text-muted-foreground">{formatCurrency(c.verba)} gastos</span>
                     </div>
@@ -330,6 +373,13 @@ export function CriativosFadiga({ empresaId }: CriativosFadigaProps) {
             )}
           </div>
         )}
+
+        {/* Modal de detalhes */}
+        <CriativoDetalhesModal 
+          criativo={selectedCriativo}
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+        />
       </CardContent>
     </Card>
   );

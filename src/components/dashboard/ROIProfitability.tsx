@@ -8,6 +8,7 @@ import { DollarSign, TrendingUp, AlertTriangle, Wallet } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { MetricaComInfo } from "@/components/ui/MetricaComInfo";
 
 interface ROIProfitabilityProps {
   empresaId?: string;
@@ -18,17 +19,20 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
   const { data: roiData, isLoading } = useQuery({
     queryKey: ["roi-profitability", empresaId],
     queryFn: async () => {
-      // Buscar receita total (vendas realizadas)
+      // Período de 6 meses
+      const dataInicio = startOfMonth(subMonths(new Date(), 5));
+      
+      // Buscar receita total (vendas realizadas) - MESMO PERÍODO DE 6 MESES
       const { data: vendas, error: vendasError } = await supabase
         .from("lead")
         .select("valor_venda, data_venda, id_empresa, empresa:id_empresa(nome)")
         .eq("venda_realizada", true)
-        .not("valor_venda", "is", null);
+        .not("valor_venda", "is", null)
+        .gte("data_venda", dataInicio.toISOString());
 
       if (vendasError) throw vendasError;
 
       // Buscar gasto total por empresa (últimos 6 meses)
-      const dataInicio = startOfMonth(subMonths(new Date(), 5));
       const { data: metricas, error: metricasError } = await supabase
         .from("empresa_semana_metricas")
         .select("id_empresa, verba_investida, empresa:id_empresa(nome), semana:id_semana(data_inicio)")
@@ -170,28 +174,44 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
         {/* KPIs de ROI */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
-            <div className="text-sm text-muted-foreground mb-1">Receita Total</div>
+            <MetricaComInfo 
+              label="Receita Total" 
+              info="Soma do valor de todas as vendas realizadas nos últimos 6 meses."
+              className="text-sm text-muted-foreground mb-1"
+            />
             <div className="text-xl md:text-2xl font-bold text-green-600">
               {formatCurrency(roiData?.totalReceita || 0)}
             </div>
           </div>
           
           <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900">
-            <div className="text-sm text-muted-foreground mb-1">Gasto em Mídia</div>
+            <MetricaComInfo 
+              label="Gasto em Mídia" 
+              info="Total investido em anúncios (Meta Ads + Google Ads) nos últimos 6 meses."
+              className="text-sm text-muted-foreground mb-1"
+            />
             <div className="text-xl md:text-2xl font-bold text-red-600">
               {formatCurrency(roiData?.totalGasto || 0)}
             </div>
           </div>
           
           <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
-            <div className="text-sm text-muted-foreground mb-1">Lucro Bruto</div>
+            <MetricaComInfo 
+              label="Lucro Bruto" 
+              info="Receita Total menos Gasto em Mídia. Valor positivo indica lucro, negativo indica prejuízo."
+              className="text-sm text-muted-foreground mb-1"
+            />
             <div className={`text-xl md:text-2xl font-bold ${(roiData?.lucroBruto || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
               {formatCurrency(roiData?.lucroBruto || 0)}
             </div>
           </div>
           
           <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900">
-            <div className="text-sm text-muted-foreground mb-1">ROAS</div>
+            <MetricaComInfo 
+              label="ROAS" 
+              info="Return On Ad Spend. Quanto retorna em receita para cada R$1 investido. ROAS de 2x significa que cada R$1 gera R$2 em vendas."
+              className="text-sm text-muted-foreground mb-1"
+            />
             <div className="text-xl md:text-2xl font-bold text-purple-600">
               {(roiData?.roas || 0).toFixed(1)}x
             </div>
@@ -201,18 +221,27 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
         {/* Métricas secundárias */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="p-3 rounded-lg bg-muted/50 text-center">
-            <div className="text-xs text-muted-foreground">Ticket Médio</div>
+            <MetricaComInfo 
+              label="Ticket Médio" 
+              info="Valor médio de cada venda realizada. Calculado dividindo a receita total pelo número de vendas."
+              className="text-xs text-muted-foreground justify-center"
+            />
             <div className="text-lg font-semibold">{formatCurrency(roiData?.ticketMedio || 0)}</div>
           </div>
           <div className="p-3 rounded-lg bg-muted/50 text-center">
-            <div className="text-xs text-muted-foreground">CAC</div>
+            <MetricaComInfo 
+              label="CAC" 
+              info="Custo de Aquisição de Cliente. Quanto custa em média para converter um lead em cliente. Calculado: Gasto Total / Número de Vendas."
+              className="text-xs text-muted-foreground justify-center"
+            />
             <div className="text-lg font-semibold">{formatCurrency(roiData?.cac || 0)}</div>
           </div>
           <div className="p-3 rounded-lg bg-muted/50 text-center">
-            <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-              <Wallet className="h-3 w-3" />
-              Payback
-            </div>
+            <MetricaComInfo 
+              label="Payback" 
+              info="Tempo estimado para recuperar o investimento de aquisição. Quanto menor, mais rápido o retorno."
+              className="text-xs text-muted-foreground justify-center"
+            />
             <div className="text-lg font-semibold">
               {roiData?.paybackDias || 0} dias
             </div>
