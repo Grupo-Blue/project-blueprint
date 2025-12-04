@@ -83,29 +83,11 @@ export default function DashboardDirecao() {
     queryFn: async () => {
       console.log("[DashboardDirecao] Período:", dataInicioStr, "até", dataFimStr);
 
-      // TODAS as queries em paralelo - máxima eficiência
-      const [empresasResult, leadsResult, leadsPagosResult, vendasResult, contasResult, campanhasResult, metricasResult] = await Promise.all([
+      // Buscar empresas e métricas diárias em paralelo
+      const [empresasResult, metricasDiariasResult] = await Promise.all([
         supabase.from("empresa").select("id_empresa, nome, cpl_maximo, cac_maximo"),
-        // Leads TOTAIS (para contagem geral)
-        supabase.from("lead")
-          .select("id_lead, id_empresa")
-          .gte("data_criacao", dataInicioStr)
-          .lte("data_criacao", dataFimStr + "T23:59:59"),
-        // Leads PAGOS (para CPL correto)
-        supabase.from("lead")
-          .select("id_lead, id_empresa")
-          .eq("lead_pago", true)
-          .gte("data_criacao", dataInicioStr)
-          .lte("data_criacao", dataFimStr + "T23:59:59"),
-        supabase.from("lead")
-          .select("id_lead, id_empresa, valor_venda")
-          .eq("venda_realizada", true)
-          .gte("data_venda", dataInicioStr)
-          .lte("data_venda", dataFimStr + "T23:59:59"),
-        supabase.from("conta_anuncio").select("id_conta, id_empresa"),
-        supabase.from("campanha").select("id_campanha, id_conta"),
-        supabase.from("campanha_metricas_dia")
-          .select("id_campanha, verba_investida, data")
+        supabase.from("empresa_metricas_dia")
+          .select("*")
           .gte("data", dataInicioStr)
           .lte("data", dataFimStr)
       ]);
@@ -113,79 +95,43 @@ export default function DashboardDirecao() {
       if (empresasResult.error) throw empresasResult.error;
       
       const todasEmpresas = empresasResult.data || [];
-      const todosLeads = leadsResult.data || [];
-      const leadsPagos = leadsPagosResult.data || [];
-      const todasVendas = vendasResult.data || [];
-      const todasContas = contasResult.data || [];
-      const todasCampanhas = campanhasResult.data || [];
-      const metricasVerba = metricasResult.data || [];
-
-      console.log("[DashboardDirecao] Leads totais:", todosLeads.length, "| Leads pagos:", leadsPagos.length);
-      console.log("[DashboardDirecao] Total verba bruta:", metricasVerba.reduce((sum, m) => sum + Number(m.verba_investida), 0));
-
-      // Mapa campanha -> empresa (via conta)
-      const contaToEmpresa = new Map(todasContas.map(c => [c.id_conta, c.id_empresa]));
-      const campanhaToEmpresa = new Map<string, string>();
-      todasCampanhas.forEach(camp => {
-        const empresaId = contaToEmpresa.get(camp.id_conta);
-        if (empresaId) campanhaToEmpresa.set(camp.id_campanha, empresaId);
-      });
-
-      // Agregar verba por empresa - com log de debug
-      const verbaByEmpresa = new Map<string, number>();
-      let verbaOrfao = 0;
-      metricasVerba.forEach(m => {
-        const empresaId = campanhaToEmpresa.get(m.id_campanha);
-        if (empresaId) {
-          verbaByEmpresa.set(empresaId, (verbaByEmpresa.get(empresaId) || 0) + Number(m.verba_investida));
-        } else {
-          verbaOrfao += Number(m.verba_investida);
-        }
-      });
-      
-      if (verbaOrfao > 0) {
-        console.warn("[DashboardDirecao] Verba sem empresa mapeada:", verbaOrfao);
-      }
-
-      // Agregar leads TOTAIS por empresa
-      const leadsByEmpresa = new Map<string, number>();
-      todosLeads.forEach(l => leadsByEmpresa.set(l.id_empresa, (leadsByEmpresa.get(l.id_empresa) || 0) + 1));
-      
-      // Agregar leads PAGOS por empresa (para CPL)
-      const leadsPagosByEmpresa = new Map<string, number>();
-      leadsPagos.forEach(l => leadsPagosByEmpresa.set(l.id_empresa, (leadsPagosByEmpresa.get(l.id_empresa) || 0) + 1));
-      
-      const vendasByEmpresa = new Map<string, number>();
-      todasVendas.forEach(v => vendasByEmpresa.set(v.id_empresa, (vendasByEmpresa.get(v.id_empresa) || 0) + 1));
+      const metricasDiarias = metricasDiariasResult.data || [];
 
       // Filtrar empresas
       const empresasFiltradas = empresaSelecionada && empresaSelecionada !== "todas"
         ? todasEmpresas.filter(e => e.id_empresa === empresaSelecionada)
         : todasEmpresas;
 
-      const resultado = empresasFiltradas.map(empresa => ({
-        id_empresa: empresa.id_empresa,
-        nome: empresa.nome,
-        verba_investida: verbaByEmpresa.get(empresa.id_empresa) || 0,
-        leads_total: leadsByEmpresa.get(empresa.id_empresa) || 0,
-        leads_pagos: leadsPagosByEmpresa.get(empresa.id_empresa) || 0,
-        // CPL usa apenas leads PAGOS
-        cpl: (leadsPagosByEmpresa.get(empresa.id_empresa) || 0) > 0 
-          ? (verbaByEmpresa.get(empresa.id_empresa) || 0) / (leadsPagosByEmpresa.get(empresa.id_empresa) || 1) 
-          : null,
-        cac: (vendasByEmpresa.get(empresa.id_empresa) || 0) > 0 
-          ? (verbaByEmpresa.get(empresa.id_empresa) || 0) / (vendasByEmpresa.get(empresa.id_empresa) || 1) 
-          : null,
-        vendas: vendasByEmpresa.get(empresa.id_empresa) || 0,
-        cpl_maximo: empresa.cpl_maximo,
-        cac_maximo: empresa.cac_maximo,
-      }));
+      // Agregar métricas diárias por empresa
+      const resultado = empresasFiltradas.map(empresa => {
+        const metricasEmpresa = metricasDiarias.filter(m => m.id_empresa === empresa.id_empresa);
+        
+        const totais = metricasEmpresa.reduce((acc, m) => ({
+          verba_investida: acc.verba_investida + Number(m.verba_investida || 0),
+          leads_total: acc.leads_total + (m.leads_total || 0),
+          leads_pagos: acc.leads_pagos + (m.leads_pagos || 0),
+          vendas: acc.vendas + (m.vendas || 0),
+        }), { verba_investida: 0, leads_total: 0, leads_pagos: 0, vendas: 0 });
 
-      console.log("[DashboardDirecao] Resultado final por empresa:", resultado.map(r => ({ nome: r.nome, verba: r.verba_investida })));
+        return {
+          id_empresa: empresa.id_empresa,
+          nome: empresa.nome,
+          verba_investida: totais.verba_investida,
+          leads_total: totais.leads_total,
+          leads_pagos: totais.leads_pagos,
+          cpl: totais.leads_pagos > 0 ? totais.verba_investida / totais.leads_pagos : null,
+          cac: totais.vendas > 0 ? totais.verba_investida / totais.vendas : null,
+          vendas: totais.vendas,
+          cpl_maximo: empresa.cpl_maximo,
+          cac_maximo: empresa.cac_maximo,
+        };
+      });
+
+      console.log("[DashboardDirecao] Resultado agregado:", resultado.map(r => ({ nome: r.nome, verba: r.verba_investida })));
       
       return resultado;
     },
-    staleTime: 60 * 1000, // Cache por 60 segundos
+    staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
   });
 

@@ -679,83 +679,40 @@ export default function DashboardTrafego() {
     },
   });
 
-  // Buscar totais gerais da empresa (não apenas soma das campanhas)
+  // Buscar totais gerais da empresa da tabela empresa_metricas_dia
   const { data: totaisGerais } = useQuery({
     queryKey: [
       "totais-gerais-empresa",
       empresaSelecionada,
       tipoFiltro,
-      inicioMes.toISOString(),
-      fimMes.toISOString(),
+      format(inicioMes, "yyyy-MM-dd"),
+      format(fimMes, "yyyy-MM-dd"),
     ],
     queryFn: async () => {
-      const baseTotais = {
-        verba: 0,
-        leads: 0,
-        mqls: 0,
-        levantadas: 0,
-        reunioes: 0,
-        vendas: 0,
-      };
-
-      // Filtro por empresa (ou todas)
-      const filtrarPorEmpresa = (registros: any[]) => {
-        if (empresaSelecionada === "todas") return registros || [];
-        return (registros || []).filter((r) => r.id_empresa === empresaSelecionada);
-      };
-
-      // Para outros períodos, contar diretamente da tabela lead
-      let leadsQuery = supabase
-        .from("lead")
+      let query = supabase
+        .from("empresa_metricas_dia")
         .select("*")
-        .gte("data_criacao", inicioMes.toISOString())
-        .lte("data_criacao", fimMes.toISOString());
+        .gte("data", format(inicioMes, "yyyy-MM-dd"))
+        .lte("data", format(fimMes, "yyyy-MM-dd"));
 
       if (empresaSelecionada !== "todas") {
-        leadsQuery = leadsQuery.eq("id_empresa", empresaSelecionada);
+        query = query.eq("id_empresa", empresaSelecionada);
       }
 
-      const { data: leads, error } = await leadsQuery;
+      const { data: metricasDiarias, error } = await query;
       if (error) throw error;
 
-      // Buscar verba investida das campanhas (todas ou de uma empresa)
-      let contasQuery = supabase.from("conta_anuncio").select("id_conta, id_empresa");
-      if (empresaSelecionada !== "todas") {
-        contasQuery = contasQuery.eq("id_empresa", empresaSelecionada);
-      }
+      // Agregar todas as métricas diárias
+      const totais = (metricasDiarias || []).reduce((acc, m) => ({
+        verba: acc.verba + Number(m.verba_investida || 0),
+        leads: acc.leads + (m.leads_total || 0),
+        mqls: acc.mqls + (m.mqls || 0),
+        levantadas: acc.levantadas + (m.levantadas || 0),
+        reunioes: acc.reunioes + (m.reunioes || 0),
+        vendas: acc.vendas + (m.vendas || 0),
+      }), { verba: 0, leads: 0, mqls: 0, levantadas: 0, reunioes: 0, vendas: 0 });
 
-      const { data: contas } = await contasQuery;
-      const contaIds = contas?.map((c) => c.id_conta) || [];
-      let verba = 0;
-
-      if (contaIds.length > 0) {
-        const { data: campanhas } = await supabase
-          .from("campanha")
-          .select("id_campanha")
-          .in("id_conta", contaIds);
-
-        const campanhaIds = campanhas?.map((c) => c.id_campanha) || [];
-
-        if (campanhaIds.length > 0) {
-          const { data: metricasDia } = await supabase
-            .from("campanha_metricas_dia")
-            .select("verba_investida, data")
-            .in("id_campanha", campanhaIds)
-            .gte("data", inicioMes.toISOString())
-            .lte("data", fimMes.toISOString());
-
-          verba = metricasDia?.reduce((sum, m) => sum + (m.verba_investida || 0), 0) || 0;
-        }
-      }
-
-      return {
-        verba,
-        leads: leads?.length || 0,
-        mqls: leads?.filter((l: any) => l.is_mql).length || 0,
-        levantadas: leads?.filter((l: any) => l.levantou_mao).length || 0,
-        reunioes: leads?.filter((l: any) => l.tem_reuniao || l.reuniao_realizada).length || 0,
-        vendas: leads?.filter((l: any) => l.venda_realizada).length || 0,
-      };
+      return totais;
     },
     enabled: true,
   });
