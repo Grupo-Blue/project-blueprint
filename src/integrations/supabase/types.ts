@@ -981,6 +981,7 @@ export type Database = {
           tokeniza_carrinho_abandonado: boolean | null
           tokeniza_investidor: boolean | null
           tokeniza_primeiro_investimento: string | null
+          tokeniza_projeto_nome: string | null
           tokeniza_projetos: Json | null
           tokeniza_qtd_investimentos: number | null
           tokeniza_ultimo_investimento: string | null
@@ -1035,6 +1036,7 @@ export type Database = {
           tokeniza_carrinho_abandonado?: boolean | null
           tokeniza_investidor?: boolean | null
           tokeniza_primeiro_investimento?: string | null
+          tokeniza_projeto_nome?: string | null
           tokeniza_projetos?: Json | null
           tokeniza_qtd_investimentos?: number | null
           tokeniza_ultimo_investimento?: string | null
@@ -1089,6 +1091,7 @@ export type Database = {
           tokeniza_carrinho_abandonado?: boolean | null
           tokeniza_investidor?: boolean | null
           tokeniza_primeiro_investimento?: string | null
+          tokeniza_projeto_nome?: string | null
           tokeniza_projetos?: Json | null
           tokeniza_qtd_investimentos?: number | null
           tokeniza_ultimo_investimento?: string | null
@@ -1540,6 +1543,33 @@ export type Database = {
             referencedColumns: ["id_empresa"]
           },
         ]
+      }
+      tokeniza_projeto: {
+        Row: {
+          created_at: string | null
+          descricao: string | null
+          id: string
+          nome: string
+          project_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          nome: string
+          project_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          nome?: string
+          project_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       tokeniza_usuario: {
         Row: {
