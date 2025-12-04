@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { TrendingUp, TrendingDown, Target, DollarSign, Users, MousePointer, GitBranch } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { CampanhaFluxoDiagram } from "@/components/CampanhaFluxoDiagram";
+import { useUserEmpresas } from "@/hooks/useUserEmpresas";
+import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 
 interface Campanha {
   id_campanha: string;
@@ -33,22 +35,21 @@ interface MetricasSemana {
 }
 
 export default function Campanhas() {
+  const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
   const [filtroStatus, setFiltroStatus] = useState<string>("ativas");
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
   const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState<{ id: string; nome: string } | null>(null);
 
-  const { data: empresas } = useQuery({
-    queryKey: ["empresas"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("empresa").select("id_empresa, nome");
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Auto-selecionar empresa quando carregar (se tiver apenas 1)
+  useEffect(() => {
+    if (empresasPermitidas.length === 1) {
+      setEmpresaSelecionada(empresasPermitidas[0].id_empresa);
+    }
+  }, [empresasPermitidas]);
 
   const { data: campanhas, isLoading } = useQuery({
-    queryKey: ["campanhas", filtroStatus, empresaSelecionada],
+    queryKey: ["campanhas", filtroStatus, empresaSelecionada, empresasPermitidas],
     queryFn: async () => {
       let query = supabase
         .from("campanha")
@@ -73,16 +74,21 @@ export default function Campanhas() {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Filtrar por empresa se necessário
-      let filteredData = data as Campanha[];
+      // Filtrar por empresas permitidas
+      let filteredData = (data as Campanha[]).filter((c) => 
+        empresasPermitidas.some((e) => e.id_empresa === c.conta_anuncio?.id_empresa)
+      );
+
+      // Filtrar por empresa selecionada
       if (empresaSelecionada !== "todas") {
-        filteredData = data?.filter((c: any) => 
+        filteredData = filteredData.filter((c) => 
           c.conta_anuncio?.id_empresa === empresaSelecionada
-        ) || [];
+        );
       }
 
       return filteredData;
     },
+    enabled: hasAccess,
   });
 
   const { data: metricasMap } = useQuery({
@@ -117,16 +123,18 @@ export default function Campanhas() {
       });
       return map;
     },
+    enabled: hasAccess,
   });
 
   const calcularROI = (metricas: MetricasSemana | undefined) => {
     if (!metricas || !metricas.vendas || !metricas.verba_investida) return null;
-    const receita = metricas.vendas * 1000; // Assumindo ticket médio
+    const receita = metricas.vendas * 1000;
     const roi = ((receita - metricas.verba_investida) / metricas.verba_investida) * 100;
     return roi;
   };
 
-  if (isLoading) {
+  // Loading state
+  if (loadingEmpresas || isLoading) {
     return (
       <div className="min-h-screen bg-background p-8">
         <div className="max-w-7xl mx-auto">
@@ -137,6 +145,11 @@ export default function Campanhas() {
         </div>
       </div>
     );
+  }
+
+  // Sem acesso
+  if (!hasAccess) {
+    return <SemAcessoEmpresas />;
   }
 
   return (
@@ -166,8 +179,10 @@ export default function Campanhas() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todas">Todas as Empresas</SelectItem>
-                  {empresas?.map((e) => (
+                  {empresasPermitidas.length > 1 && (
+                    <SelectItem value="todas">Todas as Empresas</SelectItem>
+                  )}
+                  {empresasPermitidas.map((e) => (
                     <SelectItem key={e.id_empresa} value={e.id_empresa}>
                       {e.nome}
                     </SelectItem>

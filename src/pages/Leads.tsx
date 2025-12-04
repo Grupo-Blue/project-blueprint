@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { ImportarUsuariosTokeniza } from "@/components/ImportarUsuariosTokeniza";
+import { useUserEmpresas } from "@/hooks/useUserEmpresas";
+import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 
 // Helpers
 const getOrigemIcon = (source: string | null) => {
@@ -49,6 +51,7 @@ const getUtmQuality = (lead: any) => {
 
 const Leads = () => {
   const { tipoFiltro, semanaSelecionada, getDataReferencia } = usePeriodo();
+  const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [stageFilter, setStageFilter] = useState<string[]>([]);
@@ -62,18 +65,12 @@ const Leads = () => {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-  // Buscar empresas
-  const { data: empresas } = useQuery({
-    queryKey: ["empresas"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("empresa")
-        .select("id_empresa, nome")
-        .order("nome");
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Auto-selecionar empresa quando carregar (se tiver apenas 1)
+  useEffect(() => {
+    if (empresasPermitidas.length === 1) {
+      setEmpresaFilter(empresasPermitidas[0].id_empresa);
+    }
+  }, [empresasPermitidas]);
 
   const availableStages = [
     { value: "Lead", label: "Lead" },
@@ -447,7 +444,7 @@ const Leads = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
-              {empresas?.map((empresa) => (
+              {empresasPermitidas.map((empresa) => (
                 <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
                   {empresa.nome}
                 </SelectItem>
