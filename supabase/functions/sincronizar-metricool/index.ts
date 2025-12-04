@@ -99,11 +99,23 @@ async function coletarMetricasRede(
         
         let valorAnterior = 0;
         for (const item of (data || [])) {
+          // Pular itens sem data válida
+          if (!item.date) {
+            console.log(`    ⚠️ Item sem data válida, pulando...`);
+            continue;
+          }
+          
           // A data pode vir em formato YYYYMMDD ou YYYY-MM-DD
-          let dataStr = item.date;
-          if (dataStr && dataStr.length === 8) {
+          let dataStr = String(item.date);
+          if (dataStr.length === 8 && !dataStr.includes('-')) {
             // Converter YYYYMMDD para YYYY-MM-DD
             dataStr = `${dataStr.substring(0, 4)}-${dataStr.substring(4, 6)}-${dataStr.substring(6, 8)}`;
+          }
+          
+          // Validar formato final da data (YYYY-MM-DD)
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) {
+            console.log(`    ⚠️ Formato de data inválido: ${dataStr}, pulando...`);
+            continue;
           }
           
           if (!metricasPorData.has(dataStr)) {
