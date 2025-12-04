@@ -313,6 +313,27 @@ serve(async (req) => {
       }
     }
 
+    // CLASSIFICAÇÃO DE ORIGEM DO LEAD
+    // Determinar se é lead pago baseado em UTM e id_criativo
+    const determinarOrigem = (utmSrc: string | null, idCriat: string | null): string => {
+      if (idCriat) return 'PAGO';
+      if (!utmSrc) return 'MANUAL';
+      
+      const source = utmSrc.toLowerCase();
+      if (['facebook', 'meta', 'fb', 'google', 'ads', 'ig', 'instagram'].some(s => source.includes(s))) {
+        return 'PAGO';
+      }
+      if (['email', 'mail'].some(s => source.includes(s))) {
+        return 'ORGANICO';
+      }
+      return 'MANUAL';
+    };
+
+    const origemTipo = determinarOrigem(utmSource, idCriativo);
+    const leadPago = origemTipo === 'PAGO';
+    
+    console.log(`[Origem] Tipo: ${origemTipo}, Lead Pago: ${leadPago} (utm_source: ${utmSource}, id_criativo: ${idCriativo})`);
+
     const leadData = {
       id_empresa: idEmpresa,
       id_lead_externo: String(dealData.id),
@@ -340,6 +361,9 @@ serve(async (req) => {
       utm_campaign: utmCampaign,
       utm_content: utmContent,
       utm_term: utmTerm,
+      // NOVO: Classificação de origem
+      origem_tipo: origemTipo,
+      lead_pago: leadPago,
     };
 
     console.log("Dados do lead a serem salvos:", JSON.stringify(leadData, null, 2));

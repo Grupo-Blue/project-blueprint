@@ -29,8 +29,9 @@ interface EmpresaMetrica {
   nome: string;
   verba_investida: number;
   leads_total: number;
-  cpl: number;
-  cac: number;
+  leads_pagos: number;
+  cpl: number | null;
+  cac: number | null;
   vendas: number;
   cpl_maximo: number;
   cac_maximo: number;
@@ -106,10 +107,17 @@ export default function DashboardDirecao() {
       console.log("[DashboardDirecao] Período:", dataInicioQuery, "até", dataFimQuery);
 
       // TODAS as queries em paralelo - máxima eficiência
-      const [empresasResult, leadsResult, vendasResult, contasResult, campanhasResult, metricasResult] = await Promise.all([
+      const [empresasResult, leadsResult, leadsPagosResult, vendasResult, contasResult, campanhasResult, metricasResult] = await Promise.all([
         supabase.from("empresa").select("id_empresa, nome, cpl_maximo, cac_maximo"),
+        // Leads TOTAIS (para contagem geral)
         supabase.from("lead")
           .select("id_lead, id_empresa")
+          .gte("data_criacao", dataInicioQuery)
+          .lte("data_criacao", dataFimQuery + "T23:59:59"),
+        // Leads PAGOS (para CPL correto)
+        supabase.from("lead")
+          .select("id_lead, id_empresa")
+          .eq("lead_pago", true)
           .gte("data_criacao", dataInicioQuery)
           .lte("data_criacao", dataFimQuery + "T23:59:59"),
         supabase.from("lead")
@@ -129,12 +137,13 @@ export default function DashboardDirecao() {
       
       const todasEmpresas = empresasResult.data || [];
       const todosLeads = leadsResult.data || [];
+      const leadsPagos = leadsPagosResult.data || [];
       const todasVendas = vendasResult.data || [];
       const todasContas = contasResult.data || [];
       const todasCampanhas = campanhasResult.data || [];
       const metricasVerba = metricasResult.data || [];
 
-      console.log("[DashboardDirecao] Registros de verba encontrados:", metricasVerba.length);
+      console.log("[DashboardDirecao] Leads totais:", todosLeads.length, "| Leads pagos:", leadsPagos.length);
       console.log("[DashboardDirecao] Total verba bruta:", metricasVerba.reduce((sum, m) => sum + Number(m.verba_investida), 0));
 
       // Mapa campanha -> empresa (via conta)
@@ -161,9 +170,13 @@ export default function DashboardDirecao() {
         console.warn("[DashboardDirecao] Verba sem empresa mapeada:", verbaOrfao);
       }
 
-      // Agregar leads e vendas por empresa
+      // Agregar leads TOTAIS por empresa
       const leadsByEmpresa = new Map<string, number>();
       todosLeads.forEach(l => leadsByEmpresa.set(l.id_empresa, (leadsByEmpresa.get(l.id_empresa) || 0) + 1));
+      
+      // Agregar leads PAGOS por empresa (para CPL)
+      const leadsPagosByEmpresa = new Map<string, number>();
+      leadsPagos.forEach(l => leadsPagosByEmpresa.set(l.id_empresa, (leadsPagosByEmpresa.get(l.id_empresa) || 0) + 1));
       
       const vendasByEmpresa = new Map<string, number>();
       todasVendas.forEach(v => vendasByEmpresa.set(v.id_empresa, (vendasByEmpresa.get(v.id_empresa) || 0) + 1));
@@ -178,8 +191,10 @@ export default function DashboardDirecao() {
         nome: empresa.nome,
         verba_investida: verbaByEmpresa.get(empresa.id_empresa) || 0,
         leads_total: leadsByEmpresa.get(empresa.id_empresa) || 0,
-        cpl: (leadsByEmpresa.get(empresa.id_empresa) || 0) > 0 
-          ? (verbaByEmpresa.get(empresa.id_empresa) || 0) / (leadsByEmpresa.get(empresa.id_empresa) || 1) 
+        leads_pagos: leadsPagosByEmpresa.get(empresa.id_empresa) || 0,
+        // CPL usa apenas leads PAGOS
+        cpl: (leadsPagosByEmpresa.get(empresa.id_empresa) || 0) > 0 
+          ? (verbaByEmpresa.get(empresa.id_empresa) || 0) / (leadsPagosByEmpresa.get(empresa.id_empresa) || 1) 
           : null,
         cac: (vendasByEmpresa.get(empresa.id_empresa) || 0) > 0 
           ? (verbaByEmpresa.get(empresa.id_empresa) || 0) / (vendasByEmpresa.get(empresa.id_empresa) || 1) 
@@ -255,12 +270,14 @@ export default function DashboardDirecao() {
     (acc, m) => ({
       verba: acc.verba + m.verba_investida,
       leads: acc.leads + m.leads_total,
+      leadsPagos: acc.leadsPagos + m.leads_pagos,
       vendas: acc.vendas + m.vendas,
     }),
-    { verba: 0, leads: 0, vendas: 0 }
-  ) || { verba: 0, leads: 0, vendas: 0 };
+    { verba: 0, leads: 0, leadsPagos: 0, vendas: 0 }
+  ) || { verba: 0, leads: 0, leadsPagos: 0, vendas: 0 };
 
-  const cplMedio = totais.leads > 0 ? totais.verba / totais.leads : 0;
+  // CPL usa apenas leads pagos
+  const cplMedio = totais.leadsPagos > 0 ? totais.verba / totais.leadsPagos : 0;
   const cacMedio = totais.vendas > 0 ? totais.verba / totais.vendas : 0;
 
   const alertas = metricas?.filter(
@@ -382,13 +399,16 @@ export default function DashboardDirecao() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Leads Totais</CardTitle>
+              <CardTitle className="text-sm font-medium">Leads</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totais.leads}</div>
+              <div className="text-2xl font-bold">
+                <span className="text-primary">{totais.leadsPagos}</span>
+                <span className="text-muted-foreground text-lg"> / {totais.leads}</span>
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
-                CPL médio: R$ {cplMedio.toFixed(2)}
+                Pagos / Total • CPL: R$ {cplMedio.toFixed(2)}
               </p>
             </CardContent>
           </Card>
@@ -443,7 +463,7 @@ export default function DashboardDirecao() {
                     <p className="font-semibold">{metrica.nome}</p>
                     <div className="flex gap-4 text-sm text-muted-foreground">
                       <span>Verba: R$ {metrica.verba_investida.toLocaleString("pt-BR")}</span>
-                      <span>Leads: {metrica.leads_total}</span>
+                      <span>Leads: <span className="text-primary font-medium">{metrica.leads_pagos}</span> / {metrica.leads_total}</span>
                       <span>Vendas: {metrica.vendas}</span>
                     </div>
                   </div>
