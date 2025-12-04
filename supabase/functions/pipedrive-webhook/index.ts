@@ -334,6 +334,39 @@ serve(async (req) => {
     
     console.log(`[Origem] Tipo: ${origemTipo}, Lead Pago: ${leadPago} (utm_source: ${utmSource}, id_criativo: ${idCriativo})`);
 
+    // Buscar lead existente para verificar mudanças de stage
+    const { data: existingLead } = await supabase
+      .from("lead")
+      .select("id_lead, is_mql, levantou_mao, tem_reuniao, reuniao_realizada, venda_realizada, data_mql, data_levantou_mao, data_reuniao")
+      .eq("id_lead_externo", String(dealData.id))
+      .eq("id_empresa", idEmpresa)
+      .maybeSingle();
+
+    const agora = new Date().toISOString();
+
+    // Capturar datas de transição - só atualiza se mudou para TRUE e não tinha data antes
+    let dataMql = existingLead?.data_mql || null;
+    let dataLevantouMao = existingLead?.data_levantou_mao || null;
+    let dataReuniao = existingLead?.data_reuniao || null;
+
+    // Se acabou de virar MQL (não era MQL antes, agora é)
+    if (isMql && !existingLead?.is_mql && !dataMql) {
+      dataMql = agora;
+      console.log(`[Transição] Lead ${dealData.id} virou MQL em ${agora}`);
+    }
+
+    // Se acabou de levantar a mão
+    if (levantouMao && !existingLead?.levantou_mao && !dataLevantouMao) {
+      dataLevantouMao = agora;
+      console.log(`[Transição] Lead ${dealData.id} levantou a mão em ${agora}`);
+    }
+
+    // Se acabou de ter reunião (tem_reuniao ou reuniao_realizada)
+    if ((temReuniao || reuniaoRealizada) && !existingLead?.tem_reuniao && !existingLead?.reuniao_realizada && !dataReuniao) {
+      dataReuniao = agora;
+      console.log(`[Transição] Lead ${dealData.id} tem reunião em ${agora}`);
+    }
+
     const leadData = {
       id_empresa: idEmpresa,
       id_lead_externo: String(dealData.id),
@@ -364,6 +397,10 @@ serve(async (req) => {
       // NOVO: Classificação de origem
       origem_tipo: origemTipo,
       lead_pago: leadPago,
+      // FASE 3: Datas de transição para tempo de ciclo
+      data_mql: dataMql,
+      data_levantou_mao: dataLevantouMao,
+      data_reuniao: dataReuniao,
     };
 
     console.log("Dados do lead a serem salvos:", JSON.stringify(leadData, null, 2));
@@ -399,6 +436,74 @@ serve(async (req) => {
       }
 
       console.log(`Lead ${dealData.id} processado com sucesso (${event})`);
+
+      // FASE 3: Registrar eventos de transição em lead_evento para histórico
+      const eventosParaInserir = [];
+      
+      // Verificar se houve mudança de stage
+      const previousStage = payload.previous?.stage_id;
+      const currentStage = dealData.stage_id;
+      
+      if (previousStage !== currentStage && stageAtual && upsertedLead) {
+        eventosParaInserir.push({
+          id_lead: upsertedLead.id_lead,
+          etapa: stageAtual,
+          data_evento: agora,
+          observacao: previousStage 
+            ? `Transição de stage ${previousStage} para ${stageAtual}`
+            : `Criado em ${stageAtual}`
+        });
+      }
+
+      // Registrar transições de funil
+      if (isMql && !existingLead?.is_mql && upsertedLead) {
+        eventosParaInserir.push({
+          id_lead: upsertedLead.id_lead,
+          etapa: "MQL",
+          data_evento: dataMql || agora,
+          observacao: "Lead qualificado como MQL"
+        });
+      }
+      
+      if (levantouMao && !existingLead?.levantou_mao && upsertedLead) {
+        eventosParaInserir.push({
+          id_lead: upsertedLead.id_lead,
+          etapa: "Levantou Mão",
+          data_evento: dataLevantouMao || agora,
+          observacao: "Lead levantou a mão / demonstrou interesse"
+        });
+      }
+      
+      if ((temReuniao || reuniaoRealizada) && !existingLead?.tem_reuniao && !existingLead?.reuniao_realizada && upsertedLead) {
+        eventosParaInserir.push({
+          id_lead: upsertedLead.id_lead,
+          etapa: reuniaoRealizada ? "Reunião Realizada" : "Reunião Agendada",
+          data_evento: dataReuniao || agora,
+          observacao: reuniaoRealizada ? "Reunião realizada" : "Reunião agendada"
+        });
+      }
+      
+      if (vendaRealizada && !existingLead?.venda_realizada && upsertedLead) {
+        eventosParaInserir.push({
+          id_lead: upsertedLead.id_lead,
+          etapa: "Venda",
+          data_evento: leadData.data_venda || agora,
+          observacao: `Venda realizada - ${valorDeal ? `R$ ${valorDeal.toFixed(2)}` : 'valor não informado'}`
+        });
+      }
+
+      // Inserir eventos em lote
+      if (eventosParaInserir.length > 0) {
+        const { error: eventosError } = await supabase
+          .from("lead_evento")
+          .insert(eventosParaInserir);
+
+        if (eventosError) {
+          console.error("Erro ao inserir eventos de transição:", eventosError);
+        } else {
+          console.log(`[Transição] ${eventosParaInserir.length} eventos registrados para lead ${dealData.id}`);
+        }
+      }
 
       // Enriquecer lead com dados do Mautic (se email disponível)
       if (personEmail && upsertedLead) {

@@ -688,6 +688,7 @@ export type Database = {
           lucro_minimo_por_venda: number
           margem_minima_percentual: number
           meta_conversao_lead_venda: number
+          meta_verba_mensal: number | null
           nome: string
           semanas_alerta_cac: number
           ticket_medio_alvo: number
@@ -702,6 +703,7 @@ export type Database = {
           lucro_minimo_por_venda: number
           margem_minima_percentual: number
           meta_conversao_lead_venda: number
+          meta_verba_mensal?: number | null
           nome: string
           semanas_alerta_cac?: number
           ticket_medio_alvo: number
@@ -716,6 +718,7 @@ export type Database = {
           lucro_minimo_por_venda?: number
           margem_minima_percentual?: number
           meta_conversao_lead_venda?: number
+          meta_verba_mensal?: number | null
           nome?: string
           semanas_alerta_cac?: number
           ticket_medio_alvo?: number
@@ -895,6 +898,9 @@ export type Database = {
           cliente_status: string | null
           created_at: string
           data_criacao: string
+          data_levantou_mao: string | null
+          data_mql: string | null
+          data_reuniao: string | null
           data_venda: string | null
           email: string | null
           estado_mautic: string | null
@@ -946,6 +952,9 @@ export type Database = {
           cliente_status?: string | null
           created_at?: string
           data_criacao?: string
+          data_levantou_mao?: string | null
+          data_mql?: string | null
+          data_reuniao?: string | null
           data_venda?: string | null
           email?: string | null
           estado_mautic?: string | null
@@ -997,6 +1006,9 @@ export type Database = {
           cliente_status?: string | null
           created_at?: string
           data_criacao?: string
+          data_levantou_mao?: string | null
+          data_mql?: string | null
+          data_reuniao?: string | null
           data_venda?: string | null
           email?: string | null
           estado_mautic?: string | null

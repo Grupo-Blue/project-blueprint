@@ -20,6 +20,8 @@ import { TrackingScore } from "@/components/dashboard/TrackingScore";
 import { ROIProfitability } from "@/components/dashboard/ROIProfitability";
 import { CriativosFadiga } from "@/components/dashboard/CriativosFadiga";
 import { AlertasAnomalias } from "@/components/dashboard/AlertasAnomalias";
+import { PacingOrcamento } from "@/components/dashboard/PacingOrcamento";
+import { TempoCiclo } from "@/components/dashboard/TempoCiclo";
 
 const Dashboard = () => {
   const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
@@ -268,6 +270,13 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* FASE 3: Pacing de Orçamento */}
+      {empresaSelecionada && (
+        <div className="mb-6 md:mb-8">
+          <PacingOrcamento empresaId={empresaSelecionada} />
+        </div>
+      )}
+
       {/* NOVA SEÇÃO: Distribuição por Empresa (visível quando há múltiplas empresas) */}
       {empresasPermitidas.length > 1 && (
         <div className="mb-6 md:mb-8">
@@ -298,6 +307,13 @@ const Dashboard = () => {
       {empresaSelecionada && (
         <div className="mb-6 md:mb-8">
           <ROIProfitability empresaId={empresaSelecionada} />
+        </div>
+      )}
+
+      {/* FASE 3: Tempo de Ciclo de Vendas */}
+      {empresaSelecionada && (
+        <div className="mb-6 md:mb-8">
+          <TempoCiclo empresaId={empresaSelecionada} />
         </div>
       )}
 
