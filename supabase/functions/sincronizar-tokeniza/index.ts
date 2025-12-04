@@ -226,22 +226,43 @@ serve(async (req) => {
           const isPaid = inv.status === "FINISHED" || inv.status === "PAID" || inv.was_paid === true;
           return inv.id && isPaid;
         })
-        .map(inv => ({
-          id_empresa: idEmpresa,
-          id_lead_externo: `tokeniza_inv_${inv.id}`,
-          data_criacao: inv.created_at || new Date().toISOString(),
-          origem_canal: "OUTRO" as const,
-          origem_campanha: "tokeniza_crowdfunding",
-          is_mql: true,
-          levantou_mao: true,
-          tem_reuniao: false,
-          reuniao_realizada: false,
-          venda_realizada: true,
-          data_venda: inv.last_update || inv.created_at,
-          valor_venda: parseFloat(inv.amount || "0"),
-          // Buscar nome do projeto no mapa
-          tokeniza_projeto_nome: inv.project_id ? (projetoNomeMap[inv.project_id] || null) : null,
-        }));
+        .map(inv => {
+          // Buscar dados do usuário para enriquecer com nome e email
+          const usuario = inv.user_id ? usuarioMap[inv.user_id] : null;
+          
+          // Detectar se first_name é hash (32 chars hexadecimais)
+          const isFirstNameHash = usuario?.first_name?.length === 32 && 
+                                  /^[a-f0-9]+$/i.test(usuario?.first_name || '');
+          
+          // Montar nome: firstName (se não hash) + lastName
+          const nomeParts: string[] = [];
+          if (usuario?.first_name && !isFirstNameHash) {
+            nomeParts.push(usuario.first_name);
+          }
+          if (usuario?.last_name) {
+            nomeParts.push(usuario.last_name);
+          }
+          const nomeLead = nomeParts.length > 0 ? nomeParts.join(' ') : null;
+
+          return {
+            id_empresa: idEmpresa,
+            id_lead_externo: `tokeniza_inv_${inv.id}`,
+            nome_lead: nomeLead,
+            email: usuario?.email || null,
+            data_criacao: inv.created_at || new Date().toISOString(),
+            origem_canal: "OUTRO" as const,
+            origem_campanha: "tokeniza_crowdfunding",
+            is_mql: true,
+            levantou_mao: true,
+            tem_reuniao: false,
+            reuniao_realizada: false,
+            venda_realizada: true,
+            data_venda: inv.last_update || inv.created_at,
+            valor_venda: parseFloat(inv.amount || "0"),
+            // Buscar nome do projeto no mapa
+            tokeniza_projeto_nome: inv.project_id ? (projetoNomeMap[inv.project_id] || null) : null,
+          };
+        });
 
       const allLeads = leadsInvestimentos;
       
