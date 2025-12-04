@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,23 +9,22 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useUserEmpresas } from "@/hooks/useUserEmpresas";
+import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 
 export default function RelatorioNovo() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
   const [empresaSelecionada, setEmpresaSelecionada] = useState("");
   const [semanaSelecionada, setSemanaSelecionada] = useState("");
 
-  const { data: empresas } = useQuery({
-    queryKey: ["empresas"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("empresa")
-        .select("id_empresa, nome");
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Auto-selecionar empresa quando carregar (se tiver apenas 1)
+  useEffect(() => {
+    if (empresasPermitidas.length === 1 && !empresaSelecionada) {
+      setEmpresaSelecionada(empresasPermitidas[0].id_empresa);
+    }
+  }, [empresasPermitidas, empresaSelecionada]);
 
   const { data: semanas } = useQuery({
     queryKey: ["semanas"],
@@ -88,6 +87,20 @@ export default function RelatorioNovo() {
     },
   });
 
+  // Loading state
+  if (loadingEmpresas) {
+    return (
+      <div className="min-h-screen bg-background p-8 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Sem acesso
+  if (!hasAccess) {
+    return <SemAcessoEmpresas />;
+  }
+
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -108,7 +121,7 @@ export default function RelatorioNovo() {
                   <SelectValue placeholder="Selecione a empresa" />
                 </SelectTrigger>
                 <SelectContent>
-                  {empresas?.map((empresa) => (
+                  {empresasPermitidas.map((empresa) => (
                     <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
                       {empresa.nome}
                     </SelectItem>

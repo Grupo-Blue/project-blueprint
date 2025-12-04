@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   TrendingUp, 
   TrendingDown, 
@@ -23,6 +23,8 @@ import { ptBR } from "date-fns/locale";
 import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { startOfMonth, endOfMonth } from "date-fns";
+import { useUserEmpresas } from "@/hooks/useUserEmpresas";
+import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 
 interface EmpresaMetrica {
   id_empresa: string;
@@ -39,7 +41,15 @@ interface EmpresaMetrica {
 
 export default function DashboardDirecao() {
   const { semanaSelecionada, getDataReferencia, tipoFiltro, dataEspecifica } = usePeriodo();
+  const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
+
+  // Auto-selecionar empresa quando carregar (se tiver apenas 1)
+  useEffect(() => {
+    if (empresasPermitidas.length === 1) {
+      setEmpresaSelecionada(empresasPermitidas[0].id_empresa);
+    }
+  }, [empresasPermitidas]);
 
   // ESTABILIZAR datas com useMemo para evitar recálculos a cada render
   const { dataInicioStr, dataFimStr, dataReferencia } = useMemo(() => {
@@ -302,7 +312,7 @@ export default function DashboardDirecao() {
 
   const labelPeriodo = getLabelPeriodo();
 
-  if (isLoading) {
+  if (isLoading || loadingEmpresas) {
     return (
       <div className="min-h-screen bg-background p-8">
         <div className="max-w-7xl mx-auto">
@@ -317,6 +327,10 @@ export default function DashboardDirecao() {
         </div>
       </div>
     );
+  }
+
+  if (!hasAccess) {
+    return <SemAcessoEmpresas />;
   }
 
   return (
@@ -335,8 +349,10 @@ export default function DashboardDirecao() {
                 <SelectValue placeholder="Selecione a empresa" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="todas">Todas as empresas</SelectItem>
-                {empresas?.map((empresa) => (
+                {empresasPermitidas.length > 1 && (
+                  <SelectItem value="todas">Todas as empresas</SelectItem>
+                )}
+                {empresasPermitidas.map((empresa) => (
                   <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
                     {empresa.nome}
                   </SelectItem>

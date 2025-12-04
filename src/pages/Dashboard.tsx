@@ -10,10 +10,13 @@ import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { InteligenciaIA } from "@/components/InteligenciaIA";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useUserEmpresas } from "@/hooks/useUserEmpresas";
+import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 
 const Dashboard = () => {
   const { semanaSelecionada, getDataReferencia, tipoFiltro } = usePeriodo();
+  const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("");
   
   // Usar data do filtro selecionado
@@ -21,22 +24,12 @@ const Dashboard = () => {
   const inicioMes = startOfMonth(dataReferencia);
   const fimMes = endOfMonth(dataReferencia);
 
-  // Buscar empresas
-  const { data: empresas } = useQuery({
-    queryKey: ["empresas"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("empresa")
-        .select("id_empresa, nome")
-        .order("nome");
-      if (error) throw error;
-      // Seleciona a primeira empresa por padrão
-      if (data && data.length > 0 && !empresaSelecionada) {
-        setEmpresaSelecionada(data[0].id_empresa);
-      }
-      return data;
-    },
-  });
+  // Auto-selecionar empresa quando carregar
+  useEffect(() => {
+    if (empresasPermitidas.length > 0 && !empresaSelecionada) {
+      setEmpresaSelecionada(empresasPermitidas[0].id_empresa);
+    }
+  }, [empresasPermitidas, empresaSelecionada]);
 
   // Buscar campanhas ativas
   const { data: campanhas } = useQuery({
@@ -136,6 +129,20 @@ const Dashboard = () => {
     enabled: !!empresaSelecionada,
   });
 
+  // Loading state
+  if (loadingEmpresas) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Sem acesso
+  if (!hasAccess) {
+    return <SemAcessoEmpresas />;
+  }
+
   // Calcular estatísticas
   const totalCampanhas = campanhas?.length || 0;
   const totalLeads = leadsDoMes?.length || 0;
@@ -170,7 +177,7 @@ const Dashboard = () => {
                 <SelectValue placeholder="Selecione a empresa" />
               </SelectTrigger>
               <SelectContent>
-                {empresas?.map((empresa) => (
+                {empresasPermitidas.map((empresa) => (
                   <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
                     {empresa.nome}
                   </SelectItem>
