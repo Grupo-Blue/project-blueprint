@@ -56,7 +56,7 @@ const getProdutoBlue = (nomeLead: string | null): string | null => {
 };
 
 const Leads = () => {
-  const { tipoFiltro, semanaSelecionada, getDataReferencia } = usePeriodo();
+  const { tipoFiltro, getDataReferencia } = usePeriodo();
   const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -118,22 +118,6 @@ const Leads = () => {
     },
   });
 
-  // Buscar dados da semana se filtro for por semana
-  const { data: semanaData } = useQuery({
-    queryKey: ["semana", semanaSelecionada],
-    queryFn: async () => {
-      if (!semanaSelecionada) return null;
-      const { data, error } = await supabase
-        .from("semana")
-        .select("*")
-        .eq("id_semana", semanaSelecionada)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: tipoFiltro === "semana_especifica" && !!semanaSelecionada,
-  });
-
   // Toggle row expansion
   const toggleRowExpansion = (id: string) => {
     setExpandedRows(prev => {
@@ -153,18 +137,11 @@ const Leads = () => {
     const leadDate = lead.venda_realizada && lead.data_venda 
       ? parseISO(lead.data_venda) 
       : parseISO(lead.data_criacao);
-    let matchesPeriodo = true;
-
-    if (tipoFiltro === "semana_especifica" && semanaData) {
-      const dataInicio = parseISO(semanaData.data_inicio);
-      const dataFim = parseISO(semanaData.data_fim);
-      matchesPeriodo = leadDate >= dataInicio && leadDate <= dataFim;
-    } else {
-      const dataReferencia = getDataReferencia();
-      const inicioMes = startOfMonth(dataReferencia);
-      const fimMes = endOfMonth(dataReferencia);
-      matchesPeriodo = leadDate >= inicioMes && leadDate <= fimMes;
-    }
+    
+    const dataReferencia = getDataReferencia();
+    const inicioMes = startOfMonth(dataReferencia);
+    const fimMes = endOfMonth(dataReferencia);
+    const matchesPeriodo = leadDate >= inicioMes && leadDate <= fimMes;
 
     const matchesSearch = 
       !searchTerm ||
