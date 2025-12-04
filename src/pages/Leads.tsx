@@ -654,6 +654,12 @@ const Leads = () => {
                                   ✋ Manual
                                 </Badge>
                               )}
+                              {/* Badge Instagram Bio - quando utm_source contém instagram ou linktree */}
+                              {lead.utm_source && (lead.utm_source.toLowerCase().includes('instagram') || lead.utm_source.toLowerCase().includes('linktree')) && !(lead as any).lead_pago && (
+                                <Badge className="bg-gradient-to-r from-pink-500 to-purple-500 text-white text-xs w-fit">
+                                  📲 Instagram Bio
+                                </Badge>
+                              )}
                               {/* Badge de canal */}
                               {origem && (
                                 <TooltipProvider>
