@@ -44,6 +44,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { CampanhaFluxoDiagram } from "@/components/CampanhaFluxoDiagram";
+import { MetricasAwareness } from "@/components/dashboard/MetricasAwareness";
 
 interface CampanhaMetrica {
   id_campanha: string;

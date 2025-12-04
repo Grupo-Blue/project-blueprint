@@ -865,6 +865,56 @@ export type Database = {
           },
         ]
       }
+      instagram_metricas_dia: {
+        Row: {
+          alcance: number
+          cliques_website: number
+          created_at: string
+          data: string
+          id_empresa: string
+          id_metrica: string
+          impressoes: number
+          novos_seguidores: number
+          seguidores_total: number
+          updated_at: string
+          visitas_perfil: number
+        }
+        Insert: {
+          alcance?: number
+          cliques_website?: number
+          created_at?: string
+          data: string
+          id_empresa: string
+          id_metrica?: string
+          impressoes?: number
+          novos_seguidores?: number
+          seguidores_total?: number
+          updated_at?: string
+          visitas_perfil?: number
+        }
+        Update: {
+          alcance?: number
+          cliques_website?: number
+          created_at?: string
+          data?: string
+          id_empresa?: string
+          id_metrica?: string
+          impressoes?: number
+          novos_seguidores?: number
+          seguidores_total?: number
+          updated_at?: string
+          visitas_perfil?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_metricas_dia_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       integracao: {
         Row: {
           ativo: boolean
@@ -1323,6 +1373,50 @@ export type Database = {
         }
         Relationships: []
       }
+      smartlink_cliques: {
+        Row: {
+          cliques: number
+          created_at: string
+          data: string
+          id_empresa: string
+          id_smartlink: string
+          smartlink_id: string
+          smartlink_nome: string | null
+          smartlink_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          cliques?: number
+          created_at?: string
+          data: string
+          id_empresa: string
+          id_smartlink?: string
+          smartlink_id: string
+          smartlink_nome?: string | null
+          smartlink_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cliques?: number
+          created_at?: string
+          data?: string
+          id_empresa?: string
+          id_smartlink?: string
+          smartlink_id?: string
+          smartlink_nome?: string | null
+          smartlink_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "smartlink_cliques_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       tokeniza_investimento: {
         Row: {
           amount: number
@@ -1642,6 +1736,7 @@ export type Database = {
         | "TOKENIZA"
         | "MAUTIC"
         | "NOTION"
+        | "METRICOOL"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1788,6 +1883,7 @@ export const Constants = {
         "TOKENIZA",
         "MAUTIC",
         "NOTION",
+        "METRICOOL",
       ],
     },
   },
