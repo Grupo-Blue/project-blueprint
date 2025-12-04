@@ -855,6 +855,75 @@ export default function DashboardTrafego() {
     enabled: true,
   });
 
+  // Query para CPL Orgânico (investimento awareness vs leads de redes sociais)
+  const { data: cplOrganicoData } = useQuery({
+    queryKey: [
+      "cpl-organico",
+      empresaSelecionada,
+      inicioMes.toISOString(),
+      fimMes.toISOString(),
+    ],
+    queryFn: async () => {
+      // Buscar contas da empresa (ou todas)
+      let contasQuery = supabase.from("conta_anuncio").select("id_conta, id_empresa");
+      if (empresaSelecionada !== "todas") {
+        contasQuery = contasQuery.eq("id_empresa", empresaSelecionada);
+      }
+
+      const { data: contas } = await contasQuery;
+      if (!contas || contas.length === 0) return { investimento: 0, leads: 0, breakdown: { instagram: 0, facebook: 0, linkedin: 0, tiktok: 0, youtube: 0, twitter: 0 } };
+
+      // Buscar campanhas de awareness
+      const { data: campanhas } = await supabase
+        .from("campanha")
+        .select("id_campanha, objetivo")
+        .in("id_conta", contas.map(c => c.id_conta))
+        .in("objetivo", ["REACH", "AWARENESS", "ENGAGEMENT", "POST_ENGAGEMENT", "VIDEO_VIEWS", "BRAND_AWARENESS"]);
+
+      let investimentoAwareness = 0;
+      if (campanhas && campanhas.length > 0) {
+        const { data: metricas } = await supabase
+          .from("campanha_metricas_dia")
+          .select("verba_investida")
+          .in("id_campanha", campanhas.map(c => c.id_campanha))
+          .gte("data", format(inicioMes, "yyyy-MM-dd"))
+          .lte("data", format(fimMes, "yyyy-MM-dd"));
+
+        investimentoAwareness = metricas?.reduce((acc, m) => acc + Number(m.verba_investida || 0), 0) || 0;
+      }
+
+      // Buscar leads orgânicos de todas as redes sociais
+      let leadsQuery = supabase
+        .from("lead")
+        .select("utm_source")
+        .eq("lead_pago", false)
+        .gte("data_criacao", inicioMes.toISOString())
+        .lte("data_criacao", fimMes.toISOString());
+
+      if (empresaSelecionada !== "todas") {
+        leadsQuery = leadsQuery.eq("id_empresa", empresaSelecionada);
+      }
+
+      const { data: leads } = await leadsQuery;
+
+      // Contar por rede social
+      const breakdown = { instagram: 0, facebook: 0, linkedin: 0, tiktok: 0, youtube: 0, twitter: 0 };
+      (leads || []).forEach((lead: any) => {
+        const source = (lead.utm_source || '').toLowerCase();
+        if (source.includes('instagram') || source.includes('linktree')) breakdown.instagram++;
+        else if ((source.includes('facebook') || source.includes('fb')) && !source.includes('ads')) breakdown.facebook++;
+        else if (source.includes('linkedin')) breakdown.linkedin++;
+        else if (source.includes('tiktok')) breakdown.tiktok++;
+        else if (source.includes('youtube')) breakdown.youtube++;
+        else if (source.includes('twitter') || source.includes('x.com')) breakdown.twitter++;
+      });
+
+      const totalLeads = Object.values(breakdown).reduce((a, b) => a + b, 0);
+
+      return { investimento: investimentoAwareness, leads: totalLeads, breakdown };
+    },
+  });
+
   const totais = totaisGerais || { verba: 0, leads: 0, mqls: 0, levantadas: 0, reunioes: 0, vendas: 0 };
 
   const taxaMQL = totais.leads > 0 ? (totais.mqls / totais.leads) * 100 : 0;
@@ -1163,6 +1232,97 @@ export default function DashboardTrafego() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Card CPL Orgânico */}
+        {cplOrganicoData && (cplOrganicoData.investimento > 0 || cplOrganicoData.leads > 0) && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-emerald-500" />
+                Custo por Lead Orgânico (Redes Sociais)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 rounded-lg bg-gradient-to-br from-emerald-500/10 to-green-500/10 border">
+                  <p className="text-sm text-muted-foreground mb-1">Investimento Awareness</p>
+                  <p className="text-2xl font-bold">
+                    R$ {cplOrganicoData.investimento.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Campanhas de alcance e engajamento
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border">
+                  <p className="text-sm text-muted-foreground mb-1">Leads de Redes Sociais</p>
+                  <p className="text-2xl font-bold">{cplOrganicoData.leads}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Orgânicos (não pagos)
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-pink-500/10 border">
+                  <p className="text-sm text-muted-foreground mb-1">CPL Orgânico</p>
+                  <p className="text-2xl font-bold">
+                    {cplOrganicoData.leads > 0 
+                      ? `R$ ${(cplOrganicoData.investimento / cplOrganicoData.leads).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : "N/A"
+                    }
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Awareness ÷ Leads orgânicos
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg border bg-card">
+                  <p className="text-sm text-muted-foreground mb-2">Por Rede Social</p>
+                  <div className="space-y-1 text-sm">
+                    {cplOrganicoData.breakdown.instagram > 0 && (
+                      <div className="flex justify-between">
+                        <span>📱 Instagram</span>
+                        <span className="font-medium">{cplOrganicoData.breakdown.instagram}</span>
+                      </div>
+                    )}
+                    {cplOrganicoData.breakdown.facebook > 0 && (
+                      <div className="flex justify-between">
+                        <span>📘 Facebook</span>
+                        <span className="font-medium">{cplOrganicoData.breakdown.facebook}</span>
+                      </div>
+                    )}
+                    {cplOrganicoData.breakdown.linkedin > 0 && (
+                      <div className="flex justify-between">
+                        <span>💼 LinkedIn</span>
+                        <span className="font-medium">{cplOrganicoData.breakdown.linkedin}</span>
+                      </div>
+                    )}
+                    {cplOrganicoData.breakdown.tiktok > 0 && (
+                      <div className="flex justify-between">
+                        <span>🎵 TikTok</span>
+                        <span className="font-medium">{cplOrganicoData.breakdown.tiktok}</span>
+                      </div>
+                    )}
+                    {cplOrganicoData.breakdown.youtube > 0 && (
+                      <div className="flex justify-between">
+                        <span>📺 YouTube</span>
+                        <span className="font-medium">{cplOrganicoData.breakdown.youtube}</span>
+                      </div>
+                    )}
+                    {cplOrganicoData.breakdown.twitter > 0 && (
+                      <div className="flex justify-between">
+                        <span>🐦 Twitter/X</span>
+                        <span className="font-medium">{cplOrganicoData.breakdown.twitter}</span>
+                      </div>
+                    )}
+                    {cplOrganicoData.leads === 0 && (
+                      <p className="text-muted-foreground text-xs">Nenhum lead de redes sociais</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Métricas de Awareness (Instagram/Metricool) */}
         <MetricasAwareness 
