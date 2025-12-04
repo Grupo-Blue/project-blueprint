@@ -352,6 +352,10 @@ const DuplicadosLeadsTab = () => {
                                   <span className="font-medium">{lead.nome_lead || 'Sem nome'}</span>
                                 </div>
                                 <div className="text-sm text-muted-foreground mt-1 space-y-1">
+                                  <p className="flex items-center gap-1">
+                                    <DollarSign className="h-3 w-3" />
+                                    Valor compra: {lead.valor_venda ? `R$ ${lead.valor_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ -'}
+                                  </p>
                                   <p>Stage: {lead.stage_atual || '-'}</p>
                                   {lead.utm_source && <p>UTMs: {lead.utm_source}/{lead.utm_medium}</p>}
                                   {lead.mautic_score && <p>Mautic: {lead.mautic_score} pts</p>}
@@ -394,7 +398,15 @@ const DuplicadosLeadsTab = () => {
                           <div className="text-sm text-muted-foreground mt-1 space-y-1">
                             <p className="flex items-center gap-1">
                               <DollarSign className="h-3 w-3" />
-                              Valor total: R$ {grupo.valorTotalTokeniza.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              Última compra: {(() => {
+                                const ultimaCompra = grupo.leadsTokeniza
+                                  .filter(l => l.data_venda)
+                                  .sort((a, b) => new Date(b.data_venda).getTime() - new Date(a.data_venda).getTime())[0];
+                                return ultimaCompra?.valor_venda ? `R$ ${ultimaCompra.valor_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ -';
+                              })()}
+                            </p>
+                            <p className="flex items-center gap-1 text-xs">
+                              Total investido: R$ {grupo.valorTotalTokeniza.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </p>
                             <p className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
