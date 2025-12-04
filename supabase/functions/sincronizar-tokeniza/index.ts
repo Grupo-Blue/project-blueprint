@@ -205,31 +205,7 @@ serve(async (req) => {
       console.log(`Vendas: ${resultados.vendas.success} salvas`);
 
       // ========== CRIAR LEADS EM LOTES ==========
-      // Leads de vendas pagas com email
-      const leadsVendas = automaticSalesData
-        .filter(v => v.id && v.wasPaid && v.userEmail)
-        .map(venda => {
-          const isPaid = venda.status === "finished" || venda.status === "completed";
-          return {
-            id_empresa: idEmpresa,
-            id_lead_externo: `tokeniza_venda_${venda.id}`,
-            data_criacao: venda.createdAt || new Date().toISOString(),
-            origem_canal: "OUTRO" as const,
-            origem_campanha: "tokeniza",
-            email: venda.userEmail,
-            nome_lead: null,
-            is_mql: true,
-            levantou_mao: true,
-            tem_reuniao: false,
-            reuniao_realizada: false,
-            venda_realizada: isPaid,
-            data_venda: isPaid ? (venda.updatedAt || venda.createdAt) : null,
-            valor_venda: isPaid ? parseFloat(venda.totalAmount || "0") : null,
-            tokeniza_projeto_nome: null, // Vendas não têm project_id
-          };
-        });
-
-      // Leads de investimentos pagos - incluindo nome do projeto
+      // Apenas leads de investimentos pagos (crowdfunding) - vendas automáticas não geram leads
       const leadsInvestimentos = crowdfundingData
         .filter(inv => {
           const isPaid = inv.status === "FINISHED" || inv.status === "PAID" || inv.was_paid === true;
@@ -252,7 +228,7 @@ serve(async (req) => {
           tokeniza_projeto_nome: inv.project_id ? (projetoNomeMap[inv.project_id] || null) : null,
         }));
 
-      const allLeads = [...leadsVendas, ...leadsInvestimentos];
+      const allLeads = leadsInvestimentos;
       
       for (let i = 0; i < allLeads.length; i += BATCH_SIZE) {
         const batch = allLeads.slice(i, i + BATCH_SIZE);
