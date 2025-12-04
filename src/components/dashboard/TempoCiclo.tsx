@@ -52,9 +52,10 @@ export const TempoCiclo = ({ empresaId }: TempoCicloProps) => {
   
   // Buscar leads dos últimos 3 meses com datas de transição
   const tresMesesAtras = subMonths(dataReferencia, 3);
+  const tresMesesAtrasStr = format(tresMesesAtras, 'yyyy-MM-dd');
 
-  const { data: leads, isLoading, error, isFetching } = useQuery({
-    queryKey: ["leads-ciclo", empresaId, tresMesesAtras.toISOString()],
+  const { data: leads, isLoading, error } = useQuery({
+    queryKey: ["leads-ciclo", empresaId, tresMesesAtrasStr],
     queryFn: async () => {
       if (!empresaId) return [];
       
@@ -158,7 +159,7 @@ export const TempoCiclo = ({ empresaId }: TempoCicloProps) => {
   const temDadosSuficientes = temposLeadVenda.length >= 3 || chartData.some(d => d.amostra >= 3);
   const temDatasTransicao = leads?.some(l => l.data_mql || l.data_levantou_mao || l.data_reuniao);
 
-  if (isLoading || isFetching) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
