@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MetricaComInfo } from "@/components/ui/MetricaComInfo";
+import { usePeriodo } from "@/contexts/PeriodoContext";
 
 // Constantes para cálculo de margem diferenciada
 const TOKENIZA_EMPRESA_ID = "61b5ffeb-fbbc-47c1-8ced-152bb647ed20";
@@ -19,29 +20,33 @@ interface ROIProfitabilityProps {
 }
 
 export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
+  const { getInicioFim, labelPeriodo } = usePeriodo();
+  const { inicio, fim } = getInicioFim();
+  
   // Buscar dados de ROI por empresa
   const { data: roiData, isLoading } = useQuery({
-    queryKey: ["roi-profitability", empresaId],
+    queryKey: ["roi-profitability", empresaId, inicio.toISOString(), fim.toISOString()],
     queryFn: async () => {
-      // Período de 6 meses
-      const dataInicio = startOfMonth(subMonths(new Date(), 5));
-      const dataInicioStr = dataInicio.toISOString().split('T')[0];
+      const dataInicioStr = inicio.toISOString().split('T')[0];
+      const dataFimStr = fim.toISOString().split('T')[0];
       
-      // Buscar receita total (vendas realizadas) - MESMO PERÍODO DE 6 MESES
+      // Buscar receita total (vendas realizadas) - PERÍODO SELECIONADO
       const { data: vendas, error: vendasError } = await supabase
         .from("lead")
         .select("valor_venda, data_venda, id_empresa, empresa:id_empresa(nome)")
         .eq("venda_realizada", true)
         .not("valor_venda", "is", null)
-        .gte("data_venda", dataInicio.toISOString());
+        .gte("data_venda", dataInicioStr)
+        .lte("data_venda", dataFimStr);
 
       if (vendasError) throw vendasError;
 
-      // Buscar gasto total por empresa (últimos 6 meses) - USANDO empresa_metricas_dia
+      // Buscar gasto total por empresa - PERÍODO SELECIONADO
       const { data: metricas, error: metricasError } = await supabase
         .from("empresa_metricas_dia")
         .select("id_empresa, verba_investida, data")
-        .gte("data", dataInicioStr);
+        .gte("data", dataInicioStr)
+        .lte("data", dataFimStr);
 
       if (metricasError) throw metricasError;
 
@@ -78,8 +83,23 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
         empresa.gasto += Number(m.verba_investida) || 0;
       });
 
-      // Calcular dados mensais para gráfico
+      // Calcular dados mensais para gráfico (últimos 6 meses para contexto histórico)
       const mesesData: { mes: string; receita: number; gasto: number }[] = [];
+      
+      // Buscar dados históricos para o gráfico (6 meses)
+      const dataInicioHistorico = startOfMonth(subMonths(new Date(), 5));
+      const { data: vendasHistorico } = await supabase
+        .from("lead")
+        .select("valor_venda, data_venda, id_empresa")
+        .eq("venda_realizada", true)
+        .not("valor_venda", "is", null)
+        .gte("data_venda", dataInicioHistorico.toISOString());
+        
+      const { data: metricasHistorico } = await supabase
+        .from("empresa_metricas_dia")
+        .select("id_empresa, verba_investida, data")
+        .gte("data", dataInicioHistorico.toISOString().split('T')[0]);
+
       for (let i = 5; i >= 0; i--) {
         const mesData = subMonths(new Date(), i);
         const mesInicio = startOfMonth(mesData);
@@ -89,7 +109,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
         let receitaMes = 0;
         let gastoMes = 0;
 
-        vendas?.forEach((v: any) => {
+        vendasHistorico?.forEach((v: any) => {
           if (!empresaId || v.id_empresa === empresaId) {
             const dataVenda = v.data_venda ? new Date(v.data_venda) : null;
             if (dataVenda && dataVenda >= mesInicio && dataVenda <= mesFim) {
@@ -98,7 +118,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
           }
         });
 
-        metricas?.forEach((m: any) => {
+        metricasHistorico?.forEach((m: any) => {
           if (!empresaId || m.id_empresa === empresaId) {
             const dataMetrica = m.data ? new Date(m.data) : null;
             if (dataMetrica && dataMetrica >= mesInicio && dataMetrica <= mesFim) {
@@ -110,7 +130,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
         mesesData.push({ mes: mesLabel, receita: receitaMes, gasto: gastoMes });
       }
 
-      // Totais
+      // Totais do período selecionado
       let totalReceita = 0;
       let totalGasto = 0;
       let totalVendas = 0;
@@ -182,7 +202,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
               <DollarSign className="h-5 w-5" />
               ROI e Lucratividade
             </CardTitle>
-            <CardDescription>Análise de retorno sobre investimento</CardDescription>
+            <CardDescription>Análise de retorno sobre investimento - {labelPeriodo}</CardDescription>
           </div>
           {roiData?.dadosIncompletos && (
             <Badge variant="outline" className="text-yellow-600 border-yellow-600">
@@ -199,8 +219,8 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
             <MetricaComInfo 
               label="Receita Total" 
               info={roiData?.isTokeniza 
-                ? "Receita líquida (5% do valor total de investimentos) nos últimos 6 meses."
-                : "Soma do valor de todas as vendas realizadas nos últimos 6 meses."}
+                ? `Valor total de investimentos em ${labelPeriodo}.`
+                : `Soma do valor de todas as vendas realizadas em ${labelPeriodo}.`}
               className="text-sm text-muted-foreground mb-1"
             />
             <div className="text-xl md:text-2xl font-bold text-green-600">
@@ -211,7 +231,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
           <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900">
             <MetricaComInfo 
               label="Gasto em Mídia" 
-              info="Total investido em anúncios (Meta Ads + Google Ads) nos últimos 6 meses."
+              info={`Total investido em anúncios (Meta Ads + Google Ads) em ${labelPeriodo}.`}
               className="text-sm text-muted-foreground mb-1"
             />
             <div className="text-xl md:text-2xl font-bold text-red-600">
@@ -223,8 +243,8 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
             <MetricaComInfo 
               label="Lucro Bruto" 
               info={roiData?.isTokeniza 
-                ? "Receita líquida (5% margem) menos Gasto em Mídia."
-                : "Receita Total menos Gasto em Mídia. Valor positivo indica lucro, negativo indica prejuízo."}
+                ? `5% da receita total (margem Tokeniza) em ${labelPeriodo}.`
+                : `Receita Total menos Gasto em Mídia em ${labelPeriodo}.`}
               className="text-sm text-muted-foreground mb-1"
             />
             <div className={`text-xl md:text-2xl font-bold ${(roiData?.lucroBruto || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
@@ -236,8 +256,8 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
             <MetricaComInfo 
               label="ROAS" 
               info={roiData?.isTokeniza 
-                ? "Return On Ad Spend com margem de 5%. Quanto retorna em receita líquida para cada R$1 investido."
-                : "Return On Ad Spend. Quanto retorna em receita para cada R$1 investido. ROAS de 2x significa que cada R$1 gera R$2 em vendas."}
+                ? `Return On Ad Spend com margem de 5% em ${labelPeriodo}. Quanto retorna em receita líquida para cada R$1 investido.`
+                : `Return On Ad Spend em ${labelPeriodo}. ROAS de 2x significa que cada R$1 gera R$2 em vendas.`}
               className="text-sm text-muted-foreground mb-1"
             />
             <div className="text-xl md:text-2xl font-bold text-purple-600">
@@ -251,9 +271,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
           <div className="p-3 rounded-lg bg-muted/50 text-center">
             <MetricaComInfo 
               label="Ticket Médio" 
-              info={roiData?.isTokeniza 
-                ? "Valor médio de receita líquida (5% margem) por venda realizada."
-                : "Valor médio de cada venda realizada. Calculado dividindo a receita total pelo número de vendas."}
+              info={`Valor médio de cada venda em ${labelPeriodo}.`}
               className="text-xs text-muted-foreground justify-center"
             />
             <div className="text-lg font-semibold">{formatCurrency(roiData?.ticketMedio || 0)}</div>
@@ -261,7 +279,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
           <div className="p-3 rounded-lg bg-muted/50 text-center">
             <MetricaComInfo 
               label="CAC" 
-              info="Custo de Aquisição de Cliente. Quanto custa em média para converter um lead em cliente. Calculado: Gasto Total / Número de Vendas."
+              info={`Custo de Aquisição de Cliente em ${labelPeriodo}. Gasto Total / Número de Vendas.`}
               className="text-xs text-muted-foreground justify-center"
             />
             <div className="text-lg font-semibold">{formatCurrency(roiData?.cac || 0)}</div>
@@ -269,7 +287,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
           <div className="p-3 rounded-lg bg-muted/50 text-center">
             <MetricaComInfo 
               label="Payback" 
-              info="Tempo estimado para recuperar o investimento de aquisição. Quanto menor, mais rápido o retorno."
+              info={`Tempo estimado para recuperar o investimento de aquisição em ${labelPeriodo}.`}
               className="text-xs text-muted-foreground justify-center"
             />
             <div className="text-lg font-semibold">
@@ -278,8 +296,9 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
           </div>
         </div>
 
-        {/* Gráfico de barras - Receita vs Gasto por mês */}
+        {/* Gráfico de barras - Receita vs Gasto por mês (histórico 6 meses) */}
         <div className="h-64">
+          <p className="text-xs text-muted-foreground mb-2">Histórico últimos 6 meses</p>
           <ChartContainer config={chartConfig} className="h-full w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={roiData?.mesesData || []} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
