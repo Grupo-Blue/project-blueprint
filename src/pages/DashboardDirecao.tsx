@@ -3,8 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import {
   TrendingUp, 
   TrendingDown, 
@@ -20,10 +19,9 @@ import {
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 import { startOfMonth, endOfMonth } from "date-fns";
-import { useUserEmpresas } from "@/hooks/useUserEmpresas";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { MetricasSociaisExecutivo } from "@/components/dashboard/MetricasSociaisExecutivo";
 
@@ -41,16 +39,8 @@ interface EmpresaMetrica {
 }
 
 export default function DashboardDirecao() {
-  const { getDataReferencia, tipoFiltro, dataEspecifica } = usePeriodo();
-  const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
-  const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
-
-  // Auto-selecionar empresa quando carregar (se tiver apenas 1)
-  useEffect(() => {
-    if (empresasPermitidas.length === 1) {
-      setEmpresaSelecionada(empresasPermitidas[0].id_empresa);
-    }
-  }, [empresasPermitidas]);
+  const { getDataReferencia, tipoFiltro, dataEspecifica, labelPeriodo } = usePeriodo();
+  const { empresaSelecionada, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
 
   // ESTABILIZAR datas com useMemo para evitar recálculos a cada render
   const { dataInicioStr, dataFimStr, dataReferencia } = useMemo(() => {
@@ -207,22 +197,6 @@ export default function DashboardDirecao() {
     (m) => (m.cpl && m.cpl > m.cpl_maximo) || (m.cac && m.cac > m.cac_maximo)
   ) || [];
 
-  // Determinar label do período
-  const getLabelPeriodo = () => {
-    switch (tipoFiltro) {
-      case "mes_atual":
-        return "Mês Atual";
-      case "mes_anterior":
-        return "Mês Anterior";
-      case "data_especifica":
-        return format(dataReferencia, "MMMM/yyyy", { locale: ptBR });
-      default:
-        return "Período";
-    }
-  };
-
-  const labelPeriodo = getLabelPeriodo();
-
   if (isLoading || loadingEmpresas) {
     return (
       <div className="min-h-screen bg-background p-8">
@@ -253,24 +227,6 @@ export default function DashboardDirecao() {
             <p className="text-muted-foreground mt-2">
               Visão executiva consolidada - {labelPeriodo}
             </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-            <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Selecione a empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                {empresasPermitidas.length > 1 && (
-                  <SelectItem value="todas">Todas as empresas</SelectItem>
-                )}
-                {empresasPermitidas.map((empresa) => (
-                  <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
-                    {empresa.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FiltroPeriodo />
           </div>
         </div>
 
@@ -456,29 +412,31 @@ export default function DashboardDirecao() {
                     Nenhuma ação pendente
                   </p>
                 ) : (
-                  acoesAprovacao?.map((acao: any) => (
-                    <div
-                      key={acao.id_acao}
-                      className="p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
+                  <>
+                    {acoesAprovacao?.map((acao: any) => (
+                      <div
+                        key={acao.id_acao}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
+                        <div>
                           <p className="font-medium text-sm">{acao.tipo_acao}</p>
-                          <p className="text-xs text-muted-foreground">{acao.empresa.nome}</p>
-                          <p className="text-xs">
-                            {format(new Date(acao.data_criacao), "dd/MM/yyyy", { locale: ptBR })}
+                          <p className="text-xs text-muted-foreground">
+                            {acao.empresa?.nome} •{" "}
+                            {format(new Date(acao.data_criacao), "dd/MM/yyyy", {
+                              locale: ptBR,
+                            })}
                           </p>
                         </div>
-                        <Badge>{acao.categoria}</Badge>
+                        <Badge variant="outline">Pendente</Badge>
                       </div>
-                    </div>
-                  ))
+                    ))}
+                    <Link to="/aprovacoes">
+                      <Button variant="outline" className="w-full mt-2">
+                        Ver todas as aprovações
+                      </Button>
+                    </Link>
+                  </>
                 )}
-                <Link to="/aprovacoes">
-                  <Button variant="outline" className="w-full">
-                    Ver Todas as Aprovações
-                  </Button>
-                </Link>
               </div>
             </CardContent>
           </Card>
@@ -487,7 +445,7 @@ export default function DashboardDirecao() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
+                <CheckCircle className="h-5 w-5" />
                 Últimos Aprendizados
               </CardTitle>
             </CardHeader>
@@ -498,33 +456,26 @@ export default function DashboardDirecao() {
                     Nenhum aprendizado registrado
                   </p>
                 ) : (
-                  ultimosAprendizados?.map((aprendizado: any) => (
-                    <div
-                      key={aprendizado.id_aprendizado}
-                      className="p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium text-sm">{aprendizado.empresa.nome}</p>
-                          <Badge variant="outline" className="text-xs">
-                            {aprendizado.tipo}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {aprendizado.descricao}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Semana {aprendizado.semana.numero_semana}/{aprendizado.semana.ano}
+                  <>
+                    {ultimosAprendizados?.map((aprendizado: any) => (
+                      <div
+                        key={aprendizado.id_aprendizado}
+                        className="p-3 border rounded-lg"
+                      >
+                        <p className="text-sm line-clamp-2">{aprendizado.descricao}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {aprendizado.empresa?.nome} • Semana{" "}
+                          {aprendizado.semana?.numero_semana}/{aprendizado.semana?.ano}
                         </p>
                       </div>
-                    </div>
-                  ))
+                    ))}
+                    <Link to="/aprendizados">
+                      <Button variant="outline" className="w-full mt-2">
+                        Ver todos os aprendizados
+                      </Button>
+                    </Link>
+                  </>
                 )}
-                <Link to="/aprendizados">
-                  <Button variant="outline" className="w-full">
-                    Ver Todos os Aprendizados
-                  </Button>
-                </Link>
               </div>
             </CardContent>
           </Card>

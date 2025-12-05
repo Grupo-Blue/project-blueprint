@@ -34,8 +34,8 @@ import {
   Link2,
   Link2Off
 } from "lucide-react";
-import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -45,6 +45,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { CampanhaFluxoDiagram } from "@/components/CampanhaFluxoDiagram";
 import { MetricasAwareness } from "@/components/dashboard/MetricasAwareness";
+import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 
 interface CampanhaMetrica {
   id_campanha: string;
@@ -527,14 +528,14 @@ function CriativosQuery({ campanhaId, plataforma, urlEsperadaCampanha }: { campa
 export default function DashboardTrafego() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
+  const { empresaSelecionada, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
   const [ordenacao, setOrdenacao] = useState<string>("verba_desc");
   const [filtroStatusCampanha, setFiltroStatusCampanha] = useState<string>("ativas");
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
   const [syncingCreatives, setSyncingCreatives] = useState(false);
   const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState<{ id: string; nome: string } | null>(null);
-  const { getDataReferencia, tipoFiltro } = usePeriodo();
+  const { getDataReferencia, tipoFiltro, labelPeriodo } = usePeriodo();
 
   // Usar data do filtro selecionado
   const dataReferencia = getDataReferencia();
@@ -977,21 +978,7 @@ export default function DashboardTrafego() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <FiltroPeriodo />
-              <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas as Empresas</SelectItem>
-                  {empresas?.map((e) => (
-                    <SelectItem key={e.id_empresa} value={e.id_empresa}>
-                      {e.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button 
+              <Button
                 variant="outline" 
                 size="sm"
                 onClick={() => {

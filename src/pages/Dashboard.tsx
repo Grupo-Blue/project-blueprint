@@ -6,12 +6,9 @@ import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertaIntegracao } from "@/components/AlertaIntegracao";
 import { ValidacaoUTM } from "@/components/ValidacaoUTM";
-import { FiltroPeriodo } from "@/components/FiltroPeriodo";
 import { usePeriodo } from "@/contexts/PeriodoContext";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 import { InteligenciaIA } from "@/components/InteligenciaIA";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useState, useEffect } from "react";
-import { useUserEmpresas } from "@/hooks/useUserEmpresas";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { KPIsHistoricos } from "@/components/dashboard/KPIsHistoricos";
 import { DistribuicaoEmpresa } from "@/components/dashboard/DistribuicaoEmpresa";
@@ -25,21 +22,13 @@ import { TempoCiclo } from "@/components/dashboard/TempoCiclo";
 import { MetricasMultiRede } from "@/components/dashboard/MetricasMultiRede";
 
 const Dashboard = () => {
-  const { getDataReferencia, tipoFiltro } = usePeriodo();
-  const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
-  const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("");
+  const { getDataReferencia, tipoFiltro, labelPeriodo } = usePeriodo();
+  const { empresaSelecionada, empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
   
   // Usar data do filtro selecionado
   const dataReferencia = getDataReferencia();
   const inicioMes = startOfMonth(dataReferencia);
   const fimMes = endOfMonth(dataReferencia);
-
-  // Auto-selecionar empresa quando carregar
-  useEffect(() => {
-    if (empresasPermitidas.length > 0 && !empresaSelecionada) {
-      setEmpresaSelecionada(empresasPermitidas[0].id_empresa);
-    }
-  }, [empresasPermitidas, empresaSelecionada]);
 
   // Buscar campanhas ativas
   const { data: campanhas } = useQuery({
@@ -54,23 +43,26 @@ const Dashboard = () => {
     },
   });
 
+  // ID da empresa para queries (null se "todas")
+  const empresaIdQuery = empresaSelecionada && empresaSelecionada !== "todas" ? empresaSelecionada : null;
+
   // Buscar métricas diárias do período
   const { data: metricasDiarias } = useQuery({
-    queryKey: ["metricas-dashboard-diarias", inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada],
+    queryKey: ["metricas-dashboard-diarias", inicioMes.toISOString(), fimMes.toISOString(), empresaIdQuery],
     queryFn: async () => {
-      if (!empresaSelecionada) return null;
+      if (!empresaIdQuery) return null;
       
       const { data, error } = await supabase
         .from("empresa_metricas_dia")
         .select("*")
-        .eq("id_empresa", empresaSelecionada)
+        .eq("id_empresa", empresaIdQuery)
         .gte("data", format(inicioMes, "yyyy-MM-dd"))
         .lte("data", format(fimMes, "yyyy-MM-dd"));
       
       if (error) throw error;
       return data;
     },
-    enabled: !!empresaSelecionada,
+    enabled: !!empresaIdQuery,
   });
 
   // Estatísticas calculadas das métricas diárias
@@ -82,22 +74,6 @@ const Dashboard = () => {
     }),
     { verba: 0, leads: 0, vendas: 0 }
   ) || { verba: 0, leads: 0, vendas: 0 };
-
-  // Determinar label do período
-  const getLabelPeriodo = () => {
-    switch (tipoFiltro) {
-      case "mes_atual":
-        return "do Mês Atual";
-      case "mes_anterior":
-        return "do Mês Anterior";
-      case "data_especifica":
-        return `de ${format(dataReferencia, "MMMM/yyyy", { locale: ptBR })}`;
-      default:
-        return "do Período";
-    }
-  };
-
-  const labelPeriodo = getLabelPeriodo();
 
   // Loading state
   if (loadingEmpresas) {
@@ -131,21 +107,6 @@ const Dashboard = () => {
             <p className="text-sm md:text-base text-muted-foreground">
               Sistema de Governança de Tráfego Pago
             </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-            <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Selecione a empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                {empresasPermitidas.map((empresa) => (
-                  <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
-                    {empresa.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FiltroPeriodo />
           </div>
         </div>
       </div>
@@ -214,16 +175,16 @@ const Dashboard = () => {
       </div>
 
       {/* NOVA SEÇÃO: KPIs Históricos */}
-      {empresaSelecionada && (
+      {empresaIdQuery && (
         <div className="mb-6 md:mb-8">
-          <KPIsHistoricos empresaId={empresaSelecionada} />
+          <KPIsHistoricos empresaId={empresaIdQuery} />
         </div>
       )}
 
       {/* FASE 3: Pacing de Orçamento */}
-      {empresaSelecionada && (
+      {empresaIdQuery && (
         <div className="mb-6 md:mb-8">
-          <PacingOrcamento empresaId={empresaSelecionada} />
+          <PacingOrcamento empresaId={empresaIdQuery} />
         </div>
       )}
 
@@ -235,55 +196,55 @@ const Dashboard = () => {
       )}
 
       {/* NOVA SEÇÃO: Coorte de Qualidade */}
-      {empresaSelecionada && (
+      {empresaIdQuery && (
         <div className="mb-6 md:mb-8">
-          <CoorteQualidade empresaId={empresaSelecionada} />
+          <CoorteQualidade empresaId={empresaIdQuery} />
         </div>
       )}
 
       {/* NOVA SEÇÃO: Tracking Score */}
       <div className="mb-6 md:mb-8">
-        <TrackingScore empresaId={empresaSelecionada} />
+        <TrackingScore empresaId={empresaIdQuery || undefined} />
       </div>
 
       {/* FASE 2: Alertas de Anomalias */}
-      {empresaSelecionada && (
+      {empresaIdQuery && (
         <div className="mb-6 md:mb-8">
-          <AlertasAnomalias empresaId={empresaSelecionada} />
+          <AlertasAnomalias empresaId={empresaIdQuery} />
         </div>
       )}
 
       {/* FASE 2: ROI e Lucratividade */}
-      {empresaSelecionada && (
+      {empresaIdQuery && (
         <div className="mb-6 md:mb-8">
-          <ROIProfitability empresaId={empresaSelecionada} />
+          <ROIProfitability empresaId={empresaIdQuery} />
         </div>
       )}
 
       {/* FASE 3: Tempo de Ciclo de Vendas */}
-      {empresaSelecionada && (
+      {empresaIdQuery && (
         <div className="mb-6 md:mb-8">
-          <TempoCiclo empresaId={empresaSelecionada} />
+          <TempoCiclo empresaId={empresaIdQuery} />
         </div>
       )}
 
       {/* FASE 2: Fadiga de Criativos */}
-      {empresaSelecionada && (
+      {empresaIdQuery && (
         <div className="mb-6 md:mb-8">
-          <CriativosFadiga empresaId={empresaSelecionada} />
+          <CriativosFadiga empresaId={empresaIdQuery} />
         </div>
       )}
 
       {/* Métricas Multi-Rede (Redes Sociais) */}
-      {empresaSelecionada && (
+      {empresaIdQuery && (
         <div className="mb-6 md:mb-8">
-          <MetricasMultiRede empresaId={empresaSelecionada} dataReferencia={dataReferencia} />
+          <MetricasMultiRede empresaId={empresaIdQuery} dataReferencia={dataReferencia} />
         </div>
       )}
 
       {/* IA Intelligence */}
       <div className="mb-6 md:mb-8">
-        {empresaSelecionada && <InteligenciaIA empresaId={empresaSelecionada} />}
+        {empresaIdQuery && <InteligenciaIA empresaId={empresaIdQuery} />}
       </div>
 
       {/* ValidacaoUTM detalhado */}

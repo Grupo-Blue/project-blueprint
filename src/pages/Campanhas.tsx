@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { TrendingUp, TrendingDown, Target, DollarSign, Users, MousePointer, GitBranch } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { CampanhaFluxoDiagram } from "@/components/CampanhaFluxoDiagram";
-import { useUserEmpresas } from "@/hooks/useUserEmpresas";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 
 interface Campanha {
@@ -35,18 +35,10 @@ interface MetricasSemana {
 }
 
 export default function Campanhas() {
-  const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
+  const { empresaSelecionada, empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
   const [filtroStatus, setFiltroStatus] = useState<string>("ativas");
-  const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
   const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState<{ id: string; nome: string } | null>(null);
-
-  // Auto-selecionar empresa quando carregar (se tiver apenas 1)
-  useEffect(() => {
-    if (empresasPermitidas.length === 1) {
-      setEmpresaSelecionada(empresasPermitidas[0].id_empresa);
-    }
-  }, [empresasPermitidas]);
 
   const { data: campanhas, isLoading } = useQuery({
     queryKey: ["campanhas", filtroStatus, empresaSelecionada, empresasPermitidas],
@@ -80,7 +72,7 @@ export default function Campanhas() {
       );
 
       // Filtrar por empresa selecionada
-      if (empresaSelecionada !== "todas") {
+      if (empresaSelecionada && empresaSelecionada !== "todas") {
         filteredData = filteredData.filter((c) => 
           c.conta_anuncio?.id_empresa === empresaSelecionada
         );
@@ -172,21 +164,6 @@ export default function Campanhas() {
                   <SelectItem value="todas">Todas</SelectItem>
                   <SelectItem value="ativas">Ativas</SelectItem>
                   <SelectItem value="inativas">Inativas</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {empresasPermitidas.length > 1 && (
-                    <SelectItem value="todas">Todas as Empresas</SelectItem>
-                  )}
-                  {empresasPermitidas.map((e) => (
-                    <SelectItem key={e.id_empresa} value={e.id_empresa}>
-                      {e.nome}
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>
