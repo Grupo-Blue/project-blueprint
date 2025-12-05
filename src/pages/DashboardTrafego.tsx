@@ -535,7 +535,9 @@ export default function DashboardTrafego() {
   const [syncingCreatives, setSyncingCreatives] = useState(false);
   const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState<{ id: string; nome: string } | null>(null);
-  const { getDataReferencia, tipoFiltro, labelPeriodo } = usePeriodo();
+  const periodoContext = usePeriodo();
+  const { getDataReferencia, tipoFiltro } = periodoContext;
+  const labelPeriodo = periodoContext.labelPeriodo;
 
   // Usar data do filtro selecionado
   const dataReferencia = getDataReferencia();
