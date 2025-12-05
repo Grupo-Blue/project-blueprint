@@ -526,6 +526,7 @@ function CriativosQuery({ campanhaId, plataforma, urlEsperadaCampanha }: { campa
 
 export default function DashboardTrafego() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
   const [ordenacao, setOrdenacao] = useState<string>("verba_desc");
   const [filtroStatusCampanha, setFiltroStatusCampanha] = useState<string>("ativas");
@@ -575,7 +576,7 @@ export default function DashboardTrafego() {
     },
   });
 
-  const { data: campanhasMetricas, isLoading } = useQuery({
+  const { data: campanhasMetricas, isLoading, refetch: refetchCampanhas } = useQuery({
     queryKey: ["campanhas-metricas", tipoFiltro, inicioMes.toISOString(), fimMes.toISOString(), empresaSelecionada, filtroStatusCampanha],
     queryFn: async () => {
       // Buscar métricas diárias de campanhas no período
@@ -677,6 +678,9 @@ export default function DashboardTrafego() {
 
       return campanhasComCriativos as CampanhaMetrica[];
     },
+    staleTime: 30 * 1000, // 30 segundos
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
   });
 
   // Buscar totais gerais da empresa da tabela empresa_metricas_dia
@@ -714,7 +718,9 @@ export default function DashboardTrafego() {
 
       return totais;
     },
-    enabled: true,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
   });
 
   // Query para CPL Orgânico (investimento awareness vs leads de redes sociais)
@@ -985,6 +991,22 @@ export default function DashboardTrafego() {
                   ))}
                 </SelectContent>
               </Select>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ["campanhas-metricas"] });
+                  queryClient.invalidateQueries({ queryKey: ["totais-gerais-empresa"] });
+                  queryClient.invalidateQueries({ queryKey: ["mql-distribuicao"] });
+                  queryClient.invalidateQueries({ queryKey: ["cpl-organico"] });
+                  refetchCampanhas();
+                  toast({ title: "Dados atualizados!", description: "Cache limpo e dados recarregados" });
+                }}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Atualizar
+              </Button>
             </div>
           </div>
         </div>
