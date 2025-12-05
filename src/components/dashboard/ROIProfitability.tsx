@@ -93,9 +93,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
           if (!empresaId || v.id_empresa === empresaId) {
             const dataVenda = v.data_venda ? new Date(v.data_venda) : null;
             if (dataVenda && dataVenda >= mesInicio && dataVenda <= mesFim) {
-              // Aplicar margem de 5% para Tokeniza
-              const margem = v.id_empresa === TOKENIZA_EMPRESA_ID ? TOKENIZA_MARGEM : 1;
-              receitaMes += (Number(v.valor_venda) || 0) * margem;
+              receitaMes += Number(v.valor_venda) || 0;
             }
           }
         });
@@ -112,23 +110,28 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
         mesesData.push({ mes: mesLabel, receita: receitaMes, gasto: gastoMes });
       }
 
-      // Totais com margem aplicada
+      // Totais
       let totalReceita = 0;
       let totalGasto = 0;
       let totalVendas = 0;
 
       empresaMap.forEach((empresa, id) => {
         if (!empresaId || id === empresaId) {
-          // Aplicar margem de 5% apenas para Tokeniza
-          const margem = id === TOKENIZA_EMPRESA_ID ? TOKENIZA_MARGEM : 1;
-          totalReceita += empresa.receita * margem;
+          totalReceita += empresa.receita;
           totalGasto += empresa.gasto;
           totalVendas += empresa.vendas;
         }
       });
 
-      const lucroBruto = totalReceita - totalGasto;
-      const roas = totalGasto > 0 ? totalReceita / totalGasto : 0;
+      // Para Tokeniza: Lucro Bruto = 5% da Receita Total
+      // Para outras empresas: Lucro Bruto = Receita - Gasto
+      const isTokeniza = empresaId === TOKENIZA_EMPRESA_ID;
+      const lucroBruto = isTokeniza 
+        ? totalReceita * TOKENIZA_MARGEM 
+        : totalReceita - totalGasto;
+      
+      // ROAS baseado no lucro bruto real
+      const roas = totalGasto > 0 ? lucroBruto / totalGasto : 0;
       const ticketMedio = totalVendas > 0 ? totalReceita / totalVendas : 0;
       const cac = totalVendas > 0 ? totalGasto / totalVendas : 0;
       const paybackDias = cac > 0 && ticketMedio > 0 ? Math.ceil((cac / ticketMedio) * 30) : 0;
@@ -136,9 +139,6 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
       // Verificar dados incompletos
       const dadosIncompletos = empresaMap.size > 0 && 
         Array.from(empresaMap.values()).some(e => e.receita === 0 && e.gasto > 0);
-
-      // Flag para saber se está mostrando Tokeniza
-      const isTokeniza = empresaId === TOKENIZA_EMPRESA_ID;
 
       return {
         totalReceita,
