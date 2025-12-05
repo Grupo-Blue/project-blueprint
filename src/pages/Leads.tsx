@@ -102,6 +102,7 @@ const Leads = () => {
           )
         `)
         .or("merged.is.null,merged.eq.false")
+        .not("nome_lead", "like", "%(cópia)%")
         .order("data_criacao", { ascending: false });
 
       if (error) throw error;
@@ -235,7 +236,7 @@ const Leads = () => {
     mqls: filteredLeads?.filter(l => l.is_mql).length || 0,
     reunioes: filteredLeads?.filter(l => l.tem_reuniao).length || 0,
     vendas: filteredLeads?.filter(l => l.venda_realizada).length || 0,
-    valorTotal: filteredLeads?.reduce((sum, l) => sum + (l.valor_venda || 0), 0) || 0,
+    valorTotal: filteredLeads?.filter(l => l.venda_realizada).reduce((sum, l) => sum + (l.valor_venda || 0), 0) || 0,
     investidores: filteredLeads?.filter(l => l.tokeniza_investidor).length || 0,
     carrinhosAbandonados: filteredLeads?.filter(l => l.tokeniza_carrinho_abandonado && !l.tokeniza_investidor).length || 0,
   };
