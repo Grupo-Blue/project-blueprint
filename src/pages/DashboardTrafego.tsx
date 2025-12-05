@@ -801,21 +801,6 @@ export default function DashboardTrafego() {
   const taxaVenda = totais.reunioes > 0 ? (totais.vendas / totais.reunioes) * 100 : 0;
   const eficienciaFunil = totais.leads > 0 ? (totais.vendas / totais.leads) * 100 : 0;
 
-  // Determinar label do período
-  const getLabelPeriodo = () => {
-    switch (tipoFiltro) {
-      case "mes_atual":
-        return "Mês Atual";
-      case "mes_anterior":
-        return "Mês Anterior";
-      case "data_especifica":
-        return format(dataReferencia, "MMMM/yyyy", { locale: ptBR });
-      default:
-        return "Período";
-    }
-  };
-
-  const labelPeriodo = getLabelPeriodo();
 
   const handleCopyId = (idExterno: string) => {
     navigator.clipboard.writeText(idExterno);
