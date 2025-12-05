@@ -9,13 +9,35 @@ interface PeriodoContextType {
   setDataEspecifica: (data: Date | null) => void;
   getDataReferencia: () => Date;
   getInicioFim: () => { inicio: Date; fim: Date };
+  labelPeriodo: string;
 }
 
 const PeriodoContext = createContext<PeriodoContextType | undefined>(undefined);
 
 export function PeriodoProvider({ children }: { children: React.ReactNode }) {
-  const [tipoFiltro, setTipoFiltro] = useState<TipoFiltroPeriodo>("mes_atual");
-  const [dataEspecifica, setDataEspecifica] = useState<Date | null>(null);
+  const [tipoFiltro, setTipoFiltroState] = useState<TipoFiltroPeriodo>(() => {
+    const saved = localStorage.getItem("sgt_tipo_filtro_periodo");
+    return (saved as TipoFiltroPeriodo) || "mes_atual";
+  });
+
+  const [dataEspecifica, setDataEspecificaState] = useState<Date | null>(() => {
+    const saved = localStorage.getItem("sgt_data_especifica");
+    return saved ? new Date(saved) : null;
+  });
+
+  const setTipoFiltro = (tipo: TipoFiltroPeriodo) => {
+    setTipoFiltroState(tipo);
+    localStorage.setItem("sgt_tipo_filtro_periodo", tipo);
+  };
+
+  const setDataEspecifica = (data: Date | null) => {
+    setDataEspecificaState(data);
+    if (data) {
+      localStorage.setItem("sgt_data_especifica", data.toISOString());
+    } else {
+      localStorage.removeItem("sgt_data_especifica");
+    }
+  };
 
   const getDataReferencia = () => {
     const hoje = new Date();
@@ -41,6 +63,26 @@ export function PeriodoProvider({ children }: { children: React.ReactNode }) {
     return { inicio, fim };
   };
 
+  // Label do período para exibição
+  const getLabelPeriodo = () => {
+    const dataRef = getDataReferencia();
+    const meses = [
+      "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ];
+    
+    switch (tipoFiltro) {
+      case "mes_atual":
+        return "Mês Atual";
+      case "mes_anterior":
+        return "Mês Anterior";
+      case "data_especifica":
+        return `${meses[dataRef.getMonth()]} ${dataRef.getFullYear()}`;
+      default:
+        return "Período";
+    }
+  };
+
   return (
     <PeriodoContext.Provider
       value={{
@@ -50,6 +92,7 @@ export function PeriodoProvider({ children }: { children: React.ReactNode }) {
         setDataEspecifica,
         getDataReferencia,
         getInicioFim,
+        labelPeriodo: getLabelPeriodo(),
       }}
     >
       {children}

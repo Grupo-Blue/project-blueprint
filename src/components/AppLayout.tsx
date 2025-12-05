@@ -5,6 +5,8 @@ import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useEmpresa } from "@/contexts/EmpresaContext";
+import { usePeriodo } from "@/contexts/PeriodoContext";
 import { 
   LogOut, 
   BarChart3, 
@@ -25,7 +27,9 @@ import {
   ArrowLeft,
   TrendingUp,
   Users,
-  Menu
+  Menu,
+  Calendar,
+  ChevronDown
 } from "lucide-react";
 import {
   Sheet,
@@ -34,7 +38,22 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import sgtLogo from "@/assets/sgt-logo.png";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -49,6 +68,23 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  
+  // Contextos globais
+  const { 
+    empresaSelecionada, 
+    setEmpresaSelecionada, 
+    empresasPermitidas, 
+    isAdmin,
+    nomeEmpresaSelecionada 
+  } = useEmpresa();
+  
+  const { 
+    tipoFiltro, 
+    setTipoFiltro, 
+    dataEspecifica, 
+    setDataEspecifica,
+    labelPeriodo 
+  } = usePeriodo();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -114,9 +150,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     return labels[perfil] || perfil;
   };
 
-  const isAdmin = profile?.perfil === "ADMIN";
-  const isDirecao = profile?.perfil === "DIRECAO" || isAdmin;
-  const isTrafego = profile?.perfil === "TRAFEGO" || isAdmin;
+  const handleTipoFiltroChange = (value: string) => {
+    setTipoFiltro(value as any);
+    if (value !== "data_especifica") {
+      setDataEspecifica(null);
+    }
+  };
+
+  const isAdminUser = profile?.perfil === "ADMIN";
+  const isDirecao = profile?.perfil === "DIRECAO" || isAdminUser;
+  const isTrafego = profile?.perfil === "TRAFEGO" || isAdminUser;
   const showBackButton = location.pathname !== "/dashboard" && !isMobile;
 
   if (loading) {
@@ -280,7 +323,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           </Link>
         </>
       )}
-      {isAdmin && (
+      {isAdminUser && (
         <>
           <Link to="/empresas" onClick={() => setMobileMenuOpen(false)}>
             <Button 
@@ -327,12 +370,73 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     </>
   );
 
+  // Componente dos filtros globais
+  const GlobalFilters = ({ className = "" }: { className?: string }) => (
+    <div className={`flex flex-col sm:flex-row gap-2 ${className}`}>
+      {/* Seletor de Empresa */}
+      <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
+        <SelectTrigger className="w-full sm:w-[180px] h-9">
+          <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
+          <SelectValue placeholder="Empresa" />
+        </SelectTrigger>
+        <SelectContent>
+          {(isAdmin || empresasPermitidas.length > 1) && (
+            <SelectItem value="todas">Todas as empresas</SelectItem>
+          )}
+          {empresasPermitidas.map((empresa) => (
+            <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
+              {empresa.nome}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Seletor de Período */}
+      <div className="flex gap-2">
+        <Select value={tipoFiltro} onValueChange={handleTipoFiltroChange}>
+          <SelectTrigger className="w-full sm:w-[150px] h-9">
+            <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="mes_atual">Mês Atual</SelectItem>
+            <SelectItem value="mes_anterior">Mês Anterior</SelectItem>
+            <SelectItem value="data_especifica">Mês Específico</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {tipoFiltro === "data_especifica" && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 px-3">
+                {dataEspecifica 
+                  ? format(dataEspecifica, "MMM/yy", { locale: ptBR })
+                  : "Selecionar"
+                }
+                <ChevronDown className="ml-2 h-3 w-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={dataEspecifica || undefined}
+                onSelect={(date) => date && setDataEspecifica(date)}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-gradient-to-r from-card via-card to-accent/5 sticky top-0 z-50 shadow-sm">
         <div className="container mx-auto px-3 md:px-6 py-3">
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 md:gap-6">
+            <div className="flex items-center gap-2 md:gap-4">
               {showBackButton && (
                 <Button 
                   variant="ghost" 
@@ -355,11 +459,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-[280px] overflow-y-auto">
+                <SheetContent side="left" className="w-[300px] overflow-y-auto">
                   <SheetHeader>
                     <SheetTitle className="text-left">Menu</SheetTitle>
                   </SheetHeader>
-                  <nav className="flex flex-col gap-2 mt-6">
+                  {/* Filtros no menu mobile */}
+                  <div className="mt-4 pb-4 border-b">
+                    <p className="text-xs text-muted-foreground mb-2 font-medium">FILTROS GLOBAIS</p>
+                    <GlobalFilters />
+                  </div>
+                  <nav className="flex flex-col gap-2 mt-4">
                     <NavLinks />
                   </nav>
                 </SheetContent>
@@ -369,26 +478,42 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                 <img 
                   src={sgtLogo} 
                   alt="SGT Logo" 
-                  className="h-8 w-8 md:h-12 md:w-12 object-contain transition-transform group-hover:scale-105"
+                  className="h-8 w-8 md:h-10 md:w-10 object-contain transition-transform group-hover:scale-105"
                 />
-                <div className="hidden sm:block">
-                  <h1 className="text-sm md:text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent transition-all group-hover:from-primary/90 group-hover:to-primary/60">
-                    SGT - Sistema de Governança de Tráfego
+                <div className="hidden md:block">
+                  <h1 className="text-sm md:text-base font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent transition-all group-hover:from-primary/90 group-hover:to-primary/60">
+                    SGT
                   </h1>
                   <p className="text-xs text-muted-foreground font-medium">
-                    {profile?.nome} • {profile && getPerfilLabel(profile.perfil)}
+                    {profile?.nome}
                   </p>
                 </div>
               </Link>
             </div>
+
+            {/* Filtros globais no header (desktop) */}
+            <div className="hidden lg:flex items-center gap-3">
+              <GlobalFilters />
+              <div className="h-8 w-px bg-border" />
+              <Button 
+                variant="outline" 
+                onClick={handleLogout}
+                size="sm"
+                className="hover:bg-destructive hover:text-destructive-foreground transition-colors h-9"
+              >
+                <LogOut className="h-4 w-4 md:mr-2" />
+                <span className="hidden xl:inline">Sair</span>
+              </Button>
+            </div>
+
+            {/* Logout mobile */}
             <Button 
               variant="outline" 
               onClick={handleLogout}
               size="sm"
-              className="hover:bg-destructive hover:text-destructive-foreground transition-colors h-8 md:h-10"
+              className="lg:hidden hover:bg-destructive hover:text-destructive-foreground transition-colors h-8 w-8 p-0"
             >
-              <LogOut className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">Sair</span>
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
           

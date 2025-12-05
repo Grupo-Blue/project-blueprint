@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,22 +9,20 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useUserEmpresas } from "@/hooks/useUserEmpresas";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 
 export default function RelatorioNovo() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useUserEmpresas();
-  const [empresaSelecionada, setEmpresaSelecionada] = useState("");
+  const { empresaSelecionada, empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
+  const [empresaRelatorio, setEmpresaRelatorio] = useState("");
   const [semanaSelecionada, setSemanaSelecionada] = useState("");
 
-  // Auto-selecionar empresa quando carregar (se tiver apenas 1)
-  useEffect(() => {
-    if (empresasPermitidas.length === 1 && !empresaSelecionada) {
-      setEmpresaSelecionada(empresasPermitidas[0].id_empresa);
-    }
-  }, [empresasPermitidas, empresaSelecionada]);
+  // Usar empresa do contexto se for única
+  const empresaParaRelatorio = empresasPermitidas.length === 1 
+    ? empresasPermitidas[0].id_empresa 
+    : empresaRelatorio;
 
   const { data: semanas } = useQuery({
     queryKey: ["semanas"],
@@ -42,7 +40,7 @@ export default function RelatorioNovo() {
 
   const criarRelatorioMutation = useMutation({
     mutationFn: async () => {
-      if (!empresaSelecionada || !semanaSelecionada) {
+      if (!empresaParaRelatorio || !semanaSelecionada) {
         throw new Error("Selecione empresa e semana");
       }
 
@@ -50,7 +48,7 @@ export default function RelatorioNovo() {
       const { data: existente } = await supabase
         .from("relatorio_semanal")
         .select("id_relatorio")
-        .eq("id_empresa", empresaSelecionada)
+        .eq("id_empresa", empresaParaRelatorio)
         .eq("id_semana", semanaSelecionada)
         .single();
 
@@ -61,7 +59,7 @@ export default function RelatorioNovo() {
       const { data, error } = await supabase
         .from("relatorio_semanal")
         .insert({
-          id_empresa: empresaSelecionada,
+          id_empresa: empresaParaRelatorio,
           id_semana: semanaSelecionada,
           status: "EM_EDICAO",
         })
@@ -114,21 +112,30 @@ export default function RelatorioNovo() {
             <CardTitle className="text-2xl">Criar Novo Relatório Semanal</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Empresa</label>
-              <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {empresasPermitidas.map((empresa) => (
-                    <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
-                      {empresa.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {empresasPermitidas.length > 1 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Empresa</label>
+                <Select value={empresaRelatorio} onValueChange={setEmpresaRelatorio}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {empresasPermitidas.map((empresa) => (
+                      <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
+                        {empresa.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {empresasPermitidas.length === 1 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Empresa</label>
+                <p className="text-sm text-muted-foreground">{empresasPermitidas[0].nome}</p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Semana</label>
@@ -149,7 +156,7 @@ export default function RelatorioNovo() {
             <Button
               className="w-full"
               onClick={() => criarRelatorioMutation.mutate()}
-              disabled={!empresaSelecionada || !semanaSelecionada || criarRelatorioMutation.isPending}
+              disabled={!empresaParaRelatorio || !semanaSelecionada || criarRelatorioMutation.isPending}
             >
               {criarRelatorioMutation.isPending ? (
                 <>

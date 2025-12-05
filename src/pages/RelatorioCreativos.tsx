@@ -3,11 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Image, TrendingUp, DollarSign, Users, Target, CheckCircle2, Eye, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 
 interface CriativoPerformance {
   id_criativo: string;
@@ -26,7 +26,7 @@ interface CriativoPerformance {
 }
 
 const RelatorioCreativos = () => {
-  const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("todas");
+  const { empresaSelecionada } = useEmpresa();
   const [criativoSelecionado, setCriativoSelecionado] = useState<string | null>(null);
   
   // Query para buscar leads do criativo selecionado
@@ -109,7 +109,7 @@ const RelatorioCreativos = () => {
           const leads = c.lead || [];
           
           // Filtrar por empresa se necessário
-          if (empresaSelecionada !== "todas") {
+          if (empresaSelecionada && empresaSelecionada !== "todas") {
             const empresaDoCriativo = c.campanha?.conta_anuncio?.id_empresa;
             if (empresaDoCriativo !== empresaSelecionada) {
               return null;
@@ -183,19 +183,6 @@ const RelatorioCreativos = () => {
             Análise detalhada de performance por criativo de anúncio
           </p>
         </div>
-        <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Selecione a empresa" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas as Empresas</SelectItem>
-            {empresas?.map((empresa) => (
-              <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
-                {empresa.nome}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Stats Cards */}
@@ -382,36 +369,6 @@ const RelatorioCreativos = () => {
         </CardContent>
       </Card>
 
-      {/* Instruções de Configuração */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Como configurar o rastreamento de criativos</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h4 className="font-semibold mb-2">1. Configure UTM Parameters nos anúncios</h4>
-            <p className="text-sm text-muted-foreground">
-              Adicione parâmetros UTM nas URLs de destino dos seus anúncios:
-            </p>
-            <code className="block mt-2 p-3 bg-muted rounded text-xs">
-              ?utm_source=facebook&utm_medium=paid&utm_campaign=campanha123&utm_content=criativo_456
-            </code>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-2">2. Configure campos customizados no Pipedrive</h4>
-            <p className="text-sm text-muted-foreground">
-              Crie campos customizados no Pipedrive para capturar: utm_source, utm_medium, utm_campaign, utm_content, utm_term
-            </p>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-2">3. Vincule o ID do criativo</h4>
-            <p className="text-sm text-muted-foreground">
-              Use o campo <code className="bg-muted px-1">utm_content</code> para enviar o ID externo do criativo cadastrado no sistema.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Dialog para mostrar leads do criativo */}
       <Dialog open={!!criativoSelecionado} onOpenChange={(open) => !open && setCriativoSelecionado(null)}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
@@ -424,66 +381,35 @@ const RelatorioCreativos = () => {
           </DialogHeader>
           
           {leadsDetalhados && leadsDetalhados.length > 0 ? (
-            <div className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Organização</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Link</TableHead>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Valor</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leadsDetalhados.map((lead: any) => (
+                  <TableRow key={lead.id_lead}>
+                    <TableCell>{lead.nome_lead || "N/A"}</TableCell>
+                    <TableCell>{lead.email || "N/A"}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {lead.is_mql && <Badge variant="outline">MQL</Badge>}
+                        {lead.venda_realizada && <Badge className="bg-green-600">Venda</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {lead.valor_venda ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.valor_venda) : "-"}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {leadsDetalhados.map((lead) => (
-                    <TableRow key={lead.id_lead}>
-                      <TableCell>{lead.nome_lead || "Sem nome"}</TableCell>
-                      <TableCell>{lead.organizacao || "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {lead.is_mql && <Badge variant="secondary">MQL</Badge>}
-                          {lead.tem_reuniao && <Badge variant="outline">Reunião</Badge>}
-                          {lead.venda_realizada && <Badge className="bg-green-600">Venda</Badge>}
-                          {!lead.is_mql && !lead.tem_reuniao && !lead.venda_realizada && (
-                            <Badge variant="outline">Lead</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(lead.data_criacao).toLocaleDateString("pt-BR")}
-                      </TableCell>
-                      <TableCell>
-                        {lead.valor_venda
-                          ? new Intl.NumberFormat("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            }).format(lead.valor_venda)
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {lead.url_pipedrive && (
-                          <a
-                            href={lead.url_pipedrive}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-primary hover:underline"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            Abrir
-                          </a>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              Nenhum lead encontrado para este criativo.
-            </div>
+            <p className="text-muted-foreground text-center py-8">Nenhum lead encontrado</p>
           )}
         </DialogContent>
       </Dialog>

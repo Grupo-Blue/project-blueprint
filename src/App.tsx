@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "./components/AppLayout";
 import { PeriodoProvider } from "./contexts/PeriodoContext";
+import { EmpresaProvider } from "./contexts/EmpresaContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -35,42 +36,44 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <PeriodoProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
-          <Route path="/acoes" element={<AppLayout><Acoes /></AppLayout>} />
-          <Route path="/aprovacoes" element={<AppLayout><Aprovacoes /></AppLayout>} />
-          <Route path="/campanhas" element={<AppLayout><Campanhas /></AppLayout>} />
-          <Route path="/relatorios" element={<AppLayout><Relatorios /></AppLayout>} />
-          <Route path="/relatorios/novo" element={<AppLayout><RelatorioNovo /></AppLayout>} />
-          <Route path="/relatorios/:id" element={<AppLayout><RelatorioEditor /></AppLayout>} />
-          <Route path="/relatorio-criativos" element={<AppLayout><RelatorioCreativos /></AppLayout>} />
-          <Route path="/hipoteses" element={<AppLayout><Hipoteses /></AppLayout>} />
-          <Route path="/aprendizados" element={<AppLayout><Aprendizados /></AppLayout>} />
-          <Route path="/dashboard-direcao" element={<AppLayout><DashboardDirecao /></AppLayout>} />
-          <Route path="/dashboard-trafego" element={<AppLayout><DashboardTrafego /></AppLayout>} />
-          <Route path="/empresas" element={<AppLayout><Empresas /></AppLayout>} />
-          <Route path="/calculo-metricas" element={<AppLayout><CalculoMetricas /></AppLayout>} />
-          <Route path="/alertas" element={<AppLayout><Alertas /></AppLayout>} />
-          <Route path="/criativos" element={<AppLayout><Criativos /></AppLayout>} />
-          <Route path="/leads" element={<AppLayout><Leads /></AppLayout>} />
-          <Route path="/usuarios" element={<AppLayout><Usuarios /></AppLayout>} />
-          <Route path="/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
-          <Route path="/contas-anuncio" element={<AppLayout><ContasAnuncio /></AppLayout>} />
-          <Route path="/campanhas-cadastro" element={<AppLayout><CampanhasCadastro /></AppLayout>} />
-          <Route path="/guia-utm" element={<AppLayout><GuiaUTM /></AppLayout>} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-      </TooltipProvider>
-    </PeriodoProvider>
+    <EmpresaProvider>
+      <PeriodoProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/dashboard" element={<AppLayout><Dashboard /></AppLayout>} />
+            <Route path="/acoes" element={<AppLayout><Acoes /></AppLayout>} />
+            <Route path="/aprovacoes" element={<AppLayout><Aprovacoes /></AppLayout>} />
+            <Route path="/campanhas" element={<AppLayout><Campanhas /></AppLayout>} />
+            <Route path="/relatorios" element={<AppLayout><Relatorios /></AppLayout>} />
+            <Route path="/relatorios/novo" element={<AppLayout><RelatorioNovo /></AppLayout>} />
+            <Route path="/relatorios/:id" element={<AppLayout><RelatorioEditor /></AppLayout>} />
+            <Route path="/relatorio-criativos" element={<AppLayout><RelatorioCreativos /></AppLayout>} />
+            <Route path="/hipoteses" element={<AppLayout><Hipoteses /></AppLayout>} />
+            <Route path="/aprendizados" element={<AppLayout><Aprendizados /></AppLayout>} />
+            <Route path="/dashboard-direcao" element={<AppLayout><DashboardDirecao /></AppLayout>} />
+            <Route path="/dashboard-trafego" element={<AppLayout><DashboardTrafego /></AppLayout>} />
+            <Route path="/empresas" element={<AppLayout><Empresas /></AppLayout>} />
+            <Route path="/calculo-metricas" element={<AppLayout><CalculoMetricas /></AppLayout>} />
+            <Route path="/alertas" element={<AppLayout><Alertas /></AppLayout>} />
+            <Route path="/criativos" element={<AppLayout><Criativos /></AppLayout>} />
+            <Route path="/leads" element={<AppLayout><Leads /></AppLayout>} />
+            <Route path="/usuarios" element={<AppLayout><Usuarios /></AppLayout>} />
+            <Route path="/integracoes" element={<AppLayout><Integracoes /></AppLayout>} />
+            <Route path="/contas-anuncio" element={<AppLayout><ContasAnuncio /></AppLayout>} />
+            <Route path="/campanhas-cadastro" element={<AppLayout><CampanhasCadastro /></AppLayout>} />
+            <Route path="/guia-utm" element={<AppLayout><GuiaUTM /></AppLayout>} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+        </TooltipProvider>
+      </PeriodoProvider>
+    </EmpresaProvider>
   </QueryClientProvider>
 );
 
