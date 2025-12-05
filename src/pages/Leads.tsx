@@ -58,6 +58,40 @@ const getDiasNoStage = (lead: any): number => {
   return differenceInDays(new Date(), parseISO(ultimaData));
 };
 
+// Helper para calcular score de temperatura composto
+const calcularScoreTemperatura = (lead: any): number => {
+  let score = 0;
+  
+  // Base: Score Mautic (40% do valor)
+  score += (lead.mautic_score || 0) * 0.4;
+  
+  // Engajamento: Page hits (+5 cada, max 50)
+  score += Math.min((lead.mautic_page_hits || 0) * 5, 50);
+  
+  // Sinais de interesse (bônus fixos)
+  if (lead.levantou_mao) score += 30;
+  if (lead.tem_reuniao) score += 50;
+  if (lead.is_mql) score += 20;
+  
+  // Histórico Tokeniza
+  if (lead.tokeniza_investidor) score += 40;
+  score += Math.min((lead.tokeniza_qtd_investimentos || 0) * 10, 30);
+  
+  // Cliente existente Notion
+  if (lead.id_cliente_notion) score += 25;
+  
+  // Carrinho abandonado = interesse demonstrado
+  if (lead.tokeniza_carrinho_abandonado) score += 35;
+  
+  // Penalidade por inatividade
+  const dias = getDiasNoStage(lead);
+  if (dias > 7 && !['Vendido', 'Perdido'].includes(lead.stage_atual || '')) {
+    score -= Math.min((dias - 7) * 2, 30);
+  }
+  
+  return Math.max(0, Math.round(score));
+};
+
 // Helper para calcular prioridade
 const getPrioridade = (lead: any) => {
   const dias = getDiasNoStage(lead);
@@ -103,7 +137,7 @@ const Leads = () => {
   const [investidorFilter, setInvestidorFilter] = useState<string>("all");
   const [origemFilter, setOrigemFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortColumn, setSortColumn] = useState<string | null>("prioridade");
+  const [sortColumn, setSortColumn] = useState<string | null>("temperatura");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
@@ -175,7 +209,8 @@ const Leads = () => {
       (statusFilter === "mql" && lead.is_mql) ||
       (statusFilter === "reuniao" && lead.tem_reuniao) ||
       (statusFilter === "venda" && lead.venda_realizada) ||
-      (statusFilter === "levantou" && lead.levantou_mao);
+      (statusFilter === "levantou" && lead.levantou_mao) ||
+      (statusFilter === "nao_vendido" && !lead.venda_realizada);
     
     const matchesStage =
       stageFilter.length === 0 ||
@@ -225,6 +260,10 @@ const Leads = () => {
         valueA = new Date(a.data_criacao).getTime();
         valueB = new Date(b.data_criacao).getTime();
         break;
+      case "entrada":
+        valueA = new Date(a.data_criacao).getTime();
+        valueB = new Date(b.data_criacao).getTime();
+        break;
       case "valor":
         valueA = a.valor_venda || 0;
         valueB = b.valor_venda || 0;
@@ -236,6 +275,10 @@ const Leads = () => {
       case "dias":
         valueA = getDiasNoStage(a);
         valueB = getDiasNoStage(b);
+        break;
+      case "temperatura":
+        valueA = calcularScoreTemperatura(a);
+        valueB = calcularScoreTemperatura(b);
         break;
       default:
         return 0;
@@ -444,6 +487,7 @@ const Leads = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="nao_vendido">Não Vendido</SelectItem>
                 <SelectItem value="mql">MQLs</SelectItem>
                 <SelectItem value="levantou">Engajados</SelectItem>
                 <SelectItem value="reuniao">Com Reunião</SelectItem>
@@ -487,9 +531,12 @@ const Leads = () => {
                     <div className="flex items-center">Lead <SortIcon column="nome" /></div>
                   </TableHead>
                   <TableHead>Canal</TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort("entrada")}>
+                    <div className="flex items-center">Entrada <SortIcon column="entrada" /></div>
+                  </TableHead>
                   <TableHead>Stage</TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort("prioridade")}>
-                    <div className="flex items-center">Prioridade <SortIcon column="prioridade" /></div>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort("temperatura")}>
+                    <div className="flex items-center">Prioridade <SortIcon column="temperatura" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort("dias")}>
                     <div className="flex items-center">Dias <SortIcon column="dias" /></div>
@@ -509,6 +556,7 @@ const Leads = () => {
                   const canal = getCanal(lead.utm_source);
                   const statusPrincipal = getStatusPrincipal(lead);
                   const isCarrinhoAbandonado = lead.tokeniza_carrinho_abandonado && !lead.tokeniza_investidor;
+                  const scoreTemp = calcularScoreTemperatura(lead);
 
                   return (
                     <Collapsible key={lead.id_lead} asChild open={expandedRows.has(lead.id_lead)}>
@@ -536,17 +584,23 @@ const Leads = () => {
                             </span>
                           </TableCell>
                           <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {format(parseISO(lead.data_criacao), "dd/MM/yy")}
+                            </span>
+                          </TableCell>
+                          <TableCell>
                             <Badge variant={lead.stage_atual === "Vendido" ? "default" : "secondary"} className="text-xs">
                               {lead.stage_atual || "N/A"}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <div className={cn(
-                              "flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold w-fit",
+                              "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold w-fit",
                               prioridade.bgColor, prioridade.color
                             )}>
                               <PrioridadeIcon className="h-3 w-3" />
                               {prioridade.label}
+                              <span className="font-mono text-[11px] opacity-80">{scoreTemp}°</span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -596,7 +650,7 @@ const Leads = () => {
                         {/* Seção Expandida - 4 Colunas */}
                         <CollapsibleContent asChild>
                           <TableRow className="bg-muted/30">
-                            <TableCell colSpan={9} className="p-4">
+                            <TableCell colSpan={10} className="p-4">
                               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                                 {/* Coluna 1: Histórico */}
                                 <div className="space-y-2">

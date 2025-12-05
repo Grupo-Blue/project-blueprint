@@ -99,11 +99,11 @@ serve(async (req) => {
 
 async function enrichLeadByEmail(supabase: any, email: string, id_lead?: string) {
   try {
-    // 1. Buscar usuário Tokeniza pelo email
+    // 1. Buscar usuário Tokeniza pelo email (case-insensitive)
     const { data: tokenizaUser, error: userError } = await supabase
       .from('tokeniza_usuario')
       .select('user_id_tokeniza, email, first_name, last_name')
-      .eq('email', email)
+      .ilike('email', email)
       .maybeSingle();
 
     if (userError) {
