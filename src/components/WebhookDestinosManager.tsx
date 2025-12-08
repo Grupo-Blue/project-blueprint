@@ -293,14 +293,14 @@ export function WebhookDestinosManager() {
                 <div className="space-y-2">
                   <Label htmlFor="empresa">Empresa (opcional)</Label>
                   <Select
-                    value={newDestino.id_empresa}
-                    onValueChange={(value) => setNewDestino({ ...newDestino, id_empresa: value })}
+                    value={newDestino.id_empresa || "todas"}
+                    onValueChange={(value) => setNewDestino({ ...newDestino, id_empresa: value === "todas" ? "" : value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Todas as empresas" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas as empresas</SelectItem>
+                      <SelectItem value="todas">Todas as empresas</SelectItem>
                       {empresas?.map((empresa) => (
                         <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
                           {empresa.nome}
