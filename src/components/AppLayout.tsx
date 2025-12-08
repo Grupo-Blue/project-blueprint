@@ -208,39 +208,29 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           Dash Tráfego
         </Button>
       </Link>
-      <Link to="/acoes" onClick={() => setMobileMenuOpen(false)}>
-        <Button 
-          variant={location.pathname === "/acoes" ? "secondary" : "ghost"} 
-          size="sm"
-          className="w-full justify-start hover:bg-accent transition-all"
-        >
-          <ListChecks className="mr-2 h-4 w-4" />
-          Ações A/B/C
-        </Button>
-      </Link>
+      {(isTrafego || isDirecao) && (
+        <Link to="/acoes" onClick={() => setMobileMenuOpen(false)}>
+          <Button 
+            variant={location.pathname === "/acoes" ? "secondary" : "ghost"} 
+            size="sm"
+            className="w-full justify-start hover:bg-accent transition-all"
+          >
+            <ListChecks className="mr-2 h-4 w-4" />
+            Tarefas Tráfego
+          </Button>
+        </Link>
+      )}
       {isDirecao && (
-        <>
-          <Link to="/aprovacoes" onClick={() => setMobileMenuOpen(false)}>
-            <Button 
-              variant={location.pathname === "/aprovacoes" ? "secondary" : "ghost"} 
-              size="sm"
-              className="w-full justify-start hover:bg-accent transition-all"
-            >
-              <CheckSquare className="mr-2 h-4 w-4" />
-              Aprovações
-            </Button>
-          </Link>
-          <Link to="/demandas-campanhas" onClick={() => setMobileMenuOpen(false)}>
-            <Button 
-              variant={location.pathname === "/demandas-campanhas" ? "secondary" : "ghost"} 
-              size="sm"
-              className="w-full justify-start hover:bg-accent transition-all"
-            >
-              <ClipboardList className="mr-2 h-4 w-4" />
-              Demandas
-            </Button>
-          </Link>
-        </>
+        <Link to="/aprovacoes" onClick={() => setMobileMenuOpen(false)}>
+          <Button 
+            variant={location.pathname === "/aprovacoes" ? "secondary" : "ghost"} 
+            size="sm"
+            className="w-full justify-start hover:bg-accent transition-all"
+          >
+            <CheckSquare className="mr-2 h-4 w-4" />
+            Aprovações
+          </Button>
+        </Link>
       )}
       <Link to="/leads" onClick={() => setMobileMenuOpen(false)}>
         <Button 
