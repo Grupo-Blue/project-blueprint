@@ -101,6 +101,13 @@ const CRONJOBS: CronjobConfig[] = [
     functionName: "calcular-metricas-diarias",
     schedule: "02:00",
     description: "Calcula métricas diárias de empresas (CPL, CAC, leads, vendas)"
+  },
+  {
+    name: "verificar-demandas-campanhas",
+    displayName: "Verificar Demandas Executadas",
+    functionName: "verificar-demanda-campanha",
+    schedule: "06:30",
+    description: "Verifica automaticamente demandas EXECUTADAS há mais de 24h nas APIs Meta/Google"
   }
 ];
 
