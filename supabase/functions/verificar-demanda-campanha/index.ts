@@ -11,163 +11,85 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { id_demanda } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { id_demanda, verificar_todas } = body;
 
+    // Modo batch: verificar todas as demandas EXECUTADAS há mais de 24h
+    if (verificar_todas) {
+      console.log('[verificar-demanda] Modo batch: verificando demandas EXECUTADAS há mais de 24h');
+
+      const vintQuatroHorasAtras = new Date();
+      vintQuatroHorasAtras.setHours(vintQuatroHorasAtras.getHours() - 24);
+
+      const { data: demandasPendentes, error: fetchError } = await supabase
+        .from('demanda_campanha')
+        .select('id_demanda, titulo, plataforma, id_campanha_criada, updated_at')
+        .eq('status', 'EXECUTADA')
+        .lt('updated_at', vintQuatroHorasAtras.toISOString());
+
+      if (fetchError) {
+        console.error('[verificar-demanda] Erro ao buscar demandas:', fetchError);
+        throw fetchError;
+      }
+
+      console.log(`[verificar-demanda] Encontradas ${demandasPendentes?.length || 0} demandas para verificar`);
+
+      const resultados: Array<{ id_demanda: string; titulo: string; verificada: boolean; resultado: string }> = [];
+
+      for (const demanda of demandasPendentes || []) {
+        const resultado = await verificarDemanda(supabase, demanda.id_demanda);
+        resultados.push({
+          id_demanda: demanda.id_demanda,
+          titulo: demanda.titulo,
+          verificada: resultado.verificada,
+          resultado: resultado.resultado
+        });
+      }
+
+      const duracao = Date.now() - startTime;
+
+      // Registrar execução do cronjob
+      await supabase.from('cronjob_execucao').insert({
+        nome_cronjob: 'verificar-demanda-campanha',
+        status: 'success',
+        duracao_ms: duracao,
+        detalhes_execucao: {
+          demandas_verificadas: resultados.length,
+          resultados
+        }
+      });
+
+      console.log(`[verificar-demanda] Batch concluído: ${resultados.length} demandas verificadas em ${duracao}ms`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          total_verificadas: resultados.length,
+          resultados
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Modo individual: verificar uma demanda específica
     if (!id_demanda) {
       return new Response(
-        JSON.stringify({ error: 'id_demanda é obrigatório' }),
+        JSON.stringify({ error: 'id_demanda é obrigatório (ou use verificar_todas: true)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[verificar-demanda] Verificando demanda ${id_demanda}`);
-
-    // Buscar demanda
-    const { data: demanda, error: demandaError } = await supabase
-      .from('demanda_campanha')
-      .select(`
-        *,
-        empresa:id_empresa (
-          id_empresa,
-          nome
-        )
-      `)
-      .eq('id_demanda', id_demanda)
-      .single();
-
-    if (demandaError || !demanda) {
-      console.error('[verificar-demanda] Demanda não encontrada:', demandaError);
-      return new Response(
-        JSON.stringify({ error: 'Demanda não encontrada' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (demanda.status !== 'EXECUTADA') {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Demanda não está no status EXECUTADA' 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!demanda.id_campanha_criada) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'ID da campanha criada não foi informado' 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`[verificar-demanda] Verificando campanha ${demanda.id_campanha_criada} na plataforma ${demanda.plataforma}`);
-
-    let campanhaEncontrada = false;
-    let resultadoVerificacao = '';
-
-    // Verificar se a campanha existe no banco local
-    const { data: campanhaLocal } = await supabase
-      .from('campanha')
-      .select('id_campanha, nome, ativa')
-      .eq('id_campanha_externo', demanda.id_campanha_criada)
-      .maybeSingle();
-
-    if (campanhaLocal) {
-      campanhaEncontrada = true;
-      resultadoVerificacao = `Campanha "${campanhaLocal.nome}" encontrada no sistema. Status: ${campanhaLocal.ativa ? 'Ativa' : 'Inativa'}`;
-      console.log(`[verificar-demanda] ${resultadoVerificacao}`);
-    } else {
-      // Verificar via API da plataforma
-      if (demanda.plataforma === 'META') {
-        // Buscar integração Meta
-        const { data: integracao } = await supabase
-          .from('integracao')
-          .select('config_json')
-          .eq('tipo', 'META_ADS')
-          .eq('ativo', true)
-          .maybeSingle();
-
-        if (integracao?.config_json) {
-          const config = integracao.config_json as any;
-          const accessToken = config.access_token;
-
-          if (accessToken) {
-            try {
-              const metaResponse = await fetch(
-                `https://graph.facebook.com/v22.0/${demanda.id_campanha_criada}?fields=id,name,status&access_token=${accessToken}`
-              );
-
-              if (metaResponse.ok) {
-                const metaData = await metaResponse.json();
-                campanhaEncontrada = true;
-                resultadoVerificacao = `Campanha Meta "${metaData.name}" encontrada. Status: ${metaData.status}`;
-                console.log(`[verificar-demanda] ${resultadoVerificacao}`);
-              } else {
-                resultadoVerificacao = 'Campanha não encontrada na API do Meta Ads';
-              }
-            } catch (apiError) {
-              console.error('[verificar-demanda] Erro ao verificar Meta:', apiError);
-              resultadoVerificacao = 'Erro ao verificar campanha na API do Meta Ads';
-            }
-          }
-        }
-      } else if (demanda.plataforma === 'GOOGLE') {
-        // Buscar integração Google
-        const { data: integracao } = await supabase
-          .from('integracao')
-          .select('config_json')
-          .eq('tipo', 'GOOGLE_ADS')
-          .eq('ativo', true)
-          .maybeSingle();
-
-        if (integracao?.config_json) {
-          // Para Google Ads, verificação simplificada via banco local
-          resultadoVerificacao = 'Verificação Google Ads: aguardando próxima sincronização de campanhas';
-        }
-      }
-
-      if (!resultadoVerificacao) {
-        resultadoVerificacao = 'Não foi possível verificar a campanha. Aguardando próxima sincronização.';
-      }
-    }
-
-    // Atualizar demanda com resultado
-    const updateData: any = {
-      data_verificacao: new Date().toISOString(),
-      resultado_verificacao: resultadoVerificacao,
-    };
-
-    if (campanhaEncontrada) {
-      updateData.status = 'VERIFICADA';
-      updateData.verificada = true;
-    }
-
-    const { error: updateError } = await supabase
-      .from('demanda_campanha')
-      .update(updateData)
-      .eq('id_demanda', id_demanda);
-
-    if (updateError) {
-      console.error('[verificar-demanda] Erro ao atualizar demanda:', updateError);
-      throw updateError;
-    }
-
-    console.log(`[verificar-demanda] Demanda ${id_demanda} ${campanhaEncontrada ? 'VERIFICADA' : 'pendente de verificação'}`);
+    const resultado = await verificarDemanda(supabase, id_demanda);
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        verificada: campanhaEncontrada,
-        resultado: resultadoVerificacao
-      }),
+      JSON.stringify(resultado),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
@@ -180,3 +102,133 @@ serve(async (req) => {
     );
   }
 });
+
+async function verificarDemanda(supabase: any, id_demanda: string): Promise<{ success: boolean; verificada: boolean; resultado: string }> {
+  console.log(`[verificar-demanda] Verificando demanda ${id_demanda}`);
+
+  // Buscar demanda
+  const { data: demanda, error: demandaError } = await supabase
+    .from('demanda_campanha')
+    .select(`
+      *,
+      empresa:id_empresa (
+        id_empresa,
+        nome
+      )
+    `)
+    .eq('id_demanda', id_demanda)
+    .single();
+
+  if (demandaError || !demanda) {
+    console.error('[verificar-demanda] Demanda não encontrada:', demandaError);
+    return { success: false, verificada: false, resultado: 'Demanda não encontrada' };
+  }
+
+  if (demanda.status !== 'EXECUTADA') {
+    return { success: false, verificada: false, resultado: 'Demanda não está no status EXECUTADA' };
+  }
+
+  if (!demanda.id_campanha_criada) {
+    return { success: false, verificada: false, resultado: 'ID da campanha criada não foi informado' };
+  }
+
+  console.log(`[verificar-demanda] Verificando campanha ${demanda.id_campanha_criada} na plataforma ${demanda.plataforma}`);
+
+  let campanhaEncontrada = false;
+  let resultadoVerificacao = '';
+
+  // Verificar se a campanha existe no banco local
+  const { data: campanhaLocal } = await supabase
+    .from('campanha')
+    .select('id_campanha, nome, ativa')
+    .eq('id_campanha_externo', demanda.id_campanha_criada)
+    .maybeSingle();
+
+  if (campanhaLocal) {
+    campanhaEncontrada = true;
+    resultadoVerificacao = `Campanha "${campanhaLocal.nome}" encontrada no sistema. Status: ${campanhaLocal.ativa ? 'Ativa' : 'Inativa'}`;
+    console.log(`[verificar-demanda] ${resultadoVerificacao}`);
+  } else {
+    // Verificar via API da plataforma
+    if (demanda.plataforma === 'META') {
+      // Buscar integração Meta
+      const { data: integracao } = await supabase
+        .from('integracao')
+        .select('config_json')
+        .eq('tipo', 'META_ADS')
+        .eq('ativo', true)
+        .maybeSingle();
+
+      if (integracao?.config_json) {
+        const config = integracao.config_json as any;
+        const accessToken = config.access_token;
+
+        if (accessToken) {
+          try {
+            const metaResponse = await fetch(
+              `https://graph.facebook.com/v22.0/${demanda.id_campanha_criada}?fields=id,name,status&access_token=${accessToken}`
+            );
+
+            if (metaResponse.ok) {
+              const metaData = await metaResponse.json();
+              campanhaEncontrada = true;
+              resultadoVerificacao = `Campanha Meta "${metaData.name}" encontrada. Status: ${metaData.status}`;
+              console.log(`[verificar-demanda] ${resultadoVerificacao}`);
+            } else {
+              resultadoVerificacao = 'Campanha não encontrada na API do Meta Ads';
+            }
+          } catch (apiError) {
+            console.error('[verificar-demanda] Erro ao verificar Meta:', apiError);
+            resultadoVerificacao = 'Erro ao verificar campanha na API do Meta Ads';
+          }
+        }
+      }
+    } else if (demanda.plataforma === 'GOOGLE') {
+      // Buscar integração Google
+      const { data: integracao } = await supabase
+        .from('integracao')
+        .select('config_json')
+        .eq('tipo', 'GOOGLE_ADS')
+        .eq('ativo', true)
+        .maybeSingle();
+
+      if (integracao?.config_json) {
+        // Para Google Ads, verificação simplificada via banco local
+        resultadoVerificacao = 'Verificação Google Ads: aguardando próxima sincronização de campanhas';
+      }
+    }
+
+    if (!resultadoVerificacao) {
+      resultadoVerificacao = 'Não foi possível verificar a campanha. Aguardando próxima sincronização.';
+    }
+  }
+
+  // Atualizar demanda com resultado
+  const updateData: any = {
+    data_verificacao: new Date().toISOString(),
+    resultado_verificacao: resultadoVerificacao,
+  };
+
+  if (campanhaEncontrada) {
+    updateData.status = 'VERIFICADA';
+    updateData.verificada = true;
+  }
+
+  const { error: updateError } = await supabase
+    .from('demanda_campanha')
+    .update(updateData)
+    .eq('id_demanda', id_demanda);
+
+  if (updateError) {
+    console.error('[verificar-demanda] Erro ao atualizar demanda:', updateError);
+    throw updateError;
+  }
+
+  console.log(`[verificar-demanda] Demanda ${id_demanda} ${campanhaEncontrada ? 'VERIFICADA' : 'pendente de verificação'}`);
+
+  return {
+    success: true,
+    verificada: campanhaEncontrada,
+    resultado: resultadoVerificacao
+  };
+}
