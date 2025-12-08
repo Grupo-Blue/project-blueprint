@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.importar-usuarios-tokeniza]
 verify_jwt = false
+
+[functions.gerar-sugestoes-demandas]
+verify_jwt = true
