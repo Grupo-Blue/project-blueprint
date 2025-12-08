@@ -643,6 +643,30 @@ serve(async (req) => {
           console.error('[Tokeniza] Erro no processo de enriquecimento:', tokenizaError);
           // Não falhar o webhook se o enriquecimento falhar
         }
+
+        // Disparar webhook de saída imediatamente após enriquecimento
+        try {
+          console.log(`[Webhook] Disparando webhook de saída para lead ${upsertedLead.id_lead}`);
+          
+          const { error: webhookError } = await supabase.functions.invoke(
+            'disparar-webhook-leads',
+            {
+              body: { 
+                lead_ids: [upsertedLead.id_lead],
+                evento: event === 'added' ? 'lead_criado' : 'lead_atualizado'
+              }
+            }
+          );
+
+          if (webhookError) {
+            console.error('[Webhook] Erro ao disparar webhook de saída:', webhookError);
+          } else {
+            console.log(`[Webhook] Webhook de saída disparado para lead ${upsertedLead.id_lead}`);
+          }
+        } catch (webhookDispatchError) {
+          console.error('[Webhook] Erro ao disparar webhook:', webhookDispatchError);
+          // Não falhar o webhook se o disparo falhar
+        }
       } else if (!personEmail) {
         console.log('[Mautic/Tokeniza] Email não disponível, enriquecimento pulado');
       }

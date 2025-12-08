@@ -16,6 +16,7 @@ import { ValidacaoUTM } from "@/components/ValidacaoUTM";
 import { ImportarCampanhas } from "@/components/ImportarCampanhas";
 import { CronjobsMonitor } from "@/components/CronjobsMonitor";
 import { TokenizaProjetosManager } from "@/components/TokenizaProjetosManager";
+import { WebhookDestinosManager } from "@/components/WebhookDestinosManager";
 import type { Database } from "@/integrations/supabase/types";
 
 type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
@@ -1234,6 +1235,10 @@ export default function Integracoes() {
           )}
         </TabsContent>
       </Tabs>
+
+      <div className="mt-8">
+        <WebhookDestinosManager />
+      </div>
 
       <div className="mt-8">
         <CronjobsMonitor />
