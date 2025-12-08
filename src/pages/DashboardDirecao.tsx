@@ -14,7 +14,11 @@ import {
   CheckCircle,
   Clock,
   BarChart3,
-  Building2
+  Building2,
+  ClipboardList,
+  Play,
+  CheckCircle2,
+  ShieldCheck
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
@@ -147,6 +151,29 @@ export default function DashboardDirecao() {
 
       if (error) throw error;
       return data;
+    },
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Query para demandas de campanhas
+  const { data: demandasCampanha } = useQuery({
+    queryKey: ["demandas-direcao", empresaSelecionada],
+    queryFn: async () => {
+      let query = supabase
+        .from("demanda_campanha")
+        .select(`
+          *,
+          empresa:id_empresa (nome)
+        `);
+
+      if (empresaSelecionada && empresaSelecionada !== "todas") {
+        query = query.eq("id_empresa", empresaSelecionada);
+      }
+
+      const { data, error } = await query.order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
@@ -480,6 +507,61 @@ export default function DashboardDirecao() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Demandas de Campanhas */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Demandas de Campanhas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="flex items-center gap-3 p-3 bg-yellow-500/10 rounded-lg">
+                <Clock className="h-5 w-5 text-yellow-600" />
+                <div>
+                  <p className="text-2xl font-bold">
+                    {demandasCampanha?.filter(d => d.status === 'PENDENTE').length || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Pendentes</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-lg">
+                <Play className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-2xl font-bold">
+                    {demandasCampanha?.filter(d => d.status === 'EM_EXECUCAO').length || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Em Execução</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-green-500/10 rounded-lg">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="text-2xl font-bold">
+                    {demandasCampanha?.filter(d => d.status === 'EXECUTADA').length || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Executadas</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-purple-500/10 rounded-lg">
+                <ShieldCheck className="h-5 w-5 text-purple-600" />
+                <div>
+                  <p className="text-2xl font-bold">
+                    {demandasCampanha?.filter(d => d.status === 'VERIFICADA').length || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Verificadas</p>
+                </div>
+              </div>
+            </div>
+            <Link to="/demandas-campanhas">
+              <Button variant="outline" className="w-full">
+                Ver todas as demandas
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
