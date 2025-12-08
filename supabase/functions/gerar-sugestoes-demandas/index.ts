@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { id_empresa } = await req.json();
+    const { id_empresa, texto_produto, plataforma_alvo } = await req.json();
 
     if (!id_empresa) {
       return new Response(
@@ -159,9 +159,11 @@ serve(async (req) => {
     };
 
     console.log("[gerar-sugestoes-demandas] Contexto:", JSON.stringify(contexto, null, 2));
+    console.log("[gerar-sugestoes-demandas] Texto produto:", texto_produto ? `${texto_produto.length} chars` : "não fornecido");
+    console.log("[gerar-sugestoes-demandas] Plataforma alvo:", plataforma_alvo || "não especificada");
 
-    // Prompt para a IA
-    const systemPrompt = `Você é um especialista em mídia paga com vasta experiência em Meta Ads e Google Ads.
+    // Prompt base do sistema
+    let systemPrompt = `Você é um especialista em mídia paga com vasta experiência em Meta Ads e Google Ads.
 Sua tarefa é analisar os dados de performance de uma empresa e sugerir 3-5 novas campanhas otimizadas.
 
 REGRAS IMPORTANTES:
@@ -177,7 +179,64 @@ REGRAS IMPORTANTES:
 ESTRUTURA DA RESPOSTA:
 Use a função sugerir_campanhas_completas para retornar as sugestões no formato estruturado.`;
 
-    const userPrompt = `Analise os dados desta empresa e sugira 3-5 campanhas otimizadas:
+    let userPrompt: string;
+
+    // Se texto_produto for fornecido, usar prompt especializado
+    if (texto_produto && texto_produto.trim().length > 0) {
+      systemPrompt = `Você é um especialista em mídia paga com vasta experiência em Meta Ads e Google Ads.
+Sua tarefa é analisar o TEXTO DO PRODUTO fornecido pelo usuário junto com os dados históricos da empresa e criar campanhas otimizadas.
+
+REGRAS IMPORTANTES:
+1. ANALISE O TEXTO DO PRODUTO em detalhes: identifique o produto/serviço, benefícios, público-alvo, tom de voz, diferenciais
+2. Cada sugestão deve ter TODOS os campos preenchidos - não deixe campos vazios
+3. Combine insights do texto com dados históricos de performance
+4. Gere UTMs padronizados baseados no nome do produto/campanha
+5. Os resultados esperados devem ser realistas baseados nos dados históricos
+6. Inclua um resumo do que você entendeu do texto no campo "texto_produto_analisado"
+
+${plataforma_alvo === "GOOGLE" ? `
+REGRAS ESPECÍFICAS PARA GOOGLE ADS SEARCH:
+1. Gere 20-30 palavras-chave organizadas por intenção de busca
+2. Para cada palavra-chave, defina o match_type correto:
+   - "exact" [exato]: para termos muito específicos e transacionais
+   - "phrase" "frase": para termos com variações aceitáveis
+   - "broad" ampla: para descoberta de novos termos
+3. Sugira 10-15 palavras-chave negativas para evitar tráfego irrelevante
+4. Organize em 3-5 grupos de anúncio temáticos
+5. Para cada grupo, gere headlines (até 15, max 30 chars cada) e descriptions (até 4, max 90 chars cada) para RSA
+6. Foque em intenções transacionais e informacionais de fundo de funil
+` : `
+REGRAS ESPECÍFICAS PARA META ADS:
+1. Defina públicos-alvo detalhados com interesses e comportamentos
+2. Sugira posicionamentos otimizados (Feed, Stories, Reels, etc.)
+3. Inclua faixas etárias e gênero quando relevante
+4. Sugira tipos de criativos (imagem, vídeo, carrossel) baseados no produto
+`}
+
+ESTRUTURA DA RESPOSTA:
+Use a função sugerir_campanhas_completas para retornar as sugestões no formato estruturado.`;
+
+      userPrompt = `TEXTO DO PRODUTO A ANALISAR:
+"""
+${texto_produto}
+"""
+
+DADOS HISTÓRICOS DA EMPRESA (últimos 30 dias):
+${JSON.stringify(contexto, null, 2)}
+
+PLATAFORMA ALVO: ${plataforma_alvo || "META"}
+
+Considere:
+- CPL máximo permitido: R$ ${empresa.cpl_maximo}
+- CAC máximo permitido: R$ ${empresa.cac_maximo}
+- CPL médio atual: R$ ${cplMedio.toFixed(2)}
+- Verba mensal disponível: R$ ${empresa.meta_verba_mensal || "não definida"}
+
+Analise o texto do produto, combine com os dados históricos e gere ${plataforma_alvo === "GOOGLE" ? "campanhas de Google Search com palavras-chave estruturadas" : "campanhas de Meta Ads com segmentação detalhada"}.`;
+
+    } else {
+      // Prompt original para geração baseada apenas na base
+      userPrompt = `Analise os dados desta empresa e sugira 3-5 campanhas otimizadas:
 
 ${JSON.stringify(contexto, null, 2)}
 
@@ -188,7 +247,9 @@ Considere:
 - Plataformas disponíveis: ${contexto.plataformas_disponiveis.join(", ") || "META, GOOGLE"}
 
 Gere sugestões de campanhas completas com todos os campos preenchidos.`;
+    }
 
+    // Tool definition com campos extras para Google Ads estruturado
     const tools = [
       {
         type: "function",
@@ -207,6 +268,7 @@ Gere sugestões de campanhas completas com todos os campos preenchidos.`;
                     descricao: { type: "string", description: "Descrição do objetivo e estratégia" },
                     plataforma: { type: "string", enum: ["META", "GOOGLE"] },
                     prioridade: { type: "string", enum: ["ALTA", "MEDIA", "BAIXA"] },
+                    texto_produto_analisado: { type: "string", description: "Resumo do texto do produto analisado (apenas quando texto_produto foi fornecido)" },
                     meta_tipo_campanha: { type: "string", enum: ["CONVERSAO", "TRAFEGO", "LEAD_GEN", "AWARENESS", "ENGAJAMENTO"] },
                     meta_objetivo: { type: "string" },
                     meta_publico_alvo: { type: "string" },
@@ -216,6 +278,38 @@ Gere sugestões de campanhas completas com todos os campos preenchidos.`;
                     meta_posicionamentos: { type: "array", items: { type: "string" } },
                     google_tipo_campanha: { type: "string", enum: ["SEARCH", "DISPLAY", "PERFORMANCE_MAX", "VIDEO", "SHOPPING"] },
                     google_palavras_chave: { type: "array", items: { type: "string" } },
+                    google_palavras_chave_estruturadas: {
+                      type: "array",
+                      description: "Palavras-chave com match type e intenção para Google Search",
+                      items: {
+                        type: "object",
+                        properties: {
+                          termo: { type: "string" },
+                          match_type: { type: "string", enum: ["exact", "phrase", "broad"] },
+                          intencao: { type: "string", enum: ["transacional", "informacional", "navegacional"] }
+                        },
+                        required: ["termo", "match_type", "intencao"]
+                      }
+                    },
+                    google_palavras_negativas: {
+                      type: "array",
+                      description: "Palavras-chave negativas para evitar tráfego irrelevante",
+                      items: { type: "string" }
+                    },
+                    google_grupos_anuncio: {
+                      type: "array",
+                      description: "Grupos de anúncio com keywords, headlines e descriptions para RSA",
+                      items: {
+                        type: "object",
+                        properties: {
+                          nome: { type: "string" },
+                          palavras_chave: { type: "array", items: { type: "string" } },
+                          headlines: { type: "array", items: { type: "string" }, description: "Até 15 headlines de max 30 caracteres" },
+                          descriptions: { type: "array", items: { type: "string" }, description: "Até 4 descriptions de max 90 caracteres" }
+                        },
+                        required: ["nome", "palavras_chave"]
+                      }
+                    },
                     verba_diaria: { type: "number" },
                     verba_total: { type: "number" },
                     duracao_dias: { type: "number" },
