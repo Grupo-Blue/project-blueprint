@@ -678,6 +678,164 @@ export type Database = {
         }
         Relationships: []
       }
+      demanda_campanha: {
+        Row: {
+          contexto_ia: Json | null
+          created_at: string | null
+          criativos: Json | null
+          data_fim: string | null
+          data_inicio: string | null
+          data_verificacao: string | null
+          descricao: string | null
+          google_extensoes: string[] | null
+          google_palavras_chave: string[] | null
+          google_palavras_negativas: string[] | null
+          google_tipo_campanha:
+            | Database["public"]["Enums"]["tipo_campanha_google"]
+            | null
+          google_tipo_correspondencia: string | null
+          id_campanha_criada: string | null
+          id_criador: string
+          id_demanda: string
+          id_empresa: string
+          id_executor: string | null
+          landing_pages: string[] | null
+          meta_genero: string | null
+          meta_idade_max: number | null
+          meta_idade_min: number | null
+          meta_interesses: string[] | null
+          meta_localizacoes: string[] | null
+          meta_objetivo: string | null
+          meta_posicionamentos: string[] | null
+          meta_publico_alvo: string | null
+          meta_tipo_campanha:
+            | Database["public"]["Enums"]["tipo_campanha_meta"]
+            | null
+          observacoes_executor: string | null
+          plataforma: Database["public"]["Enums"]["plataforma_ads"]
+          prioridade: Database["public"]["Enums"]["prioridade_demanda"] | null
+          resultado_verificacao: string | null
+          status: Database["public"]["Enums"]["status_demanda"] | null
+          sugerida_por_ia: boolean | null
+          teste_ab_paginas: boolean | null
+          titulo: string
+          updated_at: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          verba_diaria: number | null
+          verba_total: number | null
+          verificada: boolean | null
+        }
+        Insert: {
+          contexto_ia?: Json | null
+          created_at?: string | null
+          criativos?: Json | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          data_verificacao?: string | null
+          descricao?: string | null
+          google_extensoes?: string[] | null
+          google_palavras_chave?: string[] | null
+          google_palavras_negativas?: string[] | null
+          google_tipo_campanha?:
+            | Database["public"]["Enums"]["tipo_campanha_google"]
+            | null
+          google_tipo_correspondencia?: string | null
+          id_campanha_criada?: string | null
+          id_criador: string
+          id_demanda?: string
+          id_empresa: string
+          id_executor?: string | null
+          landing_pages?: string[] | null
+          meta_genero?: string | null
+          meta_idade_max?: number | null
+          meta_idade_min?: number | null
+          meta_interesses?: string[] | null
+          meta_localizacoes?: string[] | null
+          meta_objetivo?: string | null
+          meta_posicionamentos?: string[] | null
+          meta_publico_alvo?: string | null
+          meta_tipo_campanha?:
+            | Database["public"]["Enums"]["tipo_campanha_meta"]
+            | null
+          observacoes_executor?: string | null
+          plataforma: Database["public"]["Enums"]["plataforma_ads"]
+          prioridade?: Database["public"]["Enums"]["prioridade_demanda"] | null
+          resultado_verificacao?: string | null
+          status?: Database["public"]["Enums"]["status_demanda"] | null
+          sugerida_por_ia?: boolean | null
+          teste_ab_paginas?: boolean | null
+          titulo: string
+          updated_at?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          verba_diaria?: number | null
+          verba_total?: number | null
+          verificada?: boolean | null
+        }
+        Update: {
+          contexto_ia?: Json | null
+          created_at?: string | null
+          criativos?: Json | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          data_verificacao?: string | null
+          descricao?: string | null
+          google_extensoes?: string[] | null
+          google_palavras_chave?: string[] | null
+          google_palavras_negativas?: string[] | null
+          google_tipo_campanha?:
+            | Database["public"]["Enums"]["tipo_campanha_google"]
+            | null
+          google_tipo_correspondencia?: string | null
+          id_campanha_criada?: string | null
+          id_criador?: string
+          id_demanda?: string
+          id_empresa?: string
+          id_executor?: string | null
+          landing_pages?: string[] | null
+          meta_genero?: string | null
+          meta_idade_max?: number | null
+          meta_idade_min?: number | null
+          meta_interesses?: string[] | null
+          meta_localizacoes?: string[] | null
+          meta_objetivo?: string | null
+          meta_posicionamentos?: string[] | null
+          meta_publico_alvo?: string | null
+          meta_tipo_campanha?:
+            | Database["public"]["Enums"]["tipo_campanha_meta"]
+            | null
+          observacoes_executor?: string | null
+          plataforma?: Database["public"]["Enums"]["plataforma_ads"]
+          prioridade?: Database["public"]["Enums"]["prioridade_demanda"] | null
+          resultado_verificacao?: string | null
+          status?: Database["public"]["Enums"]["status_demanda"] | null
+          sugerida_por_ia?: boolean | null
+          teste_ab_paginas?: boolean | null
+          titulo?: string
+          updated_at?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          verba_diaria?: number | null
+          verba_total?: number | null
+          verificada?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demanda_campanha_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       empresa: {
         Row: {
           cac_maximo: number
@@ -1927,7 +2085,9 @@ export type Database = {
       categoria_acao: "A" | "B" | "C"
       origem_lead: "PAGO" | "ORGANICO" | "INDICACAO" | "LISTA" | "MANUAL"
       perfil_usuario: "TRAFEGO" | "SDR_COMERCIAL" | "DIRECAO" | "ADMIN"
+      plataforma_ads: "META" | "GOOGLE"
       plataforma_midia: "META" | "GOOGLE"
+      prioridade_demanda: "ALTA" | "MEDIA" | "BAIXA"
       rede_social:
         | "INSTAGRAM"
         | "FACEBOOK"
@@ -1938,8 +2098,26 @@ export type Database = {
       resultado_hipotese: "VALIDADA" | "REFUTADA" | "INCONCLUSIVA"
       status_acao: "PENDENTE" | "APROVADA" | "REPROVADA" | "EXECUTADA"
       status_aprovacao: "APROVADA" | "REPROVADA"
+      status_demanda:
+        | "PENDENTE"
+        | "EM_EXECUCAO"
+        | "EXECUTADA"
+        | "VERIFICADA"
+        | "REJEITADA"
       status_relatorio: "EM_EDICAO" | "PRONTO" | "VALIDADO"
       tipo_aprendizado: "CRIATIVO" | "PUBLICO" | "OFERTA" | "FUNIL" | "OUTRO"
+      tipo_campanha_google:
+        | "SEARCH"
+        | "DISPLAY"
+        | "PERFORMANCE_MAX"
+        | "VIDEO"
+        | "SHOPPING"
+      tipo_campanha_meta:
+        | "CONVERSAO"
+        | "TRAFEGO"
+        | "LEAD_GEN"
+        | "AWARENESS"
+        | "ENGAJAMENTO"
       tipo_criativo: "VIDEO" | "IMAGEM" | "CARROSSEL" | "OUTRO"
       tipo_integracao:
         | "META_ADS"
@@ -2081,7 +2259,9 @@ export const Constants = {
       categoria_acao: ["A", "B", "C"],
       origem_lead: ["PAGO", "ORGANICO", "INDICACAO", "LISTA", "MANUAL"],
       perfil_usuario: ["TRAFEGO", "SDR_COMERCIAL", "DIRECAO", "ADMIN"],
+      plataforma_ads: ["META", "GOOGLE"],
       plataforma_midia: ["META", "GOOGLE"],
+      prioridade_demanda: ["ALTA", "MEDIA", "BAIXA"],
       rede_social: [
         "INSTAGRAM",
         "FACEBOOK",
@@ -2093,8 +2273,29 @@ export const Constants = {
       resultado_hipotese: ["VALIDADA", "REFUTADA", "INCONCLUSIVA"],
       status_acao: ["PENDENTE", "APROVADA", "REPROVADA", "EXECUTADA"],
       status_aprovacao: ["APROVADA", "REPROVADA"],
+      status_demanda: [
+        "PENDENTE",
+        "EM_EXECUCAO",
+        "EXECUTADA",
+        "VERIFICADA",
+        "REJEITADA",
+      ],
       status_relatorio: ["EM_EDICAO", "PRONTO", "VALIDADO"],
       tipo_aprendizado: ["CRIATIVO", "PUBLICO", "OFERTA", "FUNIL", "OUTRO"],
+      tipo_campanha_google: [
+        "SEARCH",
+        "DISPLAY",
+        "PERFORMANCE_MAX",
+        "VIDEO",
+        "SHOPPING",
+      ],
+      tipo_campanha_meta: [
+        "CONVERSAO",
+        "TRAFEGO",
+        "LEAD_GEN",
+        "AWARENESS",
+        "ENGAJAMENTO",
+      ],
       tipo_criativo: ["VIDEO", "IMAGEM", "CARROSSEL", "OUTRO"],
       tipo_integracao: [
         "META_ADS",
