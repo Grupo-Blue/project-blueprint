@@ -134,14 +134,32 @@ export default function SugestoesIACampanhas({ open, onOpenChange, onSugestaoSel
   };
 
   const handleSelecionarSugestao = (sugestao: SugestaoIA) => {
+    // Converter palavras-chave estruturadas para array simples se existirem
+    let googlePalavrasChave = sugestao.google_palavras_chave || [];
+    
+    if (sugestao.google_palavras_chave_estruturadas && sugestao.google_palavras_chave_estruturadas.length > 0) {
+      googlePalavrasChave = sugestao.google_palavras_chave_estruturadas.map(k => k.termo);
+    }
+
+    // Extrair palavras-chave dos grupos de anúncio se existirem
+    if (sugestao.google_grupos_anuncio && sugestao.google_grupos_anuncio.length > 0) {
+      const keywordsFromGroups = sugestao.google_grupos_anuncio.flatMap(g => g.palavras_chave || []);
+      if (keywordsFromGroups.length > 0 && googlePalavrasChave.length === 0) {
+        googlePalavrasChave = keywordsFromGroups;
+      }
+    }
+
     onSugestaoSelecionada({
       ...sugestao,
+      google_palavras_chave: googlePalavrasChave,
       id_empresa: empresaSelecionada,
       sugerida_por_ia: true,
       contexto_ia: {
         justificativa: sugestao.justificativa,
         resultados_esperados: sugestao.resultados_esperados,
         texto_produto_analisado: sugestao.texto_produto_analisado,
+        google_palavras_chave_estruturadas: sugestao.google_palavras_chave_estruturadas,
+        google_grupos_anuncio: sugestao.google_grupos_anuncio,
       }
     });
   };
