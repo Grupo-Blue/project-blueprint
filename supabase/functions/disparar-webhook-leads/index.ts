@@ -151,7 +151,14 @@ serve(async (req) => {
     let webhooksErros = 0;
 
     for (const lead of leads) {
-      const evento = body.evento || (lead.webhook_enviado_em ? 'lead_atualizado' : 'lead_criado');
+      // Mapear eventos para formato esperado pelo destino
+      const eventoInterno = body.evento || (lead.webhook_enviado_em ? 'lead_atualizado' : 'lead_criado');
+      const mapaEventos: Record<string, string> = {
+        'lead_criado': 'LEAD_NOVO',
+        'lead_atualizado': 'ATUALIZACAO',
+        'enriquecimento': 'ATUALIZACAO'
+      };
+      const evento = mapaEventos[eventoInterno] || eventoInterno.toUpperCase();
       
       // Montar payload completo
       const payload: LeadPayload = {
