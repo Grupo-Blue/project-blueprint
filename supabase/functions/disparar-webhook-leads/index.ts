@@ -92,11 +92,20 @@ serve(async (req) => {
       // Disparo imediato de leads específicos
       query = query.in('id_lead', body.lead_ids);
     } else {
-      // Buscar leads com updated_at > webhook_enviado_em OU webhook_enviado_em IS NULL
-      query = query.or('webhook_enviado_em.is.null,updated_at.gt.webhook_enviado_em');
+      // Buscar leads atualizados nos últimos 15 minutos OU sem webhook enviado
+      const quinzeMinutosAtras = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      query = query.or(`webhook_enviado_em.is.null,updated_at.gte.${quinzeMinutosAtras}`);
     }
 
-    const { data: leads, error: leadsError } = await query.limit(50);
+    const { data: leadsRaw, error: leadsError } = await query.limit(100);
+
+    // Filtrar no código: leads onde updated_at > webhook_enviado_em OU webhook_enviado_em IS NULL
+    const leads = body.lead_ids?.length 
+      ? leadsRaw 
+      : leadsRaw?.filter(lead => 
+          !lead.webhook_enviado_em || 
+          new Date(lead.updated_at) > new Date(lead.webhook_enviado_em)
+        ).slice(0, 50);
 
     if (leadsError) {
       throw new Error(`Erro ao buscar leads: ${leadsError.message}`);
