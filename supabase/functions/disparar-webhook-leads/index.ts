@@ -6,60 +6,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface LeadPayload {
-  evento: string;
-  timestamp: string;
+// Payload no formato esperado pelo SDR IA
+interface SDRPayload {
   lead_id: string;
-  email: string | null;
-  empresa: string;
-  lead: {
-    id: string;
-    nome: string | null;
-    email: string | null;
-    empresa: string;
-    id_empresa: string;
-    stage_atual: string | null;
-    is_mql: boolean;
-    levantou_mao: boolean;
-    tem_reuniao: boolean;
-    reuniao_realizada: boolean;
-    venda_realizada: boolean;
-    valor_venda: number | null;
-    utm_source: string | null;
-    utm_medium: string | null;
-    utm_campaign: string | null;
-    utm_content: string | null;
-    utm_term: string | null;
-    origem_tipo: string | null;
-    lead_pago: boolean | null;
-    mautic: {
-      score: number | null;
-      page_hits: number | null;
-      last_active: string | null;
-      first_visit: string | null;
-      tags: any;
-      segments: any;
-      cidade: string | null;
-      estado: string | null;
-    };
-    tokeniza: {
-      investidor: boolean | null;
-      valor_investido: number | null;
-      qtd_investimentos: number | null;
-      projetos: any;
-      carrinho_abandonado: boolean | null;
-      valor_carrinho: number | null;
-      projeto_nome: string | null;
-    };
-    url_pipedrive: string | null;
-    data_criacao: string;
-    data_atualizacao: string;
-    data_mql: string | null;
-    data_levantou_mao: string | null;
-    data_reuniao: string | null;
-    data_venda: string | null;
+  evento: 'LEAD_NOVO' | 'ATUALIZACAO' | 'CARRINHO_ABANDONADO' | 'MQL' | 'SCORE_ATUALIZADO' | 'CLIQUE_OFERTA' | 'FUNIL_ATUALIZADO';
+  empresa: 'TOKENIZA' | 'BLUE';
+  timestamp: string;
+  dados_lead: {
+    nome: string;
+    email: string;
+    telefone?: string;
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    utm_term?: string;
+    score: number;
+    stage: string;
+  };
+  dados_tokeniza?: {
+    valor_investido: number;
+    qtd_investimentos: number;
+    qtd_projetos: number;
+    ultimo_investimento_em?: string;
+  };
+  dados_blue?: {
+    qtd_compras_ir: number;
+    ticket_medio: number;
+    score_mautic: number;
+    plano_atual?: string;
+  };
+  event_metadata?: {
+    oferta_id?: string;
+    valor_simulado?: number;
+    pagina_visitada?: string;
+    tipo_compra?: string;
   };
 }
+
+// IDs das empresas
+const TOKENIZA_ID = '61b5ffeb-fbbc-47c1-8ced-152bb647ed20';
+const BLUE_ID = '95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -151,70 +137,78 @@ serve(async (req) => {
     let webhooksErros = 0;
 
     for (const lead of leads) {
-      // Mapear eventos para formato esperado pelo destino
-      const eventoInterno = body.evento || (lead.webhook_enviado_em ? 'lead_atualizado' : 'lead_criado');
-      const mapaEventos: Record<string, string> = {
-        'lead_criado': 'LEAD_NOVO',
-        'lead_atualizado': 'ATUALIZACAO',
-        'enriquecimento': 'ATUALIZACAO'
-      };
-      const evento = mapaEventos[eventoInterno] || eventoInterno.toUpperCase();
+      // Determinar empresa no formato SDR IA
+      const empresaSDR: 'TOKENIZA' | 'BLUE' = lead.id_empresa === TOKENIZA_ID ? 'TOKENIZA' : 'BLUE';
       
-      // Montar payload completo
-      const payload: LeadPayload = {
-        evento,
-        timestamp: new Date().toISOString(),
+      // Determinar evento no formato SDR IA
+      let evento: SDRPayload['evento'] = 'ATUALIZACAO';
+      
+      if (body.evento) {
+        // Evento fornecido explicitamente
+        const eventoUpper = body.evento.toUpperCase();
+        if (['LEAD_NOVO', 'ATUALIZACAO', 'CARRINHO_ABANDONADO', 'MQL', 'SCORE_ATUALIZADO', 'CLIQUE_OFERTA', 'FUNIL_ATUALIZADO'].includes(eventoUpper)) {
+          evento = eventoUpper as SDRPayload['evento'];
+        }
+      } else if (!lead.webhook_enviado_em) {
+        // Primeiro envio = Lead Novo
+        evento = 'LEAD_NOVO';
+      } else if (lead.tokeniza_carrinho_abandonado) {
+        evento = 'CARRINHO_ABANDONADO';
+      } else if (lead.is_mql) {
+        evento = 'MQL';
+      }
+      
+      // Montar payload no formato SDR IA
+      const payload: SDRPayload = {
         lead_id: lead.id_lead,
-        email: lead.email,
-        empresa: lead.empresa?.nome || '',
-        lead: {
-          id: lead.id_lead,
-          nome: lead.nome_lead,
-          email: lead.email,
-          empresa: lead.empresa?.nome || '',
-          id_empresa: lead.id_empresa,
-          stage_atual: lead.stage_atual,
-          is_mql: lead.is_mql,
-          levantou_mao: lead.levantou_mao,
-          tem_reuniao: lead.tem_reuniao,
-          reuniao_realizada: lead.reuniao_realizada,
-          venda_realizada: lead.venda_realizada,
-          valor_venda: lead.valor_venda,
-          utm_source: lead.utm_source,
-          utm_medium: lead.utm_medium,
-          utm_campaign: lead.utm_campaign,
-          utm_content: lead.utm_content,
-          utm_term: lead.utm_term,
-          origem_tipo: lead.origem_tipo,
-          lead_pago: lead.lead_pago,
-          mautic: {
-            score: lead.mautic_score,
-            page_hits: lead.mautic_page_hits,
-            last_active: lead.mautic_last_active,
-            first_visit: lead.mautic_first_visit,
-            tags: lead.mautic_tags,
-            segments: lead.mautic_segments,
-            cidade: lead.cidade_mautic,
-            estado: lead.estado_mautic
-          },
-          tokeniza: {
-            investidor: lead.tokeniza_investidor,
-            valor_investido: lead.tokeniza_valor_investido,
-            qtd_investimentos: lead.tokeniza_qtd_investimentos,
-            projetos: lead.tokeniza_projetos,
-            carrinho_abandonado: lead.tokeniza_carrinho_abandonado,
-            valor_carrinho: lead.tokeniza_valor_carrinho,
-            projeto_nome: lead.tokeniza_projeto_nome
-          },
-          url_pipedrive: lead.url_pipedrive,
-          data_criacao: lead.data_criacao,
-          data_atualizacao: lead.updated_at,
-          data_mql: lead.data_mql,
-          data_levantou_mao: lead.data_levantou_mao,
-          data_reuniao: lead.data_reuniao,
-          data_venda: lead.data_venda
+        evento,
+        empresa: empresaSDR,
+        timestamp: new Date().toISOString(),
+        dados_lead: {
+          nome: lead.nome_lead || 'Não informado',
+          email: lead.email || 'nao-informado@placeholder.com',
+          telefone: undefined, // Não temos telefone no lead atualmente
+          utm_source: lead.utm_source || undefined,
+          utm_medium: lead.utm_medium || undefined,
+          utm_campaign: lead.utm_campaign || undefined,
+          utm_term: lead.utm_term || undefined,
+          score: lead.mautic_score || 0,
+          stage: lead.stage_atual || 'Lead'
         }
       };
+
+      // Adicionar dados específicos da Tokeniza
+      if (empresaSDR === 'TOKENIZA') {
+        // Calcular quantidade de projetos do array
+        const qtdProjetos = Array.isArray(lead.tokeniza_projetos) 
+          ? lead.tokeniza_projetos.length 
+          : 0;
+        
+        payload.dados_tokeniza = {
+          valor_investido: lead.tokeniza_valor_investido || 0,
+          qtd_investimentos: lead.tokeniza_qtd_investimentos || 0,
+          qtd_projetos: qtdProjetos,
+          ultimo_investimento_em: lead.tokeniza_ultimo_investimento || undefined
+        };
+
+        // Adicionar metadata para carrinho abandonado
+        if (lead.tokeniza_carrinho_abandonado && lead.tokeniza_valor_carrinho) {
+          payload.event_metadata = {
+            valor_simulado: lead.tokeniza_valor_carrinho,
+            pagina_visitada: lead.tokeniza_projeto_nome ? `/investir/${lead.tokeniza_projeto_nome}` : undefined
+          };
+        }
+      }
+
+      // Adicionar dados específicos da Blue
+      if (empresaSDR === 'BLUE') {
+        payload.dados_blue = {
+          qtd_compras_ir: lead.venda_realizada ? 1 : 0, // Simplificado - não temos histórico de compras
+          ticket_medio: lead.valor_venda || 0,
+          score_mautic: lead.mautic_score || 0,
+          plano_atual: undefined // Não temos essa informação atualmente
+        };
+      }
 
       // Enviar para cada destino ativo
       for (const destino of destinos) {
@@ -234,6 +228,8 @@ serve(async (req) => {
             'Content-Type': 'application/json',
             ...(destino.headers || {})
           };
+
+          console.log(`[Webhook] Enviando lead ${lead.id_lead} para ${destino.nome}:`, JSON.stringify(payload).substring(0, 500));
 
           // Enviar webhook
           const response = await fetch(destino.url, {
@@ -261,7 +257,7 @@ serve(async (req) => {
             console.log(`[Webhook] Lead ${lead.id_lead} enviado para ${destino.nome} - ${statusCode}`);
           } else {
             webhooksErros++;
-            console.error(`[Webhook] Erro ao enviar lead ${lead.id_lead} para ${destino.nome} - ${statusCode}`);
+            console.error(`[Webhook] Erro ao enviar lead ${lead.id_lead} para ${destino.nome} - ${statusCode}: ${resposta}`);
           }
         } catch (sendError) {
           webhooksErros++;
