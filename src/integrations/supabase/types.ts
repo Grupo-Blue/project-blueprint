@@ -1224,6 +1224,7 @@ export type Database = {
           utm_term: string | null
           valor_venda: number | null
           venda_realizada: boolean
+          webhook_enviado_em: string | null
         }
         Insert: {
           cidade_mautic?: string | null
@@ -1283,6 +1284,7 @@ export type Database = {
           utm_term?: string | null
           valor_venda?: number | null
           venda_realizada?: boolean
+          webhook_enviado_em?: string | null
         }
         Update: {
           cidade_mautic?: string | null
@@ -1342,6 +1344,7 @@ export type Database = {
           utm_term?: string | null
           valor_venda?: number | null
           venda_realizada?: boolean
+          webhook_enviado_em?: string | null
         }
         Relationships: [
           {
@@ -1406,6 +1409,60 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lead"
             referencedColumns: ["id_lead"]
+          },
+        ]
+      }
+      lead_webhook_log: {
+        Row: {
+          created_at: string | null
+          evento: string
+          id: string
+          id_lead: string | null
+          id_webhook_destino: string | null
+          payload: Json
+          resposta: string | null
+          status: string
+          status_code: number | null
+          tentativas: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          evento: string
+          id?: string
+          id_lead?: string | null
+          id_webhook_destino?: string | null
+          payload: Json
+          resposta?: string | null
+          status: string
+          status_code?: number | null
+          tentativas?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          evento?: string
+          id?: string
+          id_lead?: string | null
+          id_webhook_destino?: string | null
+          payload?: Json
+          resposta?: string | null
+          status?: string
+          status_code?: number | null
+          tentativas?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_webhook_log_id_lead_fkey"
+            columns: ["id_lead"]
+            isOneToOne: false
+            referencedRelation: "lead"
+            referencedColumns: ["id_lead"]
+          },
+          {
+            foreignKeyName: "lead_webhook_log_id_webhook_destino_fkey"
+            columns: ["id_webhook_destino"]
+            isOneToOne: false
+            referencedRelation: "webhook_destino"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2065,6 +2122,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      webhook_destino: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          eventos: string[] | null
+          headers: Json | null
+          id: string
+          id_empresa: string | null
+          nome: string
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          eventos?: string[] | null
+          headers?: Json | null
+          id?: string
+          id_empresa?: string | null
+          nome: string
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          eventos?: string[] | null
+          headers?: Json | null
+          id?: string
+          id_empresa?: string | null
+          nome?: string
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_destino_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
       }
     }
     Views: {

@@ -71,3 +71,9 @@ verify_jwt = true
 
 [functions.verificar-demanda-campanha]
 verify_jwt = true
+
+[functions.monitorar-enriquecimento-leads]
+verify_jwt = false
+
+[functions.disparar-webhook-leads]
+verify_jwt = false
