@@ -9,6 +9,9 @@ const corsHeaders = {
 interface LeadPayload {
   evento: string;
   timestamp: string;
+  lead_id: string;
+  email: string | null;
+  empresa: string;
   lead: {
     id: string;
     nome: string | null;
@@ -154,6 +157,9 @@ serve(async (req) => {
       const payload: LeadPayload = {
         evento,
         timestamp: new Date().toISOString(),
+        lead_id: lead.id_lead,
+        email: lead.email,
+        empresa: lead.empresa?.nome || '',
         lead: {
           id: lead.id_lead,
           nome: lead.nome_lead,
