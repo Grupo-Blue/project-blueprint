@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.gerar-sugestoes-demandas]
 verify_jwt = true
+
+[functions.verificar-demanda-campanha]
+verify_jwt = true
