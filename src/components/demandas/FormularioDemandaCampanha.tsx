@@ -13,7 +13,15 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useEmpresa } from "@/contexts/EmpresaContext";
-import { Plus, X, Image, Link2, Loader2 } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Plus, X, Image, Link2, Loader2, Layers } from "lucide-react";
+
+interface GrupoAnuncio {
+  nome: string;
+  palavras_chave: string[];
+  headlines: string[];
+  descriptions: string[];
+}
 
 interface Criativo {
   url_midia: string;
@@ -72,6 +80,9 @@ export default function FormularioDemandaCampanha({ dadosIniciais, onSubmit, onC
   const [criativos, setCriativos] = useState<Criativo[]>(dadosIniciais?.criativos || []);
   const [posicionamentosSelecionados, setPosicionamentosSelecionados] = useState<string[]>(
     dadosIniciais?.meta_posicionamentos || []
+  );
+  const [gruposAnuncio, setGruposAnuncio] = useState<GrupoAnuncio[]>(
+    dadosIniciais?.contexto_ia?.google_grupos_anuncio || []
   );
   const [submitting, setSubmitting] = useState(false);
   
@@ -472,6 +483,77 @@ export default function FormularioDemandaCampanha({ dadosIniciais, onSubmit, onC
                 placeholder="Ex: grátis, free, download"
               />
             </div>
+
+            {/* Grupos de Anúncio da IA */}
+            {gruposAnuncio.length > 0 && (
+              <div className="space-y-3 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-purple-500" />
+                  <Label className="text-base font-semibold">Grupos de Anúncio Sugeridos pela IA</Label>
+                  <Badge variant="secondary" className="text-xs">{gruposAnuncio.length} grupos</Badge>
+                </div>
+                <Accordion type="multiple" className="space-y-2">
+                  {gruposAnuncio.map((grupo, idx) => (
+                    <AccordionItem key={idx} value={`grupo-${idx}`} className="border rounded-lg px-3">
+                      <AccordionTrigger className="hover:no-underline py-3">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{idx + 1}</Badge>
+                          <span className="font-medium">{grupo.nome}</span>
+                          <Badge variant="secondary" className="text-xs ml-2">
+                            {grupo.palavras_chave?.length || 0} palavras
+                          </Badge>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-4 space-y-4">
+                        {/* Palavras-chave do grupo */}
+                        <div className="space-y-2">
+                          <Label className="text-sm text-muted-foreground">Palavras-chave</Label>
+                          <div className="flex flex-wrap gap-1">
+                            {grupo.palavras_chave?.map((kw, kwIdx) => (
+                              <Badge key={kwIdx} variant="outline" className="text-xs">
+                                {kw}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        {/* Headlines */}
+                        {grupo.headlines && grupo.headlines.length > 0 && (
+                          <div className="space-y-2">
+                            <Label className="text-sm text-muted-foreground">Headlines (RSA)</Label>
+                            <div className="space-y-1">
+                              {grupo.headlines.map((h, hIdx) => (
+                                <div key={hIdx} className="text-sm bg-muted/50 px-2 py-1 rounded flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground w-4">{hIdx + 1}.</span>
+                                  <span>{h}</span>
+                                  <span className="text-xs text-muted-foreground ml-auto">{h.length}/30</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Descriptions */}
+                        {grupo.descriptions && grupo.descriptions.length > 0 && (
+                          <div className="space-y-2">
+                            <Label className="text-sm text-muted-foreground">Descriptions (RSA)</Label>
+                            <div className="space-y-1">
+                              {grupo.descriptions.map((d, dIdx) => (
+                                <div key={dIdx} className="text-sm bg-muted/50 px-2 py-1 rounded flex items-start gap-2">
+                                  <span className="text-xs text-muted-foreground w-4 shrink-0">{dIdx + 1}.</span>
+                                  <span className="flex-1">{d}</span>
+                                  <span className="text-xs text-muted-foreground shrink-0">{d.length}/90</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
