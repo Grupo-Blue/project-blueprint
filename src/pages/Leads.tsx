@@ -9,7 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronRight, Mail, Globe, Target, Wallet, ShoppingCart, MapPin, History, AlertTriangle, Snowflake, Timer } from "lucide-react";
+import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronRight, Mail, Globe, Target, Wallet, ShoppingCart, MapPin, History, AlertTriangle, Snowflake, Timer, X, Check } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format, differenceInDays, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -525,6 +527,65 @@ const Leads = () => {
                 <SelectItem value="nao_investidor">Não Investidor</SelectItem>
               </SelectContent>
             </Select>
+            
+            {/* Filtro Multi-Select de Stage */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[180px] justify-between">
+                  <span className="truncate">
+                    {stageFilter.length === 0 
+                      ? "Todos Stages" 
+                      : stageFilter.length === 1 
+                        ? stageFilter[0] 
+                        : `${stageFilter.length} stages`}
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[220px] p-2" align="start">
+                <div className="flex items-center justify-between mb-2 pb-2 border-b">
+                  <span className="text-sm font-medium">Filtrar por Stage</span>
+                  {stageFilter.length > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setStageFilter([])}
+                    >
+                      Limpar
+                    </Button>
+                  )}
+                </div>
+                <div className="max-h-[250px] overflow-y-auto space-y-1">
+                  {(() => {
+                    // Extrair stages únicos dos leads
+                    const uniqueStages = [...new Set(leads?.map(l => l.stage_atual).filter(Boolean) as string[])].sort();
+                    return uniqueStages.map((stage) => (
+                      <div
+                        key={stage}
+                        className="flex items-center space-x-2 p-2 hover:bg-muted rounded-md cursor-pointer"
+                        onClick={() => {
+                          setStageFilter(prev => 
+                            prev.includes(stage) 
+                              ? prev.filter(s => s !== stage) 
+                              : [...prev, stage]
+                          );
+                        }}
+                      >
+                        <Checkbox 
+                          checked={stageFilter.includes(stage)} 
+                          className="pointer-events-none"
+                        />
+                        <span className="text-sm flex-1">{stage}</span>
+                        {stageFilter.includes(stage) && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </CardContent>
       </Card>
