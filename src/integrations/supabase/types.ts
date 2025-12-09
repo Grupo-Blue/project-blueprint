@@ -1167,6 +1167,14 @@ export type Database = {
       }
       lead: {
         Row: {
+          chatwoot_agente_atual: string | null
+          chatwoot_contact_id: number | null
+          chatwoot_conversas_total: number | null
+          chatwoot_inbox: string | null
+          chatwoot_mensagens_total: number | null
+          chatwoot_status_atendimento: string | null
+          chatwoot_tempo_resposta_medio: number | null
+          chatwoot_ultima_conversa: string | null
           cidade_mautic: string | null
           cliente_status: string | null
           created_at: string
@@ -1227,6 +1235,14 @@ export type Database = {
           webhook_enviado_em: string | null
         }
         Insert: {
+          chatwoot_agente_atual?: string | null
+          chatwoot_contact_id?: number | null
+          chatwoot_conversas_total?: number | null
+          chatwoot_inbox?: string | null
+          chatwoot_mensagens_total?: number | null
+          chatwoot_status_atendimento?: string | null
+          chatwoot_tempo_resposta_medio?: number | null
+          chatwoot_ultima_conversa?: string | null
           cidade_mautic?: string | null
           cliente_status?: string | null
           created_at?: string
@@ -1287,6 +1303,14 @@ export type Database = {
           webhook_enviado_em?: string | null
         }
         Update: {
+          chatwoot_agente_atual?: string | null
+          chatwoot_contact_id?: number | null
+          chatwoot_conversas_total?: number | null
+          chatwoot_inbox?: string | null
+          chatwoot_mensagens_total?: number | null
+          chatwoot_status_atendimento?: string | null
+          chatwoot_tempo_resposta_medio?: number | null
+          chatwoot_ultima_conversa?: string | null
           cidade_mautic?: string | null
           cliente_status?: string | null
           created_at?: string
@@ -2228,6 +2252,7 @@ export type Database = {
         | "MAUTIC"
         | "NOTION"
         | "METRICOOL"
+        | "CHATWOOT"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2406,6 +2431,7 @@ export const Constants = {
         "MAUTIC",
         "NOTION",
         "METRICOOL",
+        "CHATWOOT",
       ],
     },
   },
