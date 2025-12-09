@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   TrendingUp, 
   TrendingDown, 
@@ -18,7 +18,9 @@ import {
   ClipboardList,
   Play,
   CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  XCircle,
+  Calendar
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
@@ -28,6 +30,10 @@ import { useEmpresa } from "@/contexts/EmpresaContext";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { MetricasSociaisExecutivo } from "@/components/dashboard/MetricasSociaisExecutivo";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface EmpresaMetrica {
   id_empresa: string;
@@ -45,6 +51,15 @@ interface EmpresaMetrica {
 export default function DashboardDirecao() {
   const { getDataReferencia, tipoFiltro, dataEspecifica, labelPeriodo } = usePeriodo();
   const { empresaSelecionada, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Estados para modal de aprovação
+  const [selectedAcao, setSelectedAcao] = useState<any>(null);
+  const [comentario, setComentario] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [actionType, setActionType] = useState<"aprovar" | "reprovar">("aprovar");
+  const [processingApproval, setProcessingApproval] = useState(false);
 
   // ESTABILIZAR datas com useMemo para evitar recálculos a cada render
   const { dataInicioStr, dataFimStr, dataReferencia } = useMemo(() => {
@@ -129,7 +144,7 @@ export default function DashboardDirecao() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: acoesAprovacao } = useQuery({
+  const { data: acoesAprovacao, refetch: refetchAcoes } = useQuery({
     queryKey: ["acoes-pendentes-direcao", empresaSelecionada],
     queryFn: async () => {
       let query = supabase
@@ -138,23 +153,95 @@ export default function DashboardDirecao() {
           *,
           empresa:id_empresa (nome)
         `)
+        .eq("categoria", "C")
         .eq("status", "PENDENTE");
 
-      // Filtrar por empresa se uma específica for selecionada
       if (empresaSelecionada && empresaSelecionada !== "todas") {
         query = query.eq("id_empresa", empresaSelecionada);
       }
 
-      const { data, error } = await query
-        .order("data_criacao", { ascending: false })
-        .limit(5);
-
+      const { data, error } = await query.order("data_criacao", { ascending: false });
       if (error) throw error;
-      return data;
+
+      // Buscar profiles para cada ação
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(a => a.id_usuario))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, nome")
+          .in("id", userIds);
+        
+        const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        
+        return data.map(acao => ({
+          ...acao,
+          usuario: profilesMap.get(acao.id_usuario) || { nome: "Usuário não encontrado" }
+        }));
+      }
+      return data || [];
     },
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
   });
+
+  // Funções de aprovação
+  const handleOpenDialog = (acao: any, type: "aprovar" | "reprovar") => {
+    setSelectedAcao(acao);
+    setActionType(type);
+    setComentario("");
+    setDialogOpen(true);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!selectedAcao) return;
+
+    setProcessingApproval(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const novoStatus = actionType === "aprovar" ? "APROVADA" : "REPROVADA";
+      
+      const { error: updateError } = await supabase
+        .from("acao")
+        .update({
+          status: novoStatus,
+          motivo_reprovacao: actionType === "reprovar" ? comentario : null,
+        })
+        .eq("id_acao", selectedAcao.id_acao);
+
+      if (updateError) throw updateError;
+
+      const { error: approvalError } = await supabase
+        .from("acao_aprovacao")
+        .insert({
+          id_acao: selectedAcao.id_acao,
+          id_usuario_aprovador: user.id,
+          status: actionType === "aprovar" ? "APROVADA" : "REPROVADA",
+          comentario: comentario || null,
+        });
+
+      if (approvalError) throw approvalError;
+
+      toast({
+        title: actionType === "aprovar" ? "Ação aprovada!" : "Ação reprovada",
+        description: `A ação foi ${actionType === "aprovar" ? "aprovada" : "reprovada"} com sucesso`,
+      });
+
+      setDialogOpen(false);
+      setSelectedAcao(null);
+      setComentario("");
+      refetchAcoes();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao processar ação",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingApproval(false);
+    }
+  };
 
   // Query para demandas de campanhas
   const { data: demandasCampanha } = useQuery({
@@ -423,50 +510,91 @@ export default function DashboardDirecao() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Ações Pendentes de Aprovação */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Ações Pendentes de Aprovação
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {acoesAprovacao?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhuma ação pendente
-                  </p>
-                ) : (
-                  <>
-                    {acoesAprovacao?.map((acao: any) => (
-                      <div
-                        key={acao.id_acao}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium text-sm">{acao.tipo_acao}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {acao.empresa?.nome} •{" "}
-                            {format(new Date(acao.data_criacao), "dd/MM/yyyy", {
-                              locale: ptBR,
-                            })}
-                          </p>
-                        </div>
-                        <Badge variant="outline">Pendente</Badge>
-                      </div>
-                    ))}
-                    <Link to="/aprovacoes">
-                      <Button variant="outline" className="w-full mt-2">
-                        Ver todas as aprovações
-                      </Button>
-                    </Link>
-                  </>
-                )}
+        {/* Aprovações Categoria C - Seção Completa */}
+        <Card className={acoesAprovacao?.length ? "border-l-4 border-l-yellow-500" : ""}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              Aprovações Categoria C
+              {acoesAprovacao?.length ? (
+                <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-300 ml-2">
+                  {acoesAprovacao.length} pendente{acoesAprovacao.length > 1 ? "s" : ""}
+                </Badge>
+              ) : null}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {acoesAprovacao?.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <CheckCircle2 className="h-12 w-12 text-green-500 mb-3" />
+                <p className="text-lg font-medium">Nenhuma ação pendente</p>
+                <p className="text-sm text-muted-foreground">
+                  Todas as ações Categoria C foram processadas
+                </p>
               </div>
-            </CardContent>
-          </Card>
+            ) : (
+              <div className="space-y-4">
+                {acoesAprovacao?.map((acao: any) => (
+                  <div key={acao.id_acao} className="p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-semibold">{acao.tipo_acao}</p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                          <span className="flex items-center gap-1">
+                            <Building2 className="h-3 w-3" />
+                            {acao.empresa?.nome || "N/A"}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {format(new Date(acao.data_criacao), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          </span>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-300">
+                        Pendente
+                      </Badge>
+                    </div>
+                    
+                    <div className="text-sm mb-2">
+                      <span className="text-muted-foreground">Solicitado por: </span>
+                      <span>{acao.usuario?.nome || "N/A"}</span>
+                    </div>
+                    
+                    <p className="text-sm mb-3 line-clamp-2">{acao.descricao}</p>
+                    
+                    {acao.impacto_esperado && (
+                      <p className="text-xs text-muted-foreground mb-3">
+                        <strong>Impacto:</strong> {acao.impacto_esperado}
+                      </p>
+                    )}
+                    
+                    <div className="flex gap-2 pt-3 border-t">
+                      <Button
+                        onClick={() => handleOpenDialog(acao, "aprovar")}
+                        size="sm"
+                        className="flex-1"
+                      >
+                        <CheckCircle2 className="mr-1 h-4 w-4" />
+                        Aprovar
+                      </Button>
+                      <Button
+                        onClick={() => handleOpenDialog(acao, "reprovar")}
+                        size="sm"
+                        variant="destructive"
+                        className="flex-1"
+                      >
+                        <XCircle className="mr-1 h-4 w-4" />
+                        Reprovar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           {/* Últimos Aprendizados */}
           <Card>
@@ -563,6 +691,54 @@ export default function DashboardDirecao() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog de Aprovação/Reprovação */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {actionType === "aprovar" ? "Aprovar Ação" : "Reprovar Ação"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {actionType === "aprovar"
+                ? "Você está aprovando a execução desta ação de tráfego."
+                : "Você está reprovando esta ação. Por favor, informe o motivo."}
+            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="comentario">
+                {actionType === "aprovar" ? "Comentário (opcional)" : "Motivo da Reprovação *"}
+              </Label>
+              <Textarea
+                id="comentario"
+                placeholder={
+                  actionType === "aprovar"
+                    ? "Adicione observações se necessário..."
+                    : "Explique o motivo da reprovação..."
+                }
+                value={comentario}
+                onChange={(e) => setComentario(e.target.value)}
+                rows={4}
+                required={actionType === "reprovar"}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmAction}
+              disabled={processingApproval || (actionType === "reprovar" && !comentario.trim())}
+              variant={actionType === "aprovar" ? "default" : "destructive"}
+            >
+              {processingApproval ? "Processando..." : actionType === "aprovar" ? "Confirmar Aprovação" : "Confirmar Reprovação"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
