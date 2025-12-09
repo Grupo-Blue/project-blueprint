@@ -59,12 +59,14 @@ serve(async (req) => {
     console.log(`[Sync Telefones] Integração encontrada - Domain: ${domain}`);
 
     // Buscar todos os leads da empresa que não têm telefone mas têm id_lead_externo (deal ID do Pipedrive)
+    // Ignorar leads Tokeniza que têm id_lead_externo no formato 'tokeniza_*'
     const { data: leads, error: leadsError } = await supabase
       .from('lead')
       .select('id_lead, id_lead_externo, nome_lead')
       .eq('id_empresa', id_empresa)
       .is('telefone', null)
-      .not('id_lead_externo', 'is', null);
+      .not('id_lead_externo', 'is', null)
+      .not('id_lead_externo', 'ilike', 'tokeniza_%');
 
     if (leadsError) {
       throw new Error(`Erro ao buscar leads: ${leadsError.message}`);
