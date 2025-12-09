@@ -481,7 +481,10 @@ serve(async (req) => {
       };
 
       // Double-check: verificar novamente se lead não foi criado por race condition
+      // Verificar por EMAIL e TELEFONE para evitar duplicatas
       let existingLead = null;
+      
+      // 1. Verificar por email
       if (contactEmail) {
         const { data } = await supabase
           .from('lead')
@@ -492,6 +495,26 @@ serve(async (req) => {
           .limit(1)
           .maybeSingle();
         existingLead = data;
+        if (existingLead) {
+          console.log(`[Chatwoot Webhook] Double-check: Lead encontrado por email: ${existingLead.id_lead}`);
+        }
+      }
+      
+      // 2. Verificar por telefone (se não encontrou por email)
+      if (!existingLead && contactPhone) {
+        const { data } = await supabase
+          .from('lead')
+          .select('*')
+          .eq('telefone', contactPhone)
+          .eq('id_empresa', idEmpresa)
+          .eq('merged', false)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        existingLead = data;
+        if (existingLead) {
+          console.log(`[Chatwoot Webhook] Double-check: Lead encontrado por telefone: ${existingLead.id_lead}`);
+        }
       }
       
       if (existingLead) {
