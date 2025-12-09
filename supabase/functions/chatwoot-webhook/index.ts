@@ -30,7 +30,8 @@ serve(async (req) => {
     const eventType = payload.event;
     const conversation = payload.conversation;
     const message = payload.message;
-    const contact = payload.sender || payload.contact || conversation?.meta?.sender;
+    // O cliente real está sempre em conversation.meta.sender, não em payload.sender (que pode ser agente)
+    const contact = conversation?.meta?.sender || payload.contact;
     const inbox = payload.inbox || conversation?.inbox;
     const account = payload.account;
 
