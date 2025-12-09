@@ -304,6 +304,7 @@ serve(async (req) => {
         nome_lead: contactName || 'WhatsApp Lead',
         email: contactEmail || null,
         telefone: contactPhone,
+        stage_atual: 'WhatsApp',
         origem_canal: 'WHATSAPP',
         origem_tipo: 'ORGANICO',
         origem_campanha: `Chatwoot - ${inboxName || 'WhatsApp'}`,
