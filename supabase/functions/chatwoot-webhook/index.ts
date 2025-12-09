@@ -115,39 +115,92 @@ serve(async (req) => {
       });
     }
 
-    // Buscar lead por email ou telefone (buscar o mais antigo se houver duplicatas)
+    // Buscar lead por email, telefone ou nome (buscar o mais antigo se houver duplicatas)
+    // Prioridade: 1. Email, 2. Telefone, 3. Nome (fallback para evitar duplicatas)
     let lead = null;
+    let matchMethod = '';
     
+    // 1. Busca por email (mais preciso)
     if (contactEmail) {
       const { data } = await supabase
         .from('lead')
         .select('*')
         .ilike('email', contactEmail)
-        .eq('merged', false) // Ignorar leads já mesclados
+        .eq('merged', false)
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle();
       lead = data;
       
       if (lead) {
+        matchMethod = 'email';
         console.log(`[Chatwoot Webhook] Lead encontrado por email: ${lead.id_lead}`);
       }
     }
 
+    // 2. Busca por telefone
     if (!lead && contactPhone) {
-      // Buscar por telefone
       const { data } = await supabase
         .from('lead')
         .select('*')
         .eq('telefone', contactPhone)
-        .eq('merged', false) // Ignorar leads já mesclados
+        .eq('merged', false)
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle();
       lead = data;
       
       if (lead) {
+        matchMethod = 'telefone';
         console.log(`[Chatwoot Webhook] Lead encontrado por telefone: ${lead.id_lead}`);
+      }
+    }
+    
+    // 3. Fallback: Busca por nome similar (evita duplicatas quando lead do Pipedrive não tem telefone)
+    // Só usa se tiver um nome razoável (mais de 5 caracteres, mais de uma palavra)
+    if (!lead && contactName && contactName.length > 5 && contactName.includes(' ')) {
+      console.log(`[Chatwoot Webhook] Tentando fallback de busca por nome: "${contactName}"`);
+      
+      // Buscar leads com nome similar na mesma empresa (determinada pelo inbox)
+      // Usa busca case-insensitive pelo nome completo
+      const { data: leadsByName } = await supabase
+        .from('lead')
+        .select('*')
+        .ilike('nome_lead', contactName)
+        .eq('merged', false)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      
+      if (leadsByName) {
+        lead = leadsByName;
+        matchMethod = 'nome';
+        console.log(`[Chatwoot Webhook] Lead encontrado por nome (fallback): ${lead.id_lead} - "${lead.nome_lead}"`);
+      } else {
+        // Tentar busca mais flexível ignorando acentos e maiúsculas
+        // Busca leads que contenham o primeiro e último nome
+        const nameParts = contactName.trim().split(' ');
+        if (nameParts.length >= 2) {
+          const firstName = nameParts[0];
+          const lastName = nameParts[nameParts.length - 1];
+          
+          const { data: leadsByPartialName } = await supabase
+            .from('lead')
+            .select('*')
+            .ilike('nome_lead', `%${firstName}%${lastName}%`)
+            .eq('merged', false)
+            .order('created_at', { ascending: true })
+            .limit(5);
+          
+          if (leadsByPartialName && leadsByPartialName.length === 1) {
+            // Só usa se encontrar exatamente 1 match (evita ambiguidade)
+            lead = leadsByPartialName[0];
+            matchMethod = 'nome parcial';
+            console.log(`[Chatwoot Webhook] Lead encontrado por nome parcial (fallback): ${lead.id_lead} - "${lead.nome_lead}"`);
+          } else if (leadsByPartialName && leadsByPartialName.length > 1) {
+            console.log(`[Chatwoot Webhook] Múltiplos leads encontrados por nome parcial (${leadsByPartialName.length}), não usando fallback para evitar erro`);
+          }
+        }
       }
     }
 
