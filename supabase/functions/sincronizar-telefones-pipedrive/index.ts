@@ -6,14 +6,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Normaliza telefone para formato E.164 brasileiro (+55...)
+// Normaliza telefone para formato E.164 brasileiro (+55DDNNNNNNNNN)
+// Trata todos os formatos: com/sem +55, com/sem espaços, com/sem 9º dígito
 function normalizePhone(phone: string | null): string | null {
   if (!phone) return null;
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length === 11) return `+55${digits}`;
-  if (digits.length === 13 && digits.startsWith('55')) return `+${digits}`;
-  if (digits.length === 12 && digits.startsWith('55')) return `+${digits}`;
-  return phone;
+  
+  // Remove tudo que não é dígito
+  let digits = phone.replace(/\D/g, '');
+  
+  // Remove prefixo 55 se existir para trabalhar só com DDD+número
+  if (digits.startsWith('55') && digits.length >= 12) {
+    digits = digits.substring(2);
+  }
+  
+  // Agora temos DDD + número (10 ou 11 dígitos)
+  if (digits.length === 10) {
+    // Formato sem 9º dígito: 6198626334 → adiciona o 9 após DDD
+    const ddd = digits.substring(0, 2);
+    const numero = digits.substring(2);
+    digits = `${ddd}9${numero}`;
+  }
+  
+  // Validação final: deve ter 11 dígitos (DDD + 9 + 8 dígitos)
+  if (digits.length === 11) {
+    return `+55${digits}`;
+  }
+  
+  // Se ainda não normalizou, log e retorna null para evitar dados incorretos
+  console.warn(`[normalizePhone] Telefone inválido: ${phone} → ${digits} (${digits.length} dígitos)`);
+  return null;
 }
 
 serve(async (req) => {
