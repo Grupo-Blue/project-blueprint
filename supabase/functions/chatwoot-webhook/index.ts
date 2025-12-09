@@ -145,8 +145,7 @@ serve(async (req) => {
     if (!lead) {
       console.log(`[Chatwoot Webhook] Lead não encontrado para ${contactEmail || contactPhone}, criando novo lead...`);
       
-      // Determinar empresa baseado no inbox/account ou usar empresa padrão
-      // Por enquanto, buscar a primeira empresa com integração Chatwoot ativa
+      // Buscar integração Chatwoot para determinar empresa pelo mapeamento inbox→empresa
       const { data: integracoes } = await supabase
         .from('integracao')
         .select('config_json')
@@ -157,9 +156,39 @@ serve(async (req) => {
       let mauticConfig: { url_base: string; login: string; senha: string } | null = null;
       
       if (integracoes && integracoes.length > 0) {
-        idEmpresa = integracoes[0].config_json?.id_empresa;
+        const chatwootConfig = integracoes[0].config_json as any;
         
-        // Buscar integração Mautic para a mesma empresa
+        // Determinar empresa pelo mapeamento inbox→empresa
+        if (chatwootConfig.empresas && Array.isArray(chatwootConfig.empresas) && inboxName) {
+          console.log(`[Chatwoot Webhook] Buscando empresa para inbox: "${inboxName}"`);
+          
+          for (const empresaMapping of chatwootConfig.empresas) {
+            if (empresaMapping.inboxes && Array.isArray(empresaMapping.inboxes)) {
+              const matchedInbox = empresaMapping.inboxes.find(
+                (inbox: string) => inbox.toLowerCase().trim() === inboxName.toLowerCase().trim()
+              );
+              
+              if (matchedInbox) {
+                idEmpresa = empresaMapping.id_empresa;
+                console.log(`[Chatwoot Webhook] Inbox "${inboxName}" mapeada para empresa: ${idEmpresa}`);
+                break;
+              }
+            }
+          }
+          
+          if (!idEmpresa) {
+            console.log(`[Chatwoot Webhook] Inbox "${inboxName}" não encontrada no mapeamento. Empresas configuradas:`, 
+              chatwootConfig.empresas.map((e: any) => `${e.id_empresa}: ${e.inboxes?.join(', ')}`));
+          }
+        }
+        
+        // Fallback para id_empresa legado se não houver mapeamento
+        if (!idEmpresa && chatwootConfig.id_empresa) {
+          idEmpresa = chatwootConfig.id_empresa;
+          console.log(`[Chatwoot Webhook] Usando id_empresa legado: ${idEmpresa}`);
+        }
+        
+        // Buscar integração Mautic para a empresa determinada
         if (idEmpresa) {
           const { data: mauticIntegracoes } = await supabase
             .from('integracao')
@@ -167,7 +196,7 @@ serve(async (req) => {
             .eq('tipo', 'MAUTIC')
             .eq('ativo', true);
           
-          const mauticIntegracao = mauticIntegracoes?.find(i => i.config_json?.id_empresa === idEmpresa);
+          const mauticIntegracao = mauticIntegracoes?.find(i => (i.config_json as any)?.id_empresa === idEmpresa);
           if (mauticIntegracao) {
             mauticConfig = mauticIntegracao.config_json as any;
           }

@@ -75,6 +75,7 @@ export default function Integracoes() {
   const [chatwootUrlBase, setChatwootUrlBase] = useState("");
   const [chatwootApiToken, setChatwootApiToken] = useState("");
   const [chatwootAccountId, setChatwootAccountId] = useState("");
+  const [chatwootEmpresasInboxes, setChatwootEmpresasInboxes] = useState<{id_empresa: string; inboxes: string}[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -127,6 +128,7 @@ export default function Integracoes() {
     setChatwootUrlBase("");
     setChatwootApiToken("");
     setChatwootAccountId("");
+    setChatwootEmpresasInboxes([]);
     setEditingId(null);
   };
 
@@ -169,6 +171,15 @@ export default function Integracoes() {
       setChatwootUrlBase(config.url_base || "");
       setChatwootApiToken(config.api_token || "");
       setChatwootAccountId(config.account_id || "");
+      // Carregar mapeamento de inboxes por empresa
+      if (config.empresas && Array.isArray(config.empresas)) {
+        setChatwootEmpresasInboxes(config.empresas.map((e: any) => ({
+          id_empresa: e.id_empresa,
+          inboxes: Array.isArray(e.inboxes) ? e.inboxes.join(', ') : ''
+        })));
+      } else {
+        setChatwootEmpresasInboxes([]);
+      }
     }
     
     setEmpresaSelecionada(config.id_empresa || "");
@@ -383,11 +394,19 @@ export default function Integracoes() {
         toast.error("Preencha todos os campos obrigatórios");
         return;
       }
+      // Transformar mapeamento de inboxes por empresa
+      const empresasConfig = chatwootEmpresasInboxes
+        .filter(e => e.id_empresa && e.inboxes.trim())
+        .map(e => ({
+          id_empresa: e.id_empresa,
+          inboxes: e.inboxes.split(',').map(i => i.trim()).filter(Boolean)
+        }));
+      
       configJson = {
-        ...configJson,
         url_base: chatwootUrlBase,
         api_token: chatwootApiToken || null,
-        account_id: chatwootAccountId
+        account_id: chatwootAccountId,
+        empresas: empresasConfig
       };
     }
 
@@ -790,6 +809,80 @@ export default function Integracoes() {
                       placeholder="Token de acesso à API"
                     />
                     <p className="text-xs text-muted-foreground">Necessário apenas para chamadas ativas à API do Chatwoot</p>
+                  </div>
+
+                  {/* Mapeamento de Inboxes por Empresa */}
+                  <div className="space-y-3 pt-4 border-t">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-base font-semibold">Mapeamento Inbox → Empresa</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setChatwootEmpresasInboxes([...chatwootEmpresasInboxes, { id_empresa: '', inboxes: '' }])}
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        Adicionar
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Configure quais inboxes do Chatwoot pertencem a cada empresa. Leads serão criados na empresa correspondente à inbox de origem.
+                    </p>
+                    
+                    {chatwootEmpresasInboxes.length === 0 ? (
+                      <p className="text-sm text-muted-foreground italic py-2">
+                        Nenhum mapeamento configurado. Clique em "Adicionar" para mapear inboxes.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {chatwootEmpresasInboxes.map((mapping, index) => (
+                          <div key={index} className="flex gap-2 items-start p-3 bg-muted/30 rounded-lg">
+                            <div className="flex-1 space-y-2">
+                              <Select
+                                value={mapping.id_empresa}
+                                onValueChange={(value) => {
+                                  const updated = [...chatwootEmpresasInboxes];
+                                  updated[index].id_empresa = value;
+                                  setChatwootEmpresasInboxes(updated);
+                                }}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Selecione a empresa" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {empresas.map((emp) => (
+                                    <SelectItem key={emp.id_empresa} value={emp.id_empresa}>{emp.nome}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                value={mapping.inboxes}
+                                onChange={(e) => {
+                                  const updated = [...chatwootEmpresasInboxes];
+                                  updated[index].inboxes = e.target.value;
+                                  setChatwootEmpresasInboxes(updated);
+                                }}
+                                placeholder="Ex: Blue Suporte, Blue Vendas, Blue WhatsApp"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Lista de nomes de inboxes separados por vírgula
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                setChatwootEmpresasInboxes(chatwootEmpresasInboxes.filter((_, i) => i !== index));
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
