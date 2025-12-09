@@ -71,6 +71,11 @@ export default function Integracoes() {
   const [metricoolUserId, setMetricoolUserId] = useState("");
   const [metricoolBlogId, setMetricoolBlogId] = useState("");
 
+  // Chatwoot credentials
+  const [chatwootUrlBase, setChatwootUrlBase] = useState("");
+  const [chatwootApiToken, setChatwootApiToken] = useState("");
+  const [chatwootAccountId, setChatwootAccountId] = useState("");
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -119,6 +124,9 @@ export default function Integracoes() {
     setMetricoolUserToken("");
     setMetricoolUserId("");
     setMetricoolBlogId("");
+    setChatwootUrlBase("");
+    setChatwootApiToken("");
+    setChatwootAccountId("");
     setEditingId(null);
   };
 
@@ -157,6 +165,10 @@ export default function Integracoes() {
       setMetricoolUserToken(config.user_token || "");
       setMetricoolUserId(config.user_id || "");
       setMetricoolBlogId(config.blog_id || "");
+    } else if (integracao.tipo === "CHATWOOT") {
+      setChatwootUrlBase(config.url_base || "");
+      setChatwootApiToken(config.api_token || "");
+      setChatwootAccountId(config.account_id || "");
     }
     
     setEmpresaSelecionada(config.id_empresa || "");
@@ -206,6 +218,10 @@ export default function Integracoes() {
         case 'METRICOOL':
           functionNames = ['sincronizar-metricool'];
           break;
+        case 'CHATWOOT':
+          // Chatwoot usa webhooks, não tem função de coleta
+          toast.info('Chatwoot usa webhooks para receber eventos. Configure o webhook no Chatwoot apontando para a URL do sistema.');
+          return;
         default:
           throw new Error('Tipo de integração não suportado');
       }
@@ -362,6 +378,17 @@ export default function Integracoes() {
         user_id: metricoolUserId,
         blog_id: metricoolBlogId
       };
+    } else if (tipoIntegracao === "CHATWOOT") {
+      if (!chatwootUrlBase || !chatwootAccountId) {
+        toast.error("Preencha todos os campos obrigatórios");
+        return;
+      }
+      configJson = {
+        ...configJson,
+        url_base: chatwootUrlBase,
+        api_token: chatwootApiToken || null,
+        account_id: chatwootAccountId
+      };
     }
 
     try {
@@ -440,6 +467,7 @@ export default function Integracoes() {
                     <SelectItem value="MAUTIC">Mautic</SelectItem>
                     <SelectItem value="NOTION">Notion</SelectItem>
                     <SelectItem value="METRICOOL">Metricool</SelectItem>
+                    <SelectItem value="CHATWOOT">Chatwoot</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -715,6 +743,53 @@ export default function Integracoes() {
                       onChange={(e) => setMetricoolBlogId(e.target.value)}
                       placeholder="ID do blog/marca no Metricool"
                     />
+                  </div>
+                </>
+              )}
+
+              {tipoIntegracao === "CHATWOOT" && (
+                <>
+                  <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                    <AlertCircle className="h-4 w-4 text-green-600" />
+                    <AlertTitle className="text-green-900 dark:text-green-100">Configuração Chatwoot</AlertTitle>
+                    <AlertDescription className="text-green-800 dark:text-green-200 text-sm space-y-2">
+                      <p><strong>Integração de atendimento WhatsApp/Chat</strong></p>
+                      <p>Configure o webhook no Chatwoot para receber eventos em tempo real.</p>
+                      <p className="mt-2"><strong>URL do Webhook:</strong></p>
+                      <code className="block bg-green-100 dark:bg-green-900 p-2 rounded text-xs break-all">
+                        {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatwoot-webhook`}
+                      </code>
+                      <p className="mt-2"><strong>Eventos recomendados:</strong> conversation_created, message_created, conversation_status_changed</p>
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-2">
+                    <Label>URL Base do Chatwoot *</Label>
+                    <Input
+                      value={chatwootUrlBase}
+                      onChange={(e) => setChatwootUrlBase(e.target.value)}
+                      placeholder="https://app.chatwoot.com"
+                    />
+                    <p className="text-xs text-muted-foreground">URL da sua instância Chatwoot</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account ID *</Label>
+                    <Input
+                      value={chatwootAccountId}
+                      onChange={(e) => setChatwootAccountId(e.target.value)}
+                      placeholder="Ex: 1"
+                    />
+                    <p className="text-xs text-muted-foreground">ID da conta Chatwoot (visível na URL do painel)</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>API Token (opcional)</Label>
+                    <Input
+                      type="password"
+                      value={chatwootApiToken}
+                      onChange={(e) => setChatwootApiToken(e.target.value)}
+                      placeholder="Token de acesso à API"
+                    />
+                    <p className="text-xs text-muted-foreground">Necessário apenas para chamadas ativas à API do Chatwoot</p>
                   </div>
                 </>
               )}
