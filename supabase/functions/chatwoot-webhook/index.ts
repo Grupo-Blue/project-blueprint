@@ -16,6 +16,59 @@ function normalizePhone(phone: string | null): string | null {
   return phone;
 }
 
+// Cria contato no Mautic
+async function createMauticContact(
+  config: { url_base: string; login: string; senha: string },
+  contactData: { name: string; phone: string; email?: string; inbox?: string }
+): Promise<{ success: boolean; contactId?: string; error?: string }> {
+  try {
+    const normalizedBaseUrl = config.url_base.endsWith('/') 
+      ? config.url_base.slice(0, -1) 
+      : config.url_base;
+    
+    const basicAuth = btoa(`${config.login}:${config.senha}`);
+    
+    // Preparar dados do contato
+    const mauticPayload = {
+      firstname: contactData.name?.split(' ')[0] || 'WhatsApp',
+      lastname: contactData.name?.split(' ').slice(1).join(' ') || 'Lead',
+      phone: contactData.phone,
+      email: contactData.email || null,
+      tags: ['whatsapp', 'chatwoot', contactData.inbox || 'inbox'].filter(Boolean),
+      // UTMs de origem
+      utm_source: 'whatsapp',
+      utm_medium: 'chat',
+      utm_campaign: `chatwoot-${contactData.inbox || 'inbox'}`,
+    };
+
+    console.log('[Mautic] Criando contato:', JSON.stringify(mauticPayload));
+
+    const response = await fetch(`${normalizedBaseUrl}/api/contacts/new`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(mauticPayload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Mautic] Erro ao criar contato: ${response.status} - ${errorText}`);
+      return { success: false, error: `Erro Mautic: ${response.status}` };
+    }
+
+    const result = await response.json();
+    const contactId = result.contact?.id?.toString();
+    
+    console.log(`[Mautic] Contato criado com sucesso - ID: ${contactId}`);
+    return { success: true, contactId };
+  } catch (error) {
+    console.error('[Mautic] Erro ao criar contato:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -51,8 +104,9 @@ serve(async (req) => {
     const contactEmail = contact?.email?.toLowerCase();
     const contactPhone = normalizePhone(contact?.phone_number);
     const contactName = contact?.name;
+    const inboxName = inbox?.name;
 
-    console.log(`[Chatwoot Webhook] Contato - ID: ${contactId}, Email: ${contactEmail}, Telefone: ${contactPhone}`);
+    console.log(`[Chatwoot Webhook] Contato - ID: ${contactId}, Email: ${contactEmail}, Telefone: ${contactPhone}, Nome: ${contactName}`);
 
     if (!contactEmail && !contactPhone) {
       console.log('[Chatwoot Webhook] Contato sem email ou telefone, ignorando');
@@ -74,36 +128,241 @@ serve(async (req) => {
     }
 
     if (!lead && contactPhone) {
-      // Tentar buscar por telefone (campo não existe ainda, mas pode ser adicionado)
-      console.log('[Chatwoot Webhook] Lead não encontrado por email, tentando telefone...');
+      // Buscar por telefone
+      const { data } = await supabase
+        .from('lead')
+        .select('*')
+        .eq('telefone', contactPhone)
+        .maybeSingle();
+      lead = data;
+      
+      if (lead) {
+        console.log(`[Chatwoot Webhook] Lead encontrado por telefone: ${lead.id_lead}`);
+      }
     }
 
+    // Se lead não existe, criar automaticamente
     if (!lead) {
-      console.log(`[Chatwoot Webhook] Lead não encontrado para ${contactEmail || contactPhone}`);
-      return new Response(JSON.stringify({ 
-        success: true, 
-        message: 'Lead não encontrado',
-        contact: { email: contactEmail, phone: contactPhone }
+      console.log(`[Chatwoot Webhook] Lead não encontrado para ${contactEmail || contactPhone}, criando novo lead...`);
+      
+      // Determinar empresa baseado no inbox/account ou usar empresa padrão
+      // Por enquanto, buscar a primeira empresa com integração Chatwoot ativa
+      const { data: integracoes } = await supabase
+        .from('integracao')
+        .select('config_json')
+        .eq('tipo', 'CHATWOOT')
+        .eq('ativo', true);
+      
+      let idEmpresa: string | null = null;
+      let mauticConfig: { url_base: string; login: string; senha: string } | null = null;
+      
+      if (integracoes && integracoes.length > 0) {
+        idEmpresa = integracoes[0].config_json?.id_empresa;
+        
+        // Buscar integração Mautic para a mesma empresa
+        if (idEmpresa) {
+          const { data: mauticIntegracoes } = await supabase
+            .from('integracao')
+            .select('config_json')
+            .eq('tipo', 'MAUTIC')
+            .eq('ativo', true);
+          
+          const mauticIntegracao = mauticIntegracoes?.find(i => i.config_json?.id_empresa === idEmpresa);
+          if (mauticIntegracao) {
+            mauticConfig = mauticIntegracao.config_json as any;
+          }
+        }
+      }
+      
+      if (!idEmpresa) {
+        // Fallback: buscar primeira empresa ativa
+        const { data: empresas } = await supabase
+          .from('empresa')
+          .select('id_empresa')
+          .limit(1);
+        
+        if (empresas && empresas.length > 0) {
+          idEmpresa = empresas[0].id_empresa;
+        }
+      }
+      
+      if (!idEmpresa) {
+        console.log('[Chatwoot Webhook] Nenhuma empresa encontrada para criar lead');
+        return new Response(JSON.stringify({ 
+          success: false, 
+          message: 'Nenhuma empresa configurada'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Criar contato no Mautic primeiro (se integração ativa)
+      let idMauticContact: string | null = null;
+      
+      if (mauticConfig && mauticConfig.url_base && mauticConfig.login && mauticConfig.senha) {
+        console.log('[Chatwoot Webhook] Integração Mautic encontrada, criando contato...');
+        
+        const mauticResult = await createMauticContact(mauticConfig, {
+          name: contactName || 'WhatsApp Lead',
+          phone: contactPhone || '',
+          email: contactEmail,
+          inbox: inboxName,
+        });
+        
+        if (mauticResult.success && mauticResult.contactId) {
+          idMauticContact = mauticResult.contactId;
+          console.log(`[Chatwoot Webhook] Contato Mautic criado: ${idMauticContact}`);
+        } else {
+          console.log(`[Chatwoot Webhook] Falha ao criar contato Mautic: ${mauticResult.error}`);
+        }
+      } else {
+        console.log('[Chatwoot Webhook] Sem integração Mautic ativa para esta empresa');
+      }
+      
+      // Criar lead no sistema
+      const newLeadData = {
+        id_empresa: idEmpresa,
+        nome_lead: contactName || 'WhatsApp Lead',
+        email: contactEmail || null,
+        telefone: contactPhone,
+        origem_canal: 'WHATSAPP',
+        origem_tipo: 'ORGANICO',
+        origem_campanha: `Chatwoot - ${inboxName || 'WhatsApp'}`,
+        utm_source: 'whatsapp',
+        utm_medium: 'chat',
+        utm_campaign: `chatwoot-${inboxName || 'inbox'}`,
+        // Dados Chatwoot
+        chatwoot_contact_id: contactId,
+        chatwoot_inbox: inboxName,
+        chatwoot_status_atendimento: conversation?.status || 'open',
+        chatwoot_conversas_total: eventType === 'conversation_created' ? 1 : 0,
+        chatwoot_mensagens_total: eventType === 'message_created' ? 1 : 0,
+        chatwoot_ultima_conversa: new Date().toISOString(),
+        // Mautic se disponível
+        id_mautic_contact: idMauticContact,
+      };
+
+      const { data: newLead, error: createError } = await supabase
+        .from('lead')
+        .insert(newLeadData)
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('[Chatwoot Webhook] Erro ao criar lead:', createError);
+        throw createError;
+      }
+
+      lead = newLead;
+      console.log(`[Chatwoot Webhook] Lead criado com sucesso: ${lead.id_lead}`);
+      
+      // Registrar evento de criação
+      await supabase.from('lead_evento').insert({
+        id_lead: lead.id_lead,
+        etapa: 'LEAD_CRIADO',
+        observacao: `Lead criado via WhatsApp (${inboxName || 'Chatwoot'})${idMauticContact ? ' - Contato Mautic criado' : ''}`,
+      });
+      
+      // Disparar webhook SDR para lead novo
+      try {
+        const { data: destinos } = await supabase
+          .from('webhook_destino')
+          .select('*')
+          .eq('ativo', true)
+          .or(`id_empresa.eq.${idEmpresa},id_empresa.is.null`);
+
+        if (destinos && destinos.length > 0) {
+          for (const destino of destinos) {
+            if (destino.eventos && !destino.eventos.includes('lead_criado')) {
+              continue;
+            }
+
+            const sdrPayload = {
+              lead_id: lead.id_lead,
+              evento: 'LEAD_NOVO',
+              empresa: idEmpresa,
+              timestamp: new Date().toISOString(),
+              dados_lead: {
+                nome: lead.nome_lead,
+                email: lead.email,
+                telefone: lead.telefone,
+                stage: 'novo',
+              },
+              dados_chatwoot: {
+                contact_id: contactId,
+                status: conversation?.status,
+                inbox: inboxName,
+              },
+              event_metadata: {
+                source: 'chatwoot',
+                original_event: eventType,
+                mautic_contact_created: !!idMauticContact,
+              },
+            };
+
+            try {
+              const response = await fetch(destino.url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...destino.headers,
+                },
+                body: JSON.stringify(sdrPayload),
+              });
+
+              await supabase.from('lead_webhook_log').insert({
+                id_lead: lead.id_lead,
+                id_webhook_destino: destino.id,
+                evento: 'LEAD_NOVO',
+                payload: sdrPayload,
+                status: response.ok ? 'sucesso' : 'erro',
+                status_code: response.status,
+                resposta: await response.text().catch(() => null),
+              });
+
+              console.log(`[Chatwoot Webhook] Webhook SDR enviado para ${destino.nome}: ${response.status}`);
+            } catch (webhookError) {
+              console.error(`[Chatwoot Webhook] Erro ao enviar webhook para ${destino.nome}:`, webhookError);
+            }
+          }
+        }
+      } catch (sdrError) {
+        console.error('[Chatwoot Webhook] Erro ao processar webhook SDR:', sdrError);
+      }
+
+      const duration = Date.now() - startTime;
+      return new Response(JSON.stringify({
+        success: true,
+        lead_id: lead.id_lead,
+        lead_created: true,
+        mautic_contact_created: !!idMauticContact,
+        event: eventType,
+        duration_ms: duration,
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     console.log(`[Chatwoot Webhook] Lead encontrado: ${lead.id_lead}`);
 
-    // Processar eventos
+    // Processar eventos para lead existente
     const updateData: Record<string, any> = {
       chatwoot_contact_id: contactId,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     };
+
+    // Atualizar telefone se não existir no lead
+    if (contactPhone && !lead.telefone) {
+      updateData.telefone = contactPhone;
+    }
 
     // Atualizar dados de conversa
     if (conversation) {
       updateData.chatwoot_status_atendimento = conversation.status; // open, resolved, pending
       updateData.chatwoot_ultima_conversa = new Date().toISOString();
       
-      if (inbox?.name) {
-        updateData.chatwoot_inbox = inbox.name;
+      if (inboxName) {
+        updateData.chatwoot_inbox = inboxName;
       }
 
       // Contar conversas (incrementar)
@@ -169,19 +428,20 @@ serve(async (req) => {
               dados_lead: {
                 nome: lead.nome_lead,
                 email: lead.email,
-                stage: lead.stage_atual
+                telefone: lead.telefone,
+                stage: lead.stage_atual,
               },
               dados_chatwoot: {
                 contact_id: contactId,
                 status: conversation?.status,
                 conversas_total: updateData.chatwoot_conversas_total || lead.chatwoot_conversas_total,
                 agente_atual: updateData.chatwoot_agente_atual || lead.chatwoot_agente_atual,
-                inbox: updateData.chatwoot_inbox || lead.chatwoot_inbox
+                inbox: updateData.chatwoot_inbox || lead.chatwoot_inbox,
               },
               event_metadata: {
                 source: 'chatwoot',
-                original_event: eventType
-              }
+                original_event: eventType,
+              },
             };
 
             try {
@@ -189,9 +449,9 @@ serve(async (req) => {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  ...destino.headers
+                  ...destino.headers,
                 },
-                body: JSON.stringify(sdrPayload)
+                body: JSON.stringify(sdrPayload),
               });
 
               // Logar resultado
@@ -202,7 +462,7 @@ serve(async (req) => {
                 payload: sdrPayload,
                 status: response.ok ? 'sucesso' : 'erro',
                 status_code: response.status,
-                resposta: await response.text().catch(() => null)
+                resposta: await response.text().catch(() => null),
               });
 
               console.log(`[Chatwoot Webhook] Webhook SDR enviado para ${destino.nome}: ${response.status}`);
@@ -222,20 +482,21 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       lead_id: lead.id_lead,
+      lead_created: false,
       event: eventType,
-      duration_ms: duration
+      duration_ms: duration,
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('[Chatwoot Webhook] Erro:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: error instanceof Error ? error.message : 'Erro desconhecido'
+      error: error instanceof Error ? error.message : 'Erro desconhecido',
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
