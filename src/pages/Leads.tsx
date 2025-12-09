@@ -684,10 +684,21 @@ const Leads = () => {
                             </span>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 flex-wrap">
                               <Badge className={cn("text-xs", statusPrincipal.color)}>
                                 {statusPrincipal.icon} {statusPrincipal.label}
                               </Badge>
+                              {/* Cliente/Ex-Cliente badges */}
+                              {lead.cliente_notion?.status_cliente === 'Cliente' && (
+                                <Badge variant="outline" className="text-xs bg-emerald-100 text-emerald-700 border-emerald-300">
+                                  ✅ Cliente
+                                </Badge>
+                              )}
+                              {lead.cliente_notion?.status_cliente === 'Ex-cliente' && (
+                                <Badge variant="outline" className="text-xs bg-slate-100 text-slate-600 border-slate-300">
+                                  👤 Ex-Cliente
+                                </Badge>
+                              )}
                               {lead.tokeniza_investidor && (
                                 <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300">
                                   💰

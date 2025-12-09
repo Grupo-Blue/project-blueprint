@@ -229,6 +229,62 @@ serve(async (req) => {
     if (!lead) {
       console.log(`[Chatwoot Webhook] Lead não encontrado para ${contactEmail || contactPhone}, criando novo lead...`);
       
+      // FASE 4: Verificar se contato já é cliente (cliente_notion)
+      let clienteNotion: any = null;
+      let idClienteNotion: string | null = null;
+      
+      // Buscar por email na tabela cliente_notion
+      if (contactEmail) {
+        const { data: clienteByEmail } = await supabase
+          .from('cliente_notion')
+          .select('*')
+          .or(`email.ilike.${contactEmail},email_secundario.ilike.${contactEmail}`)
+          .limit(1)
+          .maybeSingle();
+        
+        if (clienteByEmail) {
+          clienteNotion = clienteByEmail;
+          idClienteNotion = clienteByEmail.id_cliente;
+          console.log(`[Chatwoot Webhook] FASE 4: Cliente Notion encontrado por email: ${clienteByEmail.nome} (${clienteByEmail.status_cliente})`);
+        }
+      }
+      
+      // Buscar por telefone na tabela cliente_notion
+      if (!clienteNotion && contactPhone) {
+        const { data: clienteByPhone } = await supabase
+          .from('cliente_notion')
+          .select('*')
+          .eq('telefone', contactPhone)
+          .limit(1)
+          .maybeSingle();
+        
+        if (clienteByPhone) {
+          clienteNotion = clienteByPhone;
+          idClienteNotion = clienteByPhone.id_cliente;
+          console.log(`[Chatwoot Webhook] FASE 4: Cliente Notion encontrado por telefone: ${clienteByPhone.nome} (${clienteByPhone.status_cliente})`);
+        }
+      }
+      
+      // Buscar por nome na tabela cliente_notion (fallback)
+      if (!clienteNotion && contactName && contactName.length > 5 && contactName.includes(' ')) {
+        const { data: clienteByName } = await supabase
+          .from('cliente_notion')
+          .select('*')
+          .ilike('nome', contactName)
+          .limit(1)
+          .maybeSingle();
+        
+        if (clienteByName) {
+          clienteNotion = clienteByName;
+          idClienteNotion = clienteByName.id_cliente;
+          console.log(`[Chatwoot Webhook] FASE 4: Cliente Notion encontrado por nome: ${clienteByName.nome} (${clienteByName.status_cliente})`);
+        }
+      }
+      
+      if (clienteNotion) {
+        console.log(`[Chatwoot Webhook] FASE 4: Contato é ${clienteNotion.status_cliente} - será vinculado ao criar lead`);
+      }
+      
       // Buscar integração Chatwoot para determinar empresa pelo mapeamento inbox→empresa
       const { data: integracoes } = await supabase
         .from('integracao')
@@ -383,6 +439,7 @@ serve(async (req) => {
       }
       
       // Criar lead no sistema - usar dados Mautic como fallback se disponíveis
+      // FASE 4: Incluir vínculo com cliente_notion se encontrado
       const newLeadData = {
         id_empresa: idEmpresa,
         nome_lead: contactName || 'WhatsApp Lead',
@@ -418,6 +475,9 @@ serve(async (req) => {
         // Marcar como MQL se score alto ou muitos page hits
         is_mql: (mauticEnrichmentData?.mautic_score >= 50 || mauticEnrichmentData?.mautic_page_hits >= 10) || false,
         data_mql: (mauticEnrichmentData?.mautic_score >= 50 || mauticEnrichmentData?.mautic_page_hits >= 10) ? new Date().toISOString() : null,
+        // FASE 4: Vincular com cliente_notion se encontrado
+        id_cliente_notion: idClienteNotion,
+        cliente_status: clienteNotion?.status_cliente || null,
       };
 
       // Double-check: verificar novamente se lead não foi criado por race condition
