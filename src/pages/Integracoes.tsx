@@ -910,7 +910,7 @@ export default function Integracoes() {
       </div>
 
       <Tabs defaultValue="meta" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="meta">Meta Ads</TabsTrigger>
           <TabsTrigger value="google">Google Ads</TabsTrigger>
           <TabsTrigger value="pipedrive">Pipedrive</TabsTrigger>
@@ -918,6 +918,7 @@ export default function Integracoes() {
           <TabsTrigger value="mautic">Mautic</TabsTrigger>
           <TabsTrigger value="notion">Notion</TabsTrigger>
           <TabsTrigger value="metricool">Metricool</TabsTrigger>
+          <TabsTrigger value="chatwoot">Chatwoot</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meta" className="space-y-4">
@@ -1388,6 +1389,53 @@ export default function Integracoes() {
                           <TestTube2 className="w-4 h-4 mr-2" />
                           {testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar'}
                         </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })
+          )}
+        </TabsContent>
+
+        <TabsContent value="chatwoot" className="space-y-4">
+          {integracoes.filter(i => i.tipo === "CHATWOOT").length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Nenhuma integração Chatwoot configurada
+              </CardContent>
+            </Card>
+          ) : (
+            integracoes.filter(i => i.tipo === "CHATWOOT").map((integracao) => {
+              const config = integracao.config_json as any;
+              const empresasMapeadas = config.empresas?.map((emp: any) => {
+                const empresa = empresas.find(e => e.id_empresa === emp.id_empresa);
+                return empresa?.nome || emp.id_empresa;
+              }).join(", ") || "Nenhuma";
+              
+              return (
+                <Card key={integracao.id_integracao}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>Chatwoot</CardTitle>
+                        <CardDescription>
+                          URL: {config.url_base} | Account ID: {config.account_id}
+                        </CardDescription>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Empresas mapeadas: {empresasMapeadas}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                          {integracao.ativo ? 'Ativo' : 'Inativo'}
+                        </span>
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
                           <Edit className="w-4 h-4" />
                         </Button>
