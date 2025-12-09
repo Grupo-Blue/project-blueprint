@@ -77,6 +77,13 @@ export default function Integracoes() {
   const [chatwootAccountId, setChatwootAccountId] = useState("");
   const [chatwootEmpresasInboxes, setChatwootEmpresasInboxes] = useState<{id_empresa: string; inboxes: string}[]>([]);
 
+  // GA4 credentials
+  const [ga4PropertyId, setGa4PropertyId] = useState("");
+  const [ga4ClientId, setGa4ClientId] = useState("");
+  const [ga4ClientSecret, setGa4ClientSecret] = useState("");
+  const [ga4RefreshToken, setGa4RefreshToken] = useState("");
+  const [ga4SiteUrl, setGa4SiteUrl] = useState("");
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -129,6 +136,11 @@ export default function Integracoes() {
     setChatwootApiToken("");
     setChatwootAccountId("");
     setChatwootEmpresasInboxes([]);
+    setGa4PropertyId("");
+    setGa4ClientId("");
+    setGa4ClientSecret("");
+    setGa4RefreshToken("");
+    setGa4SiteUrl("");
     setEditingId(null);
   };
 
@@ -190,6 +202,12 @@ export default function Integracoes() {
       } else {
         setChatwootEmpresasInboxes([]);
       }
+    } else if (integracao.tipo === "GA4") {
+      setGa4PropertyId(config.property_id || "");
+      setGa4ClientId(config.client_id || "");
+      setGa4ClientSecret(config.client_secret || "");
+      setGa4RefreshToken(config.refresh_token || "");
+      setGa4SiteUrl(config.site_url || "");
     }
     
     setEmpresaSelecionada(config.id_empresa || "");
@@ -418,6 +436,19 @@ export default function Integracoes() {
         account_id: chatwootAccountId,
         empresas: empresasConfig
       };
+    } else if (tipoIntegracao === "GA4") {
+      if (!ga4PropertyId || !ga4ClientId || !ga4ClientSecret || !ga4RefreshToken) {
+        toast.error("Preencha todos os campos obrigatórios");
+        return;
+      }
+      configJson = {
+        ...configJson,
+        property_id: ga4PropertyId,
+        client_id: ga4ClientId,
+        client_secret: ga4ClientSecret,
+        refresh_token: ga4RefreshToken,
+        site_url: ga4SiteUrl || null
+      };
     }
 
     try {
@@ -497,6 +528,7 @@ export default function Integracoes() {
                     <SelectItem value="NOTION">Notion</SelectItem>
                     <SelectItem value="METRICOOL">Metricool</SelectItem>
                     <SelectItem value="CHATWOOT">Chatwoot</SelectItem>
+                    <SelectItem value="GA4">Google Analytics 4</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -893,6 +925,69 @@ export default function Integracoes() {
                         ))}
                       </div>
                     )}
+                  </div>
+                </>
+              )}
+
+              {tipoIntegracao === "GA4" && (
+                <>
+                  <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
+                    <AlertCircle className="h-4 w-4 text-orange-600" />
+                    <AlertTitle className="text-orange-900 dark:text-orange-100">Google Analytics 4</AlertTitle>
+                    <AlertDescription className="text-orange-800 dark:text-orange-200 text-sm space-y-2">
+                      <p><strong>Métricas de landing pages para análise de copy</strong></p>
+                      <ol className="list-decimal ml-4 space-y-1">
+                        <li>Acesse <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline">Google Cloud Console</a></li>
+                        <li>Ative a <strong>Google Analytics Data API</strong></li>
+                        <li>Crie um OAuth 2.0 Client ID</li>
+                        <li>Use o OAuth Playground para obter o Refresh Token</li>
+                        <li>O Property ID está em Admin → Property Settings</li>
+                      </ol>
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-2">
+                    <Label>Property ID *</Label>
+                    <Input
+                      value={ga4PropertyId}
+                      onChange={(e) => setGa4PropertyId(e.target.value)}
+                      placeholder="123456789"
+                    />
+                    <p className="text-xs text-muted-foreground">ID da propriedade GA4 (apenas números)</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Client ID *</Label>
+                    <Input
+                      value={ga4ClientId}
+                      onChange={(e) => setGa4ClientId(e.target.value)}
+                      placeholder="xxxxx.apps.googleusercontent.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Client Secret *</Label>
+                    <Input
+                      type="password"
+                      value={ga4ClientSecret}
+                      onChange={(e) => setGa4ClientSecret(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Refresh Token *</Label>
+                    <Input
+                      type="password"
+                      value={ga4RefreshToken}
+                      onChange={(e) => setGa4RefreshToken(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Obtenha via OAuth Playground com scope analytics.readonly</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Site URL (opcional)</Label>
+                    <Input
+                      value={ga4SiteUrl}
+                      onChange={(e) => setGa4SiteUrl(e.target.value)}
+                      placeholder="https://seusite.com.br"
+                    />
+                    <p className="text-xs text-muted-foreground">URL base do site para construir URLs completas</p>
                   </div>
                 </>
               )}
