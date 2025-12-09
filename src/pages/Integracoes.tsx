@@ -937,12 +937,21 @@ export default function Integracoes() {
                     <AlertDescription className="text-orange-800 dark:text-orange-200 text-sm space-y-2">
                       <p><strong>Métricas de landing pages para análise de copy</strong></p>
                       <ol className="list-decimal ml-4 space-y-1">
-                        <li>Acesse <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline">Google Cloud Console</a></li>
+                        <li>Acesse <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">Google Cloud Console</a></li>
                         <li>Ative a <strong>Google Analytics Data API</strong></li>
-                        <li>Crie um OAuth 2.0 Client ID</li>
-                        <li>Use o OAuth Playground para obter o Refresh Token</li>
-                        <li>O Property ID está em Admin → Property Settings</li>
+                        <li>Crie um OAuth 2.0 Client ID (Web Application)</li>
+                        <li>
+                          Acesse <a href="https://developers.google.com/oauthplayground" target="_blank" rel="noopener noreferrer" className="underline font-medium">OAuth 2.0 Playground</a>
+                        </li>
+                        <li>
+                          <strong className="text-orange-900 dark:text-orange-100">IMPORTANTE:</strong> Selecione o escopo <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">https://www.googleapis.com/auth/analytics.readonly</code>
+                        </li>
+                        <li>Autorize e troque o código pelo Refresh Token</li>
+                        <li>O Property ID está em <strong>Admin → Property Settings</strong></li>
                       </ol>
+                      <p className="mt-2 text-orange-900 dark:text-orange-100 font-medium">
+                        ⚠️ Sem o escopo analytics.readonly, a coleta retornará erro de permissão!
+                      </p>
                     </AlertDescription>
                   </Alert>
 
@@ -1627,13 +1636,34 @@ export default function Integracoes() {
                               if (error) throw error;
                               
                               if (data?.success) {
-                                toast.success(`Métricas GA4 coletadas! ${data.total_registros || 0} registros processados.`);
+                                // Verificar se realmente coletou dados
+                                const totalRegistros = data.resultados?.reduce((acc: number, r: any) => 
+                                  acc + (r.metricas_inseridas || 0), 0) || 0;
+                                
+                                if (totalRegistros > 0) {
+                                  toast.success(`Métricas GA4 coletadas! ${totalRegistros} registros processados.`);
+                                } else {
+                                  toast.warning('Conexão OK, mas nenhum dado novo encontrado. Verifique se há tráfego nas landing pages.');
+                                }
                               } else {
-                                toast.error(data?.error || 'Erro ao coletar métricas GA4');
+                                // Tratamento de erros específicos
+                                const errorMsg = data?.error || '';
+                                if (errorMsg.includes('SCOPE_INSUFFICIENT')) {
+                                  toast.error('Erro de permissão: O Refresh Token não possui o escopo analytics.readonly. Gere um novo token no OAuth Playground com o escopo correto.');
+                                } else if (errorMsg.includes('REFRESH_TOKEN_EXPIRED')) {
+                                  toast.error('Refresh Token expirado. Gere um novo token no OAuth Playground.');
+                                } else {
+                                  toast.error(errorMsg || 'Erro ao coletar métricas GA4');
+                                }
                               }
                             } catch (error: any) {
                               console.error('Erro ao testar GA4:', error);
-                              toast.error(error.message || 'Erro ao coletar métricas GA4');
+                              const errorMsg = error.message || '';
+                              if (errorMsg.includes('SCOPE_INSUFFICIENT') || errorMsg.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
+                                toast.error('Erro de permissão: Refresh Token sem escopo analytics.readonly. Acesse o OAuth Playground e gere um novo token com o escopo correto.');
+                              } else {
+                                toast.error(errorMsg || 'Erro ao coletar métricas GA4');
+                              }
                             } finally {
                               setTestingIntegracoes(prev => {
                                 const newSet = new Set(prev);

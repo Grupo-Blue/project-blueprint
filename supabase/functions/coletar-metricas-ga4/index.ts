@@ -18,12 +18,19 @@ async function getAccessToken(clientId: string, clientSecret: string, refreshTok
     })
   });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Erro ao obter access token: ${error}`);
-  }
-
   const data = await response.json();
+  
+  if (!response.ok) {
+    console.error('[GA4] Erro ao obter access token:', JSON.stringify(data));
+    
+    // Detectar erro de escopo insuficiente
+    if (data.error === 'invalid_grant' || data.error_description?.includes('expired')) {
+      throw new Error('REFRESH_TOKEN_EXPIRED: O Refresh Token expirou. Gere um novo token no OAuth Playground.');
+    }
+    
+    throw new Error(`Erro ao obter access token: ${data.error_description || data.error || 'Erro desconhecido'}`);
+  }
+  
   return data.access_token;
 }
 
@@ -128,8 +135,16 @@ serve(async (req) => {
         );
 
         if (!gaResponse.ok) {
-          const errorText = await gaResponse.text();
-          throw new Error(`GA4 API error: ${errorText}`);
+          const errorData = await gaResponse.json().catch(() => ({}));
+          console.error('[GA4] Erro na API:', JSON.stringify(errorData));
+          
+          // Detectar erro de escopo insuficiente
+          if (errorData.error?.status === 'PERMISSION_DENIED' || 
+              errorData.error?.message?.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
+            throw new Error('SCOPE_INSUFFICIENT: O Refresh Token não possui o escopo analytics.readonly. Gere um novo token com o escopo https://www.googleapis.com/auth/analytics.readonly no OAuth Playground.');
+          }
+          
+          throw new Error(`GA4 API error: ${errorData.error?.message || 'Erro desconhecido'}`);
         }
 
         const gaData = await gaResponse.json();
