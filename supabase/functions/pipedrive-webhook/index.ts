@@ -228,38 +228,63 @@ serve(async (req) => {
 
     console.log("UTM Parameters capturados:", { utmSource, utmMedium, utmCampaign, utmContent, utmTerm });
 
-    // Capturar email do contato (person)
+    // Capturar email e telefone do contato (person)
     let personEmail = null;
+    let personPhone = null;
     if (dealData.person_id) {
       try {
-        console.log(`[Email] Buscando email para person_id: ${dealData.person_id}`);
+        console.log(`[Person] Buscando dados para person_id: ${dealData.person_id}`);
         // Buscar dados da pessoa via API do Pipedrive
         const personUrl = `https://${domain}.pipedrive.com/api/v1/persons/${dealData.person_id}?api_token=${apiToken}`;
-        console.log(`[Email] URL da busca: ${personUrl.replace(apiToken, 'HIDDEN')}`);
+        console.log(`[Person] URL da busca: ${personUrl.replace(apiToken, 'HIDDEN')}`);
         
         const personResponse = await fetch(personUrl);
-        console.log(`[Email] Status da resposta: ${personResponse.status}`);
+        console.log(`[Person] Status da resposta: ${personResponse.status}`);
         
         if (personResponse.ok) {
           const personData = await personResponse.json();
-          console.log(`[Email] Dados da pessoa recebidos:`, JSON.stringify(personData, null, 2));
+          console.log(`[Person] Dados recebidos para ${dealData.person_name || 'pessoa'}`);
           
           if (personData.success && personData.data) {
+            // Extrair EMAIL
             const emails = personData.data.email;
-            console.log(`[Email] Campo email bruto:`, emails);
-            
             if (emails) {
               if (Array.isArray(emails) && emails.length > 0) {
                 personEmail = emails[0].value;
-                console.log(`✓ Email capturado do array: ${personEmail}`);
+                console.log(`✓ Email capturado: ${personEmail}`);
               } else if (typeof emails === 'string') {
                 personEmail = emails;
-                console.log(`✓ Email capturado como string: ${personEmail}`);
-              } else {
-                console.log(`⚠ Email em formato não reconhecido:`, typeof emails, emails);
+                console.log(`✓ Email capturado: ${personEmail}`);
               }
             } else {
-              console.log(`⚠ Pessoa ${dealData.person_id} não tem email cadastrado no Pipedrive`);
+              console.log(`⚠ Pessoa ${dealData.person_id} não tem email cadastrado`);
+            }
+            
+            // Extrair TELEFONE (NOVO)
+            const phones = personData.data.phone;
+            if (phones) {
+              if (Array.isArray(phones) && phones.length > 0) {
+                // Normalizar para formato E.164 brasileiro
+                const rawPhone = phones[0].value;
+                if (rawPhone) {
+                  const digits = rawPhone.replace(/\D/g, '');
+                  if (digits.length === 11) {
+                    personPhone = `+55${digits}`;
+                  } else if (digits.length === 13 && digits.startsWith('55')) {
+                    personPhone = `+${digits}`;
+                  } else if (digits.length === 12 && digits.startsWith('55')) {
+                    personPhone = `+${digits}`;
+                  } else {
+                    personPhone = rawPhone;
+                  }
+                  console.log(`✓ Telefone capturado: ${personPhone}`);
+                }
+              } else if (typeof phones === 'string') {
+                personPhone = phones;
+                console.log(`✓ Telefone capturado: ${personPhone}`);
+              }
+            } else {
+              console.log(`⚠ Pessoa ${dealData.person_id} não tem telefone cadastrado`);
             }
           } else {
             console.log(`⚠ Resposta da API não contém dados válidos`);
@@ -268,9 +293,9 @@ serve(async (req) => {
           const errorText = await personResponse.text();
           console.error(`✗ Erro na API do Pipedrive: ${personResponse.status} - ${errorText}`);
         }
-      } catch (emailError) {
-        console.error("✗ Erro ao buscar email da pessoa:", emailError);
-        console.error("Stack trace:", emailError instanceof Error ? emailError.stack : emailError);
+      } catch (personError) {
+        console.error("✗ Erro ao buscar dados da pessoa:", personError);
+        console.error("Stack trace:", personError instanceof Error ? personError.stack : personError);
       }
     } else {
       console.log(`⚠ Deal não tem person_id associado`);
@@ -412,8 +437,9 @@ serve(async (req) => {
       venda_realizada: vendaRealizada,
       data_venda: vendaRealizada ? (dealData.won_time || dealData.update_time) : null,
       valor_venda: valorDeal,
-      // Email capturado
+      // Email e telefone capturados
       email: personEmail,
+      telefone: personPhone,
       // Novos campos para rastreamento
       id_criativo: idCriativo,
       utm_source: utmSource,
