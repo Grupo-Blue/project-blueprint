@@ -225,30 +225,80 @@ serve(async (req) => {
         });
       }
       
-      // Criar contato no Mautic primeiro (se integração ativa)
+      // Verificar/criar contato no Mautic (se integração ativa)
       let idMauticContact: string | null = null;
+      let mauticEnrichmentData: any = null;
       
       if (mauticConfig && mauticConfig.url_base && mauticConfig.login && mauticConfig.senha) {
-        console.log('[Chatwoot Webhook] Integração Mautic encontrada, criando contato...');
-        
-        const mauticResult = await createMauticContact(mauticConfig, {
-          name: contactName || 'WhatsApp Lead',
-          phone: contactPhone || '',
-          email: contactEmail,
-          inbox: inboxName,
-        });
-        
-        if (mauticResult.success && mauticResult.contactId) {
-          idMauticContact = mauticResult.contactId;
-          console.log(`[Chatwoot Webhook] Contato Mautic criado: ${idMauticContact}`);
+        // Primeiro verificar se contato já existe no Mautic (se tem email)
+        if (contactEmail) {
+          console.log('[Chatwoot Webhook] Verificando se contato já existe no Mautic...');
+          
+          try {
+            const { data: enrichResult, error: enrichError } = await supabase.functions.invoke('enriquecer-lead-mautic', {
+              body: { email: contactEmail, id_empresa: idEmpresa }
+            });
+            
+            if (!enrichError && enrichResult?.success && enrichResult?.data?.id_mautic_contact) {
+              // Contato já existe - usar dados existentes
+              idMauticContact = enrichResult.data.id_mautic_contact;
+              mauticEnrichmentData = enrichResult.data;
+              console.log(`[Chatwoot Webhook] Contato Mautic existente encontrado: ${idMauticContact}`);
+            } else {
+              console.log('[Chatwoot Webhook] Contato não existe no Mautic, criando novo...');
+              
+              const mauticResult = await createMauticContact(mauticConfig, {
+                name: contactName || 'WhatsApp Lead',
+                phone: contactPhone || '',
+                email: contactEmail,
+                inbox: inboxName,
+              });
+              
+              if (mauticResult.success && mauticResult.contactId) {
+                idMauticContact = mauticResult.contactId;
+                console.log(`[Chatwoot Webhook] Contato Mautic criado: ${idMauticContact}`);
+              } else {
+                console.log(`[Chatwoot Webhook] Falha ao criar contato Mautic: ${mauticResult.error}`);
+              }
+            }
+          } catch (enrichError) {
+            console.log('[Chatwoot Webhook] Erro ao verificar Mautic, tentando criar contato:', enrichError);
+            
+            const mauticResult = await createMauticContact(mauticConfig, {
+              name: contactName || 'WhatsApp Lead',
+              phone: contactPhone || '',
+              email: contactEmail,
+              inbox: inboxName,
+            });
+            
+            if (mauticResult.success && mauticResult.contactId) {
+              idMauticContact = mauticResult.contactId;
+              console.log(`[Chatwoot Webhook] Contato Mautic criado após erro: ${idMauticContact}`);
+            }
+          }
         } else {
-          console.log(`[Chatwoot Webhook] Falha ao criar contato Mautic: ${mauticResult.error}`);
+          // Sem email, criar contato diretamente com telefone
+          console.log('[Chatwoot Webhook] Lead sem email, criando contato Mautic diretamente...');
+          
+          const mauticResult = await createMauticContact(mauticConfig, {
+            name: contactName || 'WhatsApp Lead',
+            phone: contactPhone || '',
+            email: contactEmail,
+            inbox: inboxName,
+          });
+          
+          if (mauticResult.success && mauticResult.contactId) {
+            idMauticContact = mauticResult.contactId;
+            console.log(`[Chatwoot Webhook] Contato Mautic criado: ${idMauticContact}`);
+          } else {
+            console.log(`[Chatwoot Webhook] Falha ao criar contato Mautic: ${mauticResult.error}`);
+          }
         }
       } else {
         console.log('[Chatwoot Webhook] Sem integração Mautic ativa para esta empresa');
       }
       
-      // Criar lead no sistema
+      // Criar lead no sistema - usar dados Mautic como fallback se disponíveis
       const newLeadData = {
         id_empresa: idEmpresa,
         nome_lead: contactName || 'WhatsApp Lead',
@@ -257,9 +307,12 @@ serve(async (req) => {
         origem_canal: 'WHATSAPP',
         origem_tipo: 'ORGANICO',
         origem_campanha: `Chatwoot - ${inboxName || 'WhatsApp'}`,
-        utm_source: 'whatsapp',
-        utm_medium: 'chat',
-        utm_campaign: `chatwoot-${inboxName || 'inbox'}`,
+        // UTMs: priorizar dados do Mautic (first-touch) se disponíveis
+        utm_source: mauticEnrichmentData?.utm_source_mautic || 'whatsapp',
+        utm_medium: mauticEnrichmentData?.utm_medium_mautic || 'chat',
+        utm_campaign: mauticEnrichmentData?.utm_campaign_mautic || `chatwoot-${inboxName || 'inbox'}`,
+        utm_content: mauticEnrichmentData?.utm_content_mautic || null,
+        utm_term: mauticEnrichmentData?.utm_term_mautic || null,
         // Dados Chatwoot
         chatwoot_contact_id: contactId,
         chatwoot_inbox: inboxName,
@@ -267,8 +320,19 @@ serve(async (req) => {
         chatwoot_conversas_total: eventType === 'conversation_created' ? 1 : 0,
         chatwoot_mensagens_total: eventType === 'message_created' ? 1 : 0,
         chatwoot_ultima_conversa: new Date().toISOString(),
-        // Mautic se disponível
+        // Mautic - usar dados existentes se disponíveis
         id_mautic_contact: idMauticContact,
+        mautic_score: mauticEnrichmentData?.mautic_score || null,
+        mautic_page_hits: mauticEnrichmentData?.mautic_page_hits || null,
+        mautic_last_active: mauticEnrichmentData?.mautic_last_active || null,
+        mautic_first_visit: mauticEnrichmentData?.mautic_first_visit || null,
+        mautic_tags: mauticEnrichmentData?.mautic_tags || null,
+        mautic_segments: mauticEnrichmentData?.mautic_segments || null,
+        cidade_mautic: mauticEnrichmentData?.cidade_mautic || null,
+        estado_mautic: mauticEnrichmentData?.estado_mautic || null,
+        // Marcar como MQL se score alto ou muitos page hits
+        is_mql: (mauticEnrichmentData?.mautic_score >= 50 || mauticEnrichmentData?.mautic_page_hits >= 10) || false,
+        data_mql: (mauticEnrichmentData?.mautic_score >= 50 || mauticEnrichmentData?.mautic_page_hits >= 10) ? new Date().toISOString() : null,
       };
 
       const { data: newLead, error: createError } = await supabase
@@ -286,10 +350,16 @@ serve(async (req) => {
       console.log(`[Chatwoot Webhook] Lead criado com sucesso: ${lead.id_lead}`);
       
       // Registrar evento de criação
+      const mauticStatus = mauticEnrichmentData 
+        ? ` - Contato Mautic existente enriquecido (score: ${mauticEnrichmentData.mautic_score || 0})`
+        : idMauticContact 
+          ? ' - Contato Mautic criado' 
+          : '';
+      
       await supabase.from('lead_evento').insert({
         id_lead: lead.id_lead,
         etapa: 'LEAD_CRIADO',
-        observacao: `Lead criado via WhatsApp (${inboxName || 'Chatwoot'})${idMauticContact ? ' - Contato Mautic criado' : ''}`,
+        observacao: `Lead criado via WhatsApp (${inboxName || 'Chatwoot'})${mauticStatus}`,
       });
       
       // Disparar webhook SDR para lead novo
