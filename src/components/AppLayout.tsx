@@ -262,6 +262,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           Performance Criativos
         </Button>
       </Link>
+      <Link to="/analise-landing-pages" onClick={() => setMobileMenuOpen(false)}>
+        <Button 
+          variant={location.pathname === "/analise-landing-pages" ? "secondary" : "ghost"} 
+          size="sm"
+          className="w-full justify-start hover:bg-accent transition-all"
+        >
+          <TrendingUp className="mr-2 h-4 w-4" />
+          Análise LPs
+        </Button>
+      </Link>
       <Link to="/guia-utm" onClick={() => setMobileMenuOpen(false)}>
         <Button 
           variant={location.pathname === "/guia-utm" ? "secondary" : "ghost"} 
