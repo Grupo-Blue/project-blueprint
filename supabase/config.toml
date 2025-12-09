@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.disparar-webhook-leads]
 verify_jwt = false
+
+[functions.chatwoot-webhook]
+verify_jwt = false
