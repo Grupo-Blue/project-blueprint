@@ -78,6 +78,7 @@ export default function Integracoes() {
   const [chatwootEmpresasInboxes, setChatwootEmpresasInboxes] = useState<{id_empresa: string; inboxes: string}[]>([]);
 
   // GA4 credentials
+  const [ga4Nome, setGa4Nome] = useState("");
   const [ga4PropertyId, setGa4PropertyId] = useState("");
   const [ga4ClientId, setGa4ClientId] = useState("");
   const [ga4ClientSecret, setGa4ClientSecret] = useState("");
@@ -136,6 +137,7 @@ export default function Integracoes() {
     setChatwootApiToken("");
     setChatwootAccountId("");
     setChatwootEmpresasInboxes([]);
+    setGa4Nome("");
     setGa4PropertyId("");
     setGa4ClientId("");
     setGa4ClientSecret("");
@@ -203,6 +205,7 @@ export default function Integracoes() {
         setChatwootEmpresasInboxes([]);
       }
     } else if (integracao.tipo === "GA4") {
+      setGa4Nome(config.nome || "");
       setGa4PropertyId(config.property_id || "");
       setGa4ClientId(config.client_id || "");
       setGa4ClientSecret(config.client_secret || "");
@@ -437,12 +440,13 @@ export default function Integracoes() {
         empresas: empresasConfig
       };
     } else if (tipoIntegracao === "GA4") {
-      if (!ga4PropertyId || !ga4ClientId || !ga4ClientSecret || !ga4RefreshToken) {
-        toast.error("Preencha todos os campos obrigatórios");
+      if (!ga4Nome || !ga4PropertyId || !ga4ClientId || !ga4ClientSecret || !ga4RefreshToken) {
+        toast.error("Preencha todos os campos obrigatórios (nome, property ID, credenciais)");
         return;
       }
       configJson = {
         ...configJson,
+        nome: ga4Nome,
         property_id: ga4PropertyId,
         client_id: ga4ClientId,
         client_secret: ga4ClientSecret,
@@ -933,10 +937,11 @@ export default function Integracoes() {
                 <>
                   <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
                     <AlertCircle className="h-4 w-4 text-orange-600" />
-                    <AlertTitle className="text-orange-900 dark:text-orange-100">Google Analytics 4</AlertTitle>
+                    <AlertTitle className="text-orange-900 dark:text-orange-100">Google Analytics 4 (Múltiplas Propriedades)</AlertTitle>
                     <AlertDescription className="text-orange-800 dark:text-orange-200 text-sm space-y-2">
-                      <p><strong>Métricas de landing pages para análise de copy</strong></p>
-                      <ol className="list-decimal ml-4 space-y-1">
+                      <p><strong>Você pode adicionar várias propriedades GA4 para a mesma empresa!</strong></p>
+                      <p>Use nomes descritivos como "GA4 Site Principal", "GA4 Landing Pages", "GA4 Blog".</p>
+                      <ol className="list-decimal ml-4 space-y-1 mt-2">
                         <li>Acesse <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">Google Cloud Console</a></li>
                         <li>Ative a <strong>Google Analytics Data API</strong></li>
                         <li>Crie um OAuth 2.0 Client ID (Web Application)</li>
@@ -955,6 +960,15 @@ export default function Integracoes() {
                     </AlertDescription>
                   </Alert>
 
+                  <div className="space-y-2">
+                    <Label>Nome da Integração *</Label>
+                    <Input
+                      value={ga4Nome}
+                      onChange={(e) => setGa4Nome(e.target.value)}
+                      placeholder="Ex: GA4 Site Principal, GA4 Landing Pages, GA4 Blog"
+                    />
+                    <p className="text-xs text-muted-foreground">Nome para identificar esta integração (você pode ter múltiplas GA4 por empresa)</p>
+                  </div>
                   <div className="space-y-2">
                     <Label>Property ID *</Label>
                     <Input
@@ -1606,13 +1620,17 @@ export default function Integracoes() {
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                          {config.nome || `GA4 ${config.property_id}`}
+                          <span className="text-xs font-normal text-muted-foreground">
+                            ({empresa?.nome || "Empresa não encontrada"})
+                          </span>
+                        </CardTitle>
                         <CardDescription>
                           Property ID: {config.property_id}
                           {config.site_url && (
                             <>
-                              <br />
-                              Site: {config.site_url}
+                              {" "}• Site: {config.site_url}
                             </>
                           )}
                         </CardDescription>
