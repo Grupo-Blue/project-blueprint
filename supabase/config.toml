@@ -80,3 +80,12 @@ verify_jwt = false
 
 [functions.chatwoot-webhook]
 verify_jwt = false
+
+[functions.coletar-metricas-ga4]
+verify_jwt = false
+
+[functions.extrair-conteudo-lp]
+verify_jwt = false
+
+[functions.analisar-performance-lp]
+verify_jwt = true

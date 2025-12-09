@@ -1165,6 +1165,159 @@ export type Database = {
         }
         Relationships: []
       }
+      landingpage_analise: {
+        Row: {
+          analise_texto: string | null
+          created_at: string
+          data_analise: string
+          id: string
+          id_empresa: string
+          insights: Json
+          padroes_identificados: Json
+          recomendacoes: Json
+          top_performers: Json
+        }
+        Insert: {
+          analise_texto?: string | null
+          created_at?: string
+          data_analise?: string
+          id?: string
+          id_empresa: string
+          insights?: Json
+          padroes_identificados?: Json
+          recomendacoes?: Json
+          top_performers?: Json
+        }
+        Update: {
+          analise_texto?: string | null
+          created_at?: string
+          data_analise?: string
+          id?: string
+          id_empresa?: string
+          insights?: Json
+          padroes_identificados?: Json
+          recomendacoes?: Json
+          top_performers?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "landingpage_analise_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      landingpage_conteudo: {
+        Row: {
+          created_at: string
+          ctas: string[] | null
+          id: string
+          id_empresa: string
+          meta_description: string | null
+          palavras_chave: string[] | null
+          primeiro_paragrafo: string | null
+          subtitulos_h2: string[] | null
+          titulo_h1: string | null
+          ultima_extracao: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          ctas?: string[] | null
+          id?: string
+          id_empresa: string
+          meta_description?: string | null
+          palavras_chave?: string[] | null
+          primeiro_paragrafo?: string | null
+          subtitulos_h2?: string[] | null
+          titulo_h1?: string | null
+          ultima_extracao?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          ctas?: string[] | null
+          id?: string
+          id_empresa?: string
+          meta_description?: string | null
+          palavras_chave?: string[] | null
+          primeiro_paragrafo?: string | null
+          subtitulos_h2?: string[] | null
+          titulo_h1?: string | null
+          ultima_extracao?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "landingpage_conteudo_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      landingpage_metricas: {
+        Row: {
+          bounce_rate: number | null
+          conversoes: number
+          created_at: string
+          data: string
+          id: string
+          id_empresa: string
+          pageviews: number
+          sessoes: number
+          taxa_conversao: number | null
+          tempo_medio_segundos: number | null
+          updated_at: string
+          url: string
+          usuarios: number
+        }
+        Insert: {
+          bounce_rate?: number | null
+          conversoes?: number
+          created_at?: string
+          data: string
+          id?: string
+          id_empresa: string
+          pageviews?: number
+          sessoes?: number
+          taxa_conversao?: number | null
+          tempo_medio_segundos?: number | null
+          updated_at?: string
+          url: string
+          usuarios?: number
+        }
+        Update: {
+          bounce_rate?: number | null
+          conversoes?: number
+          created_at?: string
+          data?: string
+          id?: string
+          id_empresa?: string
+          pageviews?: number
+          sessoes?: number
+          taxa_conversao?: number | null
+          tempo_medio_segundos?: number | null
+          updated_at?: string
+          url?: string
+          usuarios?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "landingpage_metricas_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       lead: {
         Row: {
           chatwoot_agente_atual: string | null
