@@ -1024,6 +1024,7 @@ export default function Integracoes() {
           <TabsTrigger value="notion">Notion</TabsTrigger>
           <TabsTrigger value="metricool">Metricool</TabsTrigger>
           <TabsTrigger value="chatwoot">Chatwoot</TabsTrigger>
+          <TabsTrigger value="ga4">GA4</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meta" className="space-y-4">
@@ -1564,6 +1565,88 @@ export default function Integracoes() {
                         <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+              );
+            })
+          )}
+        </TabsContent>
+
+        <TabsContent value="ga4" className="space-y-4">
+          {integracoes.filter(i => i.tipo === "GA4").length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                Nenhuma integração GA4 configurada
+              </CardContent>
+            </Card>
+          ) : (
+            integracoes.filter(i => i.tipo === "GA4").map((integracao) => {
+              const config = integracao.config_json as any;
+              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              
+              return (
+                <Card key={integracao.id_integracao}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription>
+                          Property ID: {config.property_id}
+                          {config.site_url && (
+                            <>
+                              <br />
+                              Site: {config.site_url}
+                            </>
+                          )}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
+                          {integracao.ativo ? 'Ativo' : 'Inativo'}
+                        </span>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={async () => {
+                            const integracaoId = integracao.id_integracao;
+                            setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
+                            
+                            try {
+                              const { data, error } = await supabase.functions.invoke('coletar-metricas-ga4', {
+                                body: { id_empresa: config.id_empresa }
+                              });
+                              
+                              if (error) throw error;
+                              
+                              if (data?.success) {
+                                toast.success(`Métricas GA4 coletadas! ${data.total_registros || 0} registros processados.`);
+                              } else {
+                                toast.error(data?.error || 'Erro ao coletar métricas GA4');
+                              }
+                            } catch (error: any) {
+                              console.error('Erro ao testar GA4:', error);
+                              toast.error(error.message || 'Erro ao coletar métricas GA4');
+                            } finally {
+                              setTestingIntegracoes(prev => {
+                                const newSet = new Set(prev);
+                                newSet.delete(integracaoId);
+                                return newSet;
+                              });
+                            }
+                          }}
+                          disabled={testingIntegracoes.has(integracao.id_integracao)}
+                        >
+                          <TestTube2 className="w-4 h-4 mr-2" />
+                          {testingIntegracoes.has(integracao.id_integracao) ? 'Coletando...' : 'Coletar Métricas'}
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
                           <Edit className="w-4 h-4" />
                         </Button>
