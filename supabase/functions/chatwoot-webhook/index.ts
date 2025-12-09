@@ -115,7 +115,7 @@ serve(async (req) => {
       });
     }
 
-    // Buscar lead por email ou telefone
+    // Buscar lead por email ou telefone (buscar o mais antigo se houver duplicatas)
     let lead = null;
     
     if (contactEmail) {
@@ -123,8 +123,15 @@ serve(async (req) => {
         .from('lead')
         .select('*')
         .ilike('email', contactEmail)
+        .eq('merged', false) // Ignorar leads já mesclados
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
       lead = data;
+      
+      if (lead) {
+        console.log(`[Chatwoot Webhook] Lead encontrado por email: ${lead.id_lead}`);
+      }
     }
 
     if (!lead && contactPhone) {
@@ -133,6 +140,9 @@ serve(async (req) => {
         .from('lead')
         .select('*')
         .eq('telefone', contactPhone)
+        .eq('merged', false) // Ignorar leads já mesclados
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
       lead = data;
       
@@ -336,19 +346,75 @@ serve(async (req) => {
         data_mql: (mauticEnrichmentData?.mautic_score >= 50 || mauticEnrichmentData?.mautic_page_hits >= 10) ? new Date().toISOString() : null,
       };
 
-      const { data: newLead, error: createError } = await supabase
-        .from('lead')
-        .insert(newLeadData)
-        .select()
-        .single();
-
-      if (createError) {
-        console.error('[Chatwoot Webhook] Erro ao criar lead:', createError);
-        throw createError;
+      // Double-check: verificar novamente se lead não foi criado por race condition
+      let existingLead = null;
+      if (contactEmail) {
+        const { data } = await supabase
+          .from('lead')
+          .select('*')
+          .ilike('email', contactEmail)
+          .eq('merged', false)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        existingLead = data;
       }
+      
+      if (existingLead) {
+        // Lead foi criado por outro request durante o processamento, usar esse
+        lead = existingLead;
+        console.log(`[Chatwoot Webhook] Lead encontrado em double-check (race condition prevenida): ${lead.id_lead}`);
+        
+        // Atualizar com dados Chatwoot
+        await supabase
+          .from('lead')
+          .update({
+            chatwoot_contact_id: contactId,
+            chatwoot_inbox: inboxName,
+            chatwoot_status_atendimento: conversation?.status || 'open',
+            chatwoot_conversas_total: (existingLead.chatwoot_conversas_total || 0) + 1,
+            chatwoot_ultima_conversa: new Date().toISOString(),
+            telefone: contactPhone || existingLead.telefone,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id_lead', lead.id_lead);
+      } else {
+        // Criar novo lead
+        const { data: newLead, error: createError } = await supabase
+          .from('lead')
+          .insert(newLeadData)
+          .select()
+          .single();
 
-      lead = newLead;
-      console.log(`[Chatwoot Webhook] Lead criado com sucesso: ${lead.id_lead}`);
+        if (createError) {
+          // Se erro de duplicata, buscar lead existente
+          if (createError.code === '23505' || createError.message?.includes('duplicate')) {
+            console.log('[Chatwoot Webhook] Erro de duplicata detectado, buscando lead existente...');
+            
+            const { data: duplicateLead } = await supabase
+              .from('lead')
+              .select('*')
+              .ilike('email', contactEmail || '')
+              .eq('merged', false)
+              .order('created_at', { ascending: true })
+              .limit(1)
+              .maybeSingle();
+            
+            if (duplicateLead) {
+              lead = duplicateLead;
+              console.log(`[Chatwoot Webhook] Lead encontrado após erro de duplicata: ${lead.id_lead}`);
+            } else {
+              throw createError;
+            }
+          } else {
+            console.error('[Chatwoot Webhook] Erro ao criar lead:', createError);
+            throw createError;
+          }
+        } else {
+          lead = newLead;
+          console.log(`[Chatwoot Webhook] Lead criado com sucesso: ${lead.id_lead}`);
+        }
+      }
       
       // Registrar evento de criação
       const mauticStatus = mauticEnrichmentData 
