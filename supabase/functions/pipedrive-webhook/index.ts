@@ -334,13 +334,40 @@ serve(async (req) => {
     
     console.log(`[Origem] Tipo: ${origemTipo}, Lead Pago: ${leadPago} (utm_source: ${utmSource}, id_criativo: ${idCriativo})`);
 
-    // Buscar lead existente para verificar mudanças de stage
-    const { data: existingLead } = await supabase
+    // Buscar lead existente - PRIORIDADE: 
+    // 1. Por id_lead_externo (deal ID do Pipedrive) 
+    // 2. Por email (mesmo contato, deal diferente)
+    let existingLead = null;
+    
+    // Primeiro: buscar por deal ID exato
+    const { data: leadByDealId } = await supabase
       .from("lead")
-      .select("id_lead, is_mql, levantou_mao, tem_reuniao, reuniao_realizada, venda_realizada, data_mql, data_levantou_mao, data_reuniao")
+      .select("id_lead, id_lead_externo, is_mql, levantou_mao, tem_reuniao, reuniao_realizada, venda_realizada, data_mql, data_levantou_mao, data_reuniao")
       .eq("id_lead_externo", String(dealData.id))
       .eq("id_empresa", idEmpresa)
+      .eq("merged", false)
       .maybeSingle();
+    
+    if (leadByDealId) {
+      existingLead = leadByDealId;
+      console.log(`[Lookup] Lead encontrado por deal ID: ${existingLead.id_lead}`);
+    } else if (personEmail) {
+      // Segundo: buscar por email (evita duplicatas para mesmo contato com deals diferentes)
+      const { data: leadByEmail } = await supabase
+        .from("lead")
+        .select("id_lead, id_lead_externo, is_mql, levantou_mao, tem_reuniao, reuniao_realizada, venda_realizada, data_mql, data_levantou_mao, data_reuniao")
+        .ilike("email", personEmail)
+        .eq("id_empresa", idEmpresa)
+        .eq("merged", false)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      
+      if (leadByEmail) {
+        existingLead = leadByEmail;
+        console.log(`[Lookup] Lead encontrado por email ${personEmail}: ${existingLead.id_lead} (deal original: ${existingLead.id_lead_externo}, novo deal: ${dealData.id})`);
+      }
+    }
 
     const agora = new Date().toISOString();
 
@@ -421,21 +448,72 @@ serve(async (req) => {
 
       console.log(`Lead ${dealData.id} deletado com sucesso`);
     } else {
-      // Deal foi adicionado ou atualizado - upsert
-      const { data: upsertedLead, error: upsertError } = await supabase
-        .from("lead")
-        .upsert(leadData, { 
-          onConflict: "id_lead_externo,id_empresa"
-        })
-        .select('id_lead')
-        .single();
+      // Deal foi adicionado ou atualizado
+      let savedLeadId: string | null = null;
+      
+      if (existingLead) {
+        // Lead já existe (por deal ID ou email) - UPDATE
+        const { error: updateError } = await supabase
+          .from("lead")
+          .update({
+            ...leadData,
+            // Se encontrado por email com deal diferente, manter o id_lead_externo original
+            // mas atualizar todos os outros campos com dados mais recentes
+            id_lead_externo: existingLead.id_lead_externo, // Manter original
+          })
+          .eq("id_lead", existingLead.id_lead);
 
-      if (upsertError) {
-        console.error("Erro ao salvar lead:", upsertError);
-        throw upsertError;
+        if (updateError) {
+          console.error("Erro ao atualizar lead:", updateError);
+          throw updateError;
+        }
+        
+        savedLeadId = existingLead.id_lead;
+        console.log(`Lead ${existingLead.id_lead} ATUALIZADO com dados do deal ${dealData.id}`);
+      } else {
+        // Lead não existe - INSERT
+        const { data: newLead, error: insertError } = await supabase
+          .from("lead")
+          .insert(leadData)
+          .select('id_lead')
+          .single();
+
+        if (insertError) {
+          // Verificar se é erro de duplicata (race condition)
+          if (insertError.code === '23505' || insertError.message?.includes('duplicate')) {
+            console.log('[Pipedrive] Erro de duplicata detectado, buscando lead existente...');
+            
+            // Buscar lead que foi criado por outro request
+            const { data: duplicateLead } = await supabase
+              .from("lead")
+              .select("id_lead")
+              .ilike("email", personEmail || '')
+              .eq("id_empresa", idEmpresa)
+              .eq("merged", false)
+              .order("created_at", { ascending: true })
+              .limit(1)
+              .maybeSingle();
+            
+            if (duplicateLead) {
+              savedLeadId = duplicateLead.id_lead;
+              console.log(`[Pipedrive] Lead encontrado após erro de duplicata: ${savedLeadId}`);
+            } else {
+              throw insertError;
+            }
+          } else {
+            console.error("Erro ao criar lead:", insertError);
+            throw insertError;
+          }
+        } else {
+          savedLeadId = newLead.id_lead;
+          console.log(`Lead ${savedLeadId} CRIADO para deal ${dealData.id}`);
+        }
       }
 
       console.log(`Lead ${dealData.id} processado com sucesso (${event})`);
+      
+      // Usar savedLeadId para o resto do processamento
+      const upsertedLead = savedLeadId ? { id_lead: savedLeadId } : null;
 
       // FASE 3: Registrar eventos de transição em lead_evento para histórico
       const eventosParaInserir = [];
