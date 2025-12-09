@@ -171,12 +171,22 @@ export default function Integracoes() {
       setChatwootUrlBase(config.url_base || "");
       setChatwootApiToken(config.api_token || "");
       setChatwootAccountId(config.account_id || "");
-      // Carregar mapeamento de inboxes por empresa
+      // Carregar e consolidar mapeamento de inboxes por empresa
       if (config.empresas && Array.isArray(config.empresas)) {
-        setChatwootEmpresasInboxes(config.empresas.map((e: any) => ({
-          id_empresa: e.id_empresa,
-          inboxes: Array.isArray(e.inboxes) ? e.inboxes.join(', ') : ''
-        })));
+        // Consolidar entradas duplicadas por empresa
+        const consolidatedMap = new Map<string, string[]>();
+        config.empresas.forEach((e: any) => {
+          const inboxList = Array.isArray(e.inboxes) ? e.inboxes : [];
+          const existing = consolidatedMap.get(e.id_empresa) || [];
+          consolidatedMap.set(e.id_empresa, [...existing, ...inboxList]);
+        });
+        
+        const consolidated = Array.from(consolidatedMap.entries()).map(([id_empresa, inboxes]) => ({
+          id_empresa,
+          inboxes: [...new Set(inboxes)].join(', ') // Remove duplicatas
+        }));
+        
+        setChatwootEmpresasInboxes(consolidated);
       } else {
         setChatwootEmpresasInboxes([]);
       }
@@ -1414,26 +1424,49 @@ export default function Integracoes() {
           ) : (
             integracoes.filter(i => i.tipo === "CHATWOOT").map((integracao) => {
               const config = integracao.config_json as any;
-              const empresasMapeadas = config.empresas?.map((emp: any) => {
-                const empresa = empresas.find(e => e.id_empresa === emp.id_empresa);
-                return empresa?.nome || emp.id_empresa;
-              }).join(", ") || "Nenhuma";
+              
+              // Consolidar empresas duplicadas para exibição
+              const consolidatedEmpresas = (() => {
+                if (!config.empresas || !Array.isArray(config.empresas)) return [];
+                const map = new Map<string, string[]>();
+                config.empresas.forEach((emp: any) => {
+                  const inboxList = Array.isArray(emp.inboxes) ? emp.inboxes : [];
+                  const existing = map.get(emp.id_empresa) || [];
+                  map.set(emp.id_empresa, [...existing, ...inboxList]);
+                });
+                return Array.from(map.entries()).map(([id_empresa, inboxes]) => {
+                  const empresa = empresas.find(e => e.id_empresa === id_empresa);
+                  return {
+                    nome: empresa?.nome || id_empresa,
+                    inboxes: [...new Set(inboxes)]
+                  };
+                });
+              })();
               
               return (
                 <Card key={integracao.id_integracao}>
                   <CardHeader>
                     <div className="flex justify-between items-start">
-                      <div>
+                      <div className="flex-1">
                         <CardTitle>Chatwoot</CardTitle>
                         <CardDescription>
                           URL: {config.url_base} | Account ID: {config.account_id}
                         </CardDescription>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Empresas mapeadas: {empresasMapeadas}
-                        </p>
+                        <div className="mt-3 space-y-1">
+                          {consolidatedEmpresas.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">Nenhuma empresa mapeada</p>
+                          ) : (
+                            consolidatedEmpresas.map((emp, idx) => (
+                              <div key={idx} className="text-xs">
+                                <span className="font-medium text-foreground">{emp.nome}:</span>{' '}
+                                <span className="text-muted-foreground">{emp.inboxes.join(', ')}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
