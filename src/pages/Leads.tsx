@@ -896,6 +896,13 @@ const Leads = () => {
                                     <Wallet className="h-4 w-4" /> Dados Extra
                                   </h4>
                                   <div className="space-y-1 text-xs">
+                                    {/* Telefone */}
+                                    {lead.telefone && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Telefone:</span>
+                                        <span className="font-medium">{lead.telefone}</span>
+                                      </div>
+                                    )}
                                     {/* Tokeniza */}
                                     <div className="flex justify-between">
                                       <span className="text-muted-foreground">Investidor:</span>
