@@ -220,18 +220,6 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           </Button>
         </Link>
       )}
-      {isDirecao && (
-        <Link to="/aprovacoes" onClick={() => setMobileMenuOpen(false)}>
-          <Button 
-            variant={location.pathname === "/aprovacoes" ? "secondary" : "ghost"} 
-            size="sm"
-            className="w-full justify-start hover:bg-accent transition-all"
-          >
-            <CheckSquare className="mr-2 h-4 w-4" />
-            Aprovações
-          </Button>
-        </Link>
-      )}
       <Link to="/leads" onClick={() => setMobileMenuOpen(false)}>
         <Button 
           variant={location.pathname === "/leads" ? "secondary" : "ghost"} 
