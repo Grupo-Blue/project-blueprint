@@ -1212,6 +1212,7 @@ export type Database = {
           pipeline_id: string | null
           reuniao_realizada: boolean
           stage_atual: string | null
+          telefone: string | null
           tem_reuniao: boolean
           tokeniza_carrinho_abandonado: boolean | null
           tokeniza_investidor: boolean | null
@@ -1280,6 +1281,7 @@ export type Database = {
           pipeline_id?: string | null
           reuniao_realizada?: boolean
           stage_atual?: string | null
+          telefone?: string | null
           tem_reuniao?: boolean
           tokeniza_carrinho_abandonado?: boolean | null
           tokeniza_investidor?: boolean | null
@@ -1348,6 +1350,7 @@ export type Database = {
           pipeline_id?: string | null
           reuniao_realizada?: boolean
           stage_atual?: string | null
+          telefone?: string | null
           tem_reuniao?: boolean
           tokeniza_carrinho_abandonado?: boolean | null
           tokeniza_investidor?: boolean | null
@@ -2206,7 +2209,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "direcao" | "trafego" | "sdr"
-      canal_origem: "META" | "GOOGLE" | "ORGANICO" | "OUTRO"
+      canal_origem: "META" | "GOOGLE" | "ORGANICO" | "OUTRO" | "WHATSAPP"
       categoria_acao: "A" | "B" | "C"
       origem_lead: "PAGO" | "ORGANICO" | "INDICACAO" | "LISTA" | "MANUAL"
       perfil_usuario: "TRAFEGO" | "SDR_COMERCIAL" | "DIRECAO" | "ADMIN"
@@ -2381,7 +2384,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "direcao", "trafego", "sdr"],
-      canal_origem: ["META", "GOOGLE", "ORGANICO", "OUTRO"],
+      canal_origem: ["META", "GOOGLE", "ORGANICO", "OUTRO", "WHATSAPP"],
       categoria_acao: ["A", "B", "C"],
       origem_lead: ["PAGO", "ORGANICO", "INDICACAO", "LISTA", "MANUAL"],
       perfil_usuario: ["TRAFEGO", "SDR_COMERCIAL", "DIRECAO", "ADMIN"],
