@@ -72,6 +72,10 @@ interface SDRPayload {
     agente_atual?: string;
     inbox?: string;
   };
+  dados_notion?: {
+    cliente_id?: string;
+    cliente_status?: string;
+  };
   event_metadata?: {
     oferta_id?: string;
     valor_simulado?: number;
@@ -252,6 +256,14 @@ serve(async (req) => {
           tempo_resposta_medio: lead.chatwoot_tempo_resposta_medio || undefined,
           agente_atual: lead.chatwoot_agente_atual || undefined,
           inbox: lead.chatwoot_inbox || undefined
+        };
+      }
+
+      // Adicionar dados Notion se existirem
+      if (lead.id_cliente_notion || lead.cliente_status) {
+        payload.dados_notion = {
+          cliente_id: lead.id_cliente_notion || undefined,
+          cliente_status: lead.cliente_status || undefined
         };
       }
 
