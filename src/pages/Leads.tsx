@@ -83,6 +83,16 @@ const calcularScoreTemperatura = (lead: any): number => {
   // Carrinho abandonado = interesse demonstrado
   if (lead.tokeniza_carrinho_abandonado) score += 35;
   
+  // Chatwoot: Engajamento de atendimento
+  if (lead.chatwoot_status_atendimento === 'open') score += 30; // Conversa ativa
+  if (lead.chatwoot_status_atendimento === 'resolved') score += 15; // Já foi atendido
+  score += Math.min((lead.chatwoot_conversas_total || 0) * 10, 50); // Histórico conversas
+  
+  // Penalidade: tempo de resposta alto no atendimento
+  if (lead.chatwoot_tempo_resposta_medio && lead.chatwoot_tempo_resposta_medio > 86400) {
+    score -= 20; // >24h sem resposta
+  }
+  
   // Penalidade por inatividade
   const dias = getDiasNoStage(lead);
   if (dias > 7 && !['Vendido', 'Perdido'].includes(lead.stage_atual || '')) {
@@ -730,7 +740,7 @@ const Leads = () => {
                                   </div>
                                 </div>
 
-                                {/* Coluna 3: Engajamento (Mautic) */}
+                                {/* Coluna 3: Engajamento (Mautic + Chatwoot) */}
                                 <div className="space-y-2">
                                   <h4 className="font-semibold flex items-center gap-2 text-foreground">
                                     <Activity className="h-4 w-4" /> Engajamento
@@ -771,6 +781,49 @@ const Leads = () => {
                                             {typeof tag === 'string' ? tag : tag.tag}
                                           </Badge>
                                         ))}
+                                      </div>
+                                    )}
+                                    
+                                    {/* Chatwoot / Atendimento */}
+                                    {(lead.chatwoot_contact_id || lead.chatwoot_conversas_total > 0) && (
+                                      <div className="mt-2 pt-2 border-t border-border">
+                                        <span className="text-muted-foreground text-[10px] uppercase">Atendimento:</span>
+                                        <div className="flex justify-between mt-1">
+                                          <span className="text-muted-foreground">Status:</span>
+                                          <Badge variant="outline" className={cn(
+                                            "text-[10px]",
+                                            lead.chatwoot_status_atendimento === 'open' ? "bg-green-100 text-green-700" :
+                                            lead.chatwoot_status_atendimento === 'pending' ? "bg-yellow-100 text-yellow-700" :
+                                            lead.chatwoot_status_atendimento === 'resolved' ? "bg-blue-100 text-blue-700" : ""
+                                          )}>
+                                            {lead.chatwoot_status_atendimento === 'open' ? '🟢 Open' :
+                                             lead.chatwoot_status_atendimento === 'pending' ? '🟡 Pending' :
+                                             lead.chatwoot_status_atendimento === 'resolved' ? '✅ Resolved' : 
+                                             lead.chatwoot_status_atendimento || '-'}
+                                          </Badge>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Conversas:</span>
+                                          <span>{lead.chatwoot_conversas_total || 0}</span>
+                                        </div>
+                                        {lead.chatwoot_ultima_conversa && (
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Última:</span>
+                                            <span>{format(parseISO(lead.chatwoot_ultima_conversa), "dd/MM HH:mm")}</span>
+                                          </div>
+                                        )}
+                                        {lead.chatwoot_agente_atual && (
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Agente:</span>
+                                            <span className="truncate max-w-[80px]">{lead.chatwoot_agente_atual}</span>
+                                          </div>
+                                        )}
+                                        {lead.chatwoot_inbox && (
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Inbox:</span>
+                                            <span className="truncate max-w-[80px]">{lead.chatwoot_inbox}</span>
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </div>
