@@ -45,6 +45,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { CampanhaFluxoDiagram } from "@/components/CampanhaFluxoDiagram";
 import { MetricasAwareness } from "@/components/dashboard/MetricasAwareness";
+import { UTMHealthWidget } from "@/components/dashboard/UTMHealthWidget";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 
 interface CampanhaMetrica {
@@ -1181,11 +1182,18 @@ export default function DashboardTrafego() {
         )}
 
         {/* Métricas de Awareness (Instagram/Metricool) */}
-        <MetricasAwareness 
-          empresaId={empresaSelecionada === "todas" ? null : empresaSelecionada} 
-          dataInicio={inicioMes} 
-          dataFim={fimMes} 
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <MetricasAwareness 
+              empresaId={empresaSelecionada === "todas" ? null : empresaSelecionada} 
+              dataInicio={inicioMes} 
+              dataFim={fimMes} 
+            />
+          </div>
+          <div className="lg:col-span-1">
+            <UTMHealthWidget empresaId={empresaSelecionada === "todas" ? undefined : empresaSelecionada} />
+          </div>
+        </div>
 
         {/* Funil de Conversão Visual */}
         <Card>

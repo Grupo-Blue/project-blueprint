@@ -54,19 +54,48 @@ interface EnrichedLeadData {
   utm_term_mautic: string | null;
 }
 
+// Função para normalizar telefone para formato E.164 brasileiro
+function normalizarTelefone(telefone: string | null | undefined): string | null {
+  if (!telefone) return null;
+  
+  // Remover todos os caracteres não numéricos
+  let digits = telefone.replace(/\D/g, '');
+  
+  // Se começar com 55, remover
+  if (digits.startsWith('55') && digits.length > 11) {
+    digits = digits.substring(2);
+  }
+  
+  // Se tiver 10 dígitos (DDD + 8 dígitos), inserir 9 após DDD
+  if (digits.length === 10) {
+    digits = digits.substring(0, 2) + '9' + digits.substring(2);
+  }
+  
+  // Validar: deve ter 11 dígitos (DDD + 9 + 8 dígitos)
+  if (digits.length !== 11) {
+    return null;
+  }
+  
+  return `+55${digits}`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { email, id_empresa } = await req.json();
+    const { email, telefone, id_empresa } = await req.json();
 
-    if (!email || !id_empresa) {
-      throw new Error('Email e id_empresa são obrigatórios');
+    if (!id_empresa) {
+      throw new Error('id_empresa é obrigatório');
     }
 
-    console.log(`[Mautic] Enriquecendo lead com email: ${email} para empresa: ${id_empresa}`);
+    if (!email && !telefone) {
+      throw new Error('Email ou telefone são obrigatórios');
+    }
+
+    console.log(`[Mautic] Enriquecendo lead - email: ${email || 'N/A'}, telefone: ${telefone || 'N/A'}, empresa: ${id_empresa}`);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -112,31 +141,66 @@ serve(async (req) => {
 
     // Normalizar URL base (remover barra final se existir)
     const normalizedBaseUrl = url_base.endsWith('/') ? url_base.slice(0, -1) : url_base;
-
-    // Fazer requisição à API do Mautic
-    const mauticUrl = `${normalizedBaseUrl}/api/contacts?search=email:${encodeURIComponent(email)}`;
-    console.log(`[Mautic] Buscando contato em: ${mauticUrl}`);
-
     const basicAuth = btoa(`${login}:${senha}`);
-    const mauticResponse = await fetch(mauticUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Basic ${basicAuth}`,
-        'Content-Type': 'application/json',
-      },
-    });
 
-    if (!mauticResponse.ok) {
-      const errorText = await mauticResponse.text();
-      throw new Error(`Erro na API Mautic: ${mauticResponse.status} - ${errorText}`);
+    let mauticData: MauticApiResponse | null = null;
+
+    // Tentar buscar por email primeiro
+    if (email) {
+      const mauticUrl = `${normalizedBaseUrl}/api/contacts?search=email:${encodeURIComponent(email)}`;
+      console.log(`[Mautic] Buscando contato por email: ${mauticUrl}`);
+
+      const mauticResponse = await fetch(mauticUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${basicAuth}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (mauticResponse.ok) {
+        mauticData = await mauticResponse.json();
+        console.log(`[Mautic] Busca por email - Total: ${mauticData?.total || 0}`);
+      }
     }
 
-    const mauticData: MauticApiResponse = await mauticResponse.json();
-    console.log(`[Mautic] Resposta da API - Total de contatos: ${mauticData.total || 0}`);
+    // Se não encontrou por email, tentar por telefone
+    if ((!mauticData?.contacts || Object.keys(mauticData.contacts).length === 0) && telefone) {
+      const telefoneNormalizado = normalizarTelefone(telefone);
+      if (telefoneNormalizado) {
+        // Tentar diferentes formatos de busca por telefone
+        const telefoneSemMais = telefoneNormalizado.replace('+', '');
+        const telefoneSemDDI = telefoneSemMais.substring(2); // Remove 55
+        
+        for (const tel of [telefoneNormalizado, telefoneSemMais, telefoneSemDDI]) {
+          const mauticUrl = `${normalizedBaseUrl}/api/contacts?search=phone:${encodeURIComponent(tel)}`;
+          console.log(`[Mautic] Buscando contato por telefone: ${tel}`);
+
+          const mauticResponse = await fetch(mauticUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Basic ${basicAuth}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (mauticResponse.ok) {
+            const data: MauticApiResponse = await mauticResponse.json();
+            console.log(`[Mautic] Busca por telefone ${tel} - Total: ${data?.total || 0}`);
+            
+            if (data?.contacts && Object.keys(data.contacts).length > 0) {
+              mauticData = data;
+              console.log(`[Mautic] ✅ Contato encontrado por telefone: ${tel}`);
+              break;
+            }
+          }
+        }
+      }
+    }
 
     // Se não encontrou contato
-    if (!mauticData.contacts || Object.keys(mauticData.contacts).length === 0) {
-      console.log(`[Mautic] Nenhum contato encontrado para email: ${email}`);
+    if (!mauticData?.contacts || Object.keys(mauticData.contacts).length === 0) {
+      console.log(`[Mautic] Nenhum contato encontrado para email: ${email || 'N/A'}, telefone: ${telefone || 'N/A'}`);
       return new Response(
         JSON.stringify({ success: false, message: 'Contato não encontrado no Mautic' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }

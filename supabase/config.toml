@@ -92,3 +92,6 @@ verify_jwt = false
 
 [functions.analisar-performance-lp]
 verify_jwt = true
+
+[functions.vincular-leads-criativos]
+verify_jwt = false

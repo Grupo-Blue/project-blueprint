@@ -108,6 +108,20 @@ const CRONJOBS: CronjobConfig[] = [
     functionName: "verificar-demanda-campanha",
     schedule: "06:30",
     description: "Verifica automaticamente demandas EXECUTADAS há mais de 24h nas APIs Meta/Google"
+  },
+  {
+    name: "vincular-leads-criativos",
+    displayName: "Vincular Leads a Criativos",
+    functionName: "vincular-leads-criativos",
+    schedule: "04:00",
+    description: "Vincula retroativamente leads a criativos via utm_content"
+  },
+  {
+    name: "detectar-discrepancias-utm",
+    displayName: "Detectar Discrepâncias UTM",
+    functionName: "detectar-discrepancias-utm",
+    schedule: "03:00",
+    description: "Detecta discrepâncias entre URLs esperadas e capturadas nos criativos"
   }
 ];
 
