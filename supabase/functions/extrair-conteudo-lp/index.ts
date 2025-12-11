@@ -79,6 +79,26 @@ function extractFirstParagraph(html: string): string | null {
   return paragraphs[0] || null;
 }
 
+// Mapeamento de domínios por empresa
+const getDomainByEmpresa = (empresaId: string): string => {
+  const domains: Record<string, string> = {
+    '95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db': 'https://blueconsult.com.br',
+    '61b5ffeb-fbbc-47c1-8ced-152bb647ed20': 'https://tokeniza.com.br',
+  };
+  return domains[empresaId] || '';
+};
+
+const getFullUrl = (url: string, idEmpresa: string): string => {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  const domain = getDomainByEmpresa(idEmpresa);
+  if (domain) {
+    return `${domain}${url.startsWith('/') ? '' : '/'}${url}`;
+  }
+  return url;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -130,8 +150,12 @@ serve(async (req) => {
 
     for (const url of urlsToProcess) {
       try {
+        // Construir URL completa
+        const fullUrl = getFullUrl(url, id_empresa);
+        console.log(`Fetching: ${fullUrl}`);
+        
         // Fetch da página
-        const response = await fetch(url, {
+        const response = await fetch(fullUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (compatible; SGT-Bot/1.0)'
           }

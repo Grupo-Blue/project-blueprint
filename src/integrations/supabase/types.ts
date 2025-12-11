@@ -1338,6 +1338,12 @@ export type Database = {
           data_venda: string | null
           email: string | null
           estado_mautic: string | null
+          ga4_bounce_rate: number | null
+          ga4_categoria_jornada: string | null
+          ga4_engajamento_score: number | null
+          ga4_landing_page: string | null
+          ga4_sessoes: number | null
+          ga4_tempo_site_segundos: number | null
           id_cliente_notion: string | null
           id_criativo: string | null
           id_empresa: string
@@ -1407,6 +1413,12 @@ export type Database = {
           data_venda?: string | null
           email?: string | null
           estado_mautic?: string | null
+          ga4_bounce_rate?: number | null
+          ga4_categoria_jornada?: string | null
+          ga4_engajamento_score?: number | null
+          ga4_landing_page?: string | null
+          ga4_sessoes?: number | null
+          ga4_tempo_site_segundos?: number | null
           id_cliente_notion?: string | null
           id_criativo?: string | null
           id_empresa: string
@@ -1476,6 +1488,12 @@ export type Database = {
           data_venda?: string | null
           email?: string | null
           estado_mautic?: string | null
+          ga4_bounce_rate?: number | null
+          ga4_categoria_jornada?: string | null
+          ga4_engajamento_score?: number | null
+          ga4_landing_page?: string | null
+          ga4_sessoes?: number | null
+          ga4_tempo_site_segundos?: number | null
           id_cliente_notion?: string | null
           id_criativo?: string | null
           id_empresa?: string
