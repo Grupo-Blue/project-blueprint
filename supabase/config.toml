@@ -98,3 +98,6 @@ verify_jwt = false
 
 [functions.enriquecer-leads-ga4]
 verify_jwt = false
+
+[functions.recoletar-criativos-historicos]
+verify_jwt = false
