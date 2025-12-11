@@ -1209,6 +1209,50 @@ export type Database = {
           },
         ]
       }
+      landingpage_config: {
+        Row: {
+          categoria: string
+          created_at: string | null
+          descricao: string | null
+          evento_conversao: string | null
+          id: string
+          id_empresa: string
+          ignorar_conversao: boolean | null
+          updated_at: string | null
+          url_pattern: string
+        }
+        Insert: {
+          categoria?: string
+          created_at?: string | null
+          descricao?: string | null
+          evento_conversao?: string | null
+          id?: string
+          id_empresa: string
+          ignorar_conversao?: boolean | null
+          updated_at?: string | null
+          url_pattern: string
+        }
+        Update: {
+          categoria?: string
+          created_at?: string | null
+          descricao?: string | null
+          evento_conversao?: string | null
+          id?: string
+          id_empresa?: string
+          ignorar_conversao?: boolean | null
+          updated_at?: string | null
+          url_pattern?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "landingpage_config_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       landingpage_conteudo: {
         Row: {
           created_at: string
@@ -1265,11 +1309,13 @@ export type Database = {
       landingpage_metricas: {
         Row: {
           bounce_rate: number | null
+          categoria: string | null
           conversoes: number
           created_at: string
           data: string
           id: string
           id_empresa: string
+          ignorar_analise: boolean | null
           pageviews: number
           sessoes: number
           taxa_conversao: number | null
@@ -1280,11 +1326,13 @@ export type Database = {
         }
         Insert: {
           bounce_rate?: number | null
+          categoria?: string | null
           conversoes?: number
           created_at?: string
           data: string
           id?: string
           id_empresa: string
+          ignorar_analise?: boolean | null
           pageviews?: number
           sessoes?: number
           taxa_conversao?: number | null
@@ -1295,11 +1343,13 @@ export type Database = {
         }
         Update: {
           bounce_rate?: number | null
+          categoria?: string | null
           conversoes?: number
           created_at?: string
           data?: string
           id?: string
           id_empresa?: string
+          ignorar_analise?: boolean | null
           pageviews?: number
           sessoes?: number
           taxa_conversao?: number | null
