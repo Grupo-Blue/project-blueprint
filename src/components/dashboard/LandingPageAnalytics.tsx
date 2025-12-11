@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -13,21 +14,28 @@ import {
   RefreshCw, 
   Sparkles, 
   ExternalLink,
-  Clock,
-  MousePointer,
   Eye,
   AlertCircle,
   CheckCircle,
   Lightbulb,
   Users,
-  Zap
+  Zap,
+  Settings2,
+  Filter
 } from "lucide-react";
 import { toast } from "sonner";
 import { MetricaComInfo } from "@/components/ui/MetricaComInfo";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LandingPageConfigManager } from "./LandingPageConfigManager";
 
 interface LandingPageAnalyticsProps {
   idEmpresa: string;
+}
+
+interface PageConfig {
+  url_pattern: string;
+  categoria: string;
+  ignorar_conversao: boolean;
 }
 
 interface MetricaAgregada {
@@ -60,6 +68,43 @@ interface PadraoSucesso {
 export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
   const queryClient = useQueryClient();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [filtroCategoria, setFiltroCategoria] = useState<string>("todas");
+  const [showConfig, setShowConfig] = useState(false);
+
+  // Buscar configurações de páginas
+  const { data: pageConfigs } = useQuery({
+    queryKey: ['landingpage-config', idEmpresa],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('landingpage_config')
+        .select('url_pattern, categoria, ignorar_conversao')
+        .eq('id_empresa', idEmpresa);
+      if (error) throw error;
+      return data as PageConfig[];
+    },
+    enabled: !!idEmpresa
+  });
+
+  // Função para verificar se URL corresponde ao padrão (suporta *)
+  const urlMatchesPattern = (url: string, pattern: string): boolean => {
+    const escapedPattern = pattern
+      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '.*');
+    const regex = new RegExp(`^${escapedPattern}$`);
+    return regex.test(url);
+  };
+
+  // Função para obter categoria de uma URL
+  const getCategoriaUrl = (url: string): { categoria: string; ignorar: boolean } => {
+    if (!pageConfigs) return { categoria: 'landing_page', ignorar: false };
+    
+    for (const config of pageConfigs) {
+      if (urlMatchesPattern(url, config.url_pattern)) {
+        return { categoria: config.categoria, ignorar: config.ignorar_conversao };
+      }
+    }
+    return { categoria: 'landing_page', ignorar: false };
+  };
 
   // Buscar métricas agregadas
   const { data: metricas, isLoading: loadingMetricas } = useQuery({
@@ -102,6 +147,14 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
     },
     enabled: !!idEmpresa
   });
+
+  // Filtrar métricas baseado na categoria e ignorar
+  const metricasFiltradas = metricas?.filter(m => {
+    const { categoria, ignorar } = getCategoriaUrl(m.url);
+    if (ignorar) return false; // Sempre exclui páginas ignoradas
+    if (filtroCategoria === "todas") return true;
+    return categoria === filtroCategoria;
+  }) || [];
 
   // Buscar conteúdo extraído
   const { data: conteudos } = useQuery({
@@ -290,12 +343,35 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
     return conteudos?.find(c => c.url === url);
   };
 
-  const topPerformers = metricas?.filter(m => m.sessoes >= 10).sort((a, b) => b.taxa_conversao - a.taxa_conversao).slice(0, 5) || [];
-  const bottomPerformers = metricas?.filter(m => m.sessoes >= 10).sort((a, b) => a.taxa_conversao - b.taxa_conversao).slice(0, 5) || [];
+  // Badge de categoria para exibição
+  const getCategoriaBadge = (url: string) => {
+    const { categoria } = getCategoriaUrl(url);
+    const configs: Record<string, { label: string; className: string }> = {
+      landing_page: { label: "LP", className: "bg-green-500 text-white" },
+      oferta: { label: "Oferta", className: "bg-blue-500 text-white" },
+      sistema: { label: "Sistema", className: "bg-gray-500 text-white" },
+      conteudo: { label: "Conteúdo", className: "bg-purple-500 text-white" },
+    };
+    return configs[categoria] || configs.landing_page;
+  };
 
-  const totalSessoes = metricas?.reduce((s, m) => s + m.sessoes, 0) || 0;
-  const totalConversoes = metricas?.reduce((s, m) => s + m.conversoes, 0) || 0;
+  const topPerformers = metricasFiltradas.filter(m => m.sessoes >= 10).sort((a, b) => b.taxa_conversao - a.taxa_conversao).slice(0, 5);
+  const bottomPerformers = metricasFiltradas.filter(m => m.sessoes >= 10).sort((a, b) => a.taxa_conversao - b.taxa_conversao).slice(0, 5);
+
+  const totalSessoes = metricasFiltradas.reduce((s, m) => s + m.sessoes, 0);
+  const totalConversoes = metricasFiltradas.reduce((s, m) => s + m.conversoes, 0);
   const taxaGeralConversao = totalSessoes > 0 ? (totalConversoes / totalSessoes) * 100 : 0;
+  
+  // Contagem por categoria (antes de filtrar)
+  const contagemCategorias = metricas?.reduce((acc, m) => {
+    const { categoria, ignorar } = getCategoriaUrl(m.url);
+    if (!ignorar) {
+      acc[categoria] = (acc[categoria] || 0) + 1;
+    } else {
+      acc.ignoradas = (acc.ignoradas || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>) || {};
 
   if (loadingMetricas) {
     return (
@@ -327,6 +403,14 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
             </CardDescription>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <Button 
+              variant={showConfig ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowConfig(!showConfig)}
+            >
+              <Settings2 className="h-4 w-4 mr-2" />
+              Configurar
+            </Button>
             <Button 
               variant="outline" 
               size="sm"
@@ -366,11 +450,41 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
         </div>
       </CardHeader>
       <CardContent>
+        {/* Painel de Configuração */}
+        {showConfig && (
+          <div className="mb-6">
+            <LandingPageConfigManager idEmpresa={idEmpresa} />
+          </div>
+        )}
+
+        {/* Filtro de Categoria */}
+        <div className="flex items-center gap-4 mb-6 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filtrar categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas ({metricasFiltradas.length})</SelectItem>
+                <SelectItem value="landing_page">Landing Pages ({contagemCategorias.landing_page || 0})</SelectItem>
+                <SelectItem value="oferta">Ofertas ({contagemCategorias.oferta || 0})</SelectItem>
+                <SelectItem value="conteudo">Conteúdo ({contagemCategorias.conteudo || 0})</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {contagemCategorias.ignoradas > 0 && (
+            <Badge variant="outline" className="text-muted-foreground">
+              {contagemCategorias.ignoradas} páginas de sistema ignoradas
+            </Badge>
+          )}
+        </div>
+
         {/* KPIs Resumo */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
           <Card className="p-4">
-            <div className="text-sm text-muted-foreground">Landing Pages</div>
-            <div className="text-2xl font-bold">{metricas?.length || 0}</div>
+            <div className="text-sm text-muted-foreground">Páginas Analisadas</div>
+            <div className="text-2xl font-bold">{metricasFiltradas.length}</div>
           </Card>
           <Card className="p-4">
             <div className="text-sm text-muted-foreground">Sessões (30d)</div>
@@ -437,12 +551,14 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
                 <div className="space-y-2">
                   {topPerformers.map((lp, idx) => {
                     const conteudo = getConteudo(lp.url);
+                    const catBadge = getCategoriaBadge(lp.url);
                     return (
                       <Card key={lp.url} className="p-3">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <Badge variant="outline">{idx + 1}º</Badge>
+                              <Badge className={`${catBadge.className} text-xs`}>{catBadge.label}</Badge>
                               <a 
                                 href={getFullUrl(lp.url)} 
                                 target="_blank" 
@@ -485,12 +601,14 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
                 <div className="space-y-2">
                   {bottomPerformers.map((lp, idx) => {
                     const conteudo = getConteudo(lp.url);
+                    const catBadge = getCategoriaBadge(lp.url);
                     return (
                       <Card key={lp.url} className="p-3 border-destructive/20">
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <Badge variant="destructive">{idx + 1}º</Badge>
+                              <Badge className={`${catBadge.className} text-xs`}>{catBadge.label}</Badge>
                               <a 
                                 href={getFullUrl(lp.url)} 
                                 target="_blank" 
@@ -526,14 +644,15 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
             </div>
 
             {/* Tabela completa */}
-            {metricas && metricas.length > 0 && (
+            {metricasFiltradas.length > 0 && (
               <div className="mt-6">
-                <h3 className="font-medium mb-3">Todas as Landing Pages</h3>
+                <h3 className="font-medium mb-3">Todas as Páginas</h3>
                 <div className="border rounded-lg overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>URL</TableHead>
+                        <TableHead>Categoria</TableHead>
                         <TableHead>H1</TableHead>
                         <TableHead className="text-right">Sessões</TableHead>
                         <TableHead className="text-right">Conversões</TableHead>
@@ -541,8 +660,9 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {metricas.slice(0, 20).map(lp => {
+                      {metricasFiltradas.slice(0, 20).map(lp => {
                         const conteudo = getConteudo(lp.url);
+                        const catBadge = getCategoriaBadge(lp.url);
                         return (
                           <TableRow key={lp.url}>
                             <TableCell className="max-w-[200px] truncate">
@@ -554,6 +674,9 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
                               >
                                 {formatUrl(lp.url)}
                               </a>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={`${catBadge.className} text-xs`}>{catBadge.label}</Badge>
                             </TableCell>
                             <TableCell className="max-w-[250px] truncate text-muted-foreground">
                               {conteudo?.titulo_h1 || '-'}
