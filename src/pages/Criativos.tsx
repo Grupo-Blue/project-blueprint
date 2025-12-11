@@ -35,6 +35,7 @@ interface CampanhaCriativo {
   criativos: Array<{
     id_criativo: string;
     id_criativo_externo: string;
+    id_anuncio_externo: string | null;
     tipo: string;
     descricao: string | null;
     ativo: boolean;
@@ -47,6 +48,7 @@ interface CampanhaCriativo {
 interface CriativoParaEditar {
   id_criativo: string;
   id_criativo_externo: string;
+  id_anuncio_externo: string | null;
   tipo: string;
   descricao: string | null;
   url_esperada: string | null;
@@ -113,7 +115,7 @@ const Criativos = () => {
       for (const camp of campanhasData || []) {
         const { data: criativosData, error: criativosError } = await supabase
           .from("criativo")
-          .select("id_criativo, id_criativo_externo, tipo, descricao, ativo, url_midia, url_preview, url_esperada")
+          .select("id_criativo, id_criativo_externo, id_anuncio_externo, tipo, descricao, ativo, url_midia, url_preview, url_esperada")
           .eq("id_campanha", camp.id_campanha);
 
         if (criativosError) continue;
@@ -131,6 +133,7 @@ const Criativos = () => {
           criativos: criativosData?.map((c) => ({
             id_criativo: c.id_criativo,
             id_criativo_externo: c.id_criativo_externo,
+            id_anuncio_externo: c.id_anuncio_externo,
             tipo: c.tipo,
             descricao: c.descricao,
             ativo: c.ativo,
@@ -159,11 +162,11 @@ const Criativos = () => {
     });
   };
 
-  const handleCopyId = (idExterno: string) => {
-    navigator.clipboard.writeText(idExterno);
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
     toast({
-      title: "ID copiado!",
-      description: "Use este ID no parâmetro utm_content dos seus anúncios",
+      title: "Ad ID copiado!",
+      description: "Este é o mesmo ID que aparece no Meta Ads Manager",
     });
   };
 
@@ -171,6 +174,7 @@ const Criativos = () => {
     setCriativoEditando({
       id_criativo: criativo.id_criativo,
       id_criativo_externo: criativo.id_criativo_externo,
+      id_anuncio_externo: criativo.id_anuncio_externo,
       tipo: criativo.tipo,
       descricao: criativo.descricao,
       url_esperada: criativo.url_esperada,
@@ -484,19 +488,19 @@ const Criativos = () => {
                                 </div>
                                 <div className="flex flex-col gap-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs text-muted-foreground">ID:</span>
+                                    <span className="text-xs text-muted-foreground">Ad ID:</span>
                                     <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                                      {criativo.id_criativo_externo}
+                                      {criativo.id_anuncio_externo || criativo.id_criativo_externo}
                                     </code>
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleCopyId(criativo.id_criativo_externo);
+                                        handleCopyId(criativo.id_anuncio_externo || criativo.id_criativo_externo);
                                       }}
                                       className="h-6 w-6 p-0"
-                                      title="Copiar ID"
+                                      title="Copiar Ad ID"
                                     >
                                       <Copy className="h-3 w-3" />
                                     </Button>
@@ -586,9 +590,9 @@ const Criativos = () => {
                   {getTipoLabel(criativoEditando.tipo)}
                 </p>
                 <p className="text-sm">
-                  <span className="text-muted-foreground">ID Externo:</span>{" "}
+                  <span className="text-muted-foreground">Ad ID:</span>{" "}
                   <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                    {criativoEditando.id_criativo_externo}
+                    {criativoEditando.id_anuncio_externo || criativoEditando.id_criativo_externo}
                   </code>
                 </p>
                 {criativoEditando.descricao && (

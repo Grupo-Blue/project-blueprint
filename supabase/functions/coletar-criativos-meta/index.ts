@@ -754,7 +754,7 @@ serve(async (req) => {
               const { data: criativoSalvo, error: upsertError } = await supabase
                 .from("criativo")
                 .upsert(criativoData, {
-                  onConflict: "id_criativo_externo",
+                  onConflict: "id_anuncio_externo",
                   ignoreDuplicates: false,
                 })
                 .select()
