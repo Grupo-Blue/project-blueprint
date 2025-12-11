@@ -122,6 +122,13 @@ const CRONJOBS: CronjobConfig[] = [
     functionName: "detectar-discrepancias-utm",
     schedule: "03:00",
     description: "Detecta discrepâncias entre URLs esperadas e capturadas nos criativos"
+  },
+  {
+    name: "recoletar-criativos-historicos",
+    displayName: "Recoletar Criativos Históricos",
+    functionName: "recoletar-criativos-historicos",
+    schedule: "Manual",
+    description: "Recoleta TODOS os criativos históricos (ativos, pausados, arquivados) do Meta Ads"
   }
 ];
 
