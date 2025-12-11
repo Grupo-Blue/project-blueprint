@@ -95,3 +95,6 @@ verify_jwt = true
 
 [functions.vincular-leads-criativos]
 verify_jwt = false
+
+[functions.enriquecer-leads-ga4]
+verify_jwt = false

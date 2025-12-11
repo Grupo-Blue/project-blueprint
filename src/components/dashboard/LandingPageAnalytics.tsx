@@ -18,7 +18,9 @@ import {
   Eye,
   AlertCircle,
   CheckCircle,
-  Lightbulb
+  Lightbulb,
+  Users,
+  Zap
 } from "lucide-react";
 import { toast } from "sonner";
 import { MetricaComInfo } from "@/components/ui/MetricaComInfo";
@@ -134,6 +136,46 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
     enabled: !!idEmpresa
   });
 
+  // Buscar estatísticas de leads enriquecidos com GA4
+  const { data: statsLeadsGA4 } = useQuery({
+    queryKey: ['leads-ga4-stats', idEmpresa],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lead')
+        .select('id_lead, ga4_categoria_jornada, ga4_engajamento_score')
+        .eq('id_empresa', idEmpresa);
+
+      if (error) throw error;
+
+      const total = data?.length || 0;
+      const comEnriquecimento = data?.filter(l => l.ga4_categoria_jornada).length || 0;
+      const semEnriquecimento = total - comEnriquecimento;
+      
+      // Contagem por categoria
+      const categorias: Record<string, number> = {};
+      data?.forEach(l => {
+        if (l.ga4_categoria_jornada) {
+          categorias[l.ga4_categoria_jornada] = (categorias[l.ga4_categoria_jornada] || 0) + 1;
+        }
+      });
+
+      // Score médio
+      const scoresValidos = data?.filter(l => l.ga4_engajamento_score !== null).map(l => l.ga4_engajamento_score as number) || [];
+      const scoreMedio = scoresValidos.length > 0 
+        ? scoresValidos.reduce((s, v) => s + v, 0) / scoresValidos.length 
+        : 0;
+
+      return {
+        total,
+        comEnriquecimento,
+        semEnriquecimento,
+        categorias,
+        scoreMedio
+      };
+    },
+    enabled: !!idEmpresa
+  });
+
   // Mutação para coletar métricas GA4
   const coletarMetricasMutation = useMutation({
     mutationFn: async () => {
@@ -191,6 +233,24 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
     onError: (error: any) => {
       toast.error(error.message || 'Erro na análise');
       setIsAnalyzing(false);
+    }
+  });
+
+  // Mutação para enriquecer leads com GA4
+  const enriquecerLeadsGA4Mutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('enriquecer-leads-ga4', {
+        body: { id_empresa: idEmpresa }
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`${data.enriquecidos} leads enriquecidos com dados GA4`);
+      queryClient.invalidateQueries({ queryKey: ['leads-ga4-stats', idEmpresa] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erro ao enriquecer leads');
     }
   });
 
@@ -266,7 +326,7 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
               Performance e otimização de copy baseada em dados GA4
             </CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button 
               variant="outline" 
               size="sm"
@@ -286,6 +346,15 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
               {extrairConteudoMutation.isPending ? 'Extraindo...' : 'Extrair Copy'}
             </Button>
             <Button 
+              variant="outline"
+              size="sm"
+              onClick={() => enriquecerLeadsGA4Mutation.mutate()}
+              disabled={enriquecerLeadsGA4Mutation.isPending || !metricas?.length}
+            >
+              <Users className={`h-4 w-4 mr-2 ${enriquecerLeadsGA4Mutation.isPending ? 'animate-spin' : ''}`} />
+              {enriquecerLeadsGA4Mutation.isPending ? 'Enriquecendo...' : 'Enriquecer Leads'}
+            </Button>
+            <Button 
               size="sm"
               onClick={() => analisarMutation.mutate()}
               disabled={isAnalyzing || !metricas?.length}
@@ -298,7 +367,7 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
       </CardHeader>
       <CardContent>
         {/* KPIs Resumo */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
           <Card className="p-4">
             <div className="text-sm text-muted-foreground">Landing Pages</div>
             <div className="text-2xl font-bold">{metricas?.length || 0}</div>
@@ -318,6 +387,32 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
               className="text-sm text-muted-foreground"
             />
             <div className="text-2xl font-bold">{taxaGeralConversao.toFixed(2)}%</div>
+          </Card>
+          <Card className="p-4">
+            <MetricaComInfo 
+              label="Leads Enriquecidos" 
+              info="Leads com categoria de jornada e score de engajamento GA4"
+              className="text-sm text-muted-foreground"
+            />
+            <div className="text-2xl font-bold flex items-center gap-2">
+              {statsLeadsGA4?.comEnriquecimento || 0}
+              {statsLeadsGA4?.semEnriquecimento > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  +{statsLeadsGA4.semEnriquecimento} pendentes
+                </Badge>
+              )}
+            </div>
+          </Card>
+          <Card className="p-4">
+            <MetricaComInfo 
+              label="Score Médio" 
+              info="Score de engajamento médio dos leads (0-100)"
+              className="text-sm text-muted-foreground"
+            />
+            <div className="text-2xl font-bold flex items-center gap-2">
+              {statsLeadsGA4?.scoreMedio.toFixed(0) || 0}
+              <Zap className={`h-4 w-4 ${(statsLeadsGA4?.scoreMedio || 0) >= 70 ? 'text-green-500' : (statsLeadsGA4?.scoreMedio || 0) >= 50 ? 'text-yellow-500' : 'text-red-500'}`} />
+            </div>
           </Card>
         </div>
 
