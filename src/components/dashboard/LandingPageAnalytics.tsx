@@ -194,11 +194,34 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
     }
   });
 
+  // Mapeamento de domínios por empresa
+  const getDomainByEmpresa = (empresaId: string): string => {
+    const domains: Record<string, string> = {
+      '95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db': 'https://blueconsult.com.br', // Blue
+      '61b5ffeb-fbbc-47c1-8ced-152bb647ed20': 'https://tokeniza.com.br', // Tokeniza
+    };
+    return domains[empresaId] || '';
+  };
+
+  const getFullUrl = (url: string): string => {
+    // Se já é URL completa, retorna
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // Caso contrário, adiciona o domínio da empresa
+    const domain = getDomainByEmpresa(idEmpresa);
+    if (domain) {
+      return `${domain}${url.startsWith('/') ? '' : '/'}${url}`;
+    }
+    return url;
+  };
+
   const formatUrl = (url: string) => {
     try {
       const urlObj = new URL(url);
       return urlObj.pathname || url;
     } catch {
+      // Se não é URL completa, já é o path
       return url;
     }
   };
@@ -326,7 +349,7 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
                             <div className="flex items-center gap-2">
                               <Badge variant="outline">{idx + 1}º</Badge>
                               <a 
-                                href={lp.url} 
+                                href={getFullUrl(lp.url)} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="text-sm font-medium hover:underline truncate flex items-center gap-1"
@@ -374,7 +397,7 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
                             <div className="flex items-center gap-2">
                               <Badge variant="destructive">{idx + 1}º</Badge>
                               <a 
-                                href={lp.url} 
+                                href={getFullUrl(lp.url)} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="text-sm font-medium hover:underline truncate flex items-center gap-1"
@@ -429,7 +452,7 @@ export function LandingPageAnalytics({ idEmpresa }: LandingPageAnalyticsProps) {
                           <TableRow key={lp.url}>
                             <TableCell className="max-w-[200px] truncate">
                               <a 
-                                href={lp.url} 
+                                href={getFullUrl(lp.url)} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                                 className="hover:underline"
