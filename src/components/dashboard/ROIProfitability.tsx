@@ -214,101 +214,101 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
       </CardHeader>
       <CardContent>
         {/* KPIs de ROI */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
+        <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-4 sm:mb-6">
+          <div className="p-2.5 sm:p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
             <MetricaComInfo 
               label="Receita Total" 
               info={roiData?.isTokeniza 
                 ? `Valor total de investimentos em ${labelPeriodo}.`
                 : `Soma do valor de todas as vendas realizadas em ${labelPeriodo}.`}
-              className="text-sm text-muted-foreground mb-1"
+              className="text-xs sm:text-sm text-muted-foreground mb-1"
             />
-            <div className="text-xl md:text-2xl font-bold text-green-600">
+            <div className="text-base sm:text-xl md:text-2xl font-bold text-green-600 truncate">
               {formatCurrency(roiData?.totalReceita || 0)}
             </div>
           </div>
           
-          <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900">
+          <div className="p-2.5 sm:p-4 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900">
             <MetricaComInfo 
               label="Gasto em Mídia" 
               info={`Total investido em anúncios (Meta Ads + Google Ads) em ${labelPeriodo}.`}
-              className="text-sm text-muted-foreground mb-1"
+              className="text-xs sm:text-sm text-muted-foreground mb-1"
             />
-            <div className="text-xl md:text-2xl font-bold text-red-600">
+            <div className="text-base sm:text-xl md:text-2xl font-bold text-red-600 truncate">
               {formatCurrency(roiData?.totalGasto || 0)}
             </div>
           </div>
           
-          <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
+          <div className="p-2.5 sm:p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
             <MetricaComInfo 
               label="Lucro Bruto" 
               info={roiData?.isTokeniza 
                 ? `5% da receita total (margem Tokeniza) em ${labelPeriodo}.`
                 : `Receita Total menos Gasto em Mídia em ${labelPeriodo}.`}
-              className="text-sm text-muted-foreground mb-1"
+              className="text-xs sm:text-sm text-muted-foreground mb-1"
             />
-            <div className={`text-xl md:text-2xl font-bold ${(roiData?.lucroBruto || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+            <div className={`text-base sm:text-xl md:text-2xl font-bold truncate ${(roiData?.lucroBruto || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
               {formatCurrency(roiData?.lucroBruto || 0)}
             </div>
           </div>
           
-          <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900">
+          <div className="p-2.5 sm:p-4 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900">
             <MetricaComInfo 
               label="ROAS" 
               info={roiData?.isTokeniza 
                 ? `Return On Ad Spend com margem de 5% em ${labelPeriodo}. Quanto retorna em receita líquida para cada R$1 investido.`
                 : `Return On Ad Spend em ${labelPeriodo}. ROAS de 2x significa que cada R$1 gera R$2 em vendas.`}
-              className="text-sm text-muted-foreground mb-1"
+              className="text-xs sm:text-sm text-muted-foreground mb-1"
             />
-            <div className="text-xl md:text-2xl font-bold text-purple-600">
+            <div className="text-base sm:text-xl md:text-2xl font-bold text-purple-600">
               {(roiData?.roas || 0).toFixed(1)}x
             </div>
           </div>
         </div>
 
         {/* Métricas secundárias */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="p-3 rounded-lg bg-muted/50 text-center">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+          <div className="p-2 sm:p-3 rounded-lg bg-muted/50 text-center">
             <MetricaComInfo 
               label="Ticket Médio" 
               info={`Valor médio de cada venda em ${labelPeriodo}.`}
-              className="text-xs text-muted-foreground justify-center"
+              className="text-[10px] sm:text-xs text-muted-foreground justify-center"
             />
-            <div className="text-lg font-semibold">{formatCurrency(roiData?.ticketMedio || 0)}</div>
+            <div className="text-sm sm:text-lg font-semibold truncate">{formatCurrency(roiData?.ticketMedio || 0)}</div>
           </div>
-          <div className="p-3 rounded-lg bg-muted/50 text-center">
+          <div className="p-2 sm:p-3 rounded-lg bg-muted/50 text-center">
             <MetricaComInfo 
               label="CAC" 
               info={`Custo de Aquisição de Cliente em ${labelPeriodo}. Gasto Total / Número de Vendas.`}
-              className="text-xs text-muted-foreground justify-center"
+              className="text-[10px] sm:text-xs text-muted-foreground justify-center"
             />
-            <div className="text-lg font-semibold">{formatCurrency(roiData?.cac || 0)}</div>
+            <div className="text-sm sm:text-lg font-semibold truncate">{formatCurrency(roiData?.cac || 0)}</div>
           </div>
-          <div className="p-3 rounded-lg bg-muted/50 text-center">
+          <div className="p-2 sm:p-3 rounded-lg bg-muted/50 text-center">
             <MetricaComInfo 
               label="Payback" 
               info={`Tempo estimado para recuperar o investimento de aquisição em ${labelPeriodo}.`}
-              className="text-xs text-muted-foreground justify-center"
+              className="text-[10px] sm:text-xs text-muted-foreground justify-center"
             />
-            <div className="text-lg font-semibold">
-              {roiData?.paybackDias || 0} dias
+            <div className="text-sm sm:text-lg font-semibold">
+              {roiData?.paybackDias || 0} <span className="hidden sm:inline">dias</span><span className="sm:hidden">d</span>
             </div>
           </div>
         </div>
 
         {/* Gráfico de barras - Receita vs Gasto por mês (histórico 6 meses) */}
-        <div className="h-64">
-          <p className="text-xs text-muted-foreground mb-2">Histórico últimos 6 meses</p>
+        <div className="h-48 sm:h-64">
+          <p className="text-[10px] sm:text-xs text-muted-foreground mb-2">Histórico últimos 6 meses</p>
           <ChartContainer config={chartConfig} className="h-full w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={roiData?.mesesData || []} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 12 }} />
+              <BarChart data={roiData?.mesesData || []} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
+                <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} width={35} />
                 <ChartTooltip 
                   content={<ChartTooltipContent />}
                   formatter={(value: number) => formatCurrency(value)}
                 />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: '10px' }} />
                 <Bar dataKey="receita" name="Receita" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="gasto" name="Gasto" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
               </BarChart>

@@ -228,40 +228,40 @@ export function CriativosFadiga({ empresaId }: CriativosFadigaProps) {
         ) : (
           <div className="space-y-6">
             {/* Resumo de fadiga */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-3 rounded-lg bg-muted/50 text-center">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-lg bg-muted/50 text-center">
                 <MetricaComInfo 
                   label="Criativos Ativos" 
                   info="Total de criativos atualmente ativos nas campanhas."
-                  className="text-xs text-muted-foreground justify-center"
+                  className="text-[10px] sm:text-xs text-muted-foreground justify-center"
                 />
-                <div className="text-xl font-bold">{criativosData.criativos.length}</div>
+                <div className="text-base sm:text-xl font-bold">{criativosData.criativos.length}</div>
               </div>
-              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/20 text-center">
+              <div className="p-2 sm:p-3 rounded-lg bg-red-50 dark:bg-red-950/20 text-center">
                 <MetricaComInfo 
                   label="Fatigados" 
-                  info="Criativos com CTR em queda de mais de 20%. Indicam desgaste junto ao público."
-                  className="text-xs text-muted-foreground justify-center"
+                  info="Criativos com CTR em queda de mais de 20%."
+                  className="text-[10px] sm:text-xs text-muted-foreground justify-center"
                 />
-                <div className="text-xl font-bold text-red-600">{criativosData.fatigados.length}</div>
+                <div className="text-base sm:text-xl font-bold text-red-600">{criativosData.fatigados.length}</div>
               </div>
-              <div className="p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 text-center">
+              <div className="p-2 sm:p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 text-center">
                 <MetricaComInfo 
                   label="% Verba Fatigados" 
-                  info="Percentual do investimento total sendo gasto em criativos fatigados (dinheiro potencialmente desperdiçado)."
-                  className="text-xs text-muted-foreground justify-center"
+                  info="Percentual do investimento em criativos fatigados."
+                  className="text-[10px] sm:text-xs text-muted-foreground justify-center"
                 />
-                <div className="text-xl font-bold text-orange-600">
+                <div className="text-base sm:text-xl font-bold text-orange-600">
                   {criativosData.percentFatigados.toFixed(1)}%
                 </div>
               </div>
-              <div className="p-3 rounded-lg bg-muted/50 text-center">
+              <div className="p-2 sm:p-3 rounded-lg bg-muted/50 text-center">
                 <MetricaComInfo 
-                  label="Verba em Fatigados" 
-                  info="Valor absoluto investido em criativos fatigados."
-                  className="text-xs text-muted-foreground justify-center"
+                  label="Verba Fatigados" 
+                  info="Valor investido em criativos fatigados."
+                  className="text-[10px] sm:text-xs text-muted-foreground justify-center"
                 />
-                <div className="text-lg font-bold">{formatCurrency(criativosData.verbaTotalFatigados)}</div>
+                <div className="text-sm sm:text-lg font-bold truncate">{formatCurrency(criativosData.verbaTotalFatigados)}</div>
               </div>
             </div>
 
