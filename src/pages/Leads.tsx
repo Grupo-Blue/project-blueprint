@@ -19,6 +19,9 @@ import { usePeriodo } from "@/contexts/PeriodoContext";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { ImportarUsuariosTokeniza } from "@/components/ImportarUsuariosTokeniza";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { LeadCardMobile } from "@/components/leads/LeadCardMobile";
+import { FiltrosMobileSheet } from "@/components/leads/FiltrosMobileSheet";
 
 // Helpers - Canal simplificado
 const getCanal = (source: string | null) => {
@@ -141,6 +144,7 @@ const getStatusPrincipal = (lead: any) => {
 const Leads = () => {
   const { tipoFiltro, getDataReferencia } = usePeriodo();
   const { empresaSelecionada, empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
+  const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [stageFilter, setStageFilter] = useState<string[]>([]);
@@ -480,551 +484,557 @@ const Leads = () => {
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome, email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="nao_vendido">Não Vendido</SelectItem>
-                <SelectItem value="mql">MQLs</SelectItem>
-                <SelectItem value="levantou">Engajados</SelectItem>
-                <SelectItem value="reuniao">Com Reunião</SelectItem>
-                <SelectItem value="venda">Vendas</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={origemFilter} onValueChange={setOrigemFilter}>
-              <SelectTrigger className="w-[130px]">
-                <SelectValue placeholder="Origem" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="pago">Pago</SelectItem>
-                <SelectItem value="organico">Orgânico</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={investidorFilter} onValueChange={setInvestidorFilter}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Investidor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="investidor">Investidores</SelectItem>
-                <SelectItem value="carrinho">Carrinho Aband.</SelectItem>
-                <SelectItem value="nao_investidor">Não Investidor</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {/* Filtro Multi-Select de Stage */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-[180px] justify-between">
-                  <span className="truncate">
-                    {stageFilter.length === 0 
-                      ? "Todos Stages" 
-                      : stageFilter.length === 1 
-                        ? stageFilter[0] 
-                        : `${stageFilter.length} stages`}
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[220px] p-2" align="start">
-                <div className="flex items-center justify-between mb-2 pb-2 border-b">
-                  <span className="text-sm font-medium">Filtrar por Stage</span>
-                  {stageFilter.length > 0 && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 px-2 text-xs"
-                      onClick={() => setStageFilter([])}
-                    >
-                      Limpar
-                    </Button>
-                  )}
-                </div>
-                <div className="max-h-[250px] overflow-y-auto space-y-1">
-                  {(() => {
-                    // Extrair stages únicos dos leads
-                    const uniqueStages = [...new Set(leads?.map(l => l.stage_atual).filter(Boolean) as string[])].sort();
-                    return uniqueStages.map((stage) => (
-                      <div
-                        key={stage}
-                        className="flex items-center space-x-2 p-2 hover:bg-muted rounded-md cursor-pointer"
-                        onClick={() => {
-                          setStageFilter(prev => 
-                            prev.includes(stage) 
-                              ? prev.filter(s => s !== stage) 
-                              : [...prev, stage]
-                          );
-                        }}
+      {/* Filters - Mobile vs Desktop */}
+      {isMobile ? (
+        <FiltrosMobileSheet
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          origemFilter={origemFilter}
+          setOrigemFilter={setOrigemFilter}
+          investidorFilter={investidorFilter}
+          setInvestidorFilter={setInvestidorFilter}
+          stageFilter={stageFilter}
+          setStageFilter={setStageFilter}
+          availableStages={[...new Set(leads?.map(l => l.stage_atual).filter(Boolean) as string[])].sort()}
+        />
+      ) : (
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex flex-col md:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome, email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="nao_vendido">Não Vendido</SelectItem>
+                  <SelectItem value="mql">MQLs</SelectItem>
+                  <SelectItem value="levantou">Engajados</SelectItem>
+                  <SelectItem value="reuniao">Com Reunião</SelectItem>
+                  <SelectItem value="venda">Vendas</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={origemFilter} onValueChange={setOrigemFilter}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Origem" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
+                  <SelectItem value="organico">Orgânico</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={investidorFilter} onValueChange={setInvestidorFilter}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Investidor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="investidor">Investidores</SelectItem>
+                  <SelectItem value="carrinho">Carrinho Aband.</SelectItem>
+                  <SelectItem value="nao_investidor">Não Investidor</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Filtro Multi-Select de Stage */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[180px] justify-between">
+                    <span className="truncate">
+                      {stageFilter.length === 0 
+                        ? "Todos Stages" 
+                        : stageFilter.length === 1 
+                          ? stageFilter[0] 
+                          : `${stageFilter.length} stages`}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-2" align="start">
+                  <div className="flex items-center justify-between mb-2 pb-2 border-b">
+                    <span className="text-sm font-medium">Filtrar por Stage</span>
+                    {stageFilter.length > 0 && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setStageFilter([])}
                       >
-                        <Checkbox 
-                          checked={stageFilter.includes(stage)} 
-                          className="pointer-events-none"
-                        />
-                        <span className="text-sm flex-1">{stage}</span>
-                        {stageFilter.includes(stage) && (
-                          <Check className="h-4 w-4 text-primary" />
-                        )}
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Table */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[30px]"></TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort("nome")}>
-                    <div className="flex items-center">Lead <SortIcon column="nome" /></div>
-                  </TableHead>
-                  <TableHead>Canal</TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort("entrada")}>
-                    <div className="flex items-center">Entrada <SortIcon column="entrada" /></div>
-                  </TableHead>
-                  <TableHead>Stage</TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort("temperatura")}>
-                    <div className="flex items-center">Prioridade <SortIcon column="temperatura" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort("dias")}>
-                    <div className="flex items-center">Dias <SortIcon column="dias" /></div>
-                  </TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="cursor-pointer text-right" onClick={() => handleSort("valor")}>
-                    <div className="flex items-center justify-end">Valor <SortIcon column="valor" /></div>
-                  </TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedLeads?.map((lead) => {
-                  const prioridade = getPrioridade(lead);
-                  const PrioridadeIcon = prioridade.icon;
-                  const dias = getDiasNoStage(lead);
-                  const canal = getCanal(lead.utm_source);
-                  const statusPrincipal = getStatusPrincipal(lead);
-                  const isCarrinhoAbandonado = lead.tokeniza_carrinho_abandonado && !lead.tokeniza_investidor;
-                  const scoreTemp = calcularScoreTemperatura(lead);
-
-                  return (
-                    <Collapsible key={lead.id_lead} asChild open={expandedRows.has(lead.id_lead)}>
-                      <>
-                        <TableRow className={cn(
-                          "hover:bg-muted/50",
-                          isCarrinhoAbandonado && "bg-orange-50/70 border-l-4 border-l-orange-500"
-                        )}>
-                          <TableCell>
-                            <CollapsibleTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => toggleRowExpansion(lead.id_lead)}>
-                                {expandedRows.has(lead.id_lead) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                              </Button>
-                            </CollapsibleTrigger>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{lead.nome_lead || "Sem nome"}</span>
-                              {lead.email && <span className="text-xs text-muted-foreground">{lead.email}</span>}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className={cn("text-sm font-medium", canal.color)}>
-                              {canal.icon} {canal.label}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground">
-                              {format(parseISO(lead.data_criacao), "dd/MM/yy")}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={lead.stage_atual === "Vendido" ? "default" : "secondary"} className="text-xs">
-                              {lead.stage_atual || "N/A"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className={cn(
-                              "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold w-fit",
-                              prioridade.bgColor, prioridade.color
-                            )}>
-                              <PrioridadeIcon className="h-3 w-3" />
-                              {prioridade.label}
-                              <span className="font-mono text-[11px] opacity-80">{scoreTemp}°</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className={cn(
-                              "text-sm font-medium",
-                              dias > 7 ? "text-red-600" : dias > 3 ? "text-yellow-600" : "text-muted-foreground"
-                            )}>
-                              {dias > 7 && <AlertTriangle className="h-3 w-3 inline mr-1" />}
-                              {dias}d
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <Badge className={cn("text-xs", statusPrincipal.color)}>
-                                {statusPrincipal.icon} {statusPrincipal.label}
-                              </Badge>
-                              {/* Cliente/Ex-Cliente badges */}
-                              {lead.cliente_notion?.status_cliente === 'Cliente' && (
-                                <Badge variant="outline" className="text-xs bg-emerald-100 text-emerald-700 border-emerald-300">
-                                  ✅ Cliente
-                                </Badge>
-                              )}
-                              {lead.cliente_notion?.status_cliente === 'Ex-cliente' && (
-                                <Badge variant="outline" className="text-xs bg-slate-100 text-slate-600 border-slate-300">
-                                  👤 Ex-Cliente
-                                </Badge>
-                              )}
-                              {lead.tokeniza_investidor && (
-                                <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300">
-                                  💰
-                                </Badge>
-                              )}
-                              {isCarrinhoAbandonado && (
-                                <Badge variant="outline" className="text-xs bg-orange-100 text-orange-700 border-orange-300">
-                                  🛒
-                                </Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {lead.valor_venda ? (
-                              <span className="font-semibold text-green-600">
-                                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.valor_venda)}
-                              </span>
-                            ) : "-"}
-                          </TableCell>
-                          <TableCell>
-                            {lead.url_pipedrive && (
-                              <Button variant="ghost" size="sm" asChild>
-                                <a href={lead.url_pipedrive} target="_blank" rel="noopener noreferrer">
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                        
-                        {/* Seção Expandida - 4 Colunas */}
-                        <CollapsibleContent asChild>
-                          <TableRow className="bg-muted/30">
-                            <TableCell colSpan={10} className="p-4">
-                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                                {/* Coluna 1: Histórico */}
-                                <div className="space-y-2">
-                                  <h4 className="font-semibold flex items-center gap-2 text-foreground">
-                                    <History className="h-4 w-4" /> Histórico
-                                  </h4>
-                                  <div className="space-y-1 text-xs">
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Criado:</span>
-                                      <span>{format(parseISO(lead.data_criacao), "dd/MM/yy")}</span>
-                                    </div>
-                                    {lead.data_mql && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">MQL:</span>
-                                        <span>{format(parseISO(lead.data_mql), "dd/MM/yy")}</span>
-                                      </div>
-                                    )}
-                                    {lead.data_levantou_mao && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Engajou:</span>
-                                        <span>{format(parseISO(lead.data_levantou_mao), "dd/MM/yy")}</span>
-                                      </div>
-                                    )}
-                                    {lead.data_reuniao && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Reunião:</span>
-                                        <span>{format(parseISO(lead.data_reuniao), "dd/MM/yy")}</span>
-                                      </div>
-                                    )}
-                                    {lead.data_venda && (
-                                      <div className="flex justify-between text-green-600 font-medium">
-                                        <span>Venda:</span>
-                                        <span>{format(parseISO(lead.data_venda), "dd/MM/yy")}</span>
-                                      </div>
-                                    )}
-                                    {/* Eventos do lead_evento */}
-                                    {lead.lead_evento && lead.lead_evento.length > 0 && (
-                                      <div className="mt-2 pt-2 border-t border-border">
-                                        <span className="text-muted-foreground text-[10px] uppercase">Eventos:</span>
-                                        {lead.lead_evento.slice(0, 3).map((evento: any, idx: number) => (
-                                          <div key={idx} className="flex justify-between text-[11px]">
-                                            <span className="text-muted-foreground truncate max-w-[80px]">{evento.etapa}</span>
-                                            <span>{format(parseISO(evento.data_evento), "dd/MM")}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Coluna 2: Tracking/UTMs */}
-                                <div className="space-y-2">
-                                  <h4 className="font-semibold flex items-center gap-2 text-foreground">
-                                    <Target className="h-4 w-4" /> Tracking
-                                  </h4>
-                                  <div className="space-y-1 text-xs">
-                                    <div className="flex items-center gap-1 mb-2">
-                                      <span className="text-muted-foreground">Qualidade:</span>
-                                      <span>{getUtmQuality(lead).badge} {getUtmQuality(lead).label}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Source:</span>
-                                      <span className="truncate max-w-[100px]">{lead.utm_source || "-"}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Medium:</span>
-                                      <span className="truncate max-w-[100px]">{lead.utm_medium || "-"}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Campaign:</span>
-                                      <span className="truncate max-w-[100px]">{lead.utm_campaign || "-"}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Content:</span>
-                                      <span className="truncate max-w-[100px]">{lead.utm_content || "-"}</span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Coluna 3: Engajamento (Mautic + Chatwoot) */}
-                                <div className="space-y-2">
-                                  <h4 className="font-semibold flex items-center gap-2 text-foreground">
-                                    <Activity className="h-4 w-4" /> Engajamento
-                                  </h4>
-                                  <div className="space-y-1 text-xs">
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Score:</span>
-                                      <Badge variant={lead.mautic_score >= 50 ? "default" : "secondary"} className="text-[10px]">
-                                        {lead.mautic_score || 0}
-                                      </Badge>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Page Hits:</span>
-                                      <span>{lead.mautic_page_hits || 0}</span>
-                                    </div>
-                                    {lead.mautic_first_visit && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">1ª Visita:</span>
-                                        <span>{format(parseISO(lead.mautic_first_visit), "dd/MM/yy")}</span>
-                                      </div>
-                                    )}
-                                    {lead.mautic_last_active && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Última:</span>
-                                        <span>{format(parseISO(lead.mautic_last_active), "dd/MM/yy")}</span>
-                                      </div>
-                                    )}
-                                    {(lead.cidade_mautic || lead.estado_mautic) && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Local:</span>
-                                        <span>{lead.cidade_mautic || ""}{lead.cidade_mautic && lead.estado_mautic ? ", " : ""}{lead.estado_mautic || ""}</span>
-                                      </div>
-                                    )}
-                                    {lead.mautic_tags && Array.isArray(lead.mautic_tags) && lead.mautic_tags.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {lead.mautic_tags.slice(0, 3).map((tag: any, idx: number) => (
-                                          <Badge key={idx} variant="outline" className="text-[9px] px-1">
-                                            {typeof tag === 'string' ? tag : tag.tag}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                    )}
-                                    
-                                    {/* Chatwoot / Atendimento */}
-                                    {(lead.chatwoot_contact_id || lead.chatwoot_conversas_total > 0) && (
-                                      <div className="mt-2 pt-2 border-t border-border">
-                                        <span className="text-muted-foreground text-[10px] uppercase">Atendimento:</span>
-                                        <div className="flex justify-between mt-1">
-                                          <span className="text-muted-foreground">Status:</span>
-                                          <Badge variant="outline" className={cn(
-                                            "text-[10px]",
-                                            lead.chatwoot_status_atendimento === 'open' ? "bg-green-100 text-green-700" :
-                                            lead.chatwoot_status_atendimento === 'pending' ? "bg-yellow-100 text-yellow-700" :
-                                            lead.chatwoot_status_atendimento === 'resolved' ? "bg-blue-100 text-blue-700" : ""
-                                          )}>
-                                            {lead.chatwoot_status_atendimento === 'open' ? '🟢 Open' :
-                                             lead.chatwoot_status_atendimento === 'pending' ? '🟡 Pending' :
-                                             lead.chatwoot_status_atendimento === 'resolved' ? '✅ Resolved' : 
-                                             lead.chatwoot_status_atendimento || '-'}
-                                          </Badge>
-                                        </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Conversas:</span>
-                                          <span>{lead.chatwoot_conversas_total || 0}</span>
-                                        </div>
-                                        {lead.chatwoot_ultima_conversa && (
-                                          <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Última:</span>
-                                            <span>{format(parseISO(lead.chatwoot_ultima_conversa), "dd/MM HH:mm")}</span>
-                                          </div>
-                                        )}
-                                        {lead.chatwoot_agente_atual && (
-                                          <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Agente:</span>
-                                            <span className="truncate max-w-[80px]">{lead.chatwoot_agente_atual}</span>
-                                          </div>
-                                        )}
-                                        {lead.chatwoot_inbox && (
-                                          <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Inbox:</span>
-                                            <span className="truncate max-w-[80px]">{lead.chatwoot_inbox}</span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Coluna 4: Dados Extra (Tokeniza + Cliente Notion) */}
-                                <div className="space-y-2">
-                                  <h4 className="font-semibold flex items-center gap-2 text-foreground">
-                                    <Wallet className="h-4 w-4" /> Dados Extra
-                                  </h4>
-                                  <div className="space-y-1 text-xs">
-                                    {/* Telefone */}
-                                    {lead.telefone && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Telefone:</span>
-                                        <span className="font-medium">{lead.telefone}</span>
-                                      </div>
-                                    )}
-                                    {/* Tokeniza */}
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Investidor:</span>
-                                      <span className={lead.tokeniza_investidor ? "text-green-600 font-medium" : ""}>
-                                        {lead.tokeniza_investidor ? "✓ Sim" : "Não"}
-                                      </span>
-                                    </div>
-                                    {lead.tokeniza_valor_investido > 0 && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Investido:</span>
-                                        <span className="text-green-600 font-medium">
-                                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.tokeniza_valor_investido)}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {lead.tokeniza_projeto_nome && (
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Projeto:</span>
-                                        <span className="truncate max-w-[100px]">{lead.tokeniza_projeto_nome}</span>
-                                      </div>
-                                    )}
-                                    {isCarrinhoAbandonado && lead.tokeniza_valor_carrinho > 0 && (
-                                      <div className="flex justify-between text-orange-600">
-                                        <span>🛒 Carrinho:</span>
-                                        <span className="font-medium">
-                                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.tokeniza_valor_carrinho)}
-                                        </span>
-                                      </div>
-                                    )}
-                                    
-                                    {/* Cliente Notion */}
-                                    {lead.cliente_notion && (
-                                      <div className="mt-2 pt-2 border-t border-border">
-                                        <span className="text-muted-foreground text-[10px] uppercase">Cliente Notion:</span>
-                                        <div className="flex justify-between mt-1">
-                                          <span className="text-muted-foreground">Status:</span>
-                                          <Badge variant="outline" className={cn(
-                                            "text-[10px]",
-                                            lead.cliente_notion.status_cliente === "Cliente" ? "bg-green-100 text-green-700" : "bg-slate-100"
-                                          )}>
-                                            {lead.cliente_notion.status_cliente}
-                                          </Badge>
-                                        </div>
-                                        {lead.cliente_notion.produtos_contratados && Array.isArray(lead.cliente_notion.produtos_contratados) && (
-                                          <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Produtos:</span>
-                                            <span>{lead.cliente_notion.produtos_contratados.length}</span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-
-                                    {/* Organização */}
-                                    {lead.organizacao && (
-                                      <div className="flex justify-between mt-1">
-                                        <span className="text-muted-foreground">Org:</span>
-                                        <span className="truncate max-w-[100px]">{lead.organizacao}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        </CollapsibleContent>
-                      </>
-                    </Collapsible>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-4">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                  {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                    const page = i + 1;
-                    return (
-                      <PaginationItem key={page}>
-                        <PaginationLink
-                          onClick={() => setCurrentPage(page)}
-                          isActive={currentPage === page}
-                          className="cursor-pointer"
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                  <div className="max-h-[250px] overflow-y-auto space-y-1">
+                    {(() => {
+                      // Extrair stages únicos dos leads
+                      const uniqueStages = [...new Set(leads?.map(l => l.stage_atual).filter(Boolean) as string[])].sort();
+                      return uniqueStages.map((stage) => (
+                        <div
+                          key={stage}
+                          className="flex items-center space-x-2 p-2 hover:bg-muted rounded-md cursor-pointer"
+                          onClick={() => {
+                            setStageFilter(prev => 
+                              prev.includes(stage) 
+                                ? prev.filter(s => s !== stage) 
+                                : [...prev, stage]
+                            );
+                          }}
                         >
-                          {page}
-                        </PaginationLink>
-                      </PaginationItem>
-                    );
-                  })}
-                  {totalPages > 5 && <PaginationEllipsis />}
-                  <PaginationItem>
-                    <PaginationNext
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+                          <Checkbox 
+                            checked={stageFilter.includes(stage)} 
+                            className="pointer-events-none"
+                          />
+                          <span className="text-sm flex-1">{stage}</span>
+                          {stageFilter.includes(stage) && (
+                            <Check className="h-4 w-4 text-primary" />
+                          )}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Table - Mobile vs Desktop */}
+      {isMobile ? (
+        /* Mobile Card List */
+        <div className="space-y-3">
+          {paginatedLeads?.map((lead) => (
+            <LeadCardMobile
+              key={lead.id_lead}
+              lead={lead}
+              isExpanded={expandedRows.has(lead.id_lead)}
+              onToggleExpand={() => toggleRowExpansion(lead.id_lead)}
+            />
+          ))}
+          
+          {/* Mobile Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {currentPage} de {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Próximo
+              </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      ) : (
+        /* Desktop Table */
+        <Card>
+          <CardContent className="pt-4">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[30px]"></TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("nome")}>
+                      <div className="flex items-center">Lead <SortIcon column="nome" /></div>
+                    </TableHead>
+                    <TableHead>Canal</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("entrada")}>
+                      <div className="flex items-center">Entrada <SortIcon column="entrada" /></div>
+                    </TableHead>
+                    <TableHead>Stage</TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("temperatura")}>
+                      <div className="flex items-center">Prioridade <SortIcon column="temperatura" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort("dias")}>
+                      <div className="flex items-center">Dias <SortIcon column="dias" /></div>
+                    </TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="cursor-pointer text-right" onClick={() => handleSort("valor")}>
+                      <div className="flex items-center justify-end">Valor <SortIcon column="valor" /></div>
+                    </TableHead>
+                    <TableHead>Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedLeads?.map((lead) => {
+                    const prioridade = getPrioridade(lead);
+                    const PrioridadeIcon = prioridade.icon;
+                    const dias = getDiasNoStage(lead);
+                    const canal = getCanal(lead.utm_source);
+                    const statusPrincipal = getStatusPrincipal(lead);
+                    const isCarrinhoAbandonado = lead.tokeniza_carrinho_abandonado && !lead.tokeniza_investidor;
+                    const scoreTemp = calcularScoreTemperatura(lead);
+
+                    return (
+                      <Collapsible key={lead.id_lead} asChild open={expandedRows.has(lead.id_lead)}>
+                        <>
+                          <TableRow className={cn(
+                            "hover:bg-muted/50",
+                            isCarrinhoAbandonado && "bg-orange-50/70 border-l-4 border-l-orange-500"
+                          )}>
+                            <TableCell>
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => toggleRowExpansion(lead.id_lead)}>
+                                  {expandedRows.has(lead.id_lead) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                </Button>
+                              </CollapsibleTrigger>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{lead.nome_lead || "Sem nome"}</span>
+                                {lead.email && <span className="text-xs text-muted-foreground">{lead.email}</span>}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className={cn("text-sm font-medium", canal.color)}>
+                                {canal.icon} {canal.label}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-muted-foreground">
+                                {format(parseISO(lead.data_criacao), "dd/MM/yy")}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={lead.stage_atual === "Vendido" ? "default" : "secondary"} className="text-xs">
+                                {lead.stage_atual || "N/A"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className={cn(
+                                "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold w-fit",
+                                prioridade.bgColor, prioridade.color
+                              )}>
+                                <PrioridadeIcon className="h-3 w-3" />
+                                {prioridade.label}
+                                <span className="font-mono text-[11px] opacity-80">{scoreTemp}°</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className={cn(
+                                "text-sm font-medium",
+                                dias > 7 ? "text-red-600" : dias > 3 ? "text-yellow-600" : "text-muted-foreground"
+                              )}>
+                                {dias > 7 && <AlertTriangle className="h-3 w-3 inline mr-1" />}
+                                {dias}d
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <Badge className={cn("text-xs", statusPrincipal.color)}>
+                                  {statusPrincipal.icon} {statusPrincipal.label}
+                                </Badge>
+                                {lead.cliente_notion?.status_cliente === 'Cliente' && (
+                                  <Badge variant="outline" className="text-xs bg-emerald-100 text-emerald-700 border-emerald-300">
+                                    ✅ Cliente
+                                  </Badge>
+                                )}
+                                {lead.cliente_notion?.status_cliente === 'Ex-cliente' && (
+                                  <Badge variant="outline" className="text-xs bg-slate-100 text-slate-600 border-slate-300">
+                                    👤 Ex-Cliente
+                                  </Badge>
+                                )}
+                                {lead.tokeniza_investidor && (
+                                  <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300">
+                                    💰
+                                  </Badge>
+                                )}
+                                {isCarrinhoAbandonado && (
+                                  <Badge variant="outline" className="text-xs bg-orange-100 text-orange-700 border-orange-300">
+                                    🛒
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {lead.valor_venda ? (
+                                <span className="font-semibold text-green-600">
+                                  {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.valor_venda)}
+                                </span>
+                              ) : "-"}
+                            </TableCell>
+                            <TableCell>
+                              {lead.url_pipedrive && (
+                                <Button variant="ghost" size="sm" asChild>
+                                  <a href={lead.url_pipedrive} target="_blank" rel="noopener noreferrer">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          
+                          {/* Seção Expandida - 4 Colunas */}
+                          <CollapsibleContent asChild>
+                            <TableRow className="bg-muted/30">
+                              <TableCell colSpan={10} className="p-4">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                                  {/* Coluna 1: Histórico */}
+                                  <div className="space-y-2">
+                                    <h4 className="font-semibold flex items-center gap-2 text-foreground">
+                                      <History className="h-4 w-4" /> Histórico
+                                    </h4>
+                                    <div className="space-y-1 text-xs">
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Criado:</span>
+                                        <span>{format(parseISO(lead.data_criacao), "dd/MM/yy")}</span>
+                                      </div>
+                                      {lead.data_mql && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">MQL:</span>
+                                          <span>{format(parseISO(lead.data_mql), "dd/MM/yy")}</span>
+                                        </div>
+                                      )}
+                                      {lead.data_levantou_mao && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Engajou:</span>
+                                          <span>{format(parseISO(lead.data_levantou_mao), "dd/MM/yy")}</span>
+                                        </div>
+                                      )}
+                                      {lead.data_reuniao && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Reunião:</span>
+                                          <span>{format(parseISO(lead.data_reuniao), "dd/MM/yy")}</span>
+                                        </div>
+                                      )}
+                                      {lead.data_venda && (
+                                        <div className="flex justify-between text-green-600 font-medium">
+                                          <span>Venda:</span>
+                                          <span>{format(parseISO(lead.data_venda), "dd/MM/yy")}</span>
+                                        </div>
+                                      )}
+                                      {lead.lead_evento && lead.lead_evento.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <span className="text-muted-foreground text-[10px] uppercase">Eventos:</span>
+                                          {lead.lead_evento.slice(0, 3).map((evento: any, idx: number) => (
+                                            <div key={idx} className="flex justify-between text-[11px]">
+                                              <span className="text-muted-foreground truncate max-w-[80px]">{evento.etapa}</span>
+                                              <span>{format(parseISO(evento.data_evento), "dd/MM")}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Coluna 2: Tracking/UTMs */}
+                                  <div className="space-y-2">
+                                    <h4 className="font-semibold flex items-center gap-2 text-foreground">
+                                      <Target className="h-4 w-4" /> Tracking
+                                    </h4>
+                                    <div className="space-y-1 text-xs">
+                                      <div className="flex items-center gap-1 mb-2">
+                                        <span className="text-muted-foreground">Qualidade:</span>
+                                        <span>{getUtmQuality(lead).badge} {getUtmQuality(lead).label}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Source:</span>
+                                        <span className="truncate max-w-[100px]">{lead.utm_source || "-"}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Medium:</span>
+                                        <span className="truncate max-w-[100px]">{lead.utm_medium || "-"}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Campaign:</span>
+                                        <span className="truncate max-w-[100px]">{lead.utm_campaign || "-"}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Content:</span>
+                                        <span className="truncate max-w-[100px]">{lead.utm_content || "-"}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Coluna 3: Engajamento */}
+                                  <div className="space-y-2">
+                                    <h4 className="font-semibold flex items-center gap-2 text-foreground">
+                                      <Activity className="h-4 w-4" /> Engajamento
+                                    </h4>
+                                    <div className="space-y-1 text-xs">
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Score:</span>
+                                        <Badge variant={lead.mautic_score >= 50 ? "default" : "secondary"} className="text-[10px]">
+                                          {lead.mautic_score || 0}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Page Hits:</span>
+                                        <span>{lead.mautic_page_hits || 0}</span>
+                                      </div>
+                                      {lead.mautic_first_visit && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">1ª Visita:</span>
+                                          <span>{format(parseISO(lead.mautic_first_visit), "dd/MM/yy")}</span>
+                                        </div>
+                                      )}
+                                      {(lead.cidade_mautic || lead.estado_mautic) && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Local:</span>
+                                          <span>{lead.cidade_mautic || ""}{lead.cidade_mautic && lead.estado_mautic ? ", " : ""}{lead.estado_mautic || ""}</span>
+                                        </div>
+                                      )}
+                                      {lead.mautic_tags && Array.isArray(lead.mautic_tags) && lead.mautic_tags.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                          {lead.mautic_tags.slice(0, 3).map((tag: any, idx: number) => (
+                                            <Badge key={idx} variant="outline" className="text-[9px] px-1">
+                                              {typeof tag === 'string' ? tag : tag.tag}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {(lead.chatwoot_contact_id || lead.chatwoot_conversas_total > 0) && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <span className="text-muted-foreground text-[10px] uppercase">Atendimento:</span>
+                                          <div className="flex justify-between mt-1">
+                                            <span className="text-muted-foreground">Status:</span>
+                                            <Badge variant="outline" className={cn(
+                                              "text-[10px]",
+                                              lead.chatwoot_status_atendimento === 'open' ? "bg-green-100 text-green-700" :
+                                              lead.chatwoot_status_atendimento === 'resolved' ? "bg-blue-100 text-blue-700" : ""
+                                            )}>
+                                              {lead.chatwoot_status_atendimento || '-'}
+                                            </Badge>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Conversas:</span>
+                                            <span>{lead.chatwoot_conversas_total || 0}</span>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Coluna 4: Dados Extra */}
+                                  <div className="space-y-2">
+                                    <h4 className="font-semibold flex items-center gap-2 text-foreground">
+                                      <Wallet className="h-4 w-4" /> Dados Extra
+                                    </h4>
+                                    <div className="space-y-1 text-xs">
+                                      {lead.telefone && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Telefone:</span>
+                                          <span className="font-medium">{lead.telefone}</span>
+                                        </div>
+                                      )}
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Investidor:</span>
+                                        <span className={lead.tokeniza_investidor ? "text-green-600 font-medium" : ""}>
+                                          {lead.tokeniza_investidor ? "✓ Sim" : "Não"}
+                                        </span>
+                                      </div>
+                                      {lead.tokeniza_valor_investido > 0 && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Investido:</span>
+                                          <span className="text-green-600 font-medium">
+                                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.tokeniza_valor_investido)}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {isCarrinhoAbandonado && lead.tokeniza_valor_carrinho > 0 && (
+                                        <div className="flex justify-between text-orange-600">
+                                          <span>🛒 Carrinho:</span>
+                                          <span className="font-medium">
+                                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.tokeniza_valor_carrinho)}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {lead.cliente_notion && (
+                                        <div className="mt-2 pt-2 border-t border-border">
+                                          <span className="text-muted-foreground text-[10px] uppercase">Cliente Notion:</span>
+                                          <div className="flex justify-between mt-1">
+                                            <span className="text-muted-foreground">Status:</span>
+                                            <Badge variant="outline" className={cn(
+                                              "text-[10px]",
+                                              lead.cliente_notion.status_cliente === "Cliente" ? "bg-green-100 text-green-700" : "bg-slate-100"
+                                            )}>
+                                              {lead.cliente_notion.status_cliente}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      )}
+                                      {lead.organizacao && (
+                                        <div className="flex justify-between mt-1">
+                                          <span className="text-muted-foreground">Org:</span>
+                                          <span className="truncate max-w-[100px]">{lead.organizacao}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          </CollapsibleContent>
+                        </>
+                      </Collapsible>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Desktop Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                    {[...Array(Math.min(5, totalPages))].map((_, i) => {
+                      const page = i + 1;
+                      return (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            onClick={() => setCurrentPage(page)}
+                            isActive={currentPage === page}
+                            className="cursor-pointer"
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    })}
+                    {totalPages > 5 && <PaginationEllipsis />}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
