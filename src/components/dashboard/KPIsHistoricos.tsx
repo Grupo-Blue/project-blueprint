@@ -143,32 +143,32 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
     
     return (
       <Card className="relative overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
+          <CardTitle className="text-xs sm:text-sm font-medium">
             <MetricaComInfo label={titulo} info={info} />
           </CardTitle>
-          <Icon className="h-4 w-4 text-muted-foreground" />
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
         </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{valor}</div>
-          <div className="flex items-center gap-1 text-xs">
+        <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+          <div className="text-lg sm:text-2xl font-bold truncate">{valor}</div>
+          <div className="flex items-center gap-1 text-[10px] sm:text-xs flex-wrap">
             {variacao !== 0 && (
               <>
                 {isPositivo ? (
-                  <TrendingUp className="h-3 w-3 text-green-500" />
+                  <TrendingUp className="h-3 w-3 text-green-500 shrink-0" />
                 ) : (
-                  <TrendingDown className="h-3 w-3 text-red-500" />
+                  <TrendingDown className="h-3 w-3 text-red-500 shrink-0" />
                 )}
                 <span className={isPositivo ? "text-green-500" : "text-red-500"}>
                   {variacao > 0 ? "+" : ""}{variacao.toFixed(1)}%
                 </span>
-                <span className="text-muted-foreground">vs mês anterior</span>
+                <span className="text-muted-foreground hidden sm:inline">vs mês anterior</span>
               </>
             )}
           </div>
           
           {dados.length > 0 && (
-            <div className="mt-3 h-16">
+            <div className="mt-2 sm:mt-3 h-12 sm:h-16">
               <ChartContainer config={chartConfig} className="h-full w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={dados}>
@@ -207,16 +207,16 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">📊 Métricas Históricas</h3>
-        <ToggleGroup type="single" value={periodo} onValueChange={(v) => v && setPeriodo(v as any)}>
-          <ToggleGroupItem value="comparacao" size="sm">Mês vs Anterior</ToggleGroupItem>
-          <ToggleGroupItem value="6meses" size="sm">Últimos 6 meses</ToggleGroupItem>
+    <div className="space-y-3 sm:space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <h3 className="text-base sm:text-lg font-semibold">📊 Métricas Históricas</h3>
+        <ToggleGroup type="single" value={periodo} onValueChange={(v) => v && setPeriodo(v as any)} className="justify-start sm:justify-end">
+          <ToggleGroupItem value="comparacao" size="sm" className="text-xs sm:text-sm">Mês vs Anterior</ToggleGroupItem>
+          <ToggleGroupItem value="6meses" size="sm" className="text-xs sm:text-sm">Últimos 6 meses</ToggleGroupItem>
         </ToggleGroup>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <MiniKPICard
           titulo="Leads"
           valor={leadsAtual}

@@ -47,6 +47,8 @@ import { CampanhaFluxoDiagram } from "@/components/CampanhaFluxoDiagram";
 import { MetricasAwareness } from "@/components/dashboard/MetricasAwareness";
 import { UTMHealthWidget } from "@/components/dashboard/UTMHealthWidget";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
+import { CampanhaCardMobile } from "@/components/dashboard/CampanhaCardMobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CampanhaMetrica {
   id_campanha: string;
@@ -539,6 +541,7 @@ export default function DashboardTrafego() {
   const periodoContext = usePeriodo();
   const { getDataReferencia, tipoFiltro } = periodoContext;
   const labelPeriodo = periodoContext.labelPeriodo;
+  const isMobile = useIsMobile();
 
   // Usar data do filtro selecionado
   const dataReferencia = getDataReferencia();
@@ -955,17 +958,17 @@ export default function DashboardTrafego() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+    <div className="min-h-screen bg-background p-3 sm:p-8">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-8">
+        <div className="flex flex-col gap-3 sm:gap-4">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3 sm:gap-4">
             <div>
-              <h1 className="text-4xl font-bold text-foreground">Dashboard Tráfego</h1>
-              <p className="text-muted-foreground mt-2">
-                Análise detalhada de campanhas e funil - {labelPeriodo}
+              <h1 className="text-2xl sm:text-4xl font-bold text-foreground">Dashboard Tráfego</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
+                Análise de campanhas - {labelPeriodo}
               </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex gap-2 sm:gap-3">
               <Button
                 variant="outline" 
                 size="sm"
@@ -977,50 +980,50 @@ export default function DashboardTrafego() {
                   refetchCampanhas();
                   toast({ title: "Dados atualizados!", description: "Cache limpo e dados recarregados" });
                 }}
-                className="gap-2"
+                className="gap-1 sm:gap-2"
               >
                 <RefreshCw className="h-4 w-4" />
-                Atualizar
+                <span className="hidden sm:inline">Atualizar</span>
               </Button>
             </div>
           </div>
         </div>
 
-        {/* KPIs Topo */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+        {/* KPIs Topo - Grid responsivo */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 sm:gap-4">
+          <Card className="p-2 sm:p-0">
+            <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6 sm:pt-4">
+              <CardTitle className="text-[10px] sm:text-xs font-medium text-muted-foreground">
                 Verba Total
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold">
-                R$ {totais.verba.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <CardContent className="p-2 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-sm sm:text-xl font-bold truncate">
+                R$ {totais.verba.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+          <Card className="p-2 sm:p-0">
+            <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6 sm:pt-4">
+              <CardTitle className="text-[10px] sm:text-xs font-medium text-muted-foreground">
                 Leads
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold">{totais.leads}</div>
+            <CardContent className="p-2 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-sm sm:text-xl font-bold">{totais.leads}</div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+          <Card className="p-2 sm:p-0">
+            <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6 sm:pt-4">
+              <CardTitle className="text-[10px] sm:text-xs font-medium text-muted-foreground">
                 MQLs
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold">{totais.mqls}</div>
-              {mqlDistribuicao && (
+            <CardContent className="p-2 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-sm sm:text-xl font-bold">{totais.mqls}</div>
+              {mqlDistribuicao && !isMobile && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1042,137 +1045,129 @@ export default function DashboardTrafego() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+          <Card className="p-2 sm:p-0">
+            <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6 sm:pt-4">
+              <CardTitle className="text-[10px] sm:text-xs font-medium text-muted-foreground">
                 Levantadas
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold">{totais.levantadas}</div>
+            <CardContent className="p-2 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-sm sm:text-xl font-bold">{totais.levantadas}</div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+          <Card className="p-2 sm:p-0">
+            <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6 sm:pt-4">
+              <CardTitle className="text-[10px] sm:text-xs font-medium text-muted-foreground">
                 Reuniões
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold">{totais.reunioes}</div>
+            <CardContent className="p-2 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-sm sm:text-xl font-bold">{totais.reunioes}</div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+          <Card className="p-2 sm:p-0">
+            <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6 sm:pt-4">
+              <CardTitle className="text-[10px] sm:text-xs font-medium text-muted-foreground">
                 Vendas
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold">{totais.vendas}</div>
+            <CardContent className="p-2 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-sm sm:text-xl font-bold">{totais.vendas}</div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+          <Card className="p-2 sm:p-0 col-span-2 sm:col-span-1">
+            <CardHeader className="pb-1 sm:pb-2 p-2 sm:p-6 sm:pt-4">
+              <CardTitle className="text-[10px] sm:text-xs font-medium text-muted-foreground">
                 Eficiência do Funil
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold">{eficienciaFunil.toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground mt-1">
+            <CardContent className="p-2 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-sm sm:text-xl font-bold">{eficienciaFunil.toFixed(1)}%</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
                 {totais.vendas} / {totais.leads} leads
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Card CPL Orgânico */}
+        {/* Card CPL Orgânico - Responsivo */}
         {cplOrganicoData && (cplOrganicoData.investimento > 0 || cplOrganicoData.leads > 0) && (
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-emerald-500" />
-                Custo por Lead Orgânico (Redes Sociais)
+            <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <Target className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
+                <span className="hidden sm:inline">Custo por Lead Orgânico (Redes Sociais)</span>
+                <span className="sm:hidden">CPL Orgânico</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 rounded-lg bg-gradient-to-br from-emerald-500/10 to-green-500/10 border">
-                  <p className="text-sm text-muted-foreground mb-1">Investimento Awareness</p>
-                  <p className="text-2xl font-bold">
-                    R$ {cplOrganicoData.investimento.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+                <div className="p-2 sm:p-4 rounded-lg bg-gradient-to-br from-emerald-500/10 to-green-500/10 border">
+                  <p className="text-[10px] sm:text-sm text-muted-foreground mb-0.5 sm:mb-1">Investimento</p>
+                  <p className="text-sm sm:text-2xl font-bold truncate">
+                    R$ {cplOrganicoData.investimento.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-[9px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 hidden sm:block">
                     Campanhas de alcance e engajamento
                   </p>
                 </div>
 
-                <div className="p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border">
-                  <p className="text-sm text-muted-foreground mb-1">Leads de Redes Sociais</p>
-                  <p className="text-2xl font-bold">{cplOrganicoData.leads}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                <div className="p-2 sm:p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border">
+                  <p className="text-[10px] sm:text-sm text-muted-foreground mb-0.5 sm:mb-1">Leads Redes</p>
+                  <p className="text-sm sm:text-2xl font-bold">{cplOrganicoData.leads}</p>
+                  <p className="text-[9px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 hidden sm:block">
                     Orgânicos (não pagos)
                   </p>
                 </div>
 
-                <div className="p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-pink-500/10 border">
-                  <p className="text-sm text-muted-foreground mb-1">CPL Orgânico</p>
-                  <p className="text-2xl font-bold">
+                <div className="p-2 sm:p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-pink-500/10 border">
+                  <p className="text-[10px] sm:text-sm text-muted-foreground mb-0.5 sm:mb-1">CPL Orgânico</p>
+                  <p className="text-sm sm:text-2xl font-bold truncate">
                     {cplOrganicoData.leads > 0 
-                      ? `R$ ${(cplOrganicoData.investimento / cplOrganicoData.leads).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      ? `R$ ${(cplOrganicoData.investimento / cplOrganicoData.leads).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
                       : "N/A"
                     }
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Awareness ÷ Leads orgânicos
-                  </p>
                 </div>
 
-                <div className="p-4 rounded-lg border bg-card">
-                  <p className="text-sm text-muted-foreground mb-2">Por Rede Social</p>
-                  <div className="space-y-1 text-sm">
+                <div className="p-2 sm:p-4 rounded-lg border bg-card col-span-2 lg:col-span-1">
+                  <p className="text-[10px] sm:text-sm text-muted-foreground mb-1 sm:mb-2">Por Rede Social</p>
+                  <div className="grid grid-cols-3 lg:grid-cols-1 gap-0.5 sm:gap-1 text-[10px] sm:text-sm">
                     {cplOrganicoData.breakdown.instagram > 0 && (
                       <div className="flex justify-between">
-                        <span>📱 Instagram</span>
+                        <span>📱 IG</span>
                         <span className="font-medium">{cplOrganicoData.breakdown.instagram}</span>
                       </div>
                     )}
                     {cplOrganicoData.breakdown.facebook > 0 && (
                       <div className="flex justify-between">
-                        <span>📘 Facebook</span>
+                        <span>📘 FB</span>
                         <span className="font-medium">{cplOrganicoData.breakdown.facebook}</span>
                       </div>
                     )}
                     {cplOrganicoData.breakdown.linkedin > 0 && (
                       <div className="flex justify-between">
-                        <span>💼 LinkedIn</span>
+                        <span>💼 LI</span>
                         <span className="font-medium">{cplOrganicoData.breakdown.linkedin}</span>
                       </div>
                     )}
                     {cplOrganicoData.breakdown.tiktok > 0 && (
                       <div className="flex justify-between">
-                        <span>🎵 TikTok</span>
+                        <span>🎵 TT</span>
                         <span className="font-medium">{cplOrganicoData.breakdown.tiktok}</span>
                       </div>
                     )}
                     {cplOrganicoData.breakdown.youtube > 0 && (
                       <div className="flex justify-between">
-                        <span>📺 YouTube</span>
+                        <span>📺 YT</span>
                         <span className="font-medium">{cplOrganicoData.breakdown.youtube}</span>
                       </div>
                     )}
-                    {cplOrganicoData.breakdown.twitter > 0 && (
-                      <div className="flex justify-between">
-                        <span>🐦 Twitter/X</span>
-                        <span className="font-medium">{cplOrganicoData.breakdown.twitter}</span>
-                      </div>
-                    )}
                     {cplOrganicoData.leads === 0 && (
-                      <p className="text-muted-foreground text-xs">Nenhum lead de redes sociais</p>
+                      <p className="text-muted-foreground text-[9px] sm:text-xs col-span-3">Nenhum lead</p>
                     )}
                   </div>
                 </div>
@@ -1296,16 +1291,16 @@ export default function DashboardTrafego() {
 
         {/* Performance por Campanha */}
         <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <CardTitle>Performance por Campanha</CardTitle>
-              <div className="flex items-center gap-2 flex-wrap">
+          <CardHeader className="p-3 sm:p-6">
+            <div className="flex flex-col gap-3">
+              <CardTitle className="text-base sm:text-xl">Performance por Campanha</CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" disabled={syncingCreatives}>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      {syncingCreatives ? "Atualizando..." : "Atualizar"}
-                      <ChevronDown className="ml-2 h-4 w-4" />
+                    <Button variant="outline" size="sm" disabled={syncingCreatives} className="h-8 text-xs sm:text-sm">
+                      <RefreshCw className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                      {syncingCreatives ? "..." : "Atualizar"}
+                      <ChevronDown className="ml-1 h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
@@ -1320,7 +1315,7 @@ export default function DashboardTrafego() {
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <Select value={filtroStatusCampanha} onValueChange={setFiltroStatusCampanha}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-[90px] sm:w-[140px] h-8 text-xs sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1329,9 +1324,8 @@ export default function DashboardTrafego() {
                     <SelectItem value="todas">Todas</SelectItem>
                   </SelectContent>
                 </Select>
-                <span className="text-sm text-muted-foreground">Ordenar por:</span>
                 <Select value={ordenacao} onValueChange={setOrdenacao}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[110px] sm:w-[180px] h-8 text-xs sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1350,13 +1344,28 @@ export default function DashboardTrafego() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="space-y-3 sm:space-y-4">
               {campanhasOrdenadas?.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
+                <p className="text-center text-muted-foreground py-8 text-sm">
                   Nenhuma campanha encontrada
                 </p>
+              ) : isMobile ? (
+                /* Mobile: Cards */
+                campanhasOrdenadas?.map((campanha) => (
+                  <CampanhaCardMobile
+                    key={campanha.id_campanha}
+                    campanha={campanha}
+                    isExpanded={expandedCampaigns.has(campanha.id_campanha)}
+                    onToggleExpand={() => toggleCampaign(campanha.id_campanha)}
+                    onVerFluxo={() => {
+                      setCampanhaSelecionada({ id: campanha.id_campanha, nome: campanha.nome });
+                      setCampanhaFluxoOpen(true);
+                    }}
+                  />
+                ))
               ) : (
+                /* Desktop: Collapsible list */
                 campanhasOrdenadas?.map((campanha) => (
                   <Collapsible
                     key={campanha.id_campanha}

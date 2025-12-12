@@ -525,9 +525,57 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         </div>
       </header>
 
-      <main className="container mx-auto px-3 md:px-4 py-4 md:py-8">
+      <main className="container mx-auto px-3 md:px-4 py-4 md:py-8 pb-20 lg:pb-8">
         {children}
       </main>
+
+      {/* Bottom Navigation for Mobile */}
+      {isMobile && (
+        <nav className="fixed bottom-0 left-0 right-0 bg-background border-t z-50 safe-area-inset-bottom">
+          <div className="flex justify-around items-center h-14 px-2">
+            <Link to="/dashboard" className="flex-1">
+              <Button 
+                variant={location.pathname === "/dashboard" ? "secondary" : "ghost"} 
+                size="sm"
+                className="w-full h-12 flex flex-col gap-0.5 rounded-none"
+              >
+                <BarChart3 className="h-5 w-5" />
+                <span className="text-[10px]">Dashboard</span>
+              </Button>
+            </Link>
+            <Link to="/leads" className="flex-1">
+              <Button 
+                variant={location.pathname === "/leads" ? "secondary" : "ghost"} 
+                size="sm"
+                className="w-full h-12 flex flex-col gap-0.5 rounded-none"
+              >
+                <Users className="h-5 w-5" />
+                <span className="text-[10px]">Leads</span>
+              </Button>
+            </Link>
+            <Link to="/dashboard-trafego" className="flex-1">
+              <Button 
+                variant={location.pathname === "/dashboard-trafego" ? "secondary" : "ghost"} 
+                size="sm"
+                className="w-full h-12 flex flex-col gap-0.5 rounded-none"
+              >
+                <Activity className="h-5 w-5" />
+                <span className="text-[10px]">Tráfego</span>
+              </Button>
+            </Link>
+            <Link to="/alertas" className="flex-1">
+              <Button 
+                variant={location.pathname === "/alertas" ? "secondary" : "ghost"} 
+                size="sm"
+                className="w-full h-12 flex flex-col gap-0.5 rounded-none"
+              >
+                <AlertTriangle className="h-5 w-5" />
+                <span className="text-[10px]">Alertas</span>
+              </Button>
+            </Link>
+          </div>
+        </nav>
+      )}
     </div>
   );
 };

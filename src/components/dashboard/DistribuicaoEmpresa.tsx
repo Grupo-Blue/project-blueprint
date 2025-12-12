@@ -170,10 +170,10 @@ export function DistribuicaoEmpresa() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <div>
-            <h4 className="text-sm font-medium text-center mb-2">% do Gasto</h4>
-            <ChartContainer config={chartConfig} className="h-[200px]">
+            <h4 className="text-xs sm:text-sm font-medium text-center mb-2">% do Gasto</h4>
+            <ChartContainer config={chartConfig} className="h-[160px] sm:h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -204,8 +204,8 @@ export function DistribuicaoEmpresa() {
           </div>
 
           <div>
-            <h4 className="text-sm font-medium text-center mb-2">% das Vendas</h4>
-            <ChartContainer config={chartConfig} className="h-[200px]">
+            <h4 className="text-xs sm:text-sm font-medium text-center mb-2">% das Vendas</h4>
+            <ChartContainer config={chartConfig} className="h-[160px] sm:h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
