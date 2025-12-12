@@ -1,0 +1,207 @@
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { 
+  ChevronDown, 
+  ChevronRight, 
+  AlertTriangle,
+  Image,
+  Video,
+  Grid3x3,
+  FileQuestion,
+  Copy,
+  ExternalLink
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+
+interface CampanhaCardMobileProps {
+  campanha: {
+    id_campanha: string;
+    nome: string;
+    leads: number;
+    verba_investida: number;
+    cpl: number;
+    reunioes: number;
+    mqls: number;
+    vendas: number;
+    qtd_criativos?: number;
+    plataforma?: string;
+  };
+  criativos?: any[];
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onVerFluxo?: () => void;
+}
+
+const getTipoIcon = (tipo: string) => {
+  switch (tipo) {
+    case "VIDEO":
+      return <Video className="h-3.5 w-3.5" />;
+    case "IMAGEM":
+      return <Image className="h-3.5 w-3.5" />;
+    case "CARROSSEL":
+      return <Grid3x3 className="h-3.5 w-3.5" />;
+    default:
+      return <FileQuestion className="h-3.5 w-3.5" />;
+  }
+};
+
+export function CampanhaCardMobile({ 
+  campanha, 
+  criativos, 
+  isExpanded, 
+  onToggleExpand,
+  onVerFluxo 
+}: CampanhaCardMobileProps) {
+  const { toast } = useToast();
+  const hasAlerta = (campanha.qtd_criativos || 0) < 2;
+
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    toast({ title: "ID copiado!", description: "Use no utm_content" });
+  };
+
+  return (
+    <Card className={cn(
+      "overflow-hidden",
+      hasAlerta && "border-l-4 border-l-amber-500"
+    )}>
+      <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
+        <CollapsibleTrigger asChild>
+          <CardContent className="p-3 cursor-pointer">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm truncate">{campanha.nome}</span>
+                  {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="text-xs">
+                    {campanha.plataforma || "N/A"}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {campanha.qtd_criativos || 0} criativos
+                  </span>
+                  {hasAlerta && (
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                  )}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="font-semibold text-sm">
+                  {campanha.cpl > 0 
+                    ? `R$ ${campanha.cpl.toFixed(2)}` 
+                    : "N/A"}
+                </p>
+                <p className="text-xs text-muted-foreground">CPL</p>
+              </div>
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-4 gap-2 text-xs">
+              <div className="text-center bg-muted/50 rounded p-1.5">
+                <p className="text-muted-foreground">Leads</p>
+                <p className="font-semibold">{campanha.leads}</p>
+              </div>
+              <div className="text-center bg-muted/50 rounded p-1.5">
+                <p className="text-muted-foreground">MQLs</p>
+                <p className="font-semibold text-blue-600">{campanha.mqls}</p>
+              </div>
+              <div className="text-center bg-muted/50 rounded p-1.5">
+                <p className="text-muted-foreground">Vendas</p>
+                <p className="font-semibold text-green-600">{campanha.vendas}</p>
+              </div>
+              <div className="text-center bg-muted/50 rounded p-1.5">
+                <p className="text-muted-foreground">Verba</p>
+                <p className="font-semibold">R$ {campanha.verba_investida.toFixed(0)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </CollapsibleTrigger>
+
+        {/* Expanded: Criativos */}
+        <CollapsibleContent>
+          <div className="px-3 pb-3 pt-0 border-t space-y-2">
+            <div className="flex items-center justify-between pt-3">
+              <h4 className="font-semibold text-xs">Criativos</h4>
+              {onVerFluxo && (
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onVerFluxo}>
+                  Ver Fluxo
+                </Button>
+              )}
+            </div>
+            
+            {criativos && criativos.length > 0 ? (
+              <div className="space-y-2">
+                {criativos.map((criativo) => (
+                  <div 
+                    key={criativo.id_criativo} 
+                    className="p-2 rounded border bg-card text-xs"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        {getTipoIcon(criativo.tipo)}
+                        <span className="font-medium">{criativo.tipo}</span>
+                        <Badge variant={criativo.ativo ? "secondary" : "outline"} className="text-[10px] h-4">
+                          {criativo.ativo ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyId(criativo.id_criativo_externo)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                        {criativo.url_preview && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(criativo.url_preview, '_blank')}
+                            className="h-6 w-6 p-0"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {criativo.descricao && (
+                      <p className="text-muted-foreground truncate mb-1.5">{criativo.descricao}</p>
+                    )}
+                    <div className="grid grid-cols-4 gap-1.5">
+                      <div className="text-center bg-muted/50 rounded p-1">
+                        <p className="text-[10px] text-muted-foreground">Leads</p>
+                        <p className="font-semibold">{criativo.leads || 0}</p>
+                      </div>
+                      <div className="text-center bg-muted/50 rounded p-1">
+                        <p className="text-[10px] text-muted-foreground">Cliques</p>
+                        <p className="font-semibold">{criativo.cliques || 0}</p>
+                      </div>
+                      <div className="text-center bg-muted/50 rounded p-1">
+                        <p className="text-[10px] text-muted-foreground">CPL</p>
+                        <p className="font-semibold">{criativo.cpl ? `R$${criativo.cpl.toFixed(0)}` : "N/A"}</p>
+                      </div>
+                      <div className="text-center bg-muted/50 rounded p-1">
+                        <p className="text-[10px] text-muted-foreground">CTR</p>
+                        <p className="font-semibold">{criativo.ctr ? `${criativo.ctr.toFixed(1)}%` : "N/A"}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                Nenhum criativo cadastrado
+              </p>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
