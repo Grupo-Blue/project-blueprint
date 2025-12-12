@@ -179,39 +179,39 @@ export const PacingOrcamento = ({ empresaId }: PacingOrcamentoProps) => {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Status e resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <div className="text-sm text-muted-foreground mb-1">Gasto Atual</div>
-            <div className="text-2xl font-bold">{formatCurrency(gastoTotal)}</div>
-            <div className="text-xs text-muted-foreground">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+          <div className="bg-muted/50 p-2 md:p-4 rounded-lg">
+            <div className="text-xs md:text-sm text-muted-foreground mb-1">Gasto Atual</div>
+            <div className="text-base md:text-2xl font-bold">{formatCurrency(gastoTotal)}</div>
+            <div className="text-[10px] md:text-xs text-muted-foreground">
               {percentualMeta.toFixed(1)}% da meta
             </div>
           </div>
           
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <div className="text-sm text-muted-foreground mb-1">Ritmo Ideal</div>
-            <div className="text-2xl font-bold">{formatCurrency(ritmoIdeal)}</div>
-            <div className="text-xs text-muted-foreground">
-              Para dia {isCurrentMonth ? diaAtual : diasNoMes}/{diasNoMes}
+          <div className="bg-muted/50 p-2 md:p-4 rounded-lg">
+            <div className="text-xs md:text-sm text-muted-foreground mb-1">Ritmo Ideal</div>
+            <div className="text-base md:text-2xl font-bold">{formatCurrency(ritmoIdeal)}</div>
+            <div className="text-[10px] md:text-xs text-muted-foreground">
+              Dia {isCurrentMonth ? diaAtual : diasNoMes}/{diasNoMes}
             </div>
           </div>
           
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <div className="text-sm text-muted-foreground mb-1">Projeção Fim do Mês</div>
-            <div className="text-2xl font-bold">{formatCurrency(projecaoFimMes)}</div>
-            <div className={`text-xs ${projecaoFimMes > metaMensal ? "text-orange-500" : projecaoFimMes < metaMensal * 0.8 ? "text-yellow-500" : "text-green-500"}`}>
-              {projecaoFimMes > metaMensal ? "Acima da meta" : projecaoFimMes < metaMensal * 0.8 ? "Abaixo da meta" : "Dentro da meta"}
+          <div className="bg-muted/50 p-2 md:p-4 rounded-lg">
+            <div className="text-xs md:text-sm text-muted-foreground mb-1">Projeção</div>
+            <div className="text-base md:text-2xl font-bold">{formatCurrency(projecaoFimMes)}</div>
+            <div className={`text-[10px] md:text-xs ${projecaoFimMes > metaMensal ? "text-orange-500" : projecaoFimMes < metaMensal * 0.8 ? "text-yellow-500" : "text-green-500"}`}>
+              {projecaoFimMes > metaMensal ? "Acima" : projecaoFimMes < metaMensal * 0.8 ? "Abaixo" : "Dentro"}
             </div>
           </div>
           
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <div className="text-sm text-muted-foreground mb-1">Status</div>
-            <div className={`text-xl font-bold flex items-center gap-2 ${statusColor}`}>
-              <StatusIcon className="h-5 w-5" />
-              {statusLabel}
+          <div className="bg-muted/50 p-2 md:p-4 rounded-lg">
+            <div className="text-xs md:text-sm text-muted-foreground mb-1">Status</div>
+            <div className={`text-sm md:text-xl font-bold flex items-center gap-1 md:gap-2 ${statusColor}`}>
+              <StatusIcon className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="truncate">{statusLabel}</span>
             </div>
-            <div className="text-xs text-muted-foreground">
-              {diferencaRitmo >= 0 ? "+" : ""}{formatCurrency(diferencaRitmo)} vs ideal
+            <div className="text-[10px] md:text-xs text-muted-foreground truncate">
+              {diferencaRitmo >= 0 ? "+" : ""}{formatCurrency(diferencaRitmo)}
             </div>
           </div>
         </div>
@@ -230,19 +230,21 @@ export const PacingOrcamento = ({ empresaId }: PacingOrcamentoProps) => {
         </div>
 
         {/* Gráfico de linha */}
-        <div className="h-64">
+        <div className="h-48 md:h-64">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis 
                 dataKey="dia" 
-                tick={{ fontSize: 12 }} 
+                tick={{ fontSize: 10 }} 
                 className="text-muted-foreground"
+                interval="preserveStartEnd"
               />
               <YAxis 
-                tick={{ fontSize: 12 }}
-                tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
+                tick={{ fontSize: 10 }}
+                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                 className="text-muted-foreground"
+                width={40}
               />
               <Tooltip 
                 formatter={(value: number) => formatCurrency(value)}
@@ -250,14 +252,14 @@ export const PacingOrcamento = ({ empresaId }: PacingOrcamentoProps) => {
                 contentStyle={{ 
                   backgroundColor: 'hsl(var(--card))', 
                   border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px'
+                  borderRadius: '8px',
+                  fontSize: '12px'
                 }}
               />
               <ReferenceLine 
                 y={metaMensal} 
                 stroke="hsl(var(--destructive))" 
                 strokeDasharray="5 5" 
-                label={{ value: "Meta", fill: "hsl(var(--destructive))", fontSize: 12 }}
               />
               <Line 
                 type="monotone" 

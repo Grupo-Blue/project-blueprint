@@ -111,64 +111,63 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mb-6 md:mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Campanhas Ativas</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-6 md:mb-8">
+        <Card className="p-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-1 md:pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium">Campanhas</CardTitle>
+            <BarChart3 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalCampanhas}</div>
-            <p className="text-xs text-muted-foreground">
-              {totalCampanhas === 0 ? "Nenhuma campanha cadastrada" : "Em execução"}
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-lg md:text-2xl font-bold">{totalCampanhas}</div>
+            <p className="text-[10px] md:text-xs text-muted-foreground truncate">
+              {totalCampanhas === 0 ? "Nenhuma" : "Ativas"}
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Leads {labelPeriodo}</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+        <Card className="p-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-1 md:pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium">Leads</CardTitle>
+            <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalLeads}</div>
-            <p className="text-xs text-muted-foreground">
-              {totalLeads === 0 ? "Nenhum lead neste período" : `${format(inicioMes, "dd/MMM", { locale: ptBR })} - ${format(fimMes, "dd/MMM", { locale: ptBR })}`}
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-lg md:text-2xl font-bold">{totalLeads}</div>
+            <p className="text-[10px] md:text-xs text-muted-foreground truncate">
+              {labelPeriodo}
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">CPL Médio</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+        <Card className="p-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-1 md:pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium">CPL Médio</CardTitle>
+            <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-lg md:text-2xl font-bold">
               {cplMedio > 0 
                 ? new Intl.NumberFormat("pt-BR", {
                     style: "currency",
                     currency: "BRL",
+                    maximumFractionDigits: 0,
                   }).format(cplMedio)
-                : "R$ 0,00"}
+                : "R$ 0"}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {metricasDiarias && metricasDiarias.length > 0 
-                ? labelPeriodo
-                : "Sem métricas no período"}
+            <p className="text-[10px] md:text-xs text-muted-foreground truncate">
+              {labelPeriodo}
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Conversão {labelPeriodo}</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+        <Card className="p-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-1 md:pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium">Conversão</CardTitle>
+            <Target className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{taxaConversao.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">
-              {totalVendas} vendas de {totalLeads} leads
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-lg md:text-2xl font-bold">{taxaConversao.toFixed(1)}%</div>
+            <p className="text-[10px] md:text-xs text-muted-foreground truncate">
+              {totalVendas}/{totalLeads}
             </p>
           </CardContent>
         </Card>

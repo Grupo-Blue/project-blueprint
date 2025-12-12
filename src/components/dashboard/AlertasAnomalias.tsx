@@ -314,19 +314,19 @@ export function AlertasAnomalias({ empresaId }: AlertasAnomaliasProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 md:p-6">
         {!alertas || alertas.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <AlertTriangle className="h-12 w-12 mx-auto mb-2 opacity-30" />
-            <p>Nenhuma anomalia detectada</p>
-            <p className="text-sm">Sistema operando normalmente</p>
+          <div className="text-center py-6 md:py-8 text-muted-foreground">
+            <AlertTriangle className="h-10 w-10 md:h-12 md:w-12 mx-auto mb-2 opacity-30" />
+            <p className="text-sm md:text-base">Nenhuma anomalia detectada</p>
+            <p className="text-xs md:text-sm">Sistema operando normalmente</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2 md:space-y-3">
             {alertas.map((alerta) => (
               <div 
                 key={alerta.id}
-                className={`p-4 rounded-lg border flex items-start gap-3 ${
+                className={`p-2 md:p-4 rounded-lg border flex items-start gap-2 md:gap-3 ${
                   alerta.tipo === "critico" 
                     ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900" 
                     : alerta.tipo === "alto"
@@ -334,7 +334,7 @@ export function AlertasAnomalias({ empresaId }: AlertasAnomaliasProps) {
                     : "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900"
                 }`}
               >
-                <div className={`p-2 rounded-full ${
+                <div className={`p-1.5 md:p-2 rounded-full shrink-0 ${
                   alerta.tipo === "critico" ? "bg-red-100 dark:bg-red-900 text-red-600" :
                   alerta.tipo === "alto" ? "bg-orange-100 dark:bg-orange-900 text-orange-600" :
                   "bg-yellow-100 dark:bg-yellow-900 text-yellow-600"
@@ -342,16 +342,16 @@ export function AlertasAnomalias({ empresaId }: AlertasAnomaliasProps) {
                   {alerta.icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-center gap-1 md:gap-2 mb-1">
                     {getBadgeTipo(alerta.tipo)}
-                    <Badge variant="outline" className="text-xs">{alerta.categoria}</Badge>
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
+                    <Badge variant="outline" className="text-[10px] md:text-xs">{alerta.categoria}</Badge>
+                    <span className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-0.5">
+                      <Clock className="h-2.5 w-2.5 md:h-3 md:w-3" />
                       {alerta.tempo}
                     </span>
                   </div>
-                  <div className="font-medium truncate">{alerta.mensagem}</div>
-                  <div className="text-sm text-muted-foreground">{alerta.detalhe}</div>
+                  <div className="text-xs md:text-base font-medium truncate">{alerta.mensagem}</div>
+                  <div className="text-[10px] md:text-sm text-muted-foreground truncate">{alerta.detalhe}</div>
                 </div>
               </div>
             ))}

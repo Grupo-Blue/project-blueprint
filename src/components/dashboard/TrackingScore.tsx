@@ -168,30 +168,30 @@ export function TrackingScore({ empresaId }: TrackingScoreProps) {
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
+      <CardHeader className="p-3 md:p-6">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
               🎯 Tracking Score
             </CardTitle>
-            <CardDescription>
-              Qualidade do rastreamento de campanhas e atribuição de leads
+            <CardDescription className="text-xs md:text-sm truncate">
+              Qualidade do rastreamento
             </CardDescription>
           </div>
-          <div className="text-right">
-            <div className={`text-3xl font-bold ${getScoreColor(score)}`}>
+          <div className="text-right shrink-0">
+            <div className={`text-xl md:text-3xl font-bold ${getScoreColor(score)}`}>
               {score}
             </div>
-            <Badge variant={score >= 50 ? "default" : "destructive"}>
+            <Badge variant={score >= 50 ? "default" : "destructive"} className="text-[10px] md:text-xs">
               {getScoreLabel(score)}
             </Badge>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-3 md:p-6">
         {/* Barra de progresso principal */}
-        <div className="mb-6">
-          <div className="relative h-4 w-full overflow-hidden rounded-full bg-secondary">
+        <div className="mb-4 md:mb-6">
+          <div className="relative h-3 md:h-4 w-full overflow-hidden rounded-full bg-secondary">
             <div
               className={`h-full transition-all ${getProgressColor(score)}`}
               style={{ width: `${score}%` }}
@@ -200,41 +200,38 @@ export function TrackingScore({ empresaId }: TrackingScoreProps) {
         </div>
 
         {/* Componentes do score */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium text-muted-foreground">Componentes do Score:</h4>
+        <div className="space-y-2 md:space-y-4">
+          <h4 className="text-xs md:text-sm font-medium text-muted-foreground">Componentes:</h4>
           
           {scoreData?.componentes.map((comp, index) => (
-            <div key={index} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div key={index} className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
                 {getStatusIcon(comp.percent)}
-                <span className="text-sm">{comp.nome}</span>
+                <span className="text-xs md:text-sm truncate">{comp.nome}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
+              <div className="flex items-center gap-1 md:gap-2 shrink-0">
+                <span className="text-[10px] md:text-sm text-muted-foreground hidden sm:inline">
                   {comp.valor}/{comp.total}
                 </span>
                 <Badge 
                   variant={comp.percent >= 50 ? "secondary" : "destructive"}
-                  className="min-w-[60px] justify-center"
+                  className="min-w-[40px] md:min-w-[60px] justify-center text-[10px] md:text-xs"
                 >
                   {comp.percent.toFixed(0)}%
                 </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {getStatusLabel(comp.percent)}
-                </span>
               </div>
             </div>
           ))}
         </div>
 
         {/* Link para validação detalhada */}
-        <div className="mt-6 pt-4 border-t">
+        <div className="mt-4 md:mt-6 pt-3 md:pt-4 border-t">
           <Link 
             to="/campanhas" 
-            className="flex items-center gap-2 text-sm text-primary hover:underline"
+            className="flex items-center gap-2 text-xs md:text-sm text-primary hover:underline"
           >
-            Ver detalhes de validação UTM
-            <ArrowRight className="h-4 w-4" />
+            Ver detalhes UTM
+            <ArrowRight className="h-3 w-3 md:h-4 md:w-4" />
           </Link>
         </div>
       </CardContent>

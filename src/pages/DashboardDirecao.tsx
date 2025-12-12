@@ -333,13 +333,13 @@ export default function DashboardDirecao() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+    <div className="min-h-screen bg-background p-3 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-4 md:space-y-8">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2 md:gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-foreground">Dashboard Direção</h1>
-            <p className="text-muted-foreground mt-2">
-              Visão executiva consolidada - {labelPeriodo}
+            <h1 className="text-2xl md:text-4xl font-bold text-foreground">Dashboard Direção</h1>
+            <p className="text-sm md:text-base text-muted-foreground mt-1 md:mt-2">
+              Visão executiva - {labelPeriodo}
             </p>
           </div>
         </div>
@@ -347,28 +347,28 @@ export default function DashboardDirecao() {
         {/* Alertas Críticos */}
         {alertas.length > 0 && (
           <Card className="border-destructive">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-5 w-5" />
-                Alertas Críticos ({alertas.length})
+            <CardHeader className="p-3 md:p-6">
+              <CardTitle className="flex items-center gap-2 text-destructive text-sm md:text-base">
+                <AlertTriangle className="h-4 w-4 md:h-5 md:w-5" />
+                Alertas ({alertas.length})
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="p-3 md:p-6 pt-0 md:pt-0 space-y-2">
               {alertas.map((alerta) => (
                 <div
                   key={alerta.id_empresa}
-                  className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 md:p-3 bg-destructive/10 rounded-lg"
                 >
-                  <div>
-                    <p className="font-medium">{alerta.nome}</p>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm md:text-base truncate">{alerta.nome}</p>
+                    <p className="text-xs md:text-sm text-muted-foreground">
                       {alerta.cpl && alerta.cpl > alerta.cpl_maximo &&
-                        `CPL: R$ ${alerta.cpl.toFixed(2)} (máximo: R$ ${alerta.cpl_maximo.toFixed(2)}) `}
+                        `CPL: R$ ${alerta.cpl.toFixed(0)} (max: R$ ${alerta.cpl_maximo.toFixed(0)}) `}
                       {alerta.cac && alerta.cac > alerta.cac_maximo &&
-                        `CAC: R$ ${alerta.cac.toFixed(2)} (máximo: R$ ${alerta.cac_maximo.toFixed(2)})`}
+                        `CAC: R$ ${alerta.cac.toFixed(0)} (max: R$ ${alerta.cac_maximo.toFixed(0)})`}
                     </p>
                   </div>
-                  <Badge variant="destructive">Acima do limite</Badge>
+                  <Badge variant="destructive" className="self-start sm:self-auto text-[10px] md:text-xs">Acima</Badge>
                 </div>
               ))}
             </CardContent>
@@ -376,66 +376,66 @@ export default function DashboardDirecao() {
         )}
 
         {/* KPIs Consolidados */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Verba Investida</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-6">
+          <Card className="p-0">
+            <CardHeader className="flex flex-row items-center justify-between p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">Verba</CardTitle>
+              <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                R$ {totais.verba.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-base md:text-2xl font-bold">
+                R$ {(totais.verba / 1000).toFixed(1)}k
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-[10px] md:text-xs text-muted-foreground mt-1 truncate">
                 {empresaSelecionada === "todas" 
-                  ? `Consolidado de ${empresas?.length || 0} empresas`
+                  ? `${empresas?.length || 0} empresas`
                   : empresas?.find(e => e.id_empresa === empresaSelecionada)?.nome}
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Leads</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+          <Card className="p-0">
+            <CardHeader className="flex flex-row items-center justify-between p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">Leads</CardTitle>
+              <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-base md:text-2xl font-bold">
                 <span className="text-primary">{totais.leadsPagos}</span>
-                <span className="text-muted-foreground text-lg"> / {totais.leads}</span>
+                <span className="text-muted-foreground text-sm md:text-lg">/{totais.leads}</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Pagos / Total • CPL: R$ {cplMedio.toFixed(2)}
+              <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
+                CPL: R$ {cplMedio.toFixed(0)}
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Vendas</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
+          <Card className="p-0">
+            <CardHeader className="flex flex-row items-center justify-between p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">Vendas</CardTitle>
+              <Target className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totais.vendas}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                CAC médio: R$ {cacMedio.toFixed(2)}
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-base md:text-2xl font-bold">{totais.vendas}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
+                CAC: R$ {cacMedio.toFixed(0)}
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                {empresaSelecionada === "todas" ? "Empresas" : "Empresa Selecionada"}
+          <Card className="p-0">
+            <CardHeader className="flex flex-row items-center justify-between p-3 md:p-4 pb-1 md:pb-2">
+              <CardTitle className="text-xs md:text-sm font-medium">
+                {empresaSelecionada === "todas" ? "Empresas" : "Empresa"}
               </CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <Building2 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-3 md:p-4 pt-0">
+              <div className="text-base md:text-2xl font-bold">
                 {empresaSelecionada === "todas" ? empresas?.length || 0 : 1}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {alertas.length} com alertas
+              <p className="text-[10px] md:text-xs text-muted-foreground mt-1">
+                {alertas.length} alertas
               </p>
             </CardContent>
           </Card>
@@ -449,58 +449,46 @@ export default function DashboardDirecao() {
 
         {/* Métricas por Empresa */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
+          <CardHeader className="p-3 md:p-6">
+            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+              <BarChart3 className="h-4 w-4 md:h-5 md:w-5" />
               Performance por Empresa
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="p-3 md:p-6 pt-0">
+            <div className="space-y-2 md:space-y-4">
               {metricas?.map((metrica) => (
                 <div
                   key={metrica.id_empresa}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 p-2 md:p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
-                  <div className="space-y-1">
-                    <p className="font-semibold">{metrica.nome}</p>
-                    <div className="flex gap-4 text-sm text-muted-foreground">
-                      <span>Verba: R$ {metrica.verba_investida.toLocaleString("pt-BR")}</span>
-                      <span>Leads: <span className="text-primary font-medium">{metrica.leads_pagos}</span> / {metrica.leads_total}</span>
+                  <div className="space-y-1 min-w-0">
+                    <p className="font-semibold text-sm md:text-base truncate">{metrica.nome}</p>
+                    <div className="flex flex-wrap gap-2 md:gap-4 text-xs md:text-sm text-muted-foreground">
+                      <span>Verba: R$ {(metrica.verba_investida / 1000).toFixed(1)}k</span>
+                      <span>Leads: <span className="text-primary font-medium">{metrica.leads_pagos}</span>/{metrica.leads_total}</span>
                       <span>Vendas: {metrica.vendas}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-sm font-medium">
-                        CPL: R$ {metrica.cpl?.toFixed(2) || "N/A"}
+                  <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                    <div className="text-left md:text-right">
+                      <p className="text-xs md:text-sm font-medium">
+                        CPL: R$ {metrica.cpl?.toFixed(0) || "N/A"}
                       </p>
                       {metrica.cpl && metrica.cpl > metrica.cpl_maximo ? (
-                        <Badge variant="destructive" className="text-xs">
-                          <TrendingUp className="h-3 w-3 mr-1" />
-                          Acima do limite
-                        </Badge>
+                        <Badge variant="destructive" className="text-[10px] md:text-xs">Acima</Badge>
                       ) : (
-                        <Badge variant="default" className="text-xs">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Dentro do limite
-                        </Badge>
+                        <Badge variant="default" className="text-[10px] md:text-xs">OK</Badge>
                       )}
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">
-                        CAC: R$ {metrica.cac?.toFixed(2) || "N/A"}
+                    <div className="text-left md:text-right">
+                      <p className="text-xs md:text-sm font-medium">
+                        CAC: R$ {metrica.cac?.toFixed(0) || "N/A"}
                       </p>
                       {metrica.cac && metrica.cac > metrica.cac_maximo ? (
-                        <Badge variant="destructive" className="text-xs">
-                          <TrendingUp className="h-3 w-3 mr-1" />
-                          Acima do limite
-                        </Badge>
+                        <Badge variant="destructive" className="text-[10px] md:text-xs">Acima</Badge>
                       ) : (
-                        <Badge variant="default" className="text-xs">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Dentro do limite
-                        </Badge>
+                        <Badge variant="default" className="text-[10px] md:text-xs">OK</Badge>
                       )}
                     </div>
                   </div>

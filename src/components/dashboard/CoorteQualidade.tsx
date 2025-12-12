@@ -131,15 +131,16 @@ export function CoorteQualidade({ empresaId }: CoorteQualidadeProps) {
           )}
         </div>
       </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px]">
+      <CardContent className="p-3 md:p-6">
+        <ChartContainer config={chartConfig} className="h-[200px] md:h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={coortes} layout="horizontal">
-              <XAxis dataKey="mesLabel" tick={{ fontSize: 12 }} />
+              <XAxis dataKey="mesLabel" tick={{ fontSize: 10 }} />
               <YAxis 
                 tickFormatter={(v) => `${v}%`}
                 domain={[0, 100]}
-                tick={{ fontSize: 12 }}
+                tick={{ fontSize: 10 }}
+                width={35}
               />
               <ChartTooltip 
                 content={<ChartTooltipContent 
@@ -149,37 +150,37 @@ export function CoorteQualidade({ empresaId }: CoorteQualidadeProps) {
                   }}
                 />}
               />
-              <Legend />
-              <Bar dataKey="percentMql" name="% MQL" fill="hsl(262 83% 58%)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="percentLevantada" name="% Levantada" fill="hsl(38 92% 50%)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="percentReuniao" name="% Reunião" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="percentVenda" name="% Venda" fill="hsl(142 76% 36%)" radius={[4, 4, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: '10px' }} />
+              <Bar dataKey="percentMql" name="MQL" fill="hsl(262 83% 58%)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="percentLevantada" name="Levant." fill="hsl(38 92% 50%)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="percentReuniao" name="Reunião" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="percentVenda" name="Venda" fill="hsl(142 76% 36%)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartContainer>
 
         {/* Tabela resumo */}
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-xs">
+        <div className="mt-3 md:mt-4 overflow-x-auto -mx-3 px-3 md:mx-0 md:px-0">
+          <table className="w-full text-[10px] md:text-xs min-w-[280px]">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-2 font-medium">Mês</th>
-                <th className="text-right py-2 font-medium">Leads</th>
-                <th className="text-right py-2 font-medium">MQL</th>
-                <th className="text-right py-2 font-medium">Levantadas</th>
-                <th className="text-right py-2 font-medium">Reuniões</th>
-                <th className="text-right py-2 font-medium">Vendas</th>
+                <th className="text-left py-1.5 md:py-2 font-medium">Mês</th>
+                <th className="text-right py-1.5 md:py-2 font-medium">Leads</th>
+                <th className="text-right py-1.5 md:py-2 font-medium">MQL</th>
+                <th className="text-right py-1.5 md:py-2 font-medium hidden sm:table-cell">Levant.</th>
+                <th className="text-right py-1.5 md:py-2 font-medium hidden sm:table-cell">Reuniões</th>
+                <th className="text-right py-1.5 md:py-2 font-medium">Vendas</th>
               </tr>
             </thead>
             <tbody>
               {coortes.slice(-3).map((c: any) => (
                 <tr key={c.mes} className="border-b border-muted">
-                  <td className="py-2 font-medium">{c.mesLabel}</td>
-                  <td className="text-right py-2">{c.leads}</td>
-                  <td className="text-right py-2">{c.percentMql.toFixed(0)}%</td>
-                  <td className="text-right py-2">{c.percentLevantada.toFixed(0)}%</td>
-                  <td className="text-right py-2">{c.percentReuniao.toFixed(0)}%</td>
-                  <td className="text-right py-2 font-semibold">{c.percentVenda.toFixed(0)}%</td>
+                  <td className="py-1.5 md:py-2 font-medium">{c.mesLabel}</td>
+                  <td className="text-right py-1.5 md:py-2">{c.leads}</td>
+                  <td className="text-right py-1.5 md:py-2">{c.percentMql.toFixed(0)}%</td>
+                  <td className="text-right py-1.5 md:py-2 hidden sm:table-cell">{c.percentLevantada.toFixed(0)}%</td>
+                  <td className="text-right py-1.5 md:py-2 hidden sm:table-cell">{c.percentReuniao.toFixed(0)}%</td>
+                  <td className="text-right py-1.5 md:py-2 font-semibold">{c.percentVenda.toFixed(0)}%</td>
                 </tr>
               ))}
             </tbody>
