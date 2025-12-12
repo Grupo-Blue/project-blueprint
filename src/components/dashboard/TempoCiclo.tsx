@@ -226,132 +226,135 @@ export const TempoCiclo = ({ empresaId }: TempoCicloProps) => {
         )}
 
         {/* Diagrama visual do funil */}
-        <div className="flex flex-wrap items-center justify-center gap-2 py-4 bg-muted/30 rounded-lg">
-          <div className="text-center px-3">
-            <div className="text-sm font-medium">Lead</div>
-            <div className="text-xs text-muted-foreground">{leads?.length || 0}</div>
-          </div>
-          
-          {temDatasTransicao ? (
-            <>
-              <div className="flex items-center gap-1">
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium text-primary">{medianaLeadMql.toFixed(0)}d</span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-              
-              <div className="text-center px-3">
-                <div className="text-sm font-medium">MQL</div>
-                <div className="text-xs text-muted-foreground">{temposLeadMql.length}</div>
-              </div>
-              
-              <div className="flex items-center gap-1">
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium text-primary">{medianaMqlLevantada.toFixed(0)}d</span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-              
-              <div className="text-center px-3">
-                <div className="text-sm font-medium">Levantada</div>
-                <div className="text-xs text-muted-foreground">{temposMqlLevantada.length}</div>
-              </div>
-              
-              <div className="flex items-center gap-1">
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium text-primary">{medianaLevantadaReuniao.toFixed(0)}d</span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-              
-              <div className="text-center px-3">
-                <div className="text-sm font-medium">Reunião</div>
-                <div className="text-xs text-muted-foreground">{temposLevantadaReuniao.length}</div>
-              </div>
-              
-              <div className="flex items-center gap-1">
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium text-primary">{medianaReuniaoVenda.toFixed(0)}d</span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-1">
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-primary">{medianaLeadVenda.toFixed(0)}d</span>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+          <div className="flex items-center justify-start md:justify-center gap-1 md:gap-2 py-3 md:py-4 bg-muted/30 rounded-lg min-w-max px-3">
+            <div className="text-center px-2 md:px-3">
+              <div className="text-xs md:text-sm font-medium">Lead</div>
+              <div className="text-[10px] md:text-xs text-muted-foreground">{leads?.length || 0}</div>
             </div>
-          )}
-          
-          <div className="text-center px-3">
-            <div className="text-sm font-medium text-green-600">Venda</div>
-            <div className="text-xs text-muted-foreground">{temposLeadVenda.length}</div>
+            
+            {temDatasTransicao ? (
+              <>
+                <div className="flex items-center gap-0.5">
+                  <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                  <span className="text-[10px] md:text-xs font-medium text-primary">{medianaLeadMql.toFixed(0)}d</span>
+                  <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                </div>
+                
+                <div className="text-center px-2 md:px-3">
+                  <div className="text-xs md:text-sm font-medium">MQL</div>
+                  <div className="text-[10px] md:text-xs text-muted-foreground">{temposLeadMql.length}</div>
+                </div>
+                
+                <div className="flex items-center gap-0.5">
+                  <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                  <span className="text-[10px] md:text-xs font-medium text-primary">{medianaMqlLevantada.toFixed(0)}d</span>
+                  <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                </div>
+                
+                <div className="text-center px-2 md:px-3">
+                  <div className="text-xs md:text-sm font-medium">Levant.</div>
+                  <div className="text-[10px] md:text-xs text-muted-foreground">{temposMqlLevantada.length}</div>
+                </div>
+                
+                <div className="flex items-center gap-0.5">
+                  <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                  <span className="text-[10px] md:text-xs font-medium text-primary">{medianaLevantadaReuniao.toFixed(0)}d</span>
+                  <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                </div>
+                
+                <div className="text-center px-2 md:px-3">
+                  <div className="text-xs md:text-sm font-medium">Reunião</div>
+                  <div className="text-[10px] md:text-xs text-muted-foreground">{temposLevantadaReuniao.length}</div>
+                </div>
+                
+                <div className="flex items-center gap-0.5">
+                  <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                  <span className="text-[10px] md:text-xs font-medium text-primary">{medianaReuniaoVenda.toFixed(0)}d</span>
+                  <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-0.5">
+                <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+                <span className="text-[10px] md:text-xs font-medium text-primary">{medianaLeadVenda.toFixed(0)}d</span>
+                <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
+              </div>
+            )}
+            
+            <div className="text-center px-2 md:px-3">
+              <div className="text-xs md:text-sm font-medium text-green-600">Venda</div>
+              <div className="text-[10px] md:text-xs text-muted-foreground">{temposLeadVenda.length}</div>
+            </div>
           </div>
         </div>
 
         {/* Cards de resumo */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-muted/50 p-4 rounded-lg text-center">
-            <div className="text-sm text-muted-foreground mb-1">Ciclo Lead→Venda</div>
-            <div className="text-2xl font-bold">{medianaLeadVenda.toFixed(0)}d</div>
-            <div className="text-xs text-muted-foreground">
-              mediana de {temposLeadVenda.length} vendas
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+          <div className="bg-muted/50 p-2 md:p-4 rounded-lg text-center">
+            <div className="text-[10px] md:text-sm text-muted-foreground mb-1">Ciclo Lead→Venda</div>
+            <div className="text-lg md:text-2xl font-bold">{medianaLeadVenda.toFixed(0)}d</div>
+            <div className="text-[10px] md:text-xs text-muted-foreground">
+              {temposLeadVenda.length} vendas
             </div>
           </div>
           
-          <div className="bg-muted/50 p-4 rounded-lg text-center">
-            <div className="text-sm text-muted-foreground mb-1">Média</div>
-            <div className="text-2xl font-bold">{calcularMedia(temposLeadVenda).toFixed(0)}d</div>
-            <div className="text-xs text-muted-foreground">
-              (outliers incluídos)
+          <div className="bg-muted/50 p-2 md:p-4 rounded-lg text-center">
+            <div className="text-[10px] md:text-sm text-muted-foreground mb-1">Média</div>
+            <div className="text-lg md:text-2xl font-bold">{calcularMedia(temposLeadVenda).toFixed(0)}d</div>
+            <div className="text-[10px] md:text-xs text-muted-foreground">
+              c/ outliers
             </div>
           </div>
           
-          <div className="bg-muted/50 p-4 rounded-lg text-center">
-            <div className="text-sm text-muted-foreground mb-1">Mais Rápido</div>
-            <div className="text-2xl font-bold">
+          <div className="bg-muted/50 p-2 md:p-4 rounded-lg text-center">
+            <div className="text-[10px] md:text-sm text-muted-foreground mb-1">Mín</div>
+            <div className="text-lg md:text-2xl font-bold">
               {temposLeadVenda.length > 0 ? Math.min(...temposLeadVenda).toFixed(0) : 0}d
             </div>
-            <div className="text-xs text-muted-foreground">
-              ciclo mínimo
+            <div className="text-[10px] md:text-xs text-muted-foreground">
+              mais rápido
             </div>
           </div>
           
-          <div className="bg-muted/50 p-4 rounded-lg text-center">
-            <div className="text-sm text-muted-foreground mb-1">Mais Lento</div>
-            <div className="text-2xl font-bold">
+          <div className="bg-muted/50 p-2 md:p-4 rounded-lg text-center">
+            <div className="text-[10px] md:text-sm text-muted-foreground mb-1">Máx</div>
+            <div className="text-lg md:text-2xl font-bold">
               {temposLeadVenda.length > 0 ? Math.max(...temposLeadVenda).toFixed(0) : 0}d
             </div>
-            <div className="text-xs text-muted-foreground">
-              ciclo máximo
+            <div className="text-[10px] md:text-xs text-muted-foreground">
+              mais lento
             </div>
           </div>
         </div>
 
         {/* Gráfico de barras por etapa */}
         {chartData.length > 0 && (
-          <div className="h-64">
+          <div className="h-48 md:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis 
                   type="number" 
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 10 }}
                   tickFormatter={(value) => `${value}d`}
                 />
                 <YAxis 
                   type="category" 
                   dataKey="etapa" 
-                  tick={{ fontSize: 12 }}
-                  width={120}
+                  tick={{ fontSize: 9 }}
+                  width={80}
                 />
                 <Tooltip 
                   formatter={(value: number, name: string, props: any) => [
-                    `${value.toFixed(1)} dias (${props.payload.amostra} transições)`,
+                    `${value.toFixed(1)} dias (${props.payload.amostra})`,
                     "Mediana"
                   ]}
                   contentStyle={{ 
                     backgroundColor: 'hsl(var(--card))', 
                     border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
+                    borderRadius: '8px',
+                    fontSize: '12px'
                   }}
                 />
                 <Bar dataKey="dias" radius={[0, 4, 4, 0]}>
