@@ -485,15 +485,15 @@ export default function Integracoes() {
   }
 
   return (
-    <div className="container mx-auto p-8">
-      <div className="flex justify-between items-center mb-6">
+    <div className="container mx-auto p-4 md:p-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Integrações</h1>
-          <p className="text-muted-foreground">Gerencie as integrações com Meta Ads, Google Ads, Pipedrive, Tokeniza e Mautic por empresa</p>
+          <h1 className="text-2xl md:text-3xl font-bold">Integrações</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Gerencie as integrações com APIs externas</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Nova Integração
             </Button>
@@ -1039,16 +1039,16 @@ export default function Integracoes() {
       </div>
 
       <Tabs defaultValue="meta" className="space-y-4">
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="meta">Meta Ads</TabsTrigger>
-          <TabsTrigger value="google">Google Ads</TabsTrigger>
-          <TabsTrigger value="pipedrive">Pipedrive</TabsTrigger>
-          <TabsTrigger value="tokeniza">Tokeniza</TabsTrigger>
-          <TabsTrigger value="mautic">Mautic</TabsTrigger>
-          <TabsTrigger value="notion">Notion</TabsTrigger>
-          <TabsTrigger value="metricool">Metricool</TabsTrigger>
-          <TabsTrigger value="chatwoot">Chatwoot</TabsTrigger>
-          <TabsTrigger value="ga4">GA4</TabsTrigger>
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="meta" className="text-xs md:text-sm">Meta</TabsTrigger>
+          <TabsTrigger value="google" className="text-xs md:text-sm">Google</TabsTrigger>
+          <TabsTrigger value="pipedrive" className="text-xs md:text-sm">Pipedrive</TabsTrigger>
+          <TabsTrigger value="tokeniza" className="text-xs md:text-sm">Tokeniza</TabsTrigger>
+          <TabsTrigger value="mautic" className="text-xs md:text-sm">Mautic</TabsTrigger>
+          <TabsTrigger value="notion" className="text-xs md:text-sm">Notion</TabsTrigger>
+          <TabsTrigger value="metricool" className="text-xs md:text-sm">Metricool</TabsTrigger>
+          <TabsTrigger value="chatwoot" className="text-xs md:text-sm">Chatwoot</TabsTrigger>
+          <TabsTrigger value="ga4" className="text-xs md:text-sm">GA4</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meta" className="space-y-4">
@@ -1066,33 +1066,36 @@ export default function Integracoes() {
               return (
                 <div key={integracao.id_integracao} className="space-y-4">
                   <Card>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                          <CardDescription>
+                    <CardHeader className="p-4 md:p-6">
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                          <CardDescription className="text-xs md:text-sm truncate">
                             Ad Account: {config.ad_account_id}
                           </CardDescription>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
+                          <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                             {integracao.ativo ? 'Ativo' : 'Inativo'}
                           </span>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleTestIntegration(integracao)}
-                            disabled={testingIntegracoes.has(integracao.id_integracao)}
-                          >
-                            <TestTube2 className="w-4 h-4 mr-2" />
-                            {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleTestIntegration(integracao)}
+                              disabled={testingIntegracoes.has(integracao.id_integracao)}
+                              className="h-8 px-2 md:px-3"
+                            >
+                              <TestTube2 className="w-4 h-4 md:mr-2" />
+                              <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardHeader>
@@ -1124,33 +1127,36 @@ export default function Integracoes() {
               return (
                 <div key={integracao.id_integracao} className="space-y-4">
                   <Card>
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                          <CardDescription>
+                    <CardHeader className="p-4 md:p-6">
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                          <CardDescription className="text-xs md:text-sm truncate">
                             Customer ID: {config.customer_id}
                           </CardDescription>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
+                          <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                             {integracao.ativo ? 'Ativo' : 'Inativo'}
                           </span>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleTestIntegration(integracao)}
-                            disabled={testingIntegracoes.has(integracao.id_integracao)}
-                          >
-                            <TestTube2 className="w-4 h-4 mr-2" />
-                            {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleTestIntegration(integracao)}
+                              disabled={testingIntegracoes.has(integracao.id_integracao)}
+                              className="h-8 px-2 md:px-3"
+                            >
+                              <TestTube2 className="w-4 h-4 md:mr-2" />
+                              <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardHeader>
@@ -1181,42 +1187,42 @@ export default function Integracoes() {
               
               return (
                 <Card key={integracao.id_integracao}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription>
-                          Domain: {config.domain}.pipedrive.com
+                  <CardHeader className="p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription className="text-xs md:text-sm">
+                          <span className="truncate block">{config.domain}.pipedrive.com</span>
                           {config.pipeline_id && (
-                            <>
-                              <br />
-                              Pipeline ID: {config.pipeline_id}
-                            </>
+                            <span className="text-xs">Pipeline: {config.pipeline_id}</span>
                           )}
                         </CardDescription>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => handleTestIntegration(integracao)}
-                        disabled={testingIntegracoes.has(integracao.id_integracao)}
-                      >
-                        <TestTube2 className="w-4 h-4 mr-2" />
-                        {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleTestIntegration(integracao)}
+                            disabled={testingIntegracoes.has(integracao.id_integracao)}
+                            className="h-8 px-2 md:px-3"
+                          >
+                            <TestTube2 className="w-4 h-4 md:mr-2" />
+                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
+                  </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">
@@ -1289,33 +1295,36 @@ export default function Integracoes() {
               
               return (
                 <Card key={integracao.id_integracao}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription>
+                  <CardHeader className="p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription className="text-xs md:text-sm truncate">
                           Base URL: {config.base_url}
                         </CardDescription>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleTestIntegration(integracao)}
-                          disabled={testingIntegracoes.has(integracao.id_integracao)}
-                        >
-                          <TestTube2 className="w-4 h-4 mr-2" />
-                          {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleTestIntegration(integracao)}
+                            disabled={testingIntegracoes.has(integracao.id_integracao)}
+                            className="h-8 px-2 md:px-3"
+                          >
+                            <TestTube2 className="w-4 h-4 md:mr-2" />
+                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -1344,35 +1353,37 @@ export default function Integracoes() {
               
               return (
                 <Card key={integracao.id_integracao}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription>
-                          URL Base: {config.url_base}
-                          <br />
-                          Login: {config.login}
+                  <CardHeader className="p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription className="text-xs md:text-sm">
+                          <span className="truncate block">URL: {config.url_base}</span>
+                          <span className="text-xs">Login: {config.login}</span>
                         </CardDescription>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleTestIntegration(integracao)}
-                          disabled={testingIntegracoes.has(integracao.id_integracao)}
-                        >
-                          <TestTube2 className="w-4 h-4 mr-2" />
-                          {testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleTestIntegration(integracao)}
+                            disabled={testingIntegracoes.has(integracao.id_integracao)}
+                            className="h-8 px-2 md:px-3"
+                          >
+                            <TestTube2 className="w-4 h-4 md:mr-2" />
+                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -1448,33 +1459,36 @@ export default function Integracoes() {
               
               return (
                 <Card key={integracao.id_integracao}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription>
+                  <CardHeader className="p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription className="text-xs md:text-sm truncate">
                           Database ID: {config.database_id}
                         </CardDescription>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleTestIntegration(integracao)}
-                          disabled={testingIntegracoes.has(integracao.id_integracao)}
-                        >
-                          <TestTube2 className="w-4 h-4 mr-2" />
-                          {testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar'}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleTestIntegration(integracao)}
+                            disabled={testingIntegracoes.has(integracao.id_integracao)}
+                            className="h-8 px-2 md:px-3"
+                          >
+                            <TestTube2 className="w-4 h-4 md:mr-2" />
+                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar'}</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -1498,33 +1512,36 @@ export default function Integracoes() {
               
               return (
                 <Card key={integracao.id_integracao}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription>
-                          User ID: {config.user_id} | Blog ID: {config.blog_id}
+                  <CardHeader className="p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
+                        <CardDescription className="text-xs md:text-sm truncate">
+                          User: {config.user_id} | Blog: {config.blog_id}
                         </CardDescription>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleTestIntegration(integracao)}
-                          disabled={testingIntegracoes.has(integracao.id_integracao)}
-                        >
-                          <TestTube2 className="w-4 h-4 mr-2" />
-                          {testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar'}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleTestIntegration(integracao)}
+                            disabled={testingIntegracoes.has(integracao.id_integracao)}
+                            className="h-8 px-2 md:px-3"
+                          >
+                            <TestTube2 className="w-4 h-4 md:mr-2" />
+                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar'}</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -1565,14 +1582,15 @@ export default function Integracoes() {
               
               return (
                 <Card key={integracao.id_integracao}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <CardTitle>Chatwoot</CardTitle>
-                        <CardDescription>
-                          URL: {config.url_base} | Account ID: {config.account_id}
+                  <CardHeader className="p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base md:text-lg">Chatwoot</CardTitle>
+                        <CardDescription className="text-xs md:text-sm">
+                          <span className="truncate block">URL: {config.url_base}</span>
+                          <span className="text-xs">Account: {config.account_id}</span>
                         </CardDescription>
-                        <div className="mt-3 space-y-1">
+                        <div className="mt-2 space-y-1">
                           {consolidatedEmpresas.length === 0 ? (
                             <p className="text-xs text-muted-foreground">Nenhuma empresa mapeada</p>
                           ) : (
@@ -1585,16 +1603,18 @@ export default function Integracoes() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
+                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -1618,90 +1638,82 @@ export default function Integracoes() {
               
               return (
                 <Card key={integracao.id_integracao}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          {config.nome || `GA4 ${config.property_id}`}
+                  <CardHeader className="p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base md:text-lg flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
+                          <span className="truncate">{config.nome || `GA4 ${config.property_id}`}</span>
                           <span className="text-xs font-normal text-muted-foreground">
                             ({empresa?.nome || "Empresa não encontrada"})
                           </span>
                         </CardTitle>
-                        <CardDescription>
-                          Property ID: {config.property_id}
+                        <CardDescription className="text-xs md:text-sm">
+                          <span className="block truncate">Property: {config.property_id}</span>
                           {config.site_url && (
-                            <>
-                              {" "}• Site: {config.site_url}
-                            </>
+                            <span className="text-xs truncate block">Site: {config.site_url}</span>
                           )}
                         </CardDescription>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs px-2 py-1 rounded ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
+                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
+                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={async () => {
-                            const integracaoId = integracao.id_integracao;
-                            setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
-                            
-                            try {
-                              const { data, error } = await supabase.functions.invoke('coletar-metricas-ga4', {
-                                body: { id_empresa: config.id_empresa }
-                              });
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={async () => {
+                              const integracaoId = integracao.id_integracao;
+                              setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
                               
-                              if (error) throw error;
-                              
-                              if (data?.success) {
-                                // Verificar se realmente coletou dados
-                                const totalRegistros = data.resultados?.reduce((acc: number, r: any) => 
-                                  acc + (r.metricas_inseridas || 0), 0) || 0;
+                              try {
+                                const { data, error } = await supabase.functions.invoke('coletar-metricas-ga4', {
+                                  body: { id_empresa: config.id_empresa }
+                                });
                                 
-                                if (totalRegistros > 0) {
-                                  toast.success(`Métricas GA4 coletadas! ${totalRegistros} registros processados.`);
+                                if (error) throw error;
+                                
+                                if (data?.success) {
+                                  const totalRegistros = data.resultados?.reduce((acc: number, r: any) => 
+                                    acc + (r.metricas_inseridas || 0), 0) || 0;
+                                  
+                                  if (totalRegistros > 0) {
+                                    toast.success(`Métricas GA4 coletadas! ${totalRegistros} registros.`);
+                                  } else {
+                                    toast.warning('Conexão OK, mas nenhum dado novo.');
+                                  }
                                 } else {
-                                  toast.warning('Conexão OK, mas nenhum dado novo encontrado. Verifique se há tráfego nas landing pages.');
+                                  const errorMsg = data?.error || '';
+                                  if (errorMsg.includes('SCOPE_INSUFFICIENT')) {
+                                    toast.error('Refresh Token sem escopo analytics.readonly.');
+                                  } else {
+                                    toast.error(errorMsg || 'Erro ao coletar métricas GA4');
+                                  }
                                 }
-                              } else {
-                                // Tratamento de erros específicos
-                                const errorMsg = data?.error || '';
-                                if (errorMsg.includes('SCOPE_INSUFFICIENT')) {
-                                  toast.error('Erro de permissão: O Refresh Token não possui o escopo analytics.readonly. Gere um novo token no OAuth Playground com o escopo correto.');
-                                } else if (errorMsg.includes('REFRESH_TOKEN_EXPIRED')) {
-                                  toast.error('Refresh Token expirado. Gere um novo token no OAuth Playground.');
-                                } else {
-                                  toast.error(errorMsg || 'Erro ao coletar métricas GA4');
-                                }
+                              } catch (error: any) {
+                                console.error('Erro ao testar GA4:', error);
+                                toast.error(error.message || 'Erro ao coletar métricas GA4');
+                              } finally {
+                                setTestingIntegracoes(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(integracaoId);
+                                  return newSet;
+                                });
                               }
-                            } catch (error: any) {
-                              console.error('Erro ao testar GA4:', error);
-                              const errorMsg = error.message || '';
-                              if (errorMsg.includes('SCOPE_INSUFFICIENT') || errorMsg.includes('ACCESS_TOKEN_SCOPE_INSUFFICIENT')) {
-                                toast.error('Erro de permissão: Refresh Token sem escopo analytics.readonly. Acesse o OAuth Playground e gere um novo token com o escopo correto.');
-                              } else {
-                                toast.error(errorMsg || 'Erro ao coletar métricas GA4');
-                              }
-                            } finally {
-                              setTestingIntegracoes(prev => {
-                                const newSet = new Set(prev);
-                                newSet.delete(integracaoId);
-                                return newSet;
-                              });
-                            }
-                          }}
-                          disabled={testingIntegracoes.has(integracao.id_integracao)}
-                        >
-                          <TestTube2 className="w-4 h-4 mr-2" />
-                          {testingIntegracoes.has(integracao.id_integracao) ? 'Coletando...' : 'Coletar Métricas'}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(integracao)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(integracao.id_integracao)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                            }}
+                            disabled={testingIntegracoes.has(integracao.id_integracao)}
+                            className="h-8 px-2 md:px-3"
+                          >
+                            <TestTube2 className="w-4 h-4 md:mr-2" />
+                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Coletando...' : 'Coletar'}</span>
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
