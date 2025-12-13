@@ -58,6 +58,9 @@ interface IRPFDividaOnus {
   credor_nome?: string;
 }
 
+// IRPF é exclusivo da Blue Consult
+const BLUE_EMPRESA_ID = "95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db";
+
 export default function IRPFImportacoes() {
   const { empresaSelecionada } = useEmpresa();
   const queryClient = useQueryClient();
@@ -123,8 +126,6 @@ export default function IRPFImportacoes() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      if (!empresaSelecionada) throw new Error("Selecione uma empresa");
-      
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -136,10 +137,11 @@ export default function IRPFImportacoes() {
         reader.onerror = reject;
       });
 
+      // Sempre usa Blue Consult para importação IRPF
       const { data, error } = await supabase.functions.invoke('processar-irpf', {
         body: {
           pdfBase64: base64,
-          id_empresa: empresaSelecionada,
+          id_empresa: BLUE_EMPRESA_ID,
           arquivo_origem: file.name,
         },
       });
