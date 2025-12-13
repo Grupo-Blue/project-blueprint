@@ -74,20 +74,17 @@ export default function IRPFImportacoes() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: declaracoes, isLoading } = useQuery({
-    queryKey: ['irpf-declaracoes', empresaSelecionada],
+    queryKey: ['irpf-declaracoes', BLUE_EMPRESA_ID],
     queryFn: async () => {
-      if (!empresaSelecionada) return [];
-      
       const { data, error } = await supabase
         .from('irpf_declaracao')
         .select('*')
-        .eq('id_empresa', empresaSelecionada)
+        .eq('id_empresa', BLUE_EMPRESA_ID)
         .order('data_importacao', { ascending: false });
 
       if (error) throw error;
       return data as IRPFDeclaracao[];
     },
-    enabled: !!empresaSelecionada,
   });
 
   const { data: bensDeclaracao } = useQuery({
@@ -241,17 +238,6 @@ export default function IRPFImportacoes() {
     vinculados: declaracoes?.filter(d => d.id_lead).length || 0,
   };
 
-  if (!empresaSelecionada) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">
-            Selecione uma empresa para ver as importações de IRPF
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 space-y-6">
@@ -436,7 +422,7 @@ export default function IRPFImportacoes() {
                             {!dec.id_lead && (
                               <VincularLeadDialog
                                 declaracaoId={dec.id}
-                                empresaSelecionada={empresaSelecionada}
+                                empresaSelecionada={BLUE_EMPRESA_ID}
                                 cpfDeclaracao={dec.cpf}
                                 nomeContribuinte={dec.nome_contribuinte}
                                 onVinculado={() => {}}
