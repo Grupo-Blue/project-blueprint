@@ -236,67 +236,70 @@ export function WebhookDestinosManager() {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="flex items-center gap-2">
-            <ExternalLink className="h-5 w-5" />
+    <Card className="overflow-hidden">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6">
+        <div className="min-w-0">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <ExternalLink className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
             Webhooks de Saída
           </CardTitle>
-          <CardDescription>
-            Configure URLs para receber notificações de leads em tempo real
+          <CardDescription className="text-xs sm:text-sm mt-1">
+            Configure URLs para receber notificações de leads
           </CardDescription>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => dispararManualMutation.mutate()}
             disabled={dispararManualMutation.isPending}
+            className="flex-1 sm:flex-none text-xs sm:text-sm"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${dispararManualMutation.isPending ? 'animate-spin' : ''}`} />
-            Disparar Agora
+            <RefreshCw className={`h-4 w-4 sm:mr-2 ${dispararManualMutation.isPending ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Disparar Agora</span>
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Adicionar
+              <Button size="sm" className="flex-1 sm:flex-none text-xs sm:text-sm">
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Adicionar</span>
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[95vw] sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>Novo Destino de Webhook</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-base sm:text-lg">Novo Destino de Webhook</DialogTitle>
+                <DialogDescription className="text-xs sm:text-sm">
                   Configure uma URL para receber notificações de leads
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="nome">Nome</Label>
+                  <Label htmlFor="nome" className="text-xs sm:text-sm">Nome</Label>
                   <Input
                     id="nome"
                     value={newDestino.nome}
                     onChange={(e) => setNewDestino({ ...newDestino, nome: e.target.value })}
                     placeholder="Ex: n8n Automação"
+                    className="text-sm"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="url">URL do Webhook</Label>
+                  <Label htmlFor="url" className="text-xs sm:text-sm">URL do Webhook</Label>
                   <Input
                     id="url"
                     value={newDestino.url}
                     onChange={(e) => setNewDestino({ ...newDestino, url: e.target.value })}
                     placeholder="https://..."
+                    className="text-sm"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="empresa">Empresa (opcional)</Label>
+                  <Label htmlFor="empresa" className="text-xs sm:text-sm">Empresa (opcional)</Label>
                   <Select
                     value={newDestino.id_empresa || "todas"}
                     onValueChange={(value) => setNewDestino({ ...newDestino, id_empresa: value === "todas" ? "" : value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="text-sm">
                       <SelectValue placeholder="Todas as empresas" />
                     </SelectTrigger>
                     <SelectContent>
@@ -310,22 +313,24 @@ export function WebhookDestinosManager() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="headers">Headers (JSON, opcional)</Label>
+                  <Label htmlFor="headers" className="text-xs sm:text-sm">Headers (JSON, opcional)</Label>
                   <Input
                     id="headers"
                     value={newDestino.headers}
                     onChange={(e) => setNewDestino({ ...newDestino, headers: e.target.value })}
                     placeholder='{"Authorization": "Bearer token"}'
+                    className="text-sm"
                   />
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="w-full sm:w-auto">
                   Cancelar
                 </Button>
                 <Button
                   onClick={() => addDestinoMutation.mutate()}
                   disabled={!newDestino.nome || !newDestino.url || addDestinoMutation.isPending}
+                  className="w-full sm:w-auto"
                 >
                   Adicionar
                 </Button>
@@ -334,11 +339,11 @@ export function WebhookDestinosManager() {
           </Dialog>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
         {isLoading ? (
-          <div className="text-center py-4 text-muted-foreground">Carregando...</div>
+          <div className="text-center py-4 text-muted-foreground text-sm">Carregando...</div>
         ) : destinos?.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 text-muted-foreground text-xs sm:text-sm">
             Nenhum destino configurado. Adicione um destino para começar a enviar webhooks.
           </div>
         ) : (
@@ -349,15 +354,16 @@ export function WebhookDestinosManager() {
                 open={expandedLogs === destino.id}
                 onOpenChange={(open) => setExpandedLogs(open ? destino.id : null)}
               >
-                <div className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                <div className="border rounded-lg p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
                       <Switch
                         checked={destino.ativo}
                         onCheckedChange={(ativo) => toggleAtivoMutation.mutate({ id: destino.id, ativo })}
+                        className="shrink-0 mt-1 sm:mt-0"
                       />
-                      <div>
-                        <div className="font-medium flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium flex flex-wrap items-center gap-2 text-sm">
                           {destino.nome}
                           {destino.ativo ? (
                             <Badge variant="default" className="text-xs">Ativo</Badge>
@@ -365,7 +371,7 @@ export function WebhookDestinosManager() {
                             <Badge variant="secondary" className="text-xs">Inativo</Badge>
                           )}
                         </div>
-                        <div className="text-sm text-muted-foreground truncate max-w-md">
+                        <div className="text-xs sm:text-sm text-muted-foreground truncate">
                           {destino.url}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
@@ -373,24 +379,25 @@ export function WebhookDestinosManager() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 ml-8 sm:ml-0">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => testarWebhookMutation.mutate(destino)}
                         disabled={testarWebhookMutation.isPending}
+                        className="h-8 px-2 sm:px-3"
                       >
-                        <Send className="h-4 w-4 mr-1" />
-                        Testar
+                        <Send className="h-4 w-4 sm:mr-1" />
+                        <span className="hidden sm:inline text-xs">Testar</span>
                       </Button>
                       <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <History className="h-4 w-4 mr-1" />
-                          Logs
+                        <Button variant="ghost" size="sm" className="h-8 px-2 sm:px-3">
+                          <History className="h-4 w-4 sm:mr-1" />
+                          <span className="hidden sm:inline text-xs">Logs</span>
                           {expandedLogs === destino.id ? (
-                            <ChevronUp className="h-4 w-4 ml-1" />
+                            <ChevronUp className="h-4 w-4 ml-0 sm:ml-1" />
                           ) : (
-                            <ChevronDown className="h-4 w-4 ml-1" />
+                            <ChevronDown className="h-4 w-4 ml-0 sm:ml-1" />
                           )}
                         </Button>
                       </CollapsibleTrigger>
@@ -399,6 +406,7 @@ export function WebhookDestinosManager() {
                         size="sm"
                         onClick={() => deleteDestinoMutation.mutate(destino.id)}
                         disabled={deleteDestinoMutation.isPending}
+                        className="h-8 px-2"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
