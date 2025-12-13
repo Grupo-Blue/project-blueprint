@@ -17,6 +17,7 @@ import { ImportarCampanhas } from "@/components/ImportarCampanhas";
 import { CronjobsMonitor } from "@/components/CronjobsMonitor";
 import { TokenizaProjetosManager } from "@/components/TokenizaProjetosManager";
 import { WebhookDestinosManager } from "@/components/WebhookDestinosManager";
+import { ConsultaIRPFTester } from "@/components/ConsultaIRPFTester";
 import type { Database } from "@/integrations/supabase/types";
 
 type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
@@ -1714,6 +1715,8 @@ export default function Integracoes() {
       <div className="mt-8">
         <WebhookDestinosManager />
       </div>
+
+      <ConsultaIRPFTester />
 
       <div className="mt-8">
         <CronjobsMonitor />
