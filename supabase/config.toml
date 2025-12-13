@@ -107,3 +107,6 @@ verify_jwt = false
 
 [functions.processar-irpf]
 verify_jwt = true
+
+[functions.consultar-irpf]
+verify_jwt = false
