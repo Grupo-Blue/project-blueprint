@@ -1165,6 +1165,1441 @@ export type Database = {
         }
         Relationships: []
       }
+      irpf_alimentando: {
+        Row: {
+          cpf: string | null
+          created_at: string | null
+          data_nascimento: string | null
+          id: string
+          id_declaracao: string
+          nome: string
+          tipo_relacao: string | null
+        }
+        Insert: {
+          cpf?: string | null
+          created_at?: string | null
+          data_nascimento?: string | null
+          id?: string
+          id_declaracao: string
+          nome: string
+          tipo_relacao?: string | null
+        }
+        Update: {
+          cpf?: string | null
+          created_at?: string | null
+          data_nascimento?: string | null
+          id?: string
+          id_declaracao?: string
+          nome?: string
+          tipo_relacao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_alimentando_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_atividade_rural: {
+        Row: {
+          area_explorada: number | null
+          area_total: number | null
+          created_at: string | null
+          despesa_custeio: number | null
+          despesa_depreciacao: number | null
+          despesa_investimentos: number | null
+          despesas_outras: number | null
+          endereco: string | null
+          id: string
+          id_declaracao: string
+          inscricao_nirf: string | null
+          localizacao: string | null
+          nome_imovel: string | null
+          prejuizo_compensar: number | null
+          receita_producao_animal: number | null
+          receita_producao_vegetal: number | null
+          receita_produtos_agroindustriais: number | null
+          receita_venda_bens: number | null
+          receitas_outras: number | null
+          resultado_bruto: number | null
+          resultado_tributavel: number | null
+          tipo_exploracao: string | null
+          total_despesas: number | null
+          total_receitas: number | null
+        }
+        Insert: {
+          area_explorada?: number | null
+          area_total?: number | null
+          created_at?: string | null
+          despesa_custeio?: number | null
+          despesa_depreciacao?: number | null
+          despesa_investimentos?: number | null
+          despesas_outras?: number | null
+          endereco?: string | null
+          id?: string
+          id_declaracao: string
+          inscricao_nirf?: string | null
+          localizacao?: string | null
+          nome_imovel?: string | null
+          prejuizo_compensar?: number | null
+          receita_producao_animal?: number | null
+          receita_producao_vegetal?: number | null
+          receita_produtos_agroindustriais?: number | null
+          receita_venda_bens?: number | null
+          receitas_outras?: number | null
+          resultado_bruto?: number | null
+          resultado_tributavel?: number | null
+          tipo_exploracao?: string | null
+          total_despesas?: number | null
+          total_receitas?: number | null
+        }
+        Update: {
+          area_explorada?: number | null
+          area_total?: number | null
+          created_at?: string | null
+          despesa_custeio?: number | null
+          despesa_depreciacao?: number | null
+          despesa_investimentos?: number | null
+          despesas_outras?: number | null
+          endereco?: string | null
+          id?: string
+          id_declaracao?: string
+          inscricao_nirf?: string | null
+          localizacao?: string | null
+          nome_imovel?: string | null
+          prejuizo_compensar?: number | null
+          receita_producao_animal?: number | null
+          receita_producao_vegetal?: number | null
+          receita_produtos_agroindustriais?: number | null
+          receita_venda_bens?: number | null
+          receitas_outras?: number | null
+          resultado_bruto?: number | null
+          resultado_tributavel?: number | null
+          tipo_exploracao?: string | null
+          total_despesas?: number | null
+          total_receitas?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_atividade_rural_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_atividade_rural_rebanho: {
+        Row: {
+          abates: number | null
+          compras: number | null
+          created_at: string | null
+          id: string
+          id_atividade_rural: string
+          mortes: number | null
+          nascimentos: number | null
+          quantidade_final: number | null
+          quantidade_inicial: number | null
+          tipo_animal: string | null
+          valor_medio_cabeca: number | null
+          valor_total: number | null
+          vendas: number | null
+        }
+        Insert: {
+          abates?: number | null
+          compras?: number | null
+          created_at?: string | null
+          id?: string
+          id_atividade_rural: string
+          mortes?: number | null
+          nascimentos?: number | null
+          quantidade_final?: number | null
+          quantidade_inicial?: number | null
+          tipo_animal?: string | null
+          valor_medio_cabeca?: number | null
+          valor_total?: number | null
+          vendas?: number | null
+        }
+        Update: {
+          abates?: number | null
+          compras?: number | null
+          created_at?: string | null
+          id?: string
+          id_atividade_rural?: string
+          mortes?: number | null
+          nascimentos?: number | null
+          quantidade_final?: number | null
+          quantidade_inicial?: number | null
+          tipo_animal?: string | null
+          valor_medio_cabeca?: number | null
+          valor_total?: number | null
+          vendas?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_atividade_rural_rebanho_id_atividade_rural_fkey"
+            columns: ["id_atividade_rural"]
+            isOneToOne: false
+            referencedRelation: "irpf_atividade_rural"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_bem_direito: {
+        Row: {
+          atualizou_valor_imovel_lei_14973: boolean | null
+          banco_agencia: string | null
+          banco_codigo: string | null
+          banco_conta: string | null
+          banco_nome: string | null
+          banco_tipo_conta: string | null
+          cnpj_instituicao: string | null
+          codigo_bem: string
+          codigo_descricao: string | null
+          conta_pagamento: boolean | null
+          cpf_dependente: string | null
+          cpf_titular: string | null
+          created_at: string | null
+          credito_cpf_cnpj_devedor: string | null
+          credito_data_concessao: string | null
+          credito_nome_devedor: string | null
+          credito_parcelas_recebidas: number | null
+          credito_parcelas_totais: number | null
+          credito_valor_original: number | null
+          credito_valor_parcela: number | null
+          cripto_aplicacao_financeira: boolean | null
+          cripto_autocustodiante: boolean | null
+          cripto_codigo: string | null
+          cripto_exchange: string | null
+          cripto_imposto_pago_exterior: number | null
+          cripto_irrf_brasil: number | null
+          cripto_lucro_prejuizo: number | null
+          cripto_lucros_dividendos: boolean | null
+          cripto_quantidade: number | null
+          cripto_tipo: string | null
+          cripto_valor_recebido: number | null
+          discriminacao: string
+          fii_cnpj: string | null
+          fii_nome: string | null
+          fii_quantidade_cotas: number | null
+          ganho_capital_pago_ate_16_12: number | null
+          grupo_codigo: string
+          grupo_descricao: string | null
+          id: string
+          id_declaracao: string
+          imovel_area_total: number | null
+          imovel_cartorio: string | null
+          imovel_data_aquisicao: string | null
+          imovel_endereco: string | null
+          imovel_forma_aquisicao: string | null
+          imovel_inscricao_iptu: string | null
+          imovel_matricula: string | null
+          imovel_tipo: string | null
+          investimento_cnpj_administradora: string | null
+          investimento_nome_fundo: string | null
+          investimento_tipo: string | null
+          numero_bem: number
+          pais_codigo: string | null
+          pais_nome: string | null
+          participacao_cnpj: string | null
+          participacao_data_constituicao: string | null
+          participacao_percentual: number | null
+          participacao_quantidade: number | null
+          participacao_razao_social: string | null
+          participacao_registro: string | null
+          participacao_tipo: string | null
+          pertence_a: string | null
+          valor_ano_anterior: number | null
+          valor_ano_atual: number | null
+          veiculo_ano_fabricacao: number | null
+          veiculo_marca: string | null
+          veiculo_modelo: string | null
+          veiculo_placa: string | null
+          veiculo_renavam: string | null
+          veiculo_tipo: string | null
+        }
+        Insert: {
+          atualizou_valor_imovel_lei_14973?: boolean | null
+          banco_agencia?: string | null
+          banco_codigo?: string | null
+          banco_conta?: string | null
+          banco_nome?: string | null
+          banco_tipo_conta?: string | null
+          cnpj_instituicao?: string | null
+          codigo_bem: string
+          codigo_descricao?: string | null
+          conta_pagamento?: boolean | null
+          cpf_dependente?: string | null
+          cpf_titular?: string | null
+          created_at?: string | null
+          credito_cpf_cnpj_devedor?: string | null
+          credito_data_concessao?: string | null
+          credito_nome_devedor?: string | null
+          credito_parcelas_recebidas?: number | null
+          credito_parcelas_totais?: number | null
+          credito_valor_original?: number | null
+          credito_valor_parcela?: number | null
+          cripto_aplicacao_financeira?: boolean | null
+          cripto_autocustodiante?: boolean | null
+          cripto_codigo?: string | null
+          cripto_exchange?: string | null
+          cripto_imposto_pago_exterior?: number | null
+          cripto_irrf_brasil?: number | null
+          cripto_lucro_prejuizo?: number | null
+          cripto_lucros_dividendos?: boolean | null
+          cripto_quantidade?: number | null
+          cripto_tipo?: string | null
+          cripto_valor_recebido?: number | null
+          discriminacao: string
+          fii_cnpj?: string | null
+          fii_nome?: string | null
+          fii_quantidade_cotas?: number | null
+          ganho_capital_pago_ate_16_12?: number | null
+          grupo_codigo: string
+          grupo_descricao?: string | null
+          id?: string
+          id_declaracao: string
+          imovel_area_total?: number | null
+          imovel_cartorio?: string | null
+          imovel_data_aquisicao?: string | null
+          imovel_endereco?: string | null
+          imovel_forma_aquisicao?: string | null
+          imovel_inscricao_iptu?: string | null
+          imovel_matricula?: string | null
+          imovel_tipo?: string | null
+          investimento_cnpj_administradora?: string | null
+          investimento_nome_fundo?: string | null
+          investimento_tipo?: string | null
+          numero_bem: number
+          pais_codigo?: string | null
+          pais_nome?: string | null
+          participacao_cnpj?: string | null
+          participacao_data_constituicao?: string | null
+          participacao_percentual?: number | null
+          participacao_quantidade?: number | null
+          participacao_razao_social?: string | null
+          participacao_registro?: string | null
+          participacao_tipo?: string | null
+          pertence_a?: string | null
+          valor_ano_anterior?: number | null
+          valor_ano_atual?: number | null
+          veiculo_ano_fabricacao?: number | null
+          veiculo_marca?: string | null
+          veiculo_modelo?: string | null
+          veiculo_placa?: string | null
+          veiculo_renavam?: string | null
+          veiculo_tipo?: string | null
+        }
+        Update: {
+          atualizou_valor_imovel_lei_14973?: boolean | null
+          banco_agencia?: string | null
+          banco_codigo?: string | null
+          banco_conta?: string | null
+          banco_nome?: string | null
+          banco_tipo_conta?: string | null
+          cnpj_instituicao?: string | null
+          codigo_bem?: string
+          codigo_descricao?: string | null
+          conta_pagamento?: boolean | null
+          cpf_dependente?: string | null
+          cpf_titular?: string | null
+          created_at?: string | null
+          credito_cpf_cnpj_devedor?: string | null
+          credito_data_concessao?: string | null
+          credito_nome_devedor?: string | null
+          credito_parcelas_recebidas?: number | null
+          credito_parcelas_totais?: number | null
+          credito_valor_original?: number | null
+          credito_valor_parcela?: number | null
+          cripto_aplicacao_financeira?: boolean | null
+          cripto_autocustodiante?: boolean | null
+          cripto_codigo?: string | null
+          cripto_exchange?: string | null
+          cripto_imposto_pago_exterior?: number | null
+          cripto_irrf_brasil?: number | null
+          cripto_lucro_prejuizo?: number | null
+          cripto_lucros_dividendos?: boolean | null
+          cripto_quantidade?: number | null
+          cripto_tipo?: string | null
+          cripto_valor_recebido?: number | null
+          discriminacao?: string
+          fii_cnpj?: string | null
+          fii_nome?: string | null
+          fii_quantidade_cotas?: number | null
+          ganho_capital_pago_ate_16_12?: number | null
+          grupo_codigo?: string
+          grupo_descricao?: string | null
+          id?: string
+          id_declaracao?: string
+          imovel_area_total?: number | null
+          imovel_cartorio?: string | null
+          imovel_data_aquisicao?: string | null
+          imovel_endereco?: string | null
+          imovel_forma_aquisicao?: string | null
+          imovel_inscricao_iptu?: string | null
+          imovel_matricula?: string | null
+          imovel_tipo?: string | null
+          investimento_cnpj_administradora?: string | null
+          investimento_nome_fundo?: string | null
+          investimento_tipo?: string | null
+          numero_bem?: number
+          pais_codigo?: string | null
+          pais_nome?: string | null
+          participacao_cnpj?: string | null
+          participacao_data_constituicao?: string | null
+          participacao_percentual?: number | null
+          participacao_quantidade?: number | null
+          participacao_razao_social?: string | null
+          participacao_registro?: string | null
+          participacao_tipo?: string | null
+          pertence_a?: string | null
+          valor_ano_anterior?: number | null
+          valor_ano_atual?: number | null
+          veiculo_ano_fabricacao?: number | null
+          veiculo_marca?: string | null
+          veiculo_modelo?: string | null
+          veiculo_placa?: string | null
+          veiculo_renavam?: string | null
+          veiculo_tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_bem_direito_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_declaracao: {
+        Row: {
+          ano_calendario: number
+          arquivo_origem: string | null
+          celular_ddd: string | null
+          celular_numero: string | null
+          cpf: string
+          cpf_conjuge: string | null
+          created_at: string | null
+          data_importacao: string | null
+          data_nascimento: string | null
+          doenca_grave_ou_deficiencia: boolean | null
+          email: string | null
+          endereco_bairro: string | null
+          endereco_cep: string | null
+          endereco_complemento: string | null
+          endereco_logradouro: string | null
+          endereco_municipio: string | null
+          endereco_numero: string | null
+          endereco_uf: string | null
+          erro_processamento: string | null
+          exercicio: number
+          id: string
+          id_cliente_notion: string | null
+          id_empresa: string
+          id_lead: string | null
+          natureza_ocupacao_codigo: string | null
+          natureza_ocupacao_descricao: string | null
+          nome_conjuge: string | null
+          nome_contribuinte: string
+          numero_recibo_anterior: string | null
+          ocupacao_principal_codigo: string | null
+          ocupacao_principal_descricao: string | null
+          possui_atividade_rural: boolean | null
+          possui_conjuge: boolean | null
+          resultado_atividade_rural: number | null
+          status_processamento: string | null
+          telefone_ddd: string | null
+          telefone_numero: string | null
+          tipo_declaracao: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ano_calendario: number
+          arquivo_origem?: string | null
+          celular_ddd?: string | null
+          celular_numero?: string | null
+          cpf: string
+          cpf_conjuge?: string | null
+          created_at?: string | null
+          data_importacao?: string | null
+          data_nascimento?: string | null
+          doenca_grave_ou_deficiencia?: boolean | null
+          email?: string | null
+          endereco_bairro?: string | null
+          endereco_cep?: string | null
+          endereco_complemento?: string | null
+          endereco_logradouro?: string | null
+          endereco_municipio?: string | null
+          endereco_numero?: string | null
+          endereco_uf?: string | null
+          erro_processamento?: string | null
+          exercicio: number
+          id?: string
+          id_cliente_notion?: string | null
+          id_empresa: string
+          id_lead?: string | null
+          natureza_ocupacao_codigo?: string | null
+          natureza_ocupacao_descricao?: string | null
+          nome_conjuge?: string | null
+          nome_contribuinte: string
+          numero_recibo_anterior?: string | null
+          ocupacao_principal_codigo?: string | null
+          ocupacao_principal_descricao?: string | null
+          possui_atividade_rural?: boolean | null
+          possui_conjuge?: boolean | null
+          resultado_atividade_rural?: number | null
+          status_processamento?: string | null
+          telefone_ddd?: string | null
+          telefone_numero?: string | null
+          tipo_declaracao?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ano_calendario?: number
+          arquivo_origem?: string | null
+          celular_ddd?: string | null
+          celular_numero?: string | null
+          cpf?: string
+          cpf_conjuge?: string | null
+          created_at?: string | null
+          data_importacao?: string | null
+          data_nascimento?: string | null
+          doenca_grave_ou_deficiencia?: boolean | null
+          email?: string | null
+          endereco_bairro?: string | null
+          endereco_cep?: string | null
+          endereco_complemento?: string | null
+          endereco_logradouro?: string | null
+          endereco_municipio?: string | null
+          endereco_numero?: string | null
+          endereco_uf?: string | null
+          erro_processamento?: string | null
+          exercicio?: number
+          id?: string
+          id_cliente_notion?: string | null
+          id_empresa?: string
+          id_lead?: string | null
+          natureza_ocupacao_codigo?: string | null
+          natureza_ocupacao_descricao?: string | null
+          nome_conjuge?: string | null
+          nome_contribuinte?: string
+          numero_recibo_anterior?: string | null
+          ocupacao_principal_codigo?: string | null
+          ocupacao_principal_descricao?: string | null
+          possui_atividade_rural?: boolean | null
+          possui_conjuge?: boolean | null
+          resultado_atividade_rural?: number | null
+          status_processamento?: string | null
+          telefone_ddd?: string | null
+          telefone_numero?: string | null
+          tipo_declaracao?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_declaracao_id_cliente_notion_fkey"
+            columns: ["id_cliente_notion"]
+            isOneToOne: false
+            referencedRelation: "cliente_notion"
+            referencedColumns: ["id_cliente"]
+          },
+          {
+            foreignKeyName: "irpf_declaracao_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+          {
+            foreignKeyName: "irpf_declaracao_id_lead_fkey"
+            columns: ["id_lead"]
+            isOneToOne: false
+            referencedRelation: "lead"
+            referencedColumns: ["id_lead"]
+          },
+        ]
+      }
+      irpf_demonstrativo_lei_14754: {
+        Row: {
+          base_calculo: number | null
+          created_at: string | null
+          ganho_prejuizo: number | null
+          id: string
+          id_bem: string | null
+          id_declaracao: string
+          imposto_devido: number | null
+          imposto_pago_brasil: number | null
+          imposto_pago_exterior: number | null
+          numero_bem: number | null
+          prejuizo_a_compensar: number | null
+          prejuizo_ano_anterior: number | null
+          saldo: number | null
+          tipo: string | null
+        }
+        Insert: {
+          base_calculo?: number | null
+          created_at?: string | null
+          ganho_prejuizo?: number | null
+          id?: string
+          id_bem?: string | null
+          id_declaracao: string
+          imposto_devido?: number | null
+          imposto_pago_brasil?: number | null
+          imposto_pago_exterior?: number | null
+          numero_bem?: number | null
+          prejuizo_a_compensar?: number | null
+          prejuizo_ano_anterior?: number | null
+          saldo?: number | null
+          tipo?: string | null
+        }
+        Update: {
+          base_calculo?: number | null
+          created_at?: string | null
+          ganho_prejuizo?: number | null
+          id?: string
+          id_bem?: string | null
+          id_declaracao?: string
+          imposto_devido?: number | null
+          imposto_pago_brasil?: number | null
+          imposto_pago_exterior?: number | null
+          numero_bem?: number | null
+          prejuizo_a_compensar?: number | null
+          prejuizo_ano_anterior?: number | null
+          saldo?: number | null
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_demonstrativo_lei_14754_id_bem_fkey"
+            columns: ["id_bem"]
+            isOneToOne: false
+            referencedRelation: "irpf_bem_direito"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_demonstrativo_lei_14754_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_dependente: {
+        Row: {
+          cpf: string | null
+          created_at: string | null
+          data_nascimento: string | null
+          id: string
+          id_declaracao: string
+          nome: string
+          tipo_dependencia_codigo: string | null
+          tipo_dependencia_descricao: string | null
+        }
+        Insert: {
+          cpf?: string | null
+          created_at?: string | null
+          data_nascimento?: string | null
+          id?: string
+          id_declaracao: string
+          nome: string
+          tipo_dependencia_codigo?: string | null
+          tipo_dependencia_descricao?: string | null
+        }
+        Update: {
+          cpf?: string | null
+          created_at?: string | null
+          data_nascimento?: string | null
+          id?: string
+          id_declaracao?: string
+          nome?: string
+          tipo_dependencia_codigo?: string | null
+          tipo_dependencia_descricao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_dependente_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_divida_onus: {
+        Row: {
+          codigo: string
+          codigo_descricao: string | null
+          created_at: string | null
+          credor_cpf_cnpj: string | null
+          credor_nome: string | null
+          data_contratacao: string | null
+          discriminacao: string
+          garantia: string | null
+          id: string
+          id_bem_vinculado: string | null
+          id_declaracao: string
+          natureza_divida: string | null
+          numero_divida: number | null
+          prazo_meses: number | null
+          situacao_ano_anterior: number | null
+          situacao_ano_atual: number | null
+          taxa_juros: number | null
+          valor_original: number | null
+          valor_pago_no_ano: number | null
+          vinculada_atividade_rural: boolean | null
+        }
+        Insert: {
+          codigo: string
+          codigo_descricao?: string | null
+          created_at?: string | null
+          credor_cpf_cnpj?: string | null
+          credor_nome?: string | null
+          data_contratacao?: string | null
+          discriminacao: string
+          garantia?: string | null
+          id?: string
+          id_bem_vinculado?: string | null
+          id_declaracao: string
+          natureza_divida?: string | null
+          numero_divida?: number | null
+          prazo_meses?: number | null
+          situacao_ano_anterior?: number | null
+          situacao_ano_atual?: number | null
+          taxa_juros?: number | null
+          valor_original?: number | null
+          valor_pago_no_ano?: number | null
+          vinculada_atividade_rural?: boolean | null
+        }
+        Update: {
+          codigo?: string
+          codigo_descricao?: string | null
+          created_at?: string | null
+          credor_cpf_cnpj?: string | null
+          credor_nome?: string | null
+          data_contratacao?: string | null
+          discriminacao?: string
+          garantia?: string | null
+          id?: string
+          id_bem_vinculado?: string | null
+          id_declaracao?: string
+          natureza_divida?: string | null
+          numero_divida?: number | null
+          prazo_meses?: number | null
+          situacao_ano_anterior?: number | null
+          situacao_ano_atual?: number | null
+          taxa_juros?: number | null
+          valor_original?: number | null
+          valor_pago_no_ano?: number | null
+          vinculada_atividade_rural?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_divida_onus_id_bem_vinculado_fkey"
+            columns: ["id_bem_vinculado"]
+            isOneToOne: false
+            referencedRelation: "irpf_bem_direito"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_divida_onus_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_doacao: {
+        Row: {
+          candidato: string | null
+          cargo: string | null
+          codigo: string | null
+          cpf_cnpj_beneficiario: string | null
+          created_at: string | null
+          id: string
+          id_declaracao: string
+          nome_beneficiario: string | null
+          partido: string | null
+          tipo: string
+          valor: number | null
+        }
+        Insert: {
+          candidato?: string | null
+          cargo?: string | null
+          codigo?: string | null
+          cpf_cnpj_beneficiario?: string | null
+          created_at?: string | null
+          id?: string
+          id_declaracao: string
+          nome_beneficiario?: string | null
+          partido?: string | null
+          tipo: string
+          valor?: number | null
+        }
+        Update: {
+          candidato?: string | null
+          cargo?: string | null
+          codigo?: string | null
+          cpf_cnpj_beneficiario?: string | null
+          created_at?: string | null
+          id?: string
+          id_declaracao?: string
+          nome_beneficiario?: string | null
+          partido?: string | null
+          tipo?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_doacao_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_evolucao_patrimonial: {
+        Row: {
+          bens_ano_anterior: number | null
+          bens_ano_atual: number | null
+          created_at: string | null
+          dividas_ano_anterior: number | null
+          dividas_ano_atual: number | null
+          id: string
+          id_declaracao: string
+          patrimonio_liquido_anterior: number | null
+          patrimonio_liquido_atual: number | null
+          variacao_bens: number | null
+          variacao_dividas: number | null
+          variacao_patrimonial: number | null
+        }
+        Insert: {
+          bens_ano_anterior?: number | null
+          bens_ano_atual?: number | null
+          created_at?: string | null
+          dividas_ano_anterior?: number | null
+          dividas_ano_atual?: number | null
+          id?: string
+          id_declaracao: string
+          patrimonio_liquido_anterior?: number | null
+          patrimonio_liquido_atual?: number | null
+          variacao_bens?: number | null
+          variacao_dividas?: number | null
+          variacao_patrimonial?: number | null
+        }
+        Update: {
+          bens_ano_anterior?: number | null
+          bens_ano_atual?: number | null
+          created_at?: string | null
+          dividas_ano_anterior?: number | null
+          dividas_ano_atual?: number | null
+          id?: string
+          id_declaracao?: string
+          patrimonio_liquido_anterior?: number | null
+          patrimonio_liquido_atual?: number | null
+          variacao_bens?: number | null
+          variacao_dividas?: number | null
+          variacao_patrimonial?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_evolucao_patrimonial_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_fundo_imobiliario: {
+        Row: {
+          base_calculo: number | null
+          beneficiario: string | null
+          created_at: string | null
+          id: string
+          id_declaracao: string
+          imposto_devido: number | null
+          irrf: number | null
+          mes: number
+          resultado_liquido: number | null
+        }
+        Insert: {
+          base_calculo?: number | null
+          beneficiario?: string | null
+          created_at?: string | null
+          id?: string
+          id_declaracao: string
+          imposto_devido?: number | null
+          irrf?: number | null
+          mes: number
+          resultado_liquido?: number | null
+        }
+        Update: {
+          base_calculo?: number | null
+          beneficiario?: string | null
+          created_at?: string | null
+          id?: string
+          id_declaracao?: string
+          imposto_devido?: number | null
+          irrf?: number | null
+          mes?: number
+          resultado_liquido?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_fundo_imobiliario_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_ganho_capital: {
+        Row: {
+          created_at: string | null
+          custo_aquisicao_atualizado: number | null
+          data_alienacao: string | null
+          data_aquisicao: string | null
+          descricao_bem: string | null
+          ganho_capital: number | null
+          id: string
+          id_declaracao: string
+          imposto_devido: number | null
+          imposto_pago: number | null
+          taxa_cambio_alienacao: number | null
+          taxa_cambio_aquisicao: number | null
+          tipo_moeda: string | null
+          tipo_operacao: string | null
+          valor_alienacao: number | null
+          valor_aquisicao: number | null
+          valor_moeda_original: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          custo_aquisicao_atualizado?: number | null
+          data_alienacao?: string | null
+          data_aquisicao?: string | null
+          descricao_bem?: string | null
+          ganho_capital?: number | null
+          id?: string
+          id_declaracao: string
+          imposto_devido?: number | null
+          imposto_pago?: number | null
+          taxa_cambio_alienacao?: number | null
+          taxa_cambio_aquisicao?: number | null
+          tipo_moeda?: string | null
+          tipo_operacao?: string | null
+          valor_alienacao?: number | null
+          valor_aquisicao?: number | null
+          valor_moeda_original?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          custo_aquisicao_atualizado?: number | null
+          data_alienacao?: string | null
+          data_aquisicao?: string | null
+          descricao_bem?: string | null
+          ganho_capital?: number | null
+          id?: string
+          id_declaracao?: string
+          imposto_devido?: number | null
+          imposto_pago?: number | null
+          taxa_cambio_alienacao?: number | null
+          taxa_cambio_aquisicao?: number | null
+          tipo_moeda?: string | null
+          tipo_operacao?: string | null
+          valor_alienacao?: number | null
+          valor_aquisicao?: number | null
+          valor_moeda_original?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_ganho_capital_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_imposto_pago: {
+        Row: {
+          codigo: string
+          created_at: string | null
+          descricao: string
+          diferenca_limite_legal: number | null
+          id: string
+          id_declaracao: string
+          imposto_devido_com_rendimentos_exterior: number | null
+          imposto_devido_sem_rendimentos_exterior: number | null
+          valor: number | null
+        }
+        Insert: {
+          codigo: string
+          created_at?: string | null
+          descricao: string
+          diferenca_limite_legal?: number | null
+          id?: string
+          id_declaracao: string
+          imposto_devido_com_rendimentos_exterior?: number | null
+          imposto_devido_sem_rendimentos_exterior?: number | null
+          valor?: number | null
+        }
+        Update: {
+          codigo?: string
+          created_at?: string | null
+          descricao?: string
+          diferenca_limite_legal?: number | null
+          id?: string
+          id_declaracao?: string
+          imposto_devido_com_rendimentos_exterior?: number | null
+          imposto_devido_sem_rendimentos_exterior?: number | null
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_imposto_pago_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_outras_informacoes: {
+        Row: {
+          created_at: string | null
+          depositos_judiciais_imposto: number | null
+          doacoes_partidos_politicos: number | null
+          id: string
+          id_declaracao: string
+          imposto_devido_ganhos_capital: number | null
+          imposto_devido_ganhos_moeda_estrangeira: number | null
+          imposto_devido_renda_variavel: number | null
+          imposto_diferido_ganhos_capital: number | null
+          imposto_pagar_ganho_moeda_especie: number | null
+          imposto_pago_ganhos_capital: number | null
+          imposto_pago_ganhos_moeda_estrangeira: number | null
+          imposto_pago_renda_variavel: number | null
+          irrf_lei_11033_informado: number | null
+          rendimentos_exigibilidade_suspensa: number | null
+          rendimentos_isentos_nao_tributaveis: number | null
+          rendimentos_tributacao_exclusiva: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          depositos_judiciais_imposto?: number | null
+          doacoes_partidos_politicos?: number | null
+          id?: string
+          id_declaracao: string
+          imposto_devido_ganhos_capital?: number | null
+          imposto_devido_ganhos_moeda_estrangeira?: number | null
+          imposto_devido_renda_variavel?: number | null
+          imposto_diferido_ganhos_capital?: number | null
+          imposto_pagar_ganho_moeda_especie?: number | null
+          imposto_pago_ganhos_capital?: number | null
+          imposto_pago_ganhos_moeda_estrangeira?: number | null
+          imposto_pago_renda_variavel?: number | null
+          irrf_lei_11033_informado?: number | null
+          rendimentos_exigibilidade_suspensa?: number | null
+          rendimentos_isentos_nao_tributaveis?: number | null
+          rendimentos_tributacao_exclusiva?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          depositos_judiciais_imposto?: number | null
+          doacoes_partidos_politicos?: number | null
+          id?: string
+          id_declaracao?: string
+          imposto_devido_ganhos_capital?: number | null
+          imposto_devido_ganhos_moeda_estrangeira?: number | null
+          imposto_devido_renda_variavel?: number | null
+          imposto_diferido_ganhos_capital?: number | null
+          imposto_pagar_ganho_moeda_especie?: number | null
+          imposto_pago_ganhos_capital?: number | null
+          imposto_pago_ganhos_moeda_estrangeira?: number | null
+          imposto_pago_renda_variavel?: number | null
+          irrf_lei_11033_informado?: number | null
+          rendimentos_exigibilidade_suspensa?: number | null
+          rendimentos_isentos_nao_tributaveis?: number | null
+          rendimentos_tributacao_exclusiva?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_outras_informacoes_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_pagamento_deducao: {
+        Row: {
+          beneficiario: string | null
+          codigo: string
+          cpf_cnpj_beneficiario: string | null
+          created_at: string | null
+          descricao_codigo: string | null
+          id: string
+          id_declaracao: string
+          nome_beneficiario: string | null
+          parcela_nao_dedutivel: number | null
+          valor_pago: number | null
+        }
+        Insert: {
+          beneficiario?: string | null
+          codigo: string
+          cpf_cnpj_beneficiario?: string | null
+          created_at?: string | null
+          descricao_codigo?: string | null
+          id?: string
+          id_declaracao: string
+          nome_beneficiario?: string | null
+          parcela_nao_dedutivel?: number | null
+          valor_pago?: number | null
+        }
+        Update: {
+          beneficiario?: string | null
+          codigo?: string
+          cpf_cnpj_beneficiario?: string | null
+          created_at?: string | null
+          descricao_codigo?: string | null
+          id?: string
+          id_declaracao?: string
+          nome_beneficiario?: string | null
+          parcela_nao_dedutivel?: number | null
+          valor_pago?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_pagamento_deducao_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_renda_variavel: {
+        Row: {
+          base_calculo_comum: number | null
+          base_calculo_daytrade: number | null
+          beneficiario: string | null
+          created_at: string | null
+          id: string
+          id_declaracao: string
+          imposto_devido_comum: number | null
+          imposto_devido_daytrade: number | null
+          irrf_comum: number | null
+          irrf_daytrade: number | null
+          mes: number
+          prejuizo_comum_anterior: number | null
+          prejuizo_daytrade_anterior: number | null
+          resultado_comum_futuros: number | null
+          resultado_comum_mercado_vista: number | null
+          resultado_comum_opcoes: number | null
+          resultado_comum_outros: number | null
+          resultado_daytrade_futuros: number | null
+          resultado_daytrade_mercado_vista: number | null
+          resultado_daytrade_opcoes: number | null
+          resultado_daytrade_outros: number | null
+          total_operacoes_comuns: number | null
+          total_operacoes_daytrade: number | null
+        }
+        Insert: {
+          base_calculo_comum?: number | null
+          base_calculo_daytrade?: number | null
+          beneficiario?: string | null
+          created_at?: string | null
+          id?: string
+          id_declaracao: string
+          imposto_devido_comum?: number | null
+          imposto_devido_daytrade?: number | null
+          irrf_comum?: number | null
+          irrf_daytrade?: number | null
+          mes: number
+          prejuizo_comum_anterior?: number | null
+          prejuizo_daytrade_anterior?: number | null
+          resultado_comum_futuros?: number | null
+          resultado_comum_mercado_vista?: number | null
+          resultado_comum_opcoes?: number | null
+          resultado_comum_outros?: number | null
+          resultado_daytrade_futuros?: number | null
+          resultado_daytrade_mercado_vista?: number | null
+          resultado_daytrade_opcoes?: number | null
+          resultado_daytrade_outros?: number | null
+          total_operacoes_comuns?: number | null
+          total_operacoes_daytrade?: number | null
+        }
+        Update: {
+          base_calculo_comum?: number | null
+          base_calculo_daytrade?: number | null
+          beneficiario?: string | null
+          created_at?: string | null
+          id?: string
+          id_declaracao?: string
+          imposto_devido_comum?: number | null
+          imposto_devido_daytrade?: number | null
+          irrf_comum?: number | null
+          irrf_daytrade?: number | null
+          mes?: number
+          prejuizo_comum_anterior?: number | null
+          prejuizo_daytrade_anterior?: number | null
+          resultado_comum_futuros?: number | null
+          resultado_comum_mercado_vista?: number | null
+          resultado_comum_opcoes?: number | null
+          resultado_comum_outros?: number | null
+          resultado_daytrade_futuros?: number | null
+          resultado_daytrade_mercado_vista?: number | null
+          resultado_daytrade_opcoes?: number | null
+          resultado_daytrade_outros?: number | null
+          total_operacoes_comuns?: number | null
+          total_operacoes_daytrade?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_renda_variavel_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_rendimento: {
+        Row: {
+          beneficiario: string | null
+          categoria: string
+          cnpj_fonte: string | null
+          codigo_rendimento: string | null
+          contribuicao_previdenciaria: number | null
+          cpf_beneficiario: string | null
+          cpf_fonte: string | null
+          created_at: string | null
+          decimo_terceiro_salario: number | null
+          descricao_tipo: string | null
+          id: string
+          id_declaracao: string
+          imposto_retido_fonte: number | null
+          irrf_decimo_terceiro: number | null
+          nome_beneficiario: string | null
+          nome_fonte: string | null
+          valor_rendimento: number | null
+        }
+        Insert: {
+          beneficiario?: string | null
+          categoria: string
+          cnpj_fonte?: string | null
+          codigo_rendimento?: string | null
+          contribuicao_previdenciaria?: number | null
+          cpf_beneficiario?: string | null
+          cpf_fonte?: string | null
+          created_at?: string | null
+          decimo_terceiro_salario?: number | null
+          descricao_tipo?: string | null
+          id?: string
+          id_declaracao: string
+          imposto_retido_fonte?: number | null
+          irrf_decimo_terceiro?: number | null
+          nome_beneficiario?: string | null
+          nome_fonte?: string | null
+          valor_rendimento?: number | null
+        }
+        Update: {
+          beneficiario?: string | null
+          categoria?: string
+          cnpj_fonte?: string | null
+          codigo_rendimento?: string | null
+          contribuicao_previdenciaria?: number | null
+          cpf_beneficiario?: string | null
+          cpf_fonte?: string | null
+          created_at?: string | null
+          decimo_terceiro_salario?: number | null
+          descricao_tipo?: string | null
+          id?: string
+          id_declaracao?: string
+          imposto_retido_fonte?: number | null
+          irrf_decimo_terceiro?: number | null
+          nome_beneficiario?: string | null
+          nome_fonte?: string | null
+          valor_rendimento?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_rendimento_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_resumo_tributario: {
+        Row: {
+          aliquota_efetiva: number | null
+          banco_agencia: string | null
+          banco_codigo: string | null
+          banco_conta: string | null
+          banco_tipo_conta: string | null
+          base_calculo: number | null
+          carne_leao_dependentes: number | null
+          carne_leao_titular: number | null
+          contrib_previdencia_complementar: number | null
+          contrib_previdencia_oficial: number | null
+          contrib_previdencia_rra: number | null
+          created_at: string | null
+          deducao_dependentes: number | null
+          deducao_incentivo: number | null
+          despesas_instrucao: number | null
+          despesas_medicas: number | null
+          id: string
+          id_declaracao: string
+          imposto_a_pagar: number | null
+          imposto_a_restituir: number | null
+          imposto_complementar: number | null
+          imposto_devido: number | null
+          imposto_devido_apos_deducao: number | null
+          imposto_devido_rra: number | null
+          imposto_pago_exterior: number | null
+          irrf_dependentes: number | null
+          irrf_lei_11033: number | null
+          irrf_rra: number | null
+          irrf_titular: number | null
+          livro_caixa: number | null
+          numero_quotas: number | null
+          pensao_alimenticia_escritura: number | null
+          pensao_alimenticia_judicial: number | null
+          pensao_alimenticia_rra: number | null
+          rend_acumulado_dependentes: number | null
+          rend_acumulado_titular: number | null
+          rend_pf_exterior_dependentes: number | null
+          rend_pf_exterior_titular: number | null
+          rend_pj_dependentes: number | null
+          rend_pj_titular: number | null
+          resultado_atividade_rural: number | null
+          tipo_tributacao: string | null
+          total_deducoes: number | null
+          total_imposto_devido: number | null
+          total_imposto_pago: number | null
+          total_rendimentos_tributaveis: number | null
+          valor_quota: number | null
+        }
+        Insert: {
+          aliquota_efetiva?: number | null
+          banco_agencia?: string | null
+          banco_codigo?: string | null
+          banco_conta?: string | null
+          banco_tipo_conta?: string | null
+          base_calculo?: number | null
+          carne_leao_dependentes?: number | null
+          carne_leao_titular?: number | null
+          contrib_previdencia_complementar?: number | null
+          contrib_previdencia_oficial?: number | null
+          contrib_previdencia_rra?: number | null
+          created_at?: string | null
+          deducao_dependentes?: number | null
+          deducao_incentivo?: number | null
+          despesas_instrucao?: number | null
+          despesas_medicas?: number | null
+          id?: string
+          id_declaracao: string
+          imposto_a_pagar?: number | null
+          imposto_a_restituir?: number | null
+          imposto_complementar?: number | null
+          imposto_devido?: number | null
+          imposto_devido_apos_deducao?: number | null
+          imposto_devido_rra?: number | null
+          imposto_pago_exterior?: number | null
+          irrf_dependentes?: number | null
+          irrf_lei_11033?: number | null
+          irrf_rra?: number | null
+          irrf_titular?: number | null
+          livro_caixa?: number | null
+          numero_quotas?: number | null
+          pensao_alimenticia_escritura?: number | null
+          pensao_alimenticia_judicial?: number | null
+          pensao_alimenticia_rra?: number | null
+          rend_acumulado_dependentes?: number | null
+          rend_acumulado_titular?: number | null
+          rend_pf_exterior_dependentes?: number | null
+          rend_pf_exterior_titular?: number | null
+          rend_pj_dependentes?: number | null
+          rend_pj_titular?: number | null
+          resultado_atividade_rural?: number | null
+          tipo_tributacao?: string | null
+          total_deducoes?: number | null
+          total_imposto_devido?: number | null
+          total_imposto_pago?: number | null
+          total_rendimentos_tributaveis?: number | null
+          valor_quota?: number | null
+        }
+        Update: {
+          aliquota_efetiva?: number | null
+          banco_agencia?: string | null
+          banco_codigo?: string | null
+          banco_conta?: string | null
+          banco_tipo_conta?: string | null
+          base_calculo?: number | null
+          carne_leao_dependentes?: number | null
+          carne_leao_titular?: number | null
+          contrib_previdencia_complementar?: number | null
+          contrib_previdencia_oficial?: number | null
+          contrib_previdencia_rra?: number | null
+          created_at?: string | null
+          deducao_dependentes?: number | null
+          deducao_incentivo?: number | null
+          despesas_instrucao?: number | null
+          despesas_medicas?: number | null
+          id?: string
+          id_declaracao?: string
+          imposto_a_pagar?: number | null
+          imposto_a_restituir?: number | null
+          imposto_complementar?: number | null
+          imposto_devido?: number | null
+          imposto_devido_apos_deducao?: number | null
+          imposto_devido_rra?: number | null
+          imposto_pago_exterior?: number | null
+          irrf_dependentes?: number | null
+          irrf_lei_11033?: number | null
+          irrf_rra?: number | null
+          irrf_titular?: number | null
+          livro_caixa?: number | null
+          numero_quotas?: number | null
+          pensao_alimenticia_escritura?: number | null
+          pensao_alimenticia_judicial?: number | null
+          pensao_alimenticia_rra?: number | null
+          rend_acumulado_dependentes?: number | null
+          rend_acumulado_titular?: number | null
+          rend_pf_exterior_dependentes?: number | null
+          rend_pf_exterior_titular?: number | null
+          rend_pj_dependentes?: number | null
+          rend_pj_titular?: number | null
+          resultado_atividade_rural?: number | null
+          tipo_tributacao?: string | null
+          total_deducoes?: number | null
+          total_imposto_devido?: number | null
+          total_imposto_pago?: number | null
+          total_rendimentos_tributaveis?: number | null
+          valor_quota?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_resumo_tributario_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       landingpage_analise: {
         Row: {
           analise_texto: string | null
@@ -1397,9 +2832,31 @@ export type Database = {
           id_cliente_notion: string | null
           id_criativo: string | null
           id_empresa: string
+          id_irpf_declaracao: string | null
           id_lead: string
           id_lead_externo: string | null
           id_mautic_contact: string | null
+          irpf_aliquota_efetiva: number | null
+          irpf_ano_mais_recente: number | null
+          irpf_complexidade_declaracao: string | null
+          irpf_faixa_patrimonial: string | null
+          irpf_imposto_pagar: number | null
+          irpf_imposto_restituir: number | null
+          irpf_patrimonio_liquido: number | null
+          irpf_perfil_investidor: string | null
+          irpf_possui_atividade_rural: boolean | null
+          irpf_possui_cripto: boolean | null
+          irpf_possui_empresas: boolean | null
+          irpf_possui_imoveis: boolean | null
+          irpf_possui_investimentos: boolean | null
+          irpf_qtd_empresas: number | null
+          irpf_qtd_imoveis: number | null
+          irpf_renda_anual: number | null
+          irpf_tipos_cripto: string[] | null
+          irpf_total_bens: number | null
+          irpf_total_dividas: number | null
+          irpf_valor_cripto: number | null
+          irpf_valor_investimentos: number | null
           is_mql: boolean
           lead_pago: boolean | null
           levantou_mao: boolean
@@ -1472,9 +2929,31 @@ export type Database = {
           id_cliente_notion?: string | null
           id_criativo?: string | null
           id_empresa: string
+          id_irpf_declaracao?: string | null
           id_lead?: string
           id_lead_externo?: string | null
           id_mautic_contact?: string | null
+          irpf_aliquota_efetiva?: number | null
+          irpf_ano_mais_recente?: number | null
+          irpf_complexidade_declaracao?: string | null
+          irpf_faixa_patrimonial?: string | null
+          irpf_imposto_pagar?: number | null
+          irpf_imposto_restituir?: number | null
+          irpf_patrimonio_liquido?: number | null
+          irpf_perfil_investidor?: string | null
+          irpf_possui_atividade_rural?: boolean | null
+          irpf_possui_cripto?: boolean | null
+          irpf_possui_empresas?: boolean | null
+          irpf_possui_imoveis?: boolean | null
+          irpf_possui_investimentos?: boolean | null
+          irpf_qtd_empresas?: number | null
+          irpf_qtd_imoveis?: number | null
+          irpf_renda_anual?: number | null
+          irpf_tipos_cripto?: string[] | null
+          irpf_total_bens?: number | null
+          irpf_total_dividas?: number | null
+          irpf_valor_cripto?: number | null
+          irpf_valor_investimentos?: number | null
           is_mql?: boolean
           lead_pago?: boolean | null
           levantou_mao?: boolean
@@ -1547,9 +3026,31 @@ export type Database = {
           id_cliente_notion?: string | null
           id_criativo?: string | null
           id_empresa?: string
+          id_irpf_declaracao?: string | null
           id_lead?: string
           id_lead_externo?: string | null
           id_mautic_contact?: string | null
+          irpf_aliquota_efetiva?: number | null
+          irpf_ano_mais_recente?: number | null
+          irpf_complexidade_declaracao?: string | null
+          irpf_faixa_patrimonial?: string | null
+          irpf_imposto_pagar?: number | null
+          irpf_imposto_restituir?: number | null
+          irpf_patrimonio_liquido?: number | null
+          irpf_perfil_investidor?: string | null
+          irpf_possui_atividade_rural?: boolean | null
+          irpf_possui_cripto?: boolean | null
+          irpf_possui_empresas?: boolean | null
+          irpf_possui_imoveis?: boolean | null
+          irpf_possui_investimentos?: boolean | null
+          irpf_qtd_empresas?: number | null
+          irpf_qtd_imoveis?: number | null
+          irpf_renda_anual?: number | null
+          irpf_tipos_cripto?: string[] | null
+          irpf_total_bens?: number | null
+          irpf_total_dividas?: number | null
+          irpf_valor_cripto?: number | null
+          irpf_valor_investimentos?: number | null
           is_mql?: boolean
           lead_pago?: boolean | null
           levantou_mao?: boolean
@@ -1615,6 +3116,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "empresa"
             referencedColumns: ["id_empresa"]
+          },
+          {
+            foreignKeyName: "lead_id_irpf_declaracao_fkey"
+            columns: ["id_irpf_declaracao"]
+            isOneToOne: false
+            referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "lead_merged_into_lead_id_fkey"
