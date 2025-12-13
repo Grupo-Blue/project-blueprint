@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, 
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend 
 } from "recharts";
-import { Bitcoin, Building2, Car, TrendingUp, Wallet, Target, Users } from "lucide-react";
+import { Bitcoin, Building2, Car, TrendingUp, Wallet, Target, Users, Landmark, Briefcase } from "lucide-react";
 
 interface Props {
   empresaSelecionada: string;
@@ -126,6 +126,36 @@ export function IRPFDashboardInsights({ empresaSelecionada }: Props) {
       total: declaracoesComCripto.size,
       percentual: totalDeclaracoes > 0 ? (declaracoesComCripto.size / totalDeclaracoes) * 100 : 0,
       valor: valorCripto,
+    };
+  })();
+
+  // Clientes com alto patrimônio (>500k)
+  const clientesAltoPatrimonio = (() => {
+    if (!evolucao?.length) return { total: 0, valorTotal: 0 };
+    
+    const clientesAcima500k = evolucao.filter(e => (e.patrimonio_liquido_atual || 0) >= 500000);
+    const valorTotal = clientesAcima500k.reduce((sum, e) => sum + (e.patrimonio_liquido_atual || 0), 0);
+
+    return {
+      total: clientesAcima500k.length,
+      valorTotal,
+    };
+  })();
+
+  // Clientes com participações societárias (grupo 03)
+  const clientesComParticipacoes = (() => {
+    if (!bens?.length) return { total: 0, valor: 0 };
+    
+    const declaracoesComParticipacoes = new Set(
+      bens.filter(b => b.grupo_codigo === '03').map(b => b.id_declaracao)
+    );
+    const valorParticipacoes = bens
+      .filter(b => b.grupo_codigo === '03')
+      .reduce((sum, b) => sum + (b.valor_ano_atual || 0), 0);
+
+    return {
+      total: declaracoesComParticipacoes.size,
+      valor: valorParticipacoes,
     };
   })();
 
@@ -336,49 +366,111 @@ export function IRPFDashboardInsights({ empresaSelecionada }: Props) {
         <CardHeader>
           <CardTitle className="text-lg">Oportunidades de Cross-sell</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-lg bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
-              <div className="flex items-center gap-2 mb-2">
-                <Bitcoin className="w-5 h-5 text-orange-600" />
-                <span className="font-medium">Declaração de Cripto</span>
+        <CardContent className="space-y-6">
+          {/* Blue */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
+                <span className="text-xs font-bold text-white">B</span>
               </div>
-              <p className="text-2xl font-bold text-orange-600">
-                {clientesComCripto.total} clientes
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {formatCurrency(clientesComCripto.valor)} em criptoativos declarados
-              </p>
-              <Badge className="mt-2 bg-orange-500">Oportunidade Blue</Badge>
+              <h4 className="font-semibold text-blue-600">Blue Consult</h4>
             </div>
-
-            <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
-              <div className="flex items-center gap-2 mb-2">
-                <Building2 className="w-5 h-5 text-blue-600" />
-                <span className="font-medium">Ganho de Capital</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Bitcoin className="w-5 h-5 text-orange-600" />
+                  <span className="font-medium">Declaração de Cripto</span>
+                </div>
+                <p className="text-2xl font-bold text-orange-600">
+                  {clientesComCripto.total} clientes
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {formatCurrency(clientesComCripto.valor)} em criptoativos
+                </p>
+                <Badge className="mt-2 bg-blue-600">Blue</Badge>
               </div>
-              <p className="text-2xl font-bold text-blue-600">
-                {distribuicaoPatrimonio.find(d => d.codigo === '01')?.valor ? 
-                  Math.round((distribuicaoPatrimonio.find(d => d.codigo === '01')?.valor || 0) / 1000000) : 0}M
-              </p>
-              <p className="text-sm text-muted-foreground">
-                em imóveis declarados
-              </p>
-              <Badge className="mt-2 bg-blue-500">Potencial GCAP</Badge>
+
+              <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium">Ganho de Capital</span>
+                </div>
+                <p className="text-2xl font-bold text-blue-600">
+                  {distribuicaoPatrimonio.find(d => d.codigo === '01')?.valor ? 
+                    Math.round((distribuicaoPatrimonio.find(d => d.codigo === '01')?.valor || 0) / 1000000) : 0}M
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  em imóveis declarados
+                </p>
+                <Badge className="mt-2 bg-blue-600">Blue</Badge>
+              </div>
+
+              <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-5 h-5 text-purple-600" />
+                  <span className="font-medium">Planejamento Tributário</span>
+                </div>
+                <p className="text-2xl font-bold text-purple-600">
+                  {perfisInvestidor.find(p => p.nome === 'Arrojado')?.valor || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  investidores arrojados
+                </p>
+                <Badge className="mt-2 bg-blue-600">Blue</Badge>
+              </div>
             </div>
+          </div>
 
-            <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800">
-              <div className="flex items-center gap-2 mb-2">
-                <Target className="w-5 h-5 text-purple-600" />
-                <span className="font-medium">Planejamento Tributário</span>
+          {/* Tokeniza */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center">
+                <Landmark className="w-3.5 h-3.5 text-white" />
               </div>
-              <p className="text-2xl font-bold text-purple-600">
-                {perfisInvestidor.find(p => p.nome === 'Arrojado')?.valor || 0}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                investidores arrojados
-              </p>
-              <Badge className="mt-2 bg-purple-500">Alta complexidade</Badge>
+              <h4 className="font-semibold text-emerald-600">Tokeniza</h4>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-5 h-5 text-emerald-600" />
+                  <span className="font-medium">Crowdfunding</span>
+                </div>
+                <p className="text-2xl font-bold text-emerald-600">
+                  {perfisInvestidor.find(p => p.nome === 'Arrojado')?.valor || 0} investidores
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Perfil arrojado ideal para crowdfunding
+                </p>
+                <Badge className="mt-2 bg-emerald-600">Tokeniza</Badge>
+              </div>
+
+              <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Wallet className="w-5 h-5 text-amber-600" />
+                  <span className="font-medium">Alto Patrimônio</span>
+                </div>
+                <p className="text-2xl font-bold text-amber-600">
+                  {clientesAltoPatrimonio.total} clientes
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {formatCurrency(clientesAltoPatrimonio.valorTotal)} (patrimônio &gt;R$500k)
+                </p>
+                <Badge className="mt-2 bg-emerald-600">Tokeniza</Badge>
+              </div>
+
+              <div className="p-4 rounded-lg bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Briefcase className="w-5 h-5 text-teal-600" />
+                  <span className="font-medium">Empresários</span>
+                </div>
+                <p className="text-2xl font-bold text-teal-600">
+                  {clientesComParticipacoes.total} clientes
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {formatCurrency(clientesComParticipacoes.valor)} em participações
+                </p>
+                <Badge className="mt-2 bg-emerald-600">Tokeniza</Badge>
+              </div>
             </div>
           </div>
         </CardContent>
