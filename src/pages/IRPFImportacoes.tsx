@@ -587,7 +587,7 @@ export default function IRPFImportacoes() {
         </TabsContent>
 
         <TabsContent value="insights" className="mt-6">
-          <IRPFDashboardInsights empresaSelecionada={empresaSelecionada} />
+          <IRPFDashboardInsights empresaSelecionada={BLUE_EMPRESA_ID} />
         </TabsContent>
       </Tabs>
     </div>
