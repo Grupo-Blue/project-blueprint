@@ -30,7 +30,8 @@ import {
   Menu,
   Calendar,
   ChevronDown,
-  ClipboardList
+  ClipboardList,
+  Receipt
 } from "lucide-react";
 import {
   Sheet,
@@ -300,6 +301,18 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           Alertas
         </Button>
       </Link>
+      {isDirecao && (
+        <Link to="/irpf-importacoes" onClick={() => setMobileMenuOpen(false)}>
+          <Button 
+            variant={location.pathname === "/irpf-importacoes" ? "secondary" : "ghost"} 
+            size="sm"
+            className="w-full justify-start hover:bg-accent transition-all"
+          >
+            <Receipt className="mr-2 h-4 w-4" />
+            Imposto de Renda
+          </Button>
+        </Link>
+      )}
       {isTrafego && (
         <>
           <Link to="/contas-anuncio" onClick={() => setMobileMenuOpen(false)}>
