@@ -101,3 +101,6 @@ verify_jwt = false
 
 [functions.recoletar-criativos-historicos]
 verify_jwt = false
+
+[functions.processar-irpf]
+verify_jwt = true
