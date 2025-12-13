@@ -591,7 +591,7 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
       }
     }
 
-    // 10. Buscar e enriquecer lead por CPF/email
+    // 10. Buscar e enriquecer lead por email → telefone → cliente_notion (cascata)
     const patrimonioLiquido = totalBens - totalDividas;
     const rendaAnual = irpfData.resumoTributario?.totalRendimentosTributaveis || 0;
 
@@ -609,8 +609,25 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
     if (irpfData.bensEDireitos.length > 15 || qtdEmpresas > 0 || tiposCripto.length > 0) complexidade = 'complexa';
     else if (irpfData.bensEDireitos.length > 5) complexidade = 'media';
 
-    // Buscar lead por email ou via cliente_notion
-    let leadId = null;
+    // Normalizar telefone do IRPF para E.164
+    let telefoneNormalizado: string | null = null;
+    const celularDdd = irpfData.endereco?.celularDdd || irpfData.endereco?.telefoneDdd;
+    const celularNumero = irpfData.endereco?.celularNumero || irpfData.endereco?.telefoneNumero;
+    if (celularDdd && celularNumero) {
+      const numeroLimpo = (celularDdd + celularNumero).replace(/\D/g, '');
+      // Inserir 9 após DDD se número tem 10 dígitos (DDD + 8 dígitos)
+      const numeroComNove = numeroLimpo.length === 10 
+        ? numeroLimpo.slice(0, 2) + '9' + numeroLimpo.slice(2) 
+        : numeroLimpo;
+      telefoneNormalizado = '+55' + numeroComNove;
+      console.log("[processar-irpf] Telefone normalizado:", telefoneNormalizado);
+    }
+
+    // Buscar lead em cascata: email → telefone → cliente_notion
+    let leadId: string | null = null;
+    let metodoVinculacao = '';
+
+    // 1º - Buscar por email (mais confiável)
     if (irpfData.endereco?.email) {
       const { data: leadPorEmail } = await supabase
         .from('lead')
@@ -619,7 +636,43 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
         .eq('id_empresa', id_empresa)
         .maybeSingle();
       
-      if (leadPorEmail) leadId = leadPorEmail.id_lead;
+      if (leadPorEmail) {
+        leadId = leadPorEmail.id_lead;
+        metodoVinculacao = 'email';
+        console.log("[processar-irpf] Lead encontrado por email:", leadId);
+      }
+    }
+
+    // 2º - Buscar por telefone (se email não encontrou)
+    if (!leadId && telefoneNormalizado) {
+      const { data: leadPorTelefone } = await supabase
+        .from('lead')
+        .select('id_lead')
+        .eq('telefone', telefoneNormalizado)
+        .eq('id_empresa', id_empresa)
+        .maybeSingle();
+      
+      if (leadPorTelefone) {
+        leadId = leadPorTelefone.id_lead;
+        metodoVinculacao = 'telefone';
+        console.log("[processar-irpf] Lead encontrado por telefone:", leadId);
+      }
+    }
+
+    // 3º - Buscar por cliente_notion (se email e telefone não encontraram)
+    if (!leadId && clienteNotion?.id_cliente) {
+      const { data: leadPorCliente } = await supabase
+        .from('lead')
+        .select('id_lead')
+        .eq('id_cliente_notion', clienteNotion.id_cliente)
+        .eq('id_empresa', id_empresa)
+        .maybeSingle();
+      
+      if (leadPorCliente) {
+        leadId = leadPorCliente.id_lead;
+        metodoVinculacao = 'cliente_notion';
+        console.log("[processar-irpf] Lead encontrado por cliente_notion:", leadId);
+      }
     }
 
     if (leadId) {
@@ -656,7 +709,9 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
         .update({ id_lead: leadId })
         .eq('id', declaracao.id);
 
-      console.log("[processar-irpf] Lead enriquecido:", leadId);
+      console.log("[processar-irpf] Lead enriquecido via", metodoVinculacao, ":", leadId);
+    } else {
+      console.log("[processar-irpf] Nenhum lead encontrado para vinculação automática");
     }
 
     const duracao = Date.now() - startTime;
