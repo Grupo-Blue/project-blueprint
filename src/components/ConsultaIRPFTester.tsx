@@ -110,16 +110,16 @@ export function ConsultaIRPFTester() {
 
   return (
     <Card className="mt-8">
-      <CardHeader>
+      <CardHeader className="p-4 md:p-6">
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-primary" />
-          <CardTitle>API Consulta IRPF</CardTitle>
+          <CardTitle className="text-base md:text-lg">API Consulta IRPF</CardTitle>
         </div>
-        <CardDescription>
-          Endpoint para consulta de dados IRPF por sistemas externos (SDR IA, CRM, etc.)
+        <CardDescription className="text-xs md:text-sm">
+          Endpoint para consulta de dados IRPF por sistemas externos
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="documentacao">
@@ -135,13 +135,13 @@ export function ConsultaIRPFTester() {
           <TabsContent value="documentacao" className="space-y-6">
             {/* Endpoint Info */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Endpoint</Label>
-              <div className="flex items-center gap-2">
+              <Label className="text-xs md:text-sm font-medium">Endpoint</Label>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                 <Badge variant="secondary">POST</Badge>
-                <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono break-all">
+                <code className="flex-1 bg-muted px-2 md:px-3 py-2 rounded text-xs font-mono break-all w-full">
                   {endpointUrl}
                 </code>
-                <Button variant="ghost" size="icon" onClick={() => copyToClipboard(endpointUrl)}>
+                <Button variant="ghost" size="icon" className="shrink-0" onClick={() => copyToClipboard(endpointUrl)}>
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
@@ -149,33 +149,33 @@ export function ConsultaIRPFTester() {
 
             {/* Authentication */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
+              <Label className="text-xs md:text-sm font-medium flex items-center gap-2">
                 <Key className="h-4 w-4" />
                 Autenticação
               </Label>
-              <div className="bg-muted p-4 rounded-lg space-y-2">
-                <p className="text-sm">Header obrigatório:</p>
-                <code className="block bg-background px-3 py-2 rounded text-sm font-mono">
+              <div className="bg-muted p-3 md:p-4 rounded-lg space-y-2">
+                <p className="text-xs md:text-sm">Header obrigatório:</p>
+                <code className="block bg-background px-2 md:px-3 py-2 rounded text-xs font-mono break-all">
                   Authorization: Bearer {"<IRPF_WEBHOOK_SECRET>"}
                 </code>
                 <p className="text-xs text-muted-foreground">
-                  O token IRPF_WEBHOOK_SECRET deve ser configurado nos Secrets do projeto.
+                  O token deve ser configurado nos Secrets do projeto.
                 </p>
               </div>
             </div>
 
             {/* Request Body */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Request Body (JSON)</Label>
-              <div className="bg-muted p-4 rounded-lg space-y-3">
-                <p className="text-sm">Envie <strong>cpf</strong> ou <strong>email</strong> (um dos dois é obrigatório):</p>
-                <div className="grid gap-2 text-sm">
-                  <div className="flex items-start gap-2">
-                    <code className="bg-background px-2 py-1 rounded">cpf</code>
-                    <span className="text-muted-foreground">string - CPF do contribuinte (com ou sem formatação)</span>
+              <Label className="text-xs md:text-sm font-medium">Request Body (JSON)</Label>
+              <div className="bg-muted p-3 md:p-4 rounded-lg space-y-3">
+                <p className="text-xs md:text-sm">Envie <strong>cpf</strong> ou <strong>email</strong>:</p>
+                <div className="grid gap-2 text-xs">
+                  <div className="flex flex-col sm:flex-row items-start gap-1 sm:gap-2">
+                    <code className="bg-background px-2 py-1 rounded shrink-0">cpf</code>
+                    <span className="text-muted-foreground">string - CPF do contribuinte</span>
                   </div>
-                  <div className="flex items-start gap-2">
-                    <code className="bg-background px-2 py-1 rounded">email</code>
+                  <div className="flex flex-col sm:flex-row items-start gap-1 sm:gap-2">
+                    <code className="bg-background px-2 py-1 rounded shrink-0">email</code>
                     <span className="text-muted-foreground">string - Email do contribuinte</span>
                   </div>
                 </div>
@@ -251,15 +251,15 @@ export function ConsultaIRPFTester() {
 
             {/* Data Tables */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Tabelas de Dados Retornadas</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              <Label className="text-xs md:text-sm font-medium">Tabelas Retornadas</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 md:gap-2">
                 {[
                   "dependentes", "rendimentos", "bens_direitos", "dividas", 
                   "deducoes", "impostos_pagos", "ganhos_capital", "doacoes",
                   "evolucao_patrimonial", "atividades_rurais", "fundos_imobiliarios",
-                  "alimentandos", "demonstrativos_lei_14754"
+                  "alimentandos", "demonstrativos"
                 ].map((table) => (
-                  <Badge key={table} variant="outline" className="justify-center py-1">
+                  <Badge key={table} variant="outline" className="justify-center py-1 text-xs truncate">
                     {table}
                   </Badge>
                 ))}
