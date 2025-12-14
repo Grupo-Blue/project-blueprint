@@ -303,27 +303,36 @@ serve(async (req) => {
 
     // Tentar vincular ao criativo usando utm_content
     // utm_content pode conter o Ad ID (id_anuncio_externo) ou Creative ID (id_criativo_externo)
+    // Também suporta formato híbrido Google Ads: "ID_texto"
     let idCriativo = null;
     if (utmContent) {
       try {
-        // Prioridade 1: Buscar por Ad ID (id_anuncio_externo) - mais comum no utm_content do Meta
+        // Extrair ID numérico se utm_content tem formato "ID_texto" (Google Ads)
+        let utmContentParaMatch = utmContent;
+        if (utmContent.includes('_')) {
+          const partes = utmContent.split('_');
+          if (/^\d+$/.test(partes[0])) {
+            utmContentParaMatch = partes[0];
+            console.log(`[utm_content] Formato híbrido detectado: "${utmContent}" → ID extraído: "${utmContentParaMatch}"`);
+          }
+        }
+        
+        // Prioridade 1: Buscar por Ad ID (id_anuncio_externo) - SEM filtro ativo
         const { data: criativoPorAdId } = await supabase
           .from("criativo")
           .select("id_criativo")
-          .eq("id_anuncio_externo", utmContent)
-          .eq("ativo", true)
+          .eq("id_anuncio_externo", utmContentParaMatch)
           .maybeSingle();
         
         if (criativoPorAdId) {
           idCriativo = criativoPorAdId.id_criativo;
           console.log(`✓ Criativo vinculado por Ad ID: ${idCriativo} (utm_content: ${utmContent})`);
         } else {
-          // Prioridade 2: Buscar por Creative ID (id_criativo_externo)
+          // Prioridade 2: Buscar por Creative ID (id_criativo_externo) - SEM filtro ativo
           const { data: criativoPorCreativeId } = await supabase
             .from("criativo")
             .select("id_criativo")
-            .eq("id_criativo_externo", utmContent)
-            .eq("ativo", true)
+            .eq("id_criativo_externo", utmContentParaMatch)
             .maybeSingle();
           
           if (criativoPorCreativeId) {

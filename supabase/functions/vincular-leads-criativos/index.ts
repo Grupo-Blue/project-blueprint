@@ -74,20 +74,40 @@ serve(async (req) => {
     let vinculadosPorDescricao = 0;
     const erros: string[] = [];
 
+    // Contadores para alertas de placeholders
+    const placeholdersNaoResolvidos: { lead_id: string; utm_content: string }[] = [];
+
     for (const lead of leads || []) {
       const utmContent = lead.utm_content?.trim();
       if (!utmContent) continue;
 
-      // Skip placeholders não resolvidos
+      // Detectar placeholders não resolvidos e criar alertas
       if (utmContent.includes('{{') && utmContent.includes('}}')) {
+        placeholdersNaoResolvidos.push({ lead_id: lead.id_lead, utm_content: utmContent });
+        console.log(`⚠️ Lead ${lead.id_lead} tem placeholder não resolvido: ${utmContent}`);
         continue;
       }
 
       let idCriativoMatch: string | null = null;
       let tipoMatch = '';
 
+      // Extrair ID numérico se utm_content tem formato "ID_texto" (Google Ads)
+      let utmContentParaMatch = utmContent;
+      if (utmContent.includes('_')) {
+        const partes = utmContent.split('_');
+        if (/^\d+$/.test(partes[0])) {
+          utmContentParaMatch = partes[0];
+          console.log(`[utm_content] Formato híbrido: "${utmContent}" → ID: "${utmContentParaMatch}"`);
+        }
+      }
+
       // Tentar match direto por ID (numérico ou UUID)
-      if (mapaIds[utmContent]) {
+      if (mapaIds[utmContentParaMatch]) {
+        idCriativoMatch = mapaIds[utmContentParaMatch];
+        tipoMatch = 'id_direto';
+        vinculadosPorId++;
+      } else if (utmContentParaMatch !== utmContent && mapaIds[utmContent]) {
+        // Fallback: tentar com utm_content original
         idCriativoMatch = mapaIds[utmContent];
         tipoMatch = 'id_direto';
         vinculadosPorId++;
@@ -130,6 +150,54 @@ serve(async (req) => {
         } else {
           vinculados++;
           console.log(`✅ Lead ${lead.id_lead} vinculado ao criativo ${idCriativoMatch} (${tipoMatch})`);
+        }
+      }
+    }
+
+    // Criar alertas para placeholders não resolvidos (agrupa por utm_content único)
+    const placeholdersPorUtm: Record<string, string[]> = {};
+    for (const p of placeholdersNaoResolvidos) {
+      if (!placeholdersPorUtm[p.utm_content]) {
+        placeholdersPorUtm[p.utm_content] = [];
+      }
+      placeholdersPorUtm[p.utm_content].push(p.lead_id);
+    }
+
+    for (const [utmPlaceholder, leadIds] of Object.entries(placeholdersPorUtm)) {
+      // Verificar se já existe alerta não resolvido para este placeholder
+      const { data: alertaExistente } = await supabase
+        .from('alerta_utm')
+        .select('id_alerta')
+        .eq('tipo_discrepancia', 'placeholder_nao_resolvido')
+        .eq('url_capturada', utmPlaceholder)
+        .eq('resolvido', false)
+        .maybeSingle();
+
+      if (!alertaExistente) {
+        // Buscar uma campanha para associar o alerta (necessário pela FK)
+        const { data: primeiraCampanha } = await supabase
+          .from('campanha')
+          .select('id_campanha')
+          .limit(1)
+          .single();
+
+        const { data: primeiroCriativo } = await supabase
+          .from('criativo')
+          .select('id_criativo')
+          .limit(1)
+          .single();
+
+        if (primeiraCampanha && primeiroCriativo) {
+          await supabase.from('alerta_utm').insert({
+            id_campanha: primeiraCampanha.id_campanha,
+            id_criativo: primeiroCriativo.id_criativo,
+            tipo_discrepancia: 'placeholder_nao_resolvido',
+            url_capturada: utmPlaceholder,
+            url_esperada: 'ID numérico do anúncio (ex: 120233985273260284)',
+            detalhes: { leads_afetados: leadIds.length, sample_leads: leadIds.slice(0, 5) },
+            resolvido: false,
+          });
+          console.log(`🚨 Alerta criado para placeholder: ${utmPlaceholder} (${leadIds.length} leads afetados)`);
         }
       }
     }
