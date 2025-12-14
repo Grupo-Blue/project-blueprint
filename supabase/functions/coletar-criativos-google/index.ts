@@ -374,6 +374,7 @@ serve(async (req) => {
               const criativoData = {
                 id_campanha: campanha.id_campanha,
                 id_criativo_externo: ad.id,
+                id_anuncio_externo: ad.id, // Correção: adicionar ad.id para match com utm_content
                 tipo: tipoCriativo,
                 descricao: ad.name || null,
                 ativo: ativo,
