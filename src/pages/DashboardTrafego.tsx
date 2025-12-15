@@ -129,7 +129,7 @@ function CriativosQuery({ campanhaId, plataforma, urlEsperadaCampanha }: { campa
   const [urlEsperadaInput, setUrlEsperadaInput] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [filtroStatusCriativo, setFiltroStatusCriativo] = useState<string>("todos");
-  
+  const [ordenacaoCriativo, setOrdenacaoCriativo] = useState<string>("leads_desc");
   const { data: criativos, isLoading } = useQuery({
     queryKey: ["criativos-campanha", campanhaId],
     queryFn: async () => {
@@ -244,10 +244,38 @@ function CriativosQuery({ campanhaId, plataforma, urlEsperadaCampanha }: { campa
   }
 
   // Filtrar criativos pelo status
-  const criativosFiltrados = criativos.filter(criativo => {
+  const criativosFiltradosPorStatus = criativos.filter(criativo => {
     if (filtroStatusCriativo === "ativos") return criativo.ativo;
     if (filtroStatusCriativo === "inativos") return !criativo.ativo;
     return true; // todos
+  });
+
+  // Ordenar criativos
+  const criativosFiltrados = [...criativosFiltradosPorStatus].sort((a, b) => {
+    switch (ordenacaoCriativo) {
+      case "leads_desc":
+        return (b.leads || 0) - (a.leads || 0);
+      case "leads_asc":
+        return (a.leads || 0) - (b.leads || 0);
+      case "cliques_desc":
+        return (b.cliques || 0) - (a.cliques || 0);
+      case "cliques_asc":
+        return (a.cliques || 0) - (b.cliques || 0);
+      case "verba_desc":
+        return (b.verba_investida || 0) - (a.verba_investida || 0);
+      case "verba_asc":
+        return (a.verba_investida || 0) - (b.verba_investida || 0);
+      case "cpl_desc":
+        return (b.cpl || Infinity) - (a.cpl || Infinity);
+      case "cpl_asc":
+        return (a.cpl || Infinity) - (b.cpl || Infinity);
+      case "ctr_desc":
+        return (b.ctr || 0) - (a.ctr || 0);
+      case "ctr_asc":
+        return (a.ctr || 0) - (b.ctr || 0);
+      default:
+        return 0;
+    }
   });
 
   const qtdAtivos = criativos.filter(c => c.ativo).length;
@@ -256,19 +284,41 @@ function CriativosQuery({ campanhaId, plataforma, urlEsperadaCampanha }: { campa
   return (
     <>
       <div className="space-y-3">
-        {/* Filtro de status dos criativos */}
-        <div className="flex items-center gap-2 pb-2 border-b">
-          <span className="text-sm text-muted-foreground">Filtrar:</span>
-          <Select value={filtroStatusCriativo} onValueChange={setFiltroStatusCriativo}>
-            <SelectTrigger className="w-[160px] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos ({criativos.length})</SelectItem>
-              <SelectItem value="ativos">Ativos ({qtdAtivos})</SelectItem>
-              <SelectItem value="inativos">Inativos ({qtdInativos})</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Filtros de status e ordenação */}
+        <div className="flex flex-wrap items-center gap-2 pb-2 border-b">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Status:</span>
+            <Select value={filtroStatusCriativo} onValueChange={setFiltroStatusCriativo}>
+              <SelectTrigger className="w-[130px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos ({criativos.length})</SelectItem>
+                <SelectItem value="ativos">Ativos ({qtdAtivos})</SelectItem>
+                <SelectItem value="inativos">Inativos ({qtdInativos})</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Ordenar:</span>
+            <Select value={ordenacaoCriativo} onValueChange={setOrdenacaoCriativo}>
+              <SelectTrigger className="w-[150px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="leads_desc">Mais Leads</SelectItem>
+                <SelectItem value="leads_asc">Menos Leads</SelectItem>
+                <SelectItem value="cliques_desc">Mais Cliques</SelectItem>
+                <SelectItem value="cliques_asc">Menos Cliques</SelectItem>
+                <SelectItem value="verba_desc">Maior Verba</SelectItem>
+                <SelectItem value="verba_asc">Menor Verba</SelectItem>
+                <SelectItem value="cpl_desc">Maior CPL</SelectItem>
+                <SelectItem value="cpl_asc">Menor CPL</SelectItem>
+                <SelectItem value="ctr_desc">Maior CTR</SelectItem>
+                <SelectItem value="ctr_asc">Menor CTR</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {criativosFiltrados.length === 0 ? (
