@@ -192,7 +192,6 @@ serve(async (req) => {
                 ad_group_ad.status,
                 ad_group_ad.ad.responsive_display_ad.marketing_images,
                 ad_group_ad.ad.responsive_display_ad.logo_images,
-                ad_group_ad.ad.video_ad.video,
                 ad_group_ad.ad.image_ad.image_url,
                 ad_group_ad.ad.app_ad.images,
                 ad_group_ad.ad.demand_gen_carousel_ad.carousel_cards,
@@ -263,10 +262,10 @@ serve(async (req) => {
               let tipoCriativo = "OUTRO";
               let urlMidia = null;
               
-              if (ad.type === "VIDEO_AD" || ad.videoAd) {
+              if (ad.type === "VIDEO_AD") {
                 tipoCriativo = "VIDEO";
-                // Para vídeos do Google Ads, a URL geralmente não está disponível diretamente
-                urlMidia = ad.videoAd?.video?.id ? `https://www.youtube.com/watch?v=${ad.videoAd.video.id}` : null;
+                // URL do vídeo não disponível na query, deixar null
+                urlMidia = null;
               } else if (ad.type === "IMAGE_AD" || ad.imageAd) {
                 tipoCriativo = "IMAGEM";
                 urlMidia = ad.imageAd?.imageUrl || null;
