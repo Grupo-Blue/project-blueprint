@@ -5,16 +5,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { 
   ChevronDown, 
   ChevronRight, 
-  AlertTriangle,
-  Image,
-  Video,
-  Grid3x3,
-  FileQuestion,
-  Copy,
-  ExternalLink
+  AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import React from "react";
 
 interface CampanhaCardMobileProps {
   campanha: {
@@ -31,39 +25,20 @@ interface CampanhaCardMobileProps {
     plataforma?: string;
     url_esperada?: string | null;
   };
-  criativos?: any[];
   isExpanded: boolean;
   onToggleExpand: () => void;
   onVerFluxo?: () => void;
+  renderCriativos?: () => React.ReactNode;
 }
-
-const getTipoIcon = (tipo: string) => {
-  switch (tipo) {
-    case "VIDEO":
-      return <Video className="h-3.5 w-3.5" />;
-    case "IMAGEM":
-      return <Image className="h-3.5 w-3.5" />;
-    case "CARROSSEL":
-      return <Grid3x3 className="h-3.5 w-3.5" />;
-    default:
-      return <FileQuestion className="h-3.5 w-3.5" />;
-  }
-};
 
 export function CampanhaCardMobile({ 
   campanha, 
-  criativos, 
   isExpanded, 
   onToggleExpand,
-  onVerFluxo 
+  onVerFluxo,
+  renderCriativos
 }: CampanhaCardMobileProps) {
-  const { toast } = useToast();
   const hasAlerta = (campanha.qtd_criativos_ativos || 0) < 2;
-
-  const handleCopyId = (id: string) => {
-    navigator.clipboard.writeText(id);
-    toast({ title: "ID copiado!", description: "Use no utm_content" });
-  };
 
   return (
     <Card className={cn(
@@ -136,67 +111,7 @@ export function CampanhaCardMobile({
               )}
             </div>
             
-            {criativos && criativos.length > 0 ? (
-              <div className="space-y-2">
-                {criativos.map((criativo) => (
-                  <div 
-                    key={criativo.id_criativo} 
-                    className="p-2 rounded border bg-card text-xs"
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        {getTipoIcon(criativo.tipo)}
-                        <span className="font-medium">{criativo.tipo}</span>
-                        <Badge variant={criativo.ativo ? "secondary" : "outline"} className="text-[10px] h-4">
-                          {criativo.ativo ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCopyId(criativo.id_criativo_externo)}
-                          className="h-6 w-6 p-0"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                        {criativo.url_preview && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(criativo.url_preview, '_blank')}
-                            className="h-6 w-6 p-0"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    {criativo.descricao && (
-                      <p className="text-muted-foreground truncate mb-1.5">{criativo.descricao}</p>
-                    )}
-                    <div className="grid grid-cols-4 gap-1.5">
-                      <div className="text-center bg-muted/50 rounded p-1">
-                        <p className="text-[10px] text-muted-foreground">Leads</p>
-                        <p className="font-semibold">{criativo.leads || 0}</p>
-                      </div>
-                      <div className="text-center bg-muted/50 rounded p-1">
-                        <p className="text-[10px] text-muted-foreground">Cliques</p>
-                        <p className="font-semibold">{criativo.cliques || 0}</p>
-                      </div>
-                      <div className="text-center bg-muted/50 rounded p-1">
-                        <p className="text-[10px] text-muted-foreground">CPL</p>
-                        <p className="font-semibold">{criativo.cpl ? `R$${criativo.cpl.toFixed(0)}` : "N/A"}</p>
-                      </div>
-                      <div className="text-center bg-muted/50 rounded p-1">
-                        <p className="text-[10px] text-muted-foreground">CTR</p>
-                        <p className="font-semibold">{criativo.ctr ? `${criativo.ctr.toFixed(1)}%` : "N/A"}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
+            {renderCriativos ? renderCriativos() : (
               <p className="text-xs text-muted-foreground text-center py-2">
                 Nenhum criativo cadastrado
               </p>

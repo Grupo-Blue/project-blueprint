@@ -1405,6 +1405,13 @@ export default function DashboardTrafego() {
                       setCampanhaSelecionada({ id: campanha.id_campanha, nome: campanha.nome });
                       setCampanhaFluxoOpen(true);
                     }}
+                    renderCriativos={() => (
+                      <CriativosQuery 
+                        campanhaId={campanha.id_campanha} 
+                        plataforma={campanha.plataforma || "OUTRO"}
+                        urlEsperadaCampanha={campanha.url_esperada}
+                      />
+                    )}
                   />
                 ))
               ) : (
