@@ -48,6 +48,7 @@ import { MetricasAwareness } from "@/components/dashboard/MetricasAwareness";
 import { UTMHealthWidget } from "@/components/dashboard/UTMHealthWidget";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { CampanhaCardMobile } from "@/components/dashboard/CampanhaCardMobile";
+import { CriativoItemMobile } from "@/components/dashboard/CriativoItemMobile";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CampanhaMetrica {
@@ -122,6 +123,7 @@ const getCriativoUrl = (plataforma: string, idExterno: string) => {
 function CriativosQuery({ campanhaId, plataforma, urlEsperadaCampanha }: { campanhaId: string; plataforma: string; urlEsperadaCampanha?: string | null }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [modalOpen, setModalOpen] = useState(false);
   const [criativoEditando, setCriativoEditando] = useState<Criativo | null>(null);
   const [urlEsperadaInput, setUrlEsperadaInput] = useState("");
@@ -273,7 +275,21 @@ function CriativosQuery({ campanhaId, plataforma, urlEsperadaCampanha }: { campa
           <p className="text-sm text-muted-foreground text-center py-4">
             Nenhum criativo {filtroStatusCriativo === "ativos" ? "ativo" : "inativo"} encontrado
           </p>
+        ) : isMobile ? (
+          /* Layout Mobile - Cards compactos */
+          <div className="space-y-2">
+            {criativosFiltrados.map((criativo) => (
+              <CriativoItemMobile
+                key={criativo.id_criativo}
+                criativo={criativo}
+                urlEsperadaCampanha={urlEsperadaCampanha}
+                onCopyId={handleCopyId}
+                onEditUrl={handleAbrirModal}
+              />
+            ))}
+          </div>
         ) : (
+          /* Layout Desktop - Lista horizontal */
           <div className="space-y-2">
             {criativosFiltrados.map((criativo) => (
               <div
