@@ -27,7 +27,9 @@ interface CampanhaCardMobileProps {
     mqls: number;
     vendas: number;
     qtd_criativos?: number;
+    qtd_criativos_ativos?: number;
     plataforma?: string;
+    url_esperada?: string | null;
   };
   criativos?: any[];
   isExpanded: boolean;
@@ -56,7 +58,7 @@ export function CampanhaCardMobile({
   onVerFluxo 
 }: CampanhaCardMobileProps) {
   const { toast } = useToast();
-  const hasAlerta = (campanha.qtd_criativos || 0) < 2;
+  const hasAlerta = (campanha.qtd_criativos_ativos || 0) < 2;
 
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -83,7 +85,7 @@ export function CampanhaCardMobile({
                     {campanha.plataforma || "N/A"}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
-                    {campanha.qtd_criativos || 0} criativos
+                    {campanha.qtd_criativos || 0} ({campanha.qtd_criativos_ativos || 0} ativos)
                   </span>
                   {hasAlerta && (
                     <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />

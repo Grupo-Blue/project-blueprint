@@ -63,6 +63,7 @@ interface CampanhaMetrica {
   ticket_medio: number;
   cac: number;
   qtd_criativos?: number;
+  qtd_criativos_ativos?: number;
   plataforma?: string;
   url_esperada?: string | null;
 }
@@ -125,6 +126,7 @@ function CriativosQuery({ campanhaId, plataforma, urlEsperadaCampanha }: { campa
   const [criativoEditando, setCriativoEditando] = useState<Criativo | null>(null);
   const [urlEsperadaInput, setUrlEsperadaInput] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [filtroStatusCriativo, setFiltroStatusCriativo] = useState<string>("todos");
   
   const { data: criativos, isLoading } = useQuery({
     queryKey: ["criativos-campanha", campanhaId],
@@ -234,170 +236,203 @@ function CriativosQuery({ campanhaId, plataforma, urlEsperadaCampanha }: { campa
   if (!criativos || criativos.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-4">
-        Nenhum criativo cadastrado
+        Nenhum criativo cadastrado para esta campanha
       </p>
     );
   }
 
+  // Filtrar criativos pelo status
+  const criativosFiltrados = criativos.filter(criativo => {
+    if (filtroStatusCriativo === "ativos") return criativo.ativo;
+    if (filtroStatusCriativo === "inativos") return !criativo.ativo;
+    return true; // todos
+  });
+
+  const qtdAtivos = criativos.filter(c => c.ativo).length;
+  const qtdInativos = criativos.filter(c => !c.ativo).length;
+
   return (
     <>
-      <div className="space-y-2">
-        {criativos.map((criativo) => (
-          <div
-            key={criativo.id_criativo}
-            className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-          >
-            <div className="flex items-center gap-3 flex-1">
-              <div className="flex items-center gap-2">
-                {getTipoIcon(criativo.tipo)}
-                <span className="text-sm font-medium">
-                  {getTipoLabel(criativo.tipo)}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">ID:</span>
-                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                    {criativo.id_criativo_externo}
-                  </code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleCopyId(criativo.id_criativo_externo)}
-                    className="h-6 w-6 p-0"
-                    title="Copiar ID"
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-                {criativo.descricao && (
-                  <span className="text-sm text-muted-foreground truncate max-w-[400px]">
-                    {criativo.descricao}
-                  </span>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4 text-sm">
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground">Leads</p>
-                <p className="font-medium">{criativo.leads || 0}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground">Cliques</p>
-                <p className="font-medium">{criativo.cliques || 0}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground">Verba</p>
-                <p className="font-medium">
-                  R$ {(criativo.verba_investida || 0).toFixed(2)}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground">CPL</p>
-                <p className="font-medium">
-                  {criativo.cpl ? `R$ ${criativo.cpl.toFixed(2)}` : "N/A"}
-                </p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground">CTR</p>
-                <p className="font-medium">
-                  {criativo.ctr ? `${criativo.ctr.toFixed(2)}%` : "N/A"}
-                </p>
-              </div>
-            </div>
+      <div className="space-y-3">
+        {/* Filtro de status dos criativos */}
+        <div className="flex items-center gap-2 pb-2 border-b">
+          <span className="text-sm text-muted-foreground">Filtrar:</span>
+          <Select value={filtroStatusCriativo} onValueChange={setFiltroStatusCriativo}>
+            <SelectTrigger className="w-[160px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos ({criativos.length})</SelectItem>
+              <SelectItem value="ativos">Ativos ({qtdAtivos})</SelectItem>
+              <SelectItem value="inativos">Inativos ({qtdInativos})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-            <div className="flex items-center gap-2 ml-4">
-              <Badge variant={criativo.ativo ? "secondary" : "outline"}>
-                {criativo.ativo ? "Ativo" : "Inativo"}
-              </Badge>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleAbrirModal(criativo)}
-                      className="h-8 w-8 p-0"
-                    >
-                      {criativo.url_esperada ? (
-                        <Pencil className="h-4 w-4 text-blue-600" />
-                      ) : urlEsperadaCampanha ? (
-                        <Link2 className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Link2Off className="h-4 w-4 text-amber-600" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {criativo.url_esperada 
-                      ? "URL própria configurada" 
-                      : urlEsperadaCampanha 
-                        ? "Herdando URL da campanha" 
-                        : "Sem URL configurada"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              {criativo.url_midia && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      title="Ver mídia"
-                    >
-                      <Image className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80 p-2" side="left">
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground text-center">Prévia da mídia (pode não carregar)</p>
-                      <div className="relative bg-muted rounded-lg overflow-hidden min-h-[200px] flex items-center justify-center">
-                        <img 
-                          src={criativo.url_midia} 
-                          alt="Prévia do criativo"
-                          className="max-w-full max-h-[300px] object-contain"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const fallback = target.nextElementSibling as HTMLElement;
-                            if (fallback) fallback.style.display = 'flex';
-                          }}
-                        />
-                        <div className="hidden flex-col items-center justify-center gap-2 p-4 text-center">
-                          <Image className="h-8 w-8 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">Imagem bloqueada pelo Facebook</p>
-                          <p className="text-xs text-muted-foreground">Use "Ver no Facebook" para visualizar</p>
-                        </div>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              )}
-              {criativo.url_preview && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
+        {criativosFiltrados.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Nenhum criativo {filtroStatusCriativo === "ativos" ? "ativo" : "inativo"} encontrado
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {criativosFiltrados.map((criativo) => (
+              <div
+                key={criativo.id_criativo}
+                className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+              >
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="flex items-center gap-2">
+                    {getTipoIcon(criativo.tipo)}
+                    <span className="text-sm font-medium">
+                      {getTipoLabel(criativo.tipo)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">ID:</span>
+                      <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                        {criativo.id_criativo_externo}
+                      </code>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => window.open(criativo.url_preview!, '_blank')}
-                        className="gap-1"
+                        onClick={() => handleCopyId(criativo.id_criativo_externo)}
+                        className="h-6 w-6 p-0"
+                        title="Copiar ID"
                       >
-                        <ExternalLink className="h-3 w-3" />
-                        Ver no Facebook
+                        <Copy className="h-3 w-3" />
                       </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Abre o criativo no Facebook (pode requerer login)</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
+                    </div>
+                    {criativo.descricao && (
+                      <span className="text-sm text-muted-foreground truncate max-w-[400px]">
+                        {criativo.descricao}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Leads</p>
+                    <p className="font-medium">{criativo.leads || 0}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Cliques</p>
+                    <p className="font-medium">{criativo.cliques || 0}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">Verba</p>
+                    <p className="font-medium">
+                      R$ {(criativo.verba_investida || 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">CPL</p>
+                    <p className="font-medium">
+                      {criativo.cpl ? `R$ ${criativo.cpl.toFixed(2)}` : "N/A"}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground">CTR</p>
+                    <p className="font-medium">
+                      {criativo.ctr ? `${criativo.ctr.toFixed(2)}%` : "N/A"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 ml-4">
+                  <Badge variant={criativo.ativo ? "secondary" : "outline"}>
+                    {criativo.ativo ? "Ativo" : "Inativo"}
+                  </Badge>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleAbrirModal(criativo)}
+                          className="h-8 w-8 p-0"
+                        >
+                          {criativo.url_esperada ? (
+                            <Pencil className="h-4 w-4 text-blue-600" />
+                          ) : urlEsperadaCampanha ? (
+                            <Link2 className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <Link2Off className="h-4 w-4 text-amber-600" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {criativo.url_esperada 
+                          ? "URL própria configurada" 
+                          : urlEsperadaCampanha 
+                            ? "Herdando URL da campanha" 
+                            : "Sem URL configurada"}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  {criativo.url_midia && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          title="Ver mídia"
+                        >
+                          <Image className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-2" side="left">
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground text-center">Prévia da mídia (pode não carregar)</p>
+                          <div className="relative bg-muted rounded-lg overflow-hidden min-h-[200px] flex items-center justify-center">
+                            <img 
+                              src={criativo.url_midia} 
+                              alt="Prévia do criativo"
+                              className="max-w-full max-h-[300px] object-contain"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const fallback = target.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'flex';
+                              }}
+                            />
+                            <div className="hidden flex-col items-center justify-center gap-2 p-4 text-center">
+                              <Image className="h-8 w-8 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground">Imagem bloqueada pelo Facebook</p>
+                              <p className="text-xs text-muted-foreground">Use "Ver no Facebook" para visualizar</p>
+                            </div>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                  {criativo.url_preview && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(criativo.url_preview!, '_blank')}
+                            className="gap-1"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Ver no Facebook
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Abre o criativo no Facebook (pode requerer login)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
 
       {/* Modal de edição de URL esperada */}
@@ -663,11 +698,18 @@ export default function DashboardTrafego() {
         metricasAgregadas[m.id_campanha].verba_investida += Number(m.verba_investida || 0);
       });
 
-      // Buscar quantidade de criativos para cada campanha
+      // Buscar quantidade de criativos para cada campanha (total e ativos)
       const campanhasAgregadas = Object.values(metricasAgregadas);
       const campanhasComCriativos = await Promise.all(
         campanhasAgregadas.map(async (m: any) => {
-          const { count } = await supabase
+          // Buscar contagem total de criativos
+          const { count: countTotal } = await supabase
+            .from("criativo")
+            .select("id_criativo", { count: "exact", head: true })
+            .eq("id_campanha", m.id_campanha);
+
+          // Buscar contagem de criativos ativos
+          const { count: countAtivos } = await supabase
             .from("criativo")
             .select("id_criativo", { count: "exact", head: true })
             .eq("id_campanha", m.id_campanha)
@@ -678,7 +720,8 @@ export default function DashboardTrafego() {
             cpl: m.leads > 0 ? m.verba_investida / m.leads : null,
             cac: m.vendas > 0 ? m.verba_investida / m.vendas : null,
             ticket_medio: m.vendas > 0 ? (m.verba_investida * 3) / m.vendas : 0,
-            qtd_criativos: count || 0,
+            qtd_criativos: countTotal || 0,
+            qtd_criativos_ativos: countAtivos || 0,
           };
         })
       );
@@ -1387,7 +1430,7 @@ export default function DashboardTrafego() {
                                 </Button>
                               </CollapsibleTrigger>
                               <h3 className="font-semibold">{campanha.nome}</h3>
-                              {campanha.qtd_criativos !== undefined && campanha.qtd_criativos < 2 && (
+                              {campanha.qtd_criativos_ativos !== undefined && campanha.qtd_criativos_ativos < 2 && (
                                 <Badge variant="destructive" className="ml-2">
                                   <AlertTriangle className="h-3 w-3 mr-1" />
                                   Alerta
@@ -1410,11 +1453,20 @@ export default function DashboardTrafego() {
                                 CPL: R$ {campanha.cpl?.toFixed(2) || "N/A"}
                               </Badge>
                               {campanha.qtd_criativos !== undefined && (
-                                <Badge 
-                                  variant={campanha.qtd_criativos < 2 ? "destructive" : "secondary"}
-                                >
-                                  {campanha.qtd_criativos} criativo{campanha.qtd_criativos !== 1 ? 's' : ''}
-                                </Badge>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge 
+                                        variant={campanha.qtd_criativos_ativos !== undefined && campanha.qtd_criativos_ativos < 2 ? "destructive" : "secondary"}
+                                      >
+                                        {campanha.qtd_criativos} criativo{campanha.qtd_criativos !== 1 ? 's' : ''} ({campanha.qtd_criativos_ativos} ativo{campanha.qtd_criativos_ativos !== 1 ? 's' : ''})
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Total: {campanha.qtd_criativos} | Ativos: {campanha.qtd_criativos_ativos}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               )}
                             </div>
                           </div>
@@ -1454,36 +1506,22 @@ export default function DashboardTrafego() {
                       </div>
 
                       <CollapsibleContent>
-                        <div className="border-t bg-muted/20">
-                          {campanha.qtd_criativos === 0 ? (
-                            <div className="p-4 text-center text-sm text-muted-foreground">
-                              <AlertTriangle className="h-5 w-5 mx-auto mb-2 text-destructive" />
-                              <p className="font-medium text-destructive">
-                                ⚠️ Nenhum criativo ativo - campanha pode estar pausada ou sem material
+                        <div className="border-t bg-muted/20 p-4">
+                          {campanha.qtd_criativos_ativos !== undefined && campanha.qtd_criativos_ativos < 2 && (
+                            <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                              <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                {campanha.qtd_criativos_ativos === 0 
+                                  ? "⚠️ Nenhum criativo ativo - campanha pode estar pausada"
+                                  : "⚠️ Apenas 1 criativo ativo - recomenda-se ter pelo menos 2 para teste A/B"
+                                }
                               </p>
                             </div>
-                          ) : campanha.qtd_criativos === 1 ? (
-                            <div className="p-4">
-                              <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
-                                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                  ⚠️ Apenas 1 criativo ativo - recomenda-se ter pelo menos 2 criativos para teste A/B
-                                </p>
-                              </div>
-                              <CriativosQuery 
-                                campanhaId={campanha.id_campanha} 
-                                plataforma={campanha.plataforma || "OUTRO"}
-                                urlEsperadaCampanha={campanha.url_esperada}
-                              />
-                            </div>
-                          ) : (
-                            <div className="p-4">
-                              <CriativosQuery 
-                                campanhaId={campanha.id_campanha} 
-                                plataforma={campanha.plataforma || "OUTRO"}
-                                urlEsperadaCampanha={campanha.url_esperada}
-                              />
-                            </div>
                           )}
+                          <CriativosQuery 
+                            campanhaId={campanha.id_campanha} 
+                            plataforma={campanha.plataforma || "OUTRO"}
+                            urlEsperadaCampanha={campanha.url_esperada}
+                          />
                         </div>
                       </CollapsibleContent>
                     </div>
