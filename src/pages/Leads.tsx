@@ -152,6 +152,7 @@ const Leads = () => {
   const [clienteStatusFilter, setClienteStatusFilter] = useState<string>("all");
   const [investidorFilter, setInvestidorFilter] = useState<string>("all");
   const [origemFilter, setOrigemFilter] = useState<string>("all");
+  const [parados7DiasFilter, setParados7DiasFilter] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<string | null>("data_entrada");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -257,7 +258,14 @@ const Leads = () => {
       (origemFilter === "pago" && lead.lead_pago === true) ||
       (origemFilter === "organico" && lead.lead_pago === false);
 
-    return matchesPeriodo && matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus && matchesEmpresa && matchesInvestidor && matchesOrigem;
+    // Filtro parados +7 dias
+    const matchesParados7Dias = !parados7DiasFilter || (() => {
+      const dias = getDiasNoStage(lead);
+      const stagesFinais = ['Vendido', 'Perdido'];
+      return dias > 7 && !stagesFinais.includes(lead.stage_atual || '') && !lead.venda_realizada;
+    })();
+
+    return matchesPeriodo && matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus && matchesEmpresa && matchesInvestidor && matchesOrigem && matchesParados7Dias;
   });
 
   // Ordenar leads
@@ -405,17 +413,20 @@ const Leads = () => {
 
         <Card className={cn(
           "border-l-4 cursor-pointer hover:shadow-md transition-shadow",
-          quickWins.leadsParados7Dias.length > 0 ? "border-l-red-500 bg-red-50/50" : "border-l-slate-200"
-        )}>
+          parados7DiasFilter ? "border-l-red-600 bg-red-100 ring-2 ring-red-500" : quickWins.leadsParados7Dias.length > 0 ? "border-l-red-500 bg-red-50/50" : "border-l-slate-200"
+        )} onClick={() => setParados7DiasFilter(!parados7DiasFilter)}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-red-600" />
               Parados +7 dias
+              {parados7DiasFilter && <Badge variant="secondary" className="ml-auto text-xs">Filtrado</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{quickWins.leadsParados7Dias.length}</div>
-            <p className="text-xs text-muted-foreground">Leads para ligar</p>
+            <p className="text-xs text-muted-foreground">
+              {parados7DiasFilter ? "Clique para remover filtro" : "Leads para ligar"}
+            </p>
           </CardContent>
         </Card>
 
