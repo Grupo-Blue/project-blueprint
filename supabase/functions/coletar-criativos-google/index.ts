@@ -195,7 +195,7 @@ serve(async (req) => {
                 ad_group_ad.ad.video_ad.video,
                 ad_group_ad.ad.image_ad.image_url,
                 ad_group_ad.ad.app_ad.images,
-                ad_group_ad.ad.discovery_carousel_ad.carousel_cards,
+                ad_group_ad.ad.demand_gen_carousel_ad.carousel_cards,
                 metrics.impressions,
                 metrics.clicks,
                 metrics.cost_micros,
@@ -273,10 +273,10 @@ serve(async (req) => {
               } else if (ad.responsiveDisplayAd?.marketingImages) {
                 tipoCriativo = "IMAGEM";
                 urlMidia = ad.responsiveDisplayAd.marketingImages[0]?.fullSize?.url || null;
-              } else if (ad.type === "DISCOVERY_CAROUSEL_AD" || ad.discoveryCarouselAd) {
+              } else if (ad.type === "DEMAND_GEN_CAROUSEL_AD" || ad.demandGenCarouselAd) {
                 tipoCriativo = "CARROSSEL";
                 // Para carrossel, pegar primeira imagem
-                const firstCard = ad.discoveryCarouselAd?.carouselCards?.[0];
+                const firstCard = ad.demandGenCarouselAd?.carouselCards?.[0];
                 urlMidia = firstCard?.squareMarketingImage?.fullSize?.url || null;
               } else if (ad.appAd?.images) {
                 tipoCriativo = "IMAGEM";
