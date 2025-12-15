@@ -199,9 +199,12 @@ serve(async (req) => {
         }
 
         const apiData = await response.json();
+        const results = apiData.results || [];
+        
+        console.log(`Encontrados ${results.length} resultados de métricas para customer ${customerId}`);
 
         // Processar resultados
-        for (const result of apiData) {
+        for (const result of results) {
           const campanha = campanhas.find(c => c.id_campanha_externo === String(result.campaign.id));
           if (!campanha) continue;
 
