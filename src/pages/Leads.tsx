@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronRight, Mail, Globe, Target, Wallet, ShoppingCart, MapPin, History, AlertTriangle, Snowflake, Timer, X, Check } from "lucide-react";
+import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronRight, Mail, Globe, Target, Wallet, ShoppingCart, MapPin, History, AlertTriangle, Snowflake, Timer, X, Check, Download } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, differenceInDays, startOfMonth, endOfMonth, parseISO } from "date-fns";
@@ -188,13 +188,13 @@ const Leads = () => {
   const { data: vendasDoMes } = useQuery({
     queryKey: ["vendas-mes", empresaSelecionada, format(inicioMesPeriodo, "yyyy-MM-dd"), format(fimMesPeriodo, "yyyy-MM-dd")],
     queryFn: async () => {
-      // Para vendas, NÃO excluir "(cópia)" pois representam produtos adicionais do mesmo cliente
-      // Apenas excluir merged (leads duplicados que foram mesclados)
+      // Excluir "(cópia)" e merged para evitar duplicatas
       let vendasQuery = supabase
         .from("lead")
-        .select("valor_venda")
+        .select("id_lead, nome_lead, email, valor_venda, data_venda")
         .eq("venda_realizada", true)
         .or("merged.is.null,merged.eq.false")
+        .not("nome_lead", "like", "%(cópia)%")
         .gte("data_venda", inicioMesPeriodo.toISOString())
         .lte("data_venda", fimMesPeriodo.toISOString());
       
@@ -209,7 +209,7 @@ const Leads = () => {
       const valorTotal = data?.reduce((sum, v) => sum + (v.valor_venda || 0), 0) || 0;
       const qtdVendas = data?.length || 0;
       
-      return { valorTotal, qtdVendas };
+      return { valorTotal, qtdVendas, vendas: data || [] };
     },
   });
 
@@ -420,6 +420,30 @@ const Leads = () => {
     }
   };
 
+  // Função para exportar vendas do mês em CSV
+  const exportarVendas = () => {
+    if (!vendasDoMes?.vendas || vendasDoMes.vendas.length === 0) return;
+    
+    const headers = ["Nome", "Email", "Valor", "Data da Venda"];
+    const rows = vendasDoMes.vendas.map(v => [
+      v.nome_lead || "",
+      v.email || "",
+      v.valor_venda?.toString() || "0",
+      v.data_venda ? format(parseISO(v.data_venda), "dd/MM/yyyy") : ""
+    ]);
+    
+    const csvContent = [
+      headers.join(";"),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))
+    ].join("\n");
+    
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `vendas_${format(inicioMesPeriodo, "yyyy-MM")}.csv`;
+    link.click();
+  };
+
   const SortIcon = ({ column }: { column: string }) => {
     if (sortColumn !== column) return <ArrowUpDown className="h-3 w-3 ml-1" />;
     return sortDirection === "asc" 
@@ -547,7 +571,18 @@ const Leads = () => {
           <div className="text-xl font-bold text-green-600">{stats.vendas}</div>
         </Card>
         <Card className="p-3">
-          <div className="text-xs text-muted-foreground">Valor Total</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">Valor Total</div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-5 w-5" 
+              onClick={exportarVendas}
+              title="Exportar vendas"
+            >
+              <Download className="h-3 w-3" />
+            </Button>
+          </div>
           <div className="text-lg font-bold">
             {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(stats.valorTotal)}
           </div>
