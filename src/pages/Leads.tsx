@@ -180,6 +180,38 @@ const Leads = () => {
     },
   });
 
+  // Query para buscar todas as vendas do período (para cálculo correto do valor total)
+  const dataReferencia = getDataReferencia();
+  const inicioMesPeriodo = startOfMonth(dataReferencia);
+  const fimMesPeriodo = endOfMonth(dataReferencia);
+  
+  const { data: vendasDoMes } = useQuery({
+    queryKey: ["vendas-mes", empresaSelecionada, format(inicioMesPeriodo, "yyyy-MM-dd"), format(fimMesPeriodo, "yyyy-MM-dd")],
+    queryFn: async () => {
+      let vendasQuery = supabase
+        .from("lead")
+        .select("valor_venda")
+        .eq("venda_realizada", true)
+        .or("merged.is.null,merged.eq.false")
+        .not("nome_lead", "like", "%(cópia)%")
+        .gte("data_venda", inicioMesPeriodo.toISOString())
+        .lte("data_venda", fimMesPeriodo.toISOString());
+      
+      if (empresaSelecionada && empresaSelecionada !== "todas") {
+        vendasQuery = vendasQuery.eq("id_empresa", empresaSelecionada);
+      }
+      
+      const { data, error } = await vendasQuery;
+      if (error) throw error;
+      
+      // Calcular soma e contagem
+      const valorTotal = data?.reduce((sum, v) => sum + (v.valor_venda || 0), 0) || 0;
+      const qtdVendas = data?.length || 0;
+      
+      return { valorTotal, qtdVendas };
+    },
+  });
+
   const { data: leads, isLoading } = useQuery({
     queryKey: ["leads"],
     queryFn: async () => {
@@ -359,6 +391,7 @@ const Leads = () => {
 
   // Estatísticas gerais
   // Usa leadsCountData para total real quando sem filtros de busca/status
+  // Usa vendasDoMes para valor total de vendas (evita limite de 1000)
   const hasActiveFilters = searchTerm || statusFilter !== "all" || stageFilter.length > 0 || 
     scoreMinimo || clienteStatusFilter !== "all" || investidorFilter !== "all" || 
     origemFilter !== "all" || parados7DiasFilter;
@@ -367,8 +400,12 @@ const Leads = () => {
     total: hasActiveFilters ? (filteredLeads?.length || 0) : (leadsCountData || filteredLeads?.length || 0),
     mqls: filteredLeads?.filter(l => l.is_mql).length || 0,
     reunioes: filteredLeads?.filter(l => l.tem_reuniao).length || 0,
-    vendas: filteredLeads?.filter(l => l.venda_realizada).length || 0,
-    valorTotal: filteredLeads?.filter(l => l.venda_realizada).reduce((sum, l) => sum + (l.valor_venda || 0), 0) || 0,
+    vendas: hasActiveFilters 
+      ? (filteredLeads?.filter(l => l.venda_realizada).length || 0) 
+      : (vendasDoMes?.qtdVendas || filteredLeads?.filter(l => l.venda_realizada).length || 0),
+    valorTotal: hasActiveFilters
+      ? (filteredLeads?.filter(l => l.venda_realizada).reduce((sum, l) => sum + (l.valor_venda || 0), 0) || 0)
+      : (vendasDoMes?.valorTotal || 0),
     investidores: filteredLeads?.filter(l => l.tokeniza_investidor).length || 0,
     carrinhosAbandonados: filteredLeads?.filter(l => l.tokeniza_carrinho_abandonado && !l.tokeniza_investidor).length || 0,
   };
