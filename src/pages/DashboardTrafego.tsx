@@ -32,7 +32,8 @@ import {
   AlertTriangle,
   Pencil,
   Link2,
-  Link2Off
+  Link2Off,
+  Loader2
 } from "lucide-react";
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { useEmpresa } from "@/contexts/EmpresaContext";
@@ -50,6 +51,8 @@ import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { CampanhaCardMobile } from "@/components/dashboard/CampanhaCardMobile";
 import { CriativoItemMobile } from "@/components/dashboard/CriativoItemMobile";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { AtualizacaoProgressoModal } from "@/components/AtualizacaoProgressoModal";
+import { useAtualizarDadosEmpresa } from "@/hooks/useAtualizarDadosEmpresa";
 
 interface CampanhaMetrica {
   id_campanha: string;
@@ -666,10 +669,23 @@ export default function DashboardTrafego() {
   const [syncingCreatives, setSyncingCreatives] = useState(false);
   const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState<{ id: string; nome: string } | null>(null);
+  const [modalAtualizacaoOpen, setModalAtualizacaoOpen] = useState(false);
   const periodoContext = usePeriodo();
   const { getDataReferencia, tipoFiltro } = periodoContext;
   const labelPeriodo = periodoContext.labelPeriodo;
   const isMobile = useIsMobile();
+  
+  // Hook para atualização unificada
+  const {
+    atualizarDados,
+    isAtualizando,
+    fases,
+    duracaoTotal,
+    concluido,
+    sucesso,
+    erro,
+    resetState,
+  } = useAtualizarDadosEmpresa();
 
   // Usar data do filtro selecionado
   const dataReferencia = getDataReferencia();
@@ -1105,6 +1121,28 @@ export default function DashboardTrafego() {
               </p>
             </div>
             <div className="flex gap-2 sm:gap-3">
+              {/* Botão Atualizar Tudo - chama o orquestrador */}
+              {empresaSelecionada !== "todas" && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => {
+                    setModalAtualizacaoOpen(true);
+                    atualizarDados(empresaSelecionada);
+                  }}
+                  disabled={isAtualizando}
+                  className="gap-1 sm:gap-2"
+                >
+                  {isAtualizando ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  <span className="hidden sm:inline">Atualizar Tudo</span>
+                </Button>
+              )}
+              
+              {/* Botão para recarregar cache local */}
               <Button
                 variant="outline" 
                 size="sm"
@@ -1119,11 +1157,26 @@ export default function DashboardTrafego() {
                 className="gap-1 sm:gap-2"
               >
                 <RefreshCw className="h-4 w-4" />
-                <span className="hidden sm:inline">Atualizar</span>
+                <span className="hidden sm:inline">Recarregar</span>
               </Button>
             </div>
           </div>
         </div>
+
+        {/* Modal de progresso da atualização */}
+        <AtualizacaoProgressoModal
+          open={modalAtualizacaoOpen}
+          onClose={() => {
+            setModalAtualizacaoOpen(false);
+            resetState();
+          }}
+          empresaNome={empresas?.find(e => e.id_empresa === empresaSelecionada)?.nome || "Empresa"}
+          fases={fases}
+          duracaoTotal={duracaoTotal}
+          concluido={concluido}
+          sucesso={sucesso}
+          erro={erro}
+        />
 
         {/* KPIs Topo - Grid responsivo */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 sm:gap-4">
