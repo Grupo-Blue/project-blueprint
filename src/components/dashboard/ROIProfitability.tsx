@@ -31,11 +31,14 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
       const dataFimStr = fim.toISOString().split('T')[0];
       
       // Buscar receita total (vendas realizadas) - PERÍODO SELECIONADO
+      // Mesma lógica da página Leads: excluir "(cópia)" e merged
       const { data: vendas, error: vendasError } = await supabase
         .from("lead")
         .select("valor_venda, data_venda, id_empresa, empresa:id_empresa(nome)")
         .eq("venda_realizada", true)
         .not("valor_venda", "is", null)
+        .or("merged.is.null,merged.eq.false")
+        .not("nome_lead", "like", "%(cópia)%")
         .gte("data_venda", dataInicioStr)
         .lte("data_venda", dataFimStr);
 
@@ -93,6 +96,8 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
         .select("valor_venda, data_venda, id_empresa")
         .eq("venda_realizada", true)
         .not("valor_venda", "is", null)
+        .or("merged.is.null,merged.eq.false")
+        .not("nome_lead", "like", "%(cópia)%")
         .gte("data_venda", dataInicioHistorico.toISOString());
         
       const { data: metricasHistorico } = await supabase
