@@ -238,9 +238,9 @@ serve(async (req) => {
     const id_execucao = execucao.id_execucao;
     console.log(`[Orquestrador] Execução criada: ${id_execucao}`);
 
-    // Iniciar execução em background (fire and forget)
-    // Não usamos await para que a resposta seja imediata
-    executarAtualizacao(
+    // Iniciar execução em background usando EdgeRuntime.waitUntil
+    // para que continue executando após a resposta ser enviada
+    const backgroundTask = executarAtualizacao(
       supabase,
       supabaseUrl,
       supabaseKey,
@@ -248,7 +248,11 @@ serve(async (req) => {
       id_execucao,
       temMeta || false,
       temGoogle || false
-    ).catch((e) => console.error("[Orquestrador] Erro na execução background:", e));
+    );
+    
+    // EdgeRuntime.waitUntil mantém a função viva até a promise completar
+    // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+    EdgeRuntime.waitUntil(backgroundTask);
 
     // Retornar imediatamente com o id_execucao para polling
     return new Response(
