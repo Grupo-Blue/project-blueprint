@@ -14,13 +14,6 @@ interface FaseExecucao {
   erro?: string;
 }
 
-interface ResultadoAtualizacao {
-  sucesso: boolean;
-  fases: FaseExecucao[];
-  duracao_total_ms: number;
-  mensagem: string;
-}
-
 // Definição das fases com seus jobs
 const FASES: { nome: string; jobs: string[] }[] = [
   {
@@ -49,53 +42,50 @@ const FASES: { nome: string; jobs: string[] }[] = [
   },
 ];
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+// Função que executa em background
+async function executarAtualizacao(
+  supabase: any,
+  supabaseUrl: string,
+  supabaseKey: string,
+  id_empresa: string,
+  id_execucao: string,
+  temMeta: boolean,
+  temGoogle: boolean
+) {
+  const inicioTotal = Date.now();
+  const fases: FaseExecucao[] = FASES.map((f) => ({
+    nome: f.nome,
+    jobs: f.jobs,
+    status: "pendente" as const,
+  }));
+  let sucesso = true;
+
+  // Função para atualizar o progresso no banco
+  async function atualizarProgresso(status: string, mensagem?: string) {
+    try {
+      await supabase
+        .from("cronjob_execucao")
+        .update({
+          status,
+          duracao_ms: Date.now() - inicioTotal,
+          detalhes_execucao: {
+            id_empresa,
+            fases,
+            mensagem,
+          },
+        })
+        .eq("id_execucao", id_execucao);
+    } catch (e) {
+      console.error("[Orquestrador] Erro ao atualizar progresso:", e);
+    }
   }
 
-  const inicioTotal = Date.now();
-  const resultado: ResultadoAtualizacao = {
-    sucesso: true,
-    fases: [],
-    duracao_total_ms: 0,
-    mensagem: "",
-  };
-
   try {
-    const { id_empresa } = await req.json();
-
-    if (!id_empresa) {
-      throw new Error("id_empresa é obrigatório");
-    }
-
-    console.log(`[Orquestrador] Iniciando atualização para empresa: ${id_empresa}`);
-
-    // Inicializar Supabase
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Buscar integrações da empresa para saber quais jobs executar
-    const { data: contas } = await supabase
-      .from("conta_anuncio")
-      .select("id_conta, plataforma")
-      .eq("id_empresa", id_empresa)
-      .eq("ativa", true);
-
-    const temMeta = contas?.some((c) => c.plataforma === "META");
-    const temGoogle = contas?.some((c) => c.plataforma === "GOOGLE");
-
-    console.log(`[Orquestrador] Plataformas: Meta=${temMeta}, Google=${temGoogle}`);
-
     // Executar cada fase em sequência
-    for (const fase of FASES) {
-      const faseExecucao: FaseExecucao = {
-        nome: fase.nome,
-        jobs: fase.jobs,
-        status: "executando",
-      };
+    for (let i = 0; i < FASES.length; i++) {
+      const fase = FASES[i];
+      fases[i].status = "executando";
+      await atualizarProgresso("executando");
 
       const inicioFase = Date.now();
       console.log(`[Orquestrador] Iniciando fase: ${fase.nome}`);
@@ -110,9 +100,8 @@ serve(async (req) => {
 
         if (jobsParaExecutar.length === 0) {
           console.log(`[Orquestrador] Fase ${fase.nome} pulada - nenhum job aplicável`);
-          faseExecucao.status = "concluido";
-          faseExecucao.duracao_ms = 0;
-          resultado.fases.push(faseExecucao);
+          fases[i].status = "concluido";
+          fases[i].duracao_ms = 0;
           continue;
         }
 
@@ -120,13 +109,13 @@ serve(async (req) => {
         const resultadosJobs = await Promise.allSettled(
           jobsParaExecutar.map(async (jobName) => {
             console.log(`[Orquestrador] Executando job: ${jobName}`);
-            
+
             // Preparar body com id_empresa para filtrar
             const body: Record<string, any> = { id_empresa };
-            
+
             // Adicionar parâmetros específicos para alguns jobs
             if (jobName === "calcular-metricas-diarias") {
-              body.data = "today"; // Calcular para hoje
+              body.data = "today";
             }
 
             const response = await fetch(
@@ -159,55 +148,133 @@ serve(async (req) => {
           throw new Error(erros);
         }
 
-        faseExecucao.status = "concluido";
-        faseExecucao.duracao_ms = Date.now() - inicioFase;
-        console.log(`[Orquestrador] Fase ${fase.nome} concluída em ${faseExecucao.duracao_ms}ms`);
+        fases[i].status = "concluido";
+        fases[i].duracao_ms = Date.now() - inicioFase;
+        console.log(`[Orquestrador] Fase ${fase.nome} concluída em ${fases[i].duracao_ms}ms`);
 
       } catch (error: any) {
-        faseExecucao.status = "erro";
-        faseExecucao.duracao_ms = Date.now() - inicioFase;
-        faseExecucao.erro = error.message;
-        resultado.sucesso = false;
+        fases[i].status = "erro";
+        fases[i].duracao_ms = Date.now() - inicioFase;
+        fases[i].erro = error.message;
+        sucesso = false;
         console.error(`[Orquestrador] Erro na fase ${fase.nome}:`, error.message);
         // Não interromper, continuar com as próximas fases
       }
-
-      resultado.fases.push(faseExecucao);
     }
 
-    resultado.duracao_total_ms = Date.now() - inicioTotal;
-    resultado.mensagem = resultado.sucesso
-      ? `Atualização concluída em ${(resultado.duracao_total_ms / 1000).toFixed(1)}s`
-      : `Atualização concluída com erros em ${(resultado.duracao_total_ms / 1000).toFixed(1)}s`;
+    const duracaoTotal = Date.now() - inicioTotal;
+    const mensagemFinal = sucesso
+      ? `Atualização concluída em ${(duracaoTotal / 1000).toFixed(1)}s`
+      : `Atualização concluída com erros em ${(duracaoTotal / 1000).toFixed(1)}s`;
 
-    console.log(`[Orquestrador] ${resultado.mensagem}`);
+    console.log(`[Orquestrador] ${mensagemFinal}`);
 
-    // Registrar execução no cronjob_execucao
-    await supabase.from("cronjob_execucao").insert({
-      nome_cronjob: "atualizar-dados-empresa",
-      status: resultado.sucesso ? "sucesso" : "parcial",
-      duracao_ms: resultado.duracao_total_ms,
-      detalhes_execucao: {
-        id_empresa,
-        fases: resultado.fases,
-      },
-    });
+    // Atualizar status final
+    await atualizarProgresso(sucesso ? "sucesso" : "parcial", mensagemFinal);
 
-    return new Response(JSON.stringify(resultado), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+  } catch (error: any) {
+    console.error("[Orquestrador] Erro crítico:", error);
+    await atualizarProgresso("erro", `Erro crítico: ${error.message}`);
+  }
+}
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { id_empresa } = await req.json();
+
+    if (!id_empresa) {
+      throw new Error("id_empresa é obrigatório");
+    }
+
+    console.log(`[Orquestrador] Iniciando atualização para empresa: ${id_empresa}`);
+
+    // Inicializar Supabase
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Buscar integrações da empresa para saber quais jobs executar
+    const { data: contas } = await supabase
+      .from("conta_anuncio")
+      .select("id_conta, plataforma")
+      .eq("id_empresa", id_empresa)
+      .eq("ativa", true);
+
+    const temMeta = contas?.some((c: any) => c.plataforma === "META");
+    const temGoogle = contas?.some((c: any) => c.plataforma === "GOOGLE");
+
+    console.log(`[Orquestrador] Plataformas: Meta=${temMeta}, Google=${temGoogle}`);
+
+    // Criar registro inicial de execução
+    const fasesIniciais = FASES.map((f) => ({
+      nome: f.nome,
+      jobs: f.jobs,
+      status: "pendente",
+    }));
+
+    const { data: execucao, error: insertError } = await supabase
+      .from("cronjob_execucao")
+      .insert({
+        nome_cronjob: "atualizar-dados-empresa",
+        status: "executando",
+        duracao_ms: 0,
+        detalhes_execucao: {
+          id_empresa,
+          fases: fasesIniciais,
+        },
+      })
+      .select("id_execucao")
+      .single();
+
+    if (insertError || !execucao) {
+      throw new Error(`Erro ao criar registro de execução: ${insertError?.message}`);
+    }
+
+    const id_execucao = execucao.id_execucao;
+    console.log(`[Orquestrador] Execução criada: ${id_execucao}`);
+
+    // Iniciar execução em background (fire and forget)
+    // Não usamos await para que a resposta seja imediata
+    executarAtualizacao(
+      supabase,
+      supabaseUrl,
+      supabaseKey,
+      id_empresa,
+      id_execucao,
+      temMeta || false,
+      temGoogle || false
+    ).catch((e) => console.error("[Orquestrador] Erro na execução background:", e));
+
+    // Retornar imediatamente com o id_execucao para polling
+    return new Response(
+      JSON.stringify({
+        sucesso: true,
+        id_execucao,
+        mensagem: "Atualização iniciada. Use o id_execucao para acompanhar o progresso.",
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
 
   } catch (error: any) {
     console.error("[Orquestrador] Erro crítico:", error);
 
-    resultado.sucesso = false;
-    resultado.duracao_total_ms = Date.now() - inicioTotal;
-    resultado.mensagem = `Erro crítico: ${error.message}`;
-
-    return new Response(JSON.stringify(resultado), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+    return new Response(
+      JSON.stringify({
+        sucesso: false,
+        mensagem: `Erro ao iniciar atualização: ${error.message}`,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      }
+    );
   }
 });
