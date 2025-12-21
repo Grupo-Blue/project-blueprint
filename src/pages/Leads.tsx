@@ -188,12 +188,13 @@ const Leads = () => {
   const { data: vendasDoMes } = useQuery({
     queryKey: ["vendas-mes", empresaSelecionada, format(inicioMesPeriodo, "yyyy-MM-dd"), format(fimMesPeriodo, "yyyy-MM-dd")],
     queryFn: async () => {
+      // Para vendas, NÃO excluir "(cópia)" pois representam produtos adicionais do mesmo cliente
+      // Apenas excluir merged (leads duplicados que foram mesclados)
       let vendasQuery = supabase
         .from("lead")
         .select("valor_venda")
         .eq("venda_realizada", true)
         .or("merged.is.null,merged.eq.false")
-        .not("nome_lead", "like", "%(cópia)%")
         .gte("data_venda", inicioMesPeriodo.toISOString())
         .lte("data_venda", fimMesPeriodo.toISOString());
       
