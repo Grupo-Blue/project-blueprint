@@ -191,7 +191,7 @@ const Leads = () => {
       // Excluir "(cópia)" e merged para evitar duplicatas
       let vendasQuery = supabase
         .from("lead")
-        .select("id_lead, nome_lead, email, valor_venda, data_venda")
+        .select("id_lead, nome_lead, email, valor_venda, data_venda, url_pipedrive")
         .eq("venda_realizada", true)
         .or("merged.is.null,merged.eq.false")
         .not("nome_lead", "like", "%(cópia)%")
@@ -424,12 +424,13 @@ const Leads = () => {
   const exportarVendas = () => {
     if (!vendasDoMes?.vendas || vendasDoMes.vendas.length === 0) return;
     
-    const headers = ["Nome", "Email", "Valor", "Data da Venda"];
+    const headers = ["Nome", "Email", "Valor", "Data da Venda", "Link Pipedrive"];
     const rows = vendasDoMes.vendas.map(v => [
       v.nome_lead || "",
       v.email || "",
       v.valor_venda?.toString() || "0",
-      v.data_venda ? format(parseISO(v.data_venda), "dd/MM/yyyy") : ""
+      v.data_venda ? format(parseISO(v.data_venda), "dd/MM/yyyy") : "",
+      v.url_pipedrive || ""
     ]);
     
     const csvContent = [
