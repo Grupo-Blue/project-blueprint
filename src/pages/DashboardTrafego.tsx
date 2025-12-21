@@ -910,7 +910,7 @@ export default function DashboardTrafego() {
     refetchOnMount: 'always',
   });
 
-  // Funil de conversão baseado nos leads com stages do Pipedrive
+  // Funil de conversão baseado nos leads com stages do Pipedrive - usando COUNT para evitar limite de 1000
   const { data: funilData } = useQuery({
     queryKey: [
       "funil-conversao",
@@ -919,57 +919,78 @@ export default function DashboardTrafego() {
       format(fimMes, "yyyy-MM-dd"),
     ],
     queryFn: async () => {
-      let query = supabase
+      const baseFilters = {
+        gte: inicioMes.toISOString(),
+        lte: fimMes.toISOString(),
+        empresa: empresaSelecionada !== "todas" ? empresaSelecionada : null,
+      };
+
+      // MQL = todos os leads (count total)
+      let mqlQuery = supabase
         .from("lead")
-        .select("id_lead, stage_atual, levantou_mao, venda_realizada")
-        .gte("data_criacao", inicioMes.toISOString())
-        .lte("data_criacao", fimMes.toISOString());
-
-      if (empresaSelecionada !== "todas") {
-        query = query.eq("id_empresa", empresaSelecionada);
+        .select("*", { count: "exact", head: true })
+        .gte("data_criacao", baseFilters.gte)
+        .lte("data_criacao", baseFilters.lte);
+      if (baseFilters.empresa) {
+        mqlQuery = mqlQuery.eq("id_empresa", baseFilters.empresa);
       }
+      const { count: mql } = await mqlQuery;
 
-      const { data: leads, error } = await query;
-      if (error) throw error;
+      // Levantou a mão = stages específicos ou levantou_mao = true ou venda_realizada = true
+      let levantouMaoQuery = supabase
+        .from("lead")
+        .select("*", { count: "exact", head: true })
+        .gte("data_criacao", baseFilters.gte)
+        .lte("data_criacao", baseFilters.lte)
+        .or("stage_atual.in.(WhatsApp,Lead,Contato Iniciado,Negociação,Negociação ,Aguardando pagamento,Vendido),levantou_mao.eq.true,venda_realizada.eq.true");
+      if (baseFilters.empresa) {
+        levantouMaoQuery = levantouMaoQuery.eq("id_empresa", baseFilters.empresa);
+      }
+      const { count: levantouMao } = await levantouMaoQuery;
 
-      // MQL = todos os leads
-      const mql = leads?.length || 0;
+      // Negociação = Negociação ou etapas posteriores
+      let negociacaoQuery = supabase
+        .from("lead")
+        .select("*", { count: "exact", head: true })
+        .gte("data_criacao", baseFilters.gte)
+        .lte("data_criacao", baseFilters.lte)
+        .or("stage_atual.in.(Negociação,Negociação ,Aguardando pagamento,Vendido),venda_realizada.eq.true");
+      if (baseFilters.empresa) {
+        negociacaoQuery = negociacaoQuery.eq("id_empresa", baseFilters.empresa);
+      }
+      const { count: negociacao } = await negociacaoQuery;
 
-      // Levantou a mão = WhatsApp, Lead, Contato Iniciado ou levantou_mao = true
-      const stagesLevantouMao = ['WhatsApp', 'Lead', 'Contato Iniciado'];
-      const levantouMao = leads?.filter(l => 
-        stagesLevantouMao.includes(l.stage_atual || '') || 
-        l.levantou_mao === true ||
-        l.stage_atual === 'Negociação' ||
-        l.stage_atual === 'Negociação ' || // com espaço
-        l.stage_atual === 'Aguardando pagamento' ||
-        l.stage_atual === 'Vendido' ||
-        l.venda_realizada === true
-      ).length || 0;
-
-      // Negociação = stage_atual = 'Negociação' ou etapas posteriores
-      const negociacao = leads?.filter(l => 
-        l.stage_atual === 'Negociação' || 
-        l.stage_atual === 'Negociação ' || // com espaço (encontrado no DB)
-        l.stage_atual === 'Aguardando pagamento' ||
-        l.stage_atual === 'Vendido' ||
-        l.venda_realizada === true
-      ).length || 0;
-
-      // Aguardando Pagamento = stage_atual = 'Aguardando pagamento' ou vendeu
-      const aguardandoPagamento = leads?.filter(l => 
-        l.stage_atual === 'Aguardando pagamento' ||
-        l.stage_atual === 'Vendido' ||
-        l.venda_realizada === true
-      ).length || 0;
+      // Aguardando Pagamento = Aguardando pagamento ou Vendido ou vendeu
+      let aguardandoPagamentoQuery = supabase
+        .from("lead")
+        .select("*", { count: "exact", head: true })
+        .gte("data_criacao", baseFilters.gte)
+        .lte("data_criacao", baseFilters.lte)
+        .or("stage_atual.in.(Aguardando pagamento,Vendido),venda_realizada.eq.true");
+      if (baseFilters.empresa) {
+        aguardandoPagamentoQuery = aguardandoPagamentoQuery.eq("id_empresa", baseFilters.empresa);
+      }
+      const { count: aguardandoPagamento } = await aguardandoPagamentoQuery;
 
       // Vendas = venda_realizada = true ou stage_atual = 'Vendido'
-      const vendas = leads?.filter(l => 
-        l.venda_realizada === true || 
-        l.stage_atual === 'Vendido'
-      ).length || 0;
+      let vendasQuery = supabase
+        .from("lead")
+        .select("*", { count: "exact", head: true })
+        .gte("data_criacao", baseFilters.gte)
+        .lte("data_criacao", baseFilters.lte)
+        .or("venda_realizada.eq.true,stage_atual.eq.Vendido");
+      if (baseFilters.empresa) {
+        vendasQuery = vendasQuery.eq("id_empresa", baseFilters.empresa);
+      }
+      const { count: vendas } = await vendasQuery;
 
-      return { mql, levantouMao, negociacao, aguardandoPagamento, vendas };
+      return { 
+        mql: mql || 0, 
+        levantouMao: levantouMao || 0, 
+        negociacao: negociacao || 0, 
+        aguardandoPagamento: aguardandoPagamento || 0, 
+        vendas: vendas || 0 
+      };
     },
     staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
