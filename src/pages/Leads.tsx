@@ -160,6 +160,26 @@ const Leads = () => {
 
   const ITEMS_PER_PAGE = 15;
 
+  // Query para contagem total de leads por empresa (sem limite de 1000)
+  const { data: leadsCountData } = useQuery({
+    queryKey: ["leads-count", empresaSelecionada],
+    queryFn: async () => {
+      let countQuery = supabase
+        .from("lead")
+        .select("*", { count: "exact", head: true })
+        .or("merged.is.null,merged.eq.false")
+        .not("nome_lead", "like", "%(cópia)%");
+      
+      if (empresaSelecionada && empresaSelecionada !== "todas") {
+        countQuery = countQuery.eq("id_empresa", empresaSelecionada);
+      }
+      
+      const { count, error } = await countQuery;
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
   const { data: leads, isLoading } = useQuery({
     queryKey: ["leads"],
     queryFn: async () => {
@@ -338,8 +358,13 @@ const Leads = () => {
   const valorNegociacao = quickWins.emNegociacao.reduce((sum, l) => sum + (l.valor_venda || 0), 0);
 
   // Estatísticas gerais
+  // Usa leadsCountData para total real quando sem filtros de busca/status
+  const hasActiveFilters = searchTerm || statusFilter !== "all" || stageFilter.length > 0 || 
+    scoreMinimo || clienteStatusFilter !== "all" || investidorFilter !== "all" || 
+    origemFilter !== "all" || parados7DiasFilter;
+  
   const stats = {
-    total: filteredLeads?.length || 0,
+    total: hasActiveFilters ? (filteredLeads?.length || 0) : (leadsCountData || filteredLeads?.length || 0),
     mqls: filteredLeads?.filter(l => l.is_mql).length || 0,
     reunioes: filteredLeads?.filter(l => l.tem_reuniao).length || 0,
     vendas: filteredLeads?.filter(l => l.venda_realizada).length || 0,
