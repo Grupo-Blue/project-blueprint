@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,7 +51,7 @@ import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { CampanhaCardMobile } from "@/components/dashboard/CampanhaCardMobile";
 import { CriativoItemMobile } from "@/components/dashboard/CriativoItemMobile";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { AtualizacaoProgressoModal } from "@/components/AtualizacaoProgressoModal";
+import { AtualizacaoProgressoFloat } from "@/components/AtualizacaoProgressoFloat";
 import { useAtualizarDadosEmpresa } from "@/hooks/useAtualizarDadosEmpresa";
 
 interface CampanhaMetrica {
@@ -670,6 +670,7 @@ export default function DashboardTrafego() {
   const [campanhaFluxoOpen, setCampanhaFluxoOpen] = useState(false);
   const [campanhaSelecionada, setCampanhaSelecionada] = useState<{ id: string; nome: string } | null>(null);
   const [modalAtualizacaoOpen, setModalAtualizacaoOpen] = useState(false);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string | null>(null);
   const periodoContext = usePeriodo();
   const { getDataReferencia, tipoFiltro } = periodoContext;
   const labelPeriodo = periodoContext.labelPeriodo;
@@ -686,6 +687,33 @@ export default function DashboardTrafego() {
     erro,
     resetState,
   } = useAtualizarDadosEmpresa();
+
+  // Buscar última atualização quando empresa mudar ou atualização concluir
+  useEffect(() => {
+    const fetchUltimaAtualizacao = async () => {
+      if (!empresaSelecionada || empresaSelecionada === "todas") {
+        setUltimaAtualizacao(null);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("cronjob_execucao")
+        .select("data_execucao")
+        .eq("nome_cronjob", "atualizar-dados-empresa")
+        .in("status", ["sucesso", "parcial"])
+        .order("data_execucao", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (data?.data_execucao) {
+        setUltimaAtualizacao(data.data_execucao);
+      } else {
+        setUltimaAtualizacao(null);
+      }
+    };
+
+    fetchUltimaAtualizacao();
+  }, [empresaSelecionada, concluido]);
 
   // Usar data do filtro selecionado
   const dataReferencia = getDataReferencia();
@@ -1120,63 +1148,72 @@ export default function DashboardTrafego() {
                 Análise de campanhas - {labelPeriodo}
               </p>
             </div>
-            <div className="flex gap-2 sm:gap-3">
-              {/* Botão Atualizar Tudo - chama o orquestrador */}
-              {empresaSelecionada !== "todas" && (
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex gap-2 sm:gap-3">
+                {/* Botão Atualizar Tudo - chama o orquestrador */}
+                {empresaSelecionada !== "todas" && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      setModalAtualizacaoOpen(true);
+                      atualizarDados(empresaSelecionada);
+                    }}
+                    disabled={isAtualizando}
+                    className="gap-1 sm:gap-2"
+                  >
+                    {isAtualizando ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">Atualizar Tudo</span>
+                  </Button>
+                )}
+                
+                {/* Botão para recarregar cache local */}
                 <Button
-                  variant="default"
+                  variant="outline" 
                   size="sm"
                   onClick={() => {
-                    setModalAtualizacaoOpen(true);
-                    atualizarDados(empresaSelecionada);
+                    queryClient.invalidateQueries({ queryKey: ["campanhas-metricas"] });
+                    queryClient.invalidateQueries({ queryKey: ["totais-gerais-empresa"] });
+                    queryClient.invalidateQueries({ queryKey: ["mql-distribuicao"] });
+                    queryClient.invalidateQueries({ queryKey: ["cpl-organico"] });
+                    refetchCampanhas();
+                    toast({ title: "Dados atualizados!", description: "Cache limpo e dados recarregados" });
                   }}
-                  disabled={isAtualizando}
                   className="gap-1 sm:gap-2"
                 >
-                  {isAtualizando ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  <span className="hidden sm:inline">Atualizar Tudo</span>
+                  <RefreshCw className="h-4 w-4" />
+                  <span className="hidden sm:inline">Recarregar</span>
                 </Button>
+              </div>
+              {/* Última atualização */}
+              {empresaSelecionada !== "todas" && ultimaAtualizacao && (
+                <span className="text-xs text-muted-foreground">
+                  Última atualização: {format(new Date(ultimaAtualizacao), "dd/MM HH:mm", { locale: ptBR })}
+                </span>
               )}
-              
-              {/* Botão para recarregar cache local */}
-              <Button
-                variant="outline" 
-                size="sm"
-                onClick={() => {
-                  queryClient.invalidateQueries({ queryKey: ["campanhas-metricas"] });
-                  queryClient.invalidateQueries({ queryKey: ["totais-gerais-empresa"] });
-                  queryClient.invalidateQueries({ queryKey: ["mql-distribuicao"] });
-                  queryClient.invalidateQueries({ queryKey: ["cpl-organico"] });
-                  refetchCampanhas();
-                  toast({ title: "Dados atualizados!", description: "Cache limpo e dados recarregados" });
-                }}
-                className="gap-1 sm:gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                <span className="hidden sm:inline">Recarregar</span>
-              </Button>
             </div>
           </div>
         </div>
 
-        {/* Modal de progresso da atualização */}
-        <AtualizacaoProgressoModal
-          open={modalAtualizacaoOpen}
-          onClose={() => {
-            setModalAtualizacaoOpen(false);
-            resetState();
-          }}
-          empresaNome={empresas?.find(e => e.id_empresa === empresaSelecionada)?.nome || "Empresa"}
-          fases={fases}
-          duracaoTotal={duracaoTotal}
-          concluido={concluido}
-          sucesso={sucesso}
-          erro={erro}
-        />
+        {/* Floating de progresso da atualização */}
+        {isAtualizando || (concluido && modalAtualizacaoOpen) ? (
+          <AtualizacaoProgressoFloat
+            onClose={() => {
+              setModalAtualizacaoOpen(false);
+              resetState();
+            }}
+            empresaNome={empresas?.find(e => e.id_empresa === empresaSelecionada)?.nome || "Empresa"}
+            fases={fases}
+            duracaoTotal={duracaoTotal}
+            concluido={concluido}
+            sucesso={sucesso}
+            erro={erro}
+          />
+        ) : null}
 
         {/* KPIs Topo - Grid responsivo */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 sm:gap-4">
