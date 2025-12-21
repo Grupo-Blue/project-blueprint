@@ -44,14 +44,33 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
 
       if (vendasError) throw vendasError;
 
-      // Buscar gasto total por empresa - PERÍODO SELECIONADO
-      const { data: metricas, error: metricasError } = await supabase
-        .from("empresa_metricas_dia")
-        .select("id_empresa, verba_investida, data")
+      // Buscar gasto total diretamente das campanhas (Meta + Google)
+      // Isso garante que pegamos os valores reais das APIs
+      const { data: metricasCampanhas, error: metricasError } = await supabase
+        .from("campanha_metricas_dia")
+        .select(`
+          verba_investida,
+          data,
+          campanha!inner(
+            id_campanha,
+            conta_anuncio!inner(
+              id_empresa,
+              plataforma
+            )
+          )
+        `)
         .gte("data", dataInicioStr)
         .lte("data", dataFimStr);
 
       if (metricasError) throw metricasError;
+
+      // Transformar para formato compatível com o resto do código
+      const metricas = metricasCampanhas?.map((m: any) => ({
+        id_empresa: m.campanha?.conta_anuncio?.id_empresa,
+        verba_investida: m.verba_investida,
+        data: m.data,
+        plataforma: m.campanha?.conta_anuncio?.plataforma
+      })) || [];
 
       // Buscar nomes das empresas para métricas
       const empresaIds = [...new Set(metricas?.map(m => m.id_empresa) || [])];
@@ -100,10 +119,25 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
         .not("nome_lead", "like", "%(cópia)%")
         .gte("data_venda", dataInicioHistorico.toISOString());
         
-      const { data: metricasHistorico } = await supabase
-        .from("empresa_metricas_dia")
-        .select("id_empresa, verba_investida, data")
+      // Buscar gasto histórico diretamente das campanhas
+      const { data: metricasHistoricoCampanhas } = await supabase
+        .from("campanha_metricas_dia")
+        .select(`
+          verba_investida,
+          data,
+          campanha!inner(
+            conta_anuncio!inner(
+              id_empresa
+            )
+          )
+        `)
         .gte("data", dataInicioHistorico.toISOString().split('T')[0]);
+
+      const metricasHistorico = metricasHistoricoCampanhas?.map((m: any) => ({
+        id_empresa: m.campanha?.conta_anuncio?.id_empresa,
+        verba_investida: m.verba_investida,
+        data: m.data
+      })) || [];
 
       for (let i = 5; i >= 0; i--) {
         const mesData = subMonths(new Date(), i);
