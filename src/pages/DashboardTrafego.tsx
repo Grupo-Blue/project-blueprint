@@ -910,6 +910,72 @@ export default function DashboardTrafego() {
     refetchOnMount: 'always',
   });
 
+  // Funil de conversão baseado nos leads com stages do Pipedrive
+  const { data: funilData } = useQuery({
+    queryKey: [
+      "funil-conversao",
+      empresaSelecionada,
+      format(inicioMes, "yyyy-MM-dd"),
+      format(fimMes, "yyyy-MM-dd"),
+    ],
+    queryFn: async () => {
+      let query = supabase
+        .from("lead")
+        .select("id_lead, stage_atual, levantou_mao, venda_realizada")
+        .gte("data_criacao", inicioMes.toISOString())
+        .lte("data_criacao", fimMes.toISOString());
+
+      if (empresaSelecionada !== "todas") {
+        query = query.eq("id_empresa", empresaSelecionada);
+      }
+
+      const { data: leads, error } = await query;
+      if (error) throw error;
+
+      // MQL = todos os leads
+      const mql = leads?.length || 0;
+
+      // Levantou a mão = WhatsApp, Lead, Contato Iniciado ou levantou_mao = true
+      const stagesLevantouMao = ['WhatsApp', 'Lead', 'Contato Iniciado'];
+      const levantouMao = leads?.filter(l => 
+        stagesLevantouMao.includes(l.stage_atual || '') || 
+        l.levantou_mao === true ||
+        l.stage_atual === 'Negociação' ||
+        l.stage_atual === 'Negociação ' || // com espaço
+        l.stage_atual === 'Aguardando pagamento' ||
+        l.stage_atual === 'Vendido' ||
+        l.venda_realizada === true
+      ).length || 0;
+
+      // Negociação = stage_atual = 'Negociação' ou etapas posteriores
+      const negociacao = leads?.filter(l => 
+        l.stage_atual === 'Negociação' || 
+        l.stage_atual === 'Negociação ' || // com espaço (encontrado no DB)
+        l.stage_atual === 'Aguardando pagamento' ||
+        l.stage_atual === 'Vendido' ||
+        l.venda_realizada === true
+      ).length || 0;
+
+      // Aguardando Pagamento = stage_atual = 'Aguardando pagamento' ou vendeu
+      const aguardandoPagamento = leads?.filter(l => 
+        l.stage_atual === 'Aguardando pagamento' ||
+        l.stage_atual === 'Vendido' ||
+        l.venda_realizada === true
+      ).length || 0;
+
+      // Vendas = venda_realizada = true ou stage_atual = 'Vendido'
+      const vendas = leads?.filter(l => 
+        l.venda_realizada === true || 
+        l.stage_atual === 'Vendido'
+      ).length || 0;
+
+      return { mql, levantouMao, negociacao, aguardandoPagamento, vendas };
+    },
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+  });
+
   // Query para CPL Orgânico (investimento awareness vs leads de redes sociais)
   const { data: cplOrganicoData } = useQuery({
     queryKey: [
@@ -980,12 +1046,20 @@ export default function DashboardTrafego() {
   });
 
   const totais = totaisGerais || { verba: 0, leads: 0, mqls: 0, levantadas: 0, reunioes: 0, vendas: 0 };
+  const funil = funilData || { mql: 0, levantouMao: 0, negociacao: 0, aguardandoPagamento: 0, vendas: 0 };
 
+  // Taxas do funil de conversão
+  const taxaLevantouMao = funil.mql > 0 ? (funil.levantouMao / funil.mql) * 100 : 0;
+  const taxaNegociacao = funil.levantouMao > 0 ? (funil.negociacao / funil.levantouMao) * 100 : 0;
+  const taxaAguardando = funil.negociacao > 0 ? (funil.aguardandoPagamento / funil.negociacao) * 100 : 0;
+  const taxaVendaFunil = funil.aguardandoPagamento > 0 ? (funil.vendas / funil.aguardandoPagamento) * 100 : 0;
+  const eficienciaFunil = funil.mql > 0 ? (funil.vendas / funil.mql) * 100 : 0;
+
+  // Taxas antigas mantidas para compatibilidade com outros componentes
   const taxaMQL = totais.leads > 0 ? (totais.mqls / totais.leads) * 100 : 0;
   const taxaLevantada = totais.mqls > 0 ? (totais.levantadas / totais.mqls) * 100 : 0;
   const taxaReuniao = totais.levantadas > 0 ? (totais.reunioes / totais.levantadas) * 100 : 0;
   const taxaVenda = totais.reunioes > 0 ? (totais.vendas / totais.reunioes) * 100 : 0;
-  const eficienciaFunil = totais.leads > 0 ? (totais.vendas / totais.leads) * 100 : 0;
 
 
   const handleCopyId = (idExterno: string) => {
@@ -1426,89 +1500,119 @@ export default function DashboardTrafego() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Lead → MQL */}
+              {/* MQL (Todos os leads) */}
               <div className="relative">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-primary" />
-                    <span className="font-medium">Leads → MQLs</span>
+                    <span className="font-medium">MQL</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold">{taxaMQL.toFixed(1)}%</span>
-                    <Badge variant="outline">{totais.mqls} / {totais.leads}</Badge>
+                    <span className="text-2xl font-bold">{funil.mql}</span>
+                    <Badge variant="outline">100%</Badge>
                   </div>
                 </div>
                 <div className="h-3 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary transition-all"
-                    style={{ width: `${taxaMQL}%` }}
+                    style={{ width: '100%' }}
                   />
                 </div>
               </div>
 
-              <ArrowRight className="h-5 w-5 text-muted-foreground mx-auto" />
+              <ArrowRight className="h-5 w-5 text-muted-foreground mx-auto rotate-90" />
 
-              {/* MQL → Levantada */}
+              {/* Levantou a Mão */}
               <div className="relative">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Zap className="h-4 w-4 text-primary" />
-                    <span className="font-medium">MQLs → Levantadas</span>
+                    <span className="font-medium">Levantou a Mão</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold">{taxaLevantada.toFixed(1)}%</span>
-                    <Badge variant="outline">{totais.levantadas} / {totais.mqls}</Badge>
+                    <span className="text-2xl font-bold">{taxaLevantouMao.toFixed(1)}%</span>
+                    <Badge variant="outline">{funil.levantouMao} / {funil.mql}</Badge>
                   </div>
                 </div>
                 <div className="h-3 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary transition-all"
-                    style={{ width: `${taxaLevantada}%` }}
+                    style={{ width: `${Math.min(taxaLevantouMao, 100)}%` }}
                   />
                 </div>
               </div>
 
-              <ArrowRight className="h-5 w-5 text-muted-foreground mx-auto" />
+              <ArrowRight className="h-5 w-5 text-muted-foreground mx-auto rotate-90" />
 
-              {/* Levantada → Reunião */}
+              {/* Negociação */}
               <div className="relative">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Eye className="h-4 w-4 text-primary" />
-                    <span className="font-medium">Levantadas → Reuniões</span>
+                    <span className="font-medium">Negociação</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold">{taxaReuniao.toFixed(1)}%</span>
-                    <Badge variant="outline">{totais.reunioes} / {totais.levantadas}</Badge>
+                    <span className="text-2xl font-bold">{taxaNegociacao.toFixed(1)}%</span>
+                    <Badge variant="outline">{funil.negociacao} / {funil.levantouMao}</Badge>
                   </div>
                 </div>
                 <div className="h-3 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary transition-all"
-                    style={{ width: `${taxaReuniao}%` }}
+                    style={{ width: `${Math.min(taxaNegociacao, 100)}%` }}
                   />
                 </div>
               </div>
 
-              <ArrowRight className="h-5 w-5 text-muted-foreground mx-auto" />
+              <ArrowRight className="h-5 w-5 text-muted-foreground mx-auto rotate-90" />
 
-              {/* Reunião → Venda */}
+              {/* Aguardando Pagamento */}
               <div className="relative">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-primary" />
-                    <span className="font-medium">Reuniões → Vendas</span>
+                    <DollarSign className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Aguardando Pagamento</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold">{taxaVenda.toFixed(1)}%</span>
-                    <Badge variant="outline">{totais.vendas} / {totais.reunioes}</Badge>
+                    <span className="text-2xl font-bold">{taxaAguardando.toFixed(1)}%</span>
+                    <Badge variant="outline">{funil.aguardandoPagamento} / {funil.negociacao}</Badge>
                   </div>
                 </div>
                 <div className="h-3 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary transition-all"
-                    style={{ width: `${taxaVenda}%` }}
+                    style={{ width: `${Math.min(taxaAguardando, 100)}%` }}
                   />
+                </div>
+              </div>
+
+              <ArrowRight className="h-5 w-5 text-muted-foreground mx-auto rotate-90" />
+
+              {/* Vendas */}
+              <div className="relative">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="font-medium">Vendas</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold">{taxaVendaFunil.toFixed(1)}%</span>
+                    <Badge variant="outline">{funil.vendas} / {funil.aguardandoPagamento}</Badge>
+                  </div>
+                </div>
+                <div className="h-3 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-600 transition-all"
+                    style={{ width: `${Math.min(taxaVendaFunil, 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Taxa de Conversão Total */}
+              <div className="pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Taxa de Conversão Total (MQL → Venda)</span>
+                  <span className="text-lg font-bold text-green-600">{eficienciaFunil.toFixed(2)}%</span>
                 </div>
               </div>
             </div>
