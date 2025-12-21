@@ -11,14 +11,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  const MAX_TIME_MS = 50000; // 50s limite
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log("Iniciando sincronização Pipedrive...");
+    console.log("Iniciando sincronização Pipedrive (v2.0 - otimizada)...");
 
-    // Buscar todas as integrações Pipedrive ativas
     const { data: integracoes, error: intError } = await supabase
       .from("integracao")
       .select("*")
@@ -28,89 +30,71 @@ serve(async (req) => {
     if (intError) throw intError;
 
     if (!integracoes || integracoes.length === 0) {
-      console.log("Nenhuma integração Pipedrive ativa encontrada");
+      console.log("Nenhuma integração Pipedrive ativa");
       return new Response(
         JSON.stringify({ message: "Nenhuma integração ativa" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const resultados = [];
+    const resultados: any[] = [];
 
     for (const integracao of integracoes) {
-      const config = integracao.config_json as any;
-      const apiToken = config.api_token;
-      let domain = config.domain;
-      // Remove .pipedrive.com se o usuário incluiu no domínio
-      domain = domain.replace('.pipedrive.com', '');
-      const idEmpresa = config.id_empresa;
-      const pipelineId = config.pipeline_id; // ID da pipeline específica
-
-      console.log(`Processando integração para empresa ${idEmpresa}`);
-      console.log(`Token utilizado: ${apiToken.substring(0, 8)}...`);
-      if (pipelineId) {
-        console.log(`Filtrando deals da pipeline ID: ${pipelineId}`);
+      // Check timeout
+      if (Date.now() - startTime > MAX_TIME_MS) {
+        console.log("⏱️ Timeout próximo, encerrando...");
+        break;
       }
 
+      const config = integracao.config_json as any;
+      const apiToken = config.api_token;
+      let domain = config.domain.replace('.pipedrive.com', '');
+      const idEmpresa = config.id_empresa;
+      const pipelineId = config.pipeline_id;
+
+      console.log(`\n📊 Processando empresa ${idEmpresa}, pipeline ${pipelineId}`);
+
       try {
-        // Buscar stages da pipeline para mapear IDs para nomes e obter lista de stage_ids
+        // Buscar stages da pipeline
         const stagesMap: Record<number, string> = {};
         const stageIds: number[] = [];
+        
         if (pipelineId) {
           const stagesUrl = `https://${domain}.pipedrive.com/api/v1/stages?api_token=${apiToken}&pipeline_id=${pipelineId}`;
-          console.log(`Buscando stages da pipeline ${pipelineId}...`);
-          console.log(`URL stages: ${stagesUrl}`);
+          const stagesResponse = await fetch(stagesUrl);
           
-          try {
-            const stagesResponse = await fetch(stagesUrl);
-            console.log(`Status response stages: ${stagesResponse.status}`);
-            
-            if (stagesResponse.ok) {
-              const stagesData = await stagesResponse.json();
-              console.log(`Stages data success: ${stagesData.success}, data exists: ${!!stagesData.data}`);
-              
-              if (stagesData.success && stagesData.data) {
-                for (const stage of stagesData.data) {
-                  stagesMap[stage.id] = stage.name;
-                  stageIds.push(stage.id);
-                  console.log(`Stage mapeado: ${stage.id} -> ${stage.name}`);
-                }
-                console.log(`${Object.keys(stagesMap).length} stages carregados para pipeline ${pipelineId}`);
-                console.log(`Stage IDs da pipeline ${pipelineId}: ${stageIds.join(', ')}`);
+          if (stagesResponse.ok) {
+            const stagesData = await stagesResponse.json();
+            if (stagesData.success && stagesData.data) {
+              for (const stage of stagesData.data) {
+                stagesMap[stage.id] = stage.name;
+                stageIds.push(stage.id);
               }
-            } else {
-              console.error(`Erro ao buscar stages: ${stagesResponse.status}`);
+              console.log(`  ↳ ${Object.keys(stagesMap).length} stages carregados`);
             }
-          } catch (stageError) {
-            console.error(`Erro ao processar stages: ${stageError}`);
           }
-        } else {
-          console.log("Pipeline ID não especificado, stages não serão carregados");
         }
 
-        // Buscar TODOS os deals ativos (sem status para evitar filtros conflitantes)
-        // Vamos paginar e depois filtrar manualmente por stage_id que pertencem à pipeline correta
-        console.log(`IMPORTANTE: A API retorna apenas deals visíveis ao usuário do token. Se deals estão faltando, verifique as permissões de visibilidade do usuário no Pipedrive.`);
-        
+        // Buscar deals em batches menores (limit=100 em vez de 500)
         const allDeals: any[] = [];
-        const limit = 500;
+        const limit = 100;
         let start = 0;
         let page = 0;
-        const maxPages = 20;
+        const maxPages = 5; // Limite de páginas por execução
 
-        // Buscar TODOS os deals (open, won, lost) usando status=all
-        while (true) {
+        while (page < maxPages) {
+          if (Date.now() - startTime > MAX_TIME_MS) break;
+
           const dealsUrl = `https://${domain}.pipedrive.com/api/v1/deals?api_token=${apiToken}&status=all&start=${start}&limit=${limit}`;
-          console.log(`Buscando deals (todos status) - página ${page + 1}, start=${start}, limit=${limit}...`);
-
+          
           const dealsResponse = await fetch(dealsUrl);
           if (!dealsResponse.ok) {
             const errorText = await dealsResponse.text();
-            console.error(`Erro na API Pipedrive: ${dealsResponse.status} - ${errorText}`);
+            console.error(`❌ Erro API Pipedrive: ${dealsResponse.status}`);
             resultados.push({ 
               integracao: integracao.id_integracao, 
               status: "error", 
-              error: `Erro na API Pipedrive (${dealsResponse.status}): ${errorText}. Verifique seu API Token e domínio.` 
+              error: `Erro API: ${dealsResponse.status}` 
             });
             break;
           }
@@ -118,196 +102,113 @@ serve(async (req) => {
           const dealsData = await dealsResponse.json();
 
           if (!dealsData.success || !dealsData.data || dealsData.data.length === 0) {
-            console.log("Nenhum deal adicional encontrado nesta página");
             break;
           }
 
           allDeals.push(...dealsData.data);
-          
-          // Log específico para deals procurados
-          const foundTargets = dealsData.data.filter((d: any) => d.id === 13346 || d.id === 17991);
-          if (foundTargets.length > 0) {
-            console.log(`✓ ENCONTRADO! Deals alvos nesta página: ${foundTargets.map((d: any) => d.id).join(', ')}`);
-          }
 
           const pagination = dealsData.additional_data?.pagination;
           if (!pagination || !pagination.more_items_in_collection) {
-            console.log("Não há mais páginas de deals para buscar");
             break;
           }
 
-          if (pagination.next_start != null) {
-            start = pagination.next_start;
-          } else {
-            start += limit;
-          }
-
+          start = pagination.next_start ?? (start + limit);
           page++;
-          if (page >= maxPages) {
-            console.log(`Limite máximo de páginas (${maxPages}) atingido ao buscar deals`);
-            break;
-          }
         }
 
-        console.log(`Total de deals encontrados: ${allDeals.length}`);
-        
-        // Verificar se deals específicos foram encontrados
-        const hasTarget13346 = allDeals.some((d: any) => d.id === 13346);
-        const hasTarget17991 = allDeals.some((d: any) => d.id === 17991);
-        console.log(`Deal 13346 encontrado: ${hasTarget13346 ? 'SIM ✓' : 'NÃO'}`);
-        console.log(`Deal 17991 encontrado: ${hasTarget17991 ? 'SIM ✓' : 'NÃO'}`);
+        console.log(`  ↳ ${allDeals.length} deals carregados`);
 
-        // Buscar deals arquivados também (deletados manualmente)
-        start = 0;
-        page = 0;
-        console.log(`Buscando deals arquivados...`);
-        
-        while (true) {
-          const archivedUrl = `https://${domain}.pipedrive.com/api/v1/deals/archive?api_token=${apiToken}&start=${start}&limit=${limit}`;
-          console.log(`Buscando deals arquivados - página ${page + 1}, start=${start}, limit=${limit}...`);
-
-          const archivedResponse = await fetch(archivedUrl);
-          if (!archivedResponse.ok) {
-            console.log(`Não foi possível buscar deals arquivados: ${archivedResponse.status}`);
-            break;
-          }
-
-          const archivedData = await archivedResponse.json();
-
-          if (!archivedData.success || !archivedData.data || archivedData.data.length === 0) {
-            console.log("Nenhum deal arquivado adicional encontrado");
-            break;
-          }
-
-          allDeals.push(...archivedData.data);
-
-          const pagination = archivedData.additional_data?.pagination;
-          if (!pagination || !pagination.more_items_in_collection) {
-            break;
-          }
-
-          if (pagination.next_start != null) {
-            start = pagination.next_start;
-          } else {
-            start += limit;
-          }
-
-          page++;
-          if (page >= maxPages) {
-            console.log(`Limite máximo de páginas (${maxPages}) atingido ao buscar deals arquivados`);
-            break;
-          }
-        }
-
-        if (allDeals.length === 0) {
-          console.log("Nenhum deal encontrado (ativos + arquivados)");
-          continue;
-        }
-
-        
-        console.log(`Total: ${allDeals.length} deals retornados (ativos + arquivados)`);
-
-        // Filtrar por stage_id da pipeline (mais confiável que pipeline_id na API)
+        // Filtrar por pipeline
         const dealsFiltered = stageIds.length > 0 
           ? allDeals.filter((deal: any) => stageIds.includes(deal.stage_id) || String(deal.pipeline_id) === String(pipelineId))
           : allDeals.filter((deal: any) => String(deal.pipeline_id) === String(pipelineId));
-        
-        console.log(`${dealsFiltered.length} deals pertencem à pipeline ${pipelineId}`);
 
-        // Processar cada deal como um lead
-        let dealsProcessados = 0;
+        console.log(`  ↳ ${dealsFiltered.length} deals na pipeline ${pipelineId}`);
+
+        // Processar deals em batch (upsert múltiplos)
+        const leadsToUpsert = [];
         
         for (const deal of dealsFiltered) {
-          try {
-            dealsProcessados++;
-            console.log(`Deal ${deal.id}: pipeline ${deal.pipeline_id}, stage ${deal.stage_id} (${stagesMap[deal.stage_id] || 'desconhecido'}), status ${deal.status}`);
-            
-            // Mapear status do deal para campos do lead
-            const dealPerdido = deal.status === "lost";
-            const dealAberto = deal.status === "open";
-            const vendaRealizada = deal.status === "won";
-            
-            // Só processar deals abertos ou perdidos se pipeline_id for especificado
-            // Para manter consistência com o comportamento anterior de status=open
-            const isMql = dealAberto && deal.stage_id !== null && deal.stage_id > 1;
-            const levantouMao = dealAberto && deal.stage_id !== null && deal.stage_id > 2;
-            const temReuniao = dealAberto && deal.stage_id !== null && deal.stage_id > 3;
-            const reuniaoRealizada = dealAberto && deal.stage_id !== null && deal.stage_id > 4;
-            
-            // Construir URL do Pipedrive
-            const urlPipedrive = `https://${domain}.pipedrive.com/deal/${deal.id}`;
-            
-            // Valor: sempre sincronizar se existir, independente do status
-            const valorDeal = deal.value ? parseFloat(deal.value) : null;
-            
-            // Determinar nome do stage
-            let stageAtual = null;
-            if (dealPerdido) {
-              stageAtual = "Perdido";
-            } else if (deal.stage_id && stagesMap[deal.stage_id]) {
-              stageAtual = stagesMap[deal.stage_id];
-            }
-            
-            const leadData = {
-              id_empresa: idEmpresa,
-              id_lead_externo: String(deal.id),
-              nome_lead: deal.person_name || deal.title || "Lead sem nome",
-              organizacao: deal.org_name || null,
-              stage_atual: stageAtual,
-              pipeline_id: deal.pipeline_id ? String(deal.pipeline_id) : null,
-              url_pipedrive: urlPipedrive,
-              data_criacao: deal.add_time || new Date().toISOString(),
-              origem_canal: "OUTRO" as const,
-              origem_campanha: deal.origin || null,
-              is_mql: isMql,
-              levantou_mao: levantouMao,
-              tem_reuniao: temReuniao,
-              reuniao_realizada: reuniaoRealizada,
-              venda_realizada: vendaRealizada,
-              data_venda: vendaRealizada ? (deal.won_time || deal.update_time) : null,
-              valor_venda: valorDeal,
-            };
+          const dealPerdido = deal.status === "lost";
+          const dealAberto = deal.status === "open";
+          const vendaRealizada = deal.status === "won";
+          
+          const isMql = dealAberto && deal.stage_id > 1;
+          const levantouMao = dealAberto && deal.stage_id > 2;
+          const temReuniao = dealAberto && deal.stage_id > 3;
+          const reuniaoRealizada = dealAberto && deal.stage_id > 4;
+          
+          const urlPipedrive = `https://${domain}.pipedrive.com/deal/${deal.id}`;
+          const valorDeal = deal.value ? parseFloat(deal.value) : null;
+          
+          let stageAtual = null;
+          if (dealPerdido) {
+            stageAtual = "Perdido";
+          } else if (deal.stage_id && stagesMap[deal.stage_id]) {
+            stageAtual = stagesMap[deal.stage_id];
+          }
+          
+          leadsToUpsert.push({
+            id_empresa: idEmpresa,
+            id_lead_externo: String(deal.id),
+            nome_lead: deal.person_name || deal.title || "Lead sem nome",
+            organizacao: deal.org_name || null,
+            stage_atual: stageAtual,
+            pipeline_id: deal.pipeline_id ? String(deal.pipeline_id) : null,
+            url_pipedrive: urlPipedrive,
+            data_criacao: deal.add_time || new Date().toISOString(),
+            origem_canal: "OUTRO" as const,
+            origem_campanha: deal.origin || null,
+            is_mql: isMql,
+            levantou_mao: levantouMao,
+            tem_reuniao: temReuniao,
+            reuniao_realizada: reuniaoRealizada,
+            venda_realizada: vendaRealizada,
+            data_venda: vendaRealizada ? (deal.won_time || deal.update_time) : null,
+            valor_venda: valorDeal,
+          });
+        }
 
-            // Inserir ou atualizar lead usando as colunas do constraint único (sem buscar registro inserido)
-            const { error: leadError } = await supabase
-              .from("lead")
-              .upsert(leadData, { 
-                onConflict: "id_lead_externo,id_empresa"
-              });
+        // Upsert em batches de 50
+        const batchSize = 50;
+        let processados = 0;
+        
+        for (let i = 0; i < leadsToUpsert.length; i += batchSize) {
+          const batch = leadsToUpsert.slice(i, i + batchSize);
+          
+          const { error: batchError } = await supabase
+            .from("lead")
+            .upsert(batch, { onConflict: "id_lead_externo,id_empresa" });
 
-            if (leadError) {
-              console.error(`Erro ao salvar lead ${deal.id}:`, leadError);
-              continue;
-            }
-
-            resultados.push({ deal: deal.id, status: "success" });
-          } catch (error) {
-            console.error(`Erro ao processar deal ${deal.id}:`, error);
-            resultados.push({ deal: deal.id, status: "error", error: String(error) });
+          if (batchError) {
+            console.error(`  ⚠️ Erro batch ${i}:`, batchError.message);
+          } else {
+            processados += batch.length;
           }
         }
-        
-        console.log(`Pipeline ${pipelineId}: ${dealsProcessados} deals processados`);
-      } catch (error) {
-        console.error(`Erro ao processar integração ${integracao.id_integracao}:`, error);
-        resultados.push({ integracao: integracao.id_integracao, status: "error", error: String(error) });
+
+        console.log(`  ✅ ${processados} leads sincronizados`);
+        resultados.push({ 
+          integracao: integracao.id_integracao, 
+          status: "success",
+          deals_processados: processados 
+        });
+
+      } catch (error: any) {
+        console.error(`❌ Erro integração:`, error.message);
+        resultados.push({ 
+          integracao: integracao.id_integracao, 
+          status: "error", 
+          error: error.message 
+        });
       }
     }
 
-    console.log("Sincronização Pipedrive concluída");
+    const duracao = Date.now() - startTime;
+    console.log(`\n✅ Sincronização concluída em ${(duracao/1000).toFixed(1)}s`);
     
     const erros = resultados.filter(r => r.status === "error");
     const sucessos = resultados.filter(r => r.status === "success");
-    
-    if (erros.length > 0 && sucessos.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: erros[0].error || "Erro ao sincronizar com Pipedrive",
-          resultados 
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
     
     return new Response(
       JSON.stringify({ 
@@ -316,10 +217,11 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error) {
-    console.error("Erro na função:", error);
+
+  } catch (error: any) {
+    console.error("Erro geral:", error);
     return new Response(
-      JSON.stringify({ error: String(error) }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
