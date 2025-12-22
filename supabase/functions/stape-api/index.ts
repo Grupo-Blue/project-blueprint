@@ -56,12 +56,51 @@ serve(async (req) => {
     // Determinar URL base baseado na região (API v2 do Stape)
     const baseUrl = region === "eu" ? "https://api.app.eu.stape.io" : "https://api.app.stape.io";
 
-    // Auth do Stape: tentar múltiplos formatos de autenticação
-    const headers = {
-      Authorization: `Bearer ${stapeApiKey}`,
-      "X-API-Key": stapeApiKey,
-      "Content-Type": "application/json",
-    };
+    // Auth do Stape: o formato do header varia conforme o esquema da API.
+    // Para evitar 401 por formato incorreto, tentamos alguns padrões comuns.
+    const headerCandidates: Array<{ mode: string; headers: Record<string, string> }> = [
+      {
+        mode: "authorization_bearer",
+        headers: {
+          Authorization: `Bearer ${stapeApiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      },
+      {
+        mode: "authorization_raw",
+        headers: {
+          Authorization: stapeApiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      },
+      {
+        mode: "authorization_apikey",
+        headers: {
+          Authorization: `ApiKey ${stapeApiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      },
+      {
+        mode: "x_api_key_only",
+        headers: {
+          "X-API-Key": stapeApiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      },
+      {
+        mode: "x_api_key_and_bearer",
+        headers: {
+          Authorization: `Bearer ${stapeApiKey}`,
+          "X-API-Key": stapeApiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      },
+    ];
 
     let endpoint = "";
     let queryParams = "";
@@ -113,10 +152,38 @@ serve(async (req) => {
     const fullUrl = `${baseUrl}${endpoint}${queryParams}`;
     console.log(`[stape-api] Chamando: ${fullUrl}`);
 
-    const response = await fetch(fullUrl, {
-      method: "GET",
-      headers,
-    });
+    let response: Response | null = null;
+    let authModeUsed: string | null = null;
+
+    for (const candidate of headerCandidates) {
+      const res = await fetch(fullUrl, {
+        method: "GET",
+        headers: candidate.headers,
+      });
+
+      authModeUsed = candidate.mode;
+
+      // Se funcionou, paramos
+      if (res.ok) {
+        response = res;
+        break;
+      }
+
+      // Se não funcionou e é 401/403, tentamos outro formato de auth
+      if (res.status === 401 || res.status === 403) {
+        console.warn(`[stape-api] Auth falhou (${candidate.mode}) -> ${res.status}`);
+        response = res;
+        continue;
+      }
+
+      // Outros erros (400/404/500...) não valem retry de auth
+      response = res;
+      break;
+    }
+
+    if (!response) {
+      throw new Error("Falha ao chamar API do Stape (sem resposta)");
+    }
 
     const responseText = await response.text();
     let responseData;
@@ -134,13 +201,14 @@ serve(async (req) => {
       nome_cronjob: "stape-api",
       status: response.ok ? "sucesso" : "erro",
       duracao_ms: duration,
-      detalhes_execucao: {
-        action,
-        container_id,
-        region,
-        status_code: response.status,
-        success: response.ok,
-      },
+       detalhes_execucao: {
+         action,
+         container_id,
+         region,
+         stape_auth_mode: authModeUsed,
+         status_code: response.status,
+         success: response.ok,
+       },
       mensagem_erro: response.ok ? null : responseText.substring(0, 500),
     });
 
