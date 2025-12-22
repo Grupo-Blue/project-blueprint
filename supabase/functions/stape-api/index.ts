@@ -7,10 +7,9 @@ const corsHeaders = {
 };
 
 interface StapeApiRequest {
-  action: "statistics" | "statistics-by-day" | "logs" | "test-connection";
+  action: "statistics" | "statistics-by-day" | "logs" | "test-connection" | "container-info";
   container_id: string;
   region?: "global" | "eu";
-  log_type?: "access" | "request" | "response";
   start_date?: string;
   end_date?: string;
   limit?: number;
@@ -38,7 +37,7 @@ serve(async (req) => {
     }
 
     const body: StapeApiRequest = await req.json();
-    const { action, container_id, region = "global", log_type, start_date, end_date, limit = 100 } = body;
+    const { action, container_id, region = "global", start_date, end_date, limit = 100 } = body;
 
     if (!container_id) {
       return new Response(
@@ -47,10 +46,10 @@ serve(async (req) => {
       );
     }
 
-    // Determinar URL base baseado na região
+    // Determinar URL base baseado na região (API v2 do Stape)
     const baseUrl = region === "eu" 
-      ? "https://eu.stape.io/api" 
-      : "https://stape.io/api";
+      ? "https://api.app.eu.stape.io" 
+      : "https://api.app.stape.io";
 
     const headers = {
       "Authorization": `Bearer ${stapeApiKey}`,
@@ -62,16 +61,18 @@ serve(async (req) => {
 
     switch (action) {
       case "test-connection":
-        // Testar conexão buscando estatísticas básicas
-        endpoint = `/containers/${container_id}/statistics`;
+        // Testar conexão listando containers
+        endpoint = `/api/v2/containers`;
         break;
 
       case "statistics":
-        endpoint = `/containers/${container_id}/statistics`;
+        // Endpoint de analytics do container
+        endpoint = `/api/v2/containers/${container_id}/analytics/info`;
         break;
 
       case "statistics-by-day":
-        endpoint = `/containers/${container_id}/statistics-by-day`;
+        // Uso de analytics com clientes por período
+        endpoint = `/api/v2/containers/${container_id}/analytics/clients`;
         if (start_date || end_date) {
           const params = new URLSearchParams();
           if (start_date) params.append("start_date", start_date);
@@ -81,18 +82,18 @@ serve(async (req) => {
         break;
 
       case "logs":
-        if (!log_type) {
-          return new Response(
-            JSON.stringify({ success: false, error: "log_type é obrigatório para ação 'logs'" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        endpoint = `/containers/${container_id}/logs/${log_type}`;
+        // Logs do container (changelog)
+        endpoint = `/api/v2/containers/${container_id}/logs`;
         const logsParams = new URLSearchParams();
         logsParams.append("limit", String(limit));
         if (start_date) logsParams.append("start_date", start_date);
         if (end_date) logsParams.append("end_date", end_date);
         queryParams = `?${logsParams.toString()}`;
+        break;
+
+      case "container-info":
+        // Obter informações do container específico
+        endpoint = `/api/v2/containers/${container_id}`;
         break;
 
       default:
