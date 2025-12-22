@@ -8,10 +8,10 @@ const corsHeaders = {
 
 interface StapeApiRequest {
   action: "statistics" | "statistics-by-day" | "logs" | "test-connection" | "container-info";
-  /** Obrigatório para ações por-container (exceto test-connection) */
+  /** Container identifier (obrigatório exceto para test-connection) */
   container_id?: string;
   region?: "global" | "eu";
-  /** API key específica da empresa (opcional, fallback para env) */
+  /** Account API key da empresa (para API v2 de monitoramento) */
   api_key?: string;
   start_date?: string;
   end_date?: string;
@@ -33,14 +33,31 @@ serve(async (req) => {
     const body: StapeApiRequest = await req.json();
     const { action, container_id, region = "global", api_key, start_date, end_date, limit = 100 } = body;
 
-    // Usar api_key do body ou fallback para env
-    const stapeApiKey = api_key || Deno.env.get("STAPE_API_KEY");
+    // Usar api_key do body (Account API Key) ou fallback para env
+    const stapeAccountApiKey = api_key || Deno.env.get("STAPE_API_KEY");
 
-    if (!stapeApiKey) {
-      console.error("[stape-api] API Key não fornecida nem configurada");
+    if (!stapeAccountApiKey) {
+      console.error("[stape-api] Account API Key não fornecida nem configurada");
       return new Response(
-        JSON.stringify({ success: false, error: "API Key do Stape não configurada. Configure nas Integrações da empresa." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          success: false, 
+          error: "Account API Key do Stape não configurada. Configure nas Integrações da empresa.",
+          hint: "Use a Account API Key (formato: hash simples), não a Container API Key (formato: sar:xxx:xxx)"
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validar que não é Container API Key (começa com "sar:")
+    if (stapeAccountApiKey.startsWith("sar:")) {
+      console.error("[stape-api] Container API Key usada em vez de Account API Key");
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Você está usando a Container API Key. Para monitoramento, use a Account API Key.",
+          hint: "Obtenha a Account API Key em stape.io/account/api"
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -49,20 +66,20 @@ serve(async (req) => {
     if (requiresContainer && !container_id) {
       return new Response(
         JSON.stringify({ success: false, error: "container_id é obrigatório" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Determinar URL base baseado na região (API v2 do Stape)
+    // SA East (Brazil), US, Asia = Global | Europa = EU
     const baseUrl = region === "eu" ? "https://api.app.eu.stape.io" : "https://api.app.stape.io";
 
-    // Auth do Stape: o formato do header varia conforme o esquema da API.
-    // Para evitar 401 por formato incorreto, tentamos alguns padrões comuns.
+    // Auth do Stape: tentar múltiplos formatos
     const headerCandidates: Array<{ mode: string; headers: Record<string, string> }> = [
       {
         mode: "authorization_bearer",
         headers: {
-          Authorization: `Bearer ${stapeApiKey}`,
+          Authorization: `Bearer ${stapeAccountApiKey}`,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
@@ -70,7 +87,7 @@ serve(async (req) => {
       {
         mode: "authorization_raw",
         headers: {
-          Authorization: stapeApiKey,
+          Authorization: stapeAccountApiKey,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
@@ -78,7 +95,7 @@ serve(async (req) => {
       {
         mode: "authorization_apikey",
         headers: {
-          Authorization: `ApiKey ${stapeApiKey}`,
+          Authorization: `ApiKey ${stapeAccountApiKey}`,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
@@ -86,7 +103,7 @@ serve(async (req) => {
       {
         mode: "x_api_key_only",
         headers: {
-          "X-API-Key": stapeApiKey,
+          "X-API-Key": stapeAccountApiKey,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
@@ -94,8 +111,8 @@ serve(async (req) => {
       {
         mode: "x_api_key_and_bearer",
         headers: {
-          Authorization: `Bearer ${stapeApiKey}`,
-          "X-API-Key": stapeApiKey,
+          Authorization: `Bearer ${stapeAccountApiKey}`,
+          "X-API-Key": stapeAccountApiKey,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
@@ -145,7 +162,7 @@ serve(async (req) => {
       default:
         return new Response(
           JSON.stringify({ success: false, error: `Ação desconhecida: ${action}` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
 
@@ -154,6 +171,7 @@ serve(async (req) => {
 
     let response: Response | null = null;
     let authModeUsed: string | null = null;
+    let attempts: Array<{ mode: string; status: number }> = [];
 
     for (const candidate of headerCandidates) {
       const res = await fetch(fullUrl, {
@@ -162,6 +180,7 @@ serve(async (req) => {
       });
 
       authModeUsed = candidate.mode;
+      attempts.push({ mode: candidate.mode, status: res.status });
 
       // Se funcionou, paramos
       if (res.ok) {
@@ -201,28 +220,39 @@ serve(async (req) => {
       nome_cronjob: "stape-api",
       status: response.ok ? "sucesso" : "erro",
       duracao_ms: duration,
-       detalhes_execucao: {
-         action,
-         container_id,
-         region,
-         stape_auth_mode: authModeUsed,
-         status_code: response.status,
-         success: response.ok,
-       },
+      detalhes_execucao: {
+        action,
+        container_id,
+        region,
+        stape_auth_mode: authModeUsed,
+        status_code: response.status,
+        success: response.ok,
+        attempts_count: attempts.length,
+      },
       mensagem_erro: response.ok ? null : responseText.substring(0, 500),
     });
 
-    // Importante: não propagar o status HTTP do Stape para o cliente.
-    // Quando retornamos 401/403/etc, o supabase-js lança FunctionsHttpError ("non-2xx"),
-    // o que quebra o fluxo do frontend. Em vez disso, retornamos 200 e sinalizamos erro no payload.
+    // Não propagar status HTTP do Stape para o cliente
     if (!response.ok) {
       console.error(`[stape-api] Erro na API Stape: ${response.status}`, responseText);
+      
+      let errorHint = "";
+      if (response.status === 401) {
+        errorHint = "Verifique se você está usando a Account API Key (não Container API Key) e se a região está correta.";
+      } else if (response.status === 403) {
+        errorHint = "A API Key não tem permissão. Verifique as configurações no Stape.";
+      } else if (response.status === 404) {
+        errorHint = "Container não encontrado. Verifique o Container ID.";
+      }
+
       return new Response(
         JSON.stringify({
           success: false,
           error: `Erro na API Stape: ${response.status}`,
           stape_status_code: response.status,
+          hint: errorHint,
           details: responseData,
+          attempts,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -254,7 +284,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

@@ -1023,7 +1023,8 @@ export type Database = {
           id_empresa: string
           meta_capi_token: string | null
           meta_pixel_id: string | null
-          stape_api_key: string | null
+          stape_account_api_key: string | null
+          stape_container_api_key: string | null
           stape_container_id: string | null
           stape_container_url: string | null
           stape_region: string | null
@@ -1036,7 +1037,8 @@ export type Database = {
           id_empresa: string
           meta_capi_token?: string | null
           meta_pixel_id?: string | null
-          stape_api_key?: string | null
+          stape_account_api_key?: string | null
+          stape_container_api_key?: string | null
           stape_container_id?: string | null
           stape_container_url?: string | null
           stape_region?: string | null
@@ -1049,7 +1051,8 @@ export type Database = {
           id_empresa?: string
           meta_capi_token?: string | null
           meta_pixel_id?: string | null
-          stape_api_key?: string | null
+          stape_account_api_key?: string | null
+          stape_container_api_key?: string | null
           stape_container_id?: string | null
           stape_container_url?: string | null
           stape_region?: string | null
