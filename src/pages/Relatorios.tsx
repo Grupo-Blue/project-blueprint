@@ -94,54 +94,97 @@ export default function Relatorios() {
 
     setIsExporting(true);
     try {
-      // Buscar leads que contêm o project_id no array tokeniza_projetos
-      // Usando filter com operador cs (contains) para array JSONB
-      const { data: leads, error } = await supabase
-        .from("lead")
-        .select(`
-          nome_lead,
-          email,
-          telefone,
-          tokeniza_valor_investido,
-          tokeniza_qtd_investimentos,
-          tokeniza_primeiro_investimento,
-          tokeniza_ultimo_investimento
-        `)
-        .eq("tokeniza_investidor", true)
-        .filter("tokeniza_projetos", "cs", `["${ofertaSelecionada}"]`)
-        .order("tokeniza_valor_investido", { ascending: false, nullsFirst: false });
+      // Buscar investimentos diretamente da tabela tokeniza_investimento para o projeto específico
+      const { data: investimentos, error: invError } = await supabase
+        .from("tokeniza_investimento")
+        .select("user_id_tokeniza, amount, data_criacao")
+        .eq("project_id", ofertaSelecionada);
 
-      if (error) throw error;
+      if (invError) throw invError;
 
-      if (!leads || leads.length === 0) {
-        toast.warning("Nenhum lead investidor encontrado para esta oferta");
+      if (!investimentos || investimentos.length === 0) {
+        toast.warning("Nenhum investimento encontrado para esta oferta");
         return;
       }
 
-      // Deduplicar antes de exportar (o banco pode ter múltiplos registros por email/telefone)
-      const normalizeEmail = (v: string | null | undefined) => (v ?? "").trim().toLowerCase();
-      const normalizePhone = (v: string | null | undefined) => (v ?? "").replace(/[^\d+]/g, "").trim();
+      // Agrupar investimentos por usuário
+      const investimentosPorUsuario = new Map<string, { total: number; qtd: number; primeiro: Date; ultimo: Date }>();
+      
+      investimentos.forEach(inv => {
+        const userId = inv.user_id_tokeniza;
+        if (!userId) return;
+        
+        const dataInv = inv.data_criacao ? new Date(inv.data_criacao) : new Date();
+        const valor = Number(inv.amount) || 0;
+        
+        if (investimentosPorUsuario.has(userId)) {
+          const atual = investimentosPorUsuario.get(userId)!;
+          atual.total += valor;
+          atual.qtd += 1;
+          if (dataInv < atual.primeiro) atual.primeiro = dataInv;
+          if (dataInv > atual.ultimo) atual.ultimo = dataInv;
+        } else {
+          investimentosPorUsuario.set(userId, {
+            total: valor,
+            qtd: 1,
+            primeiro: dataInv,
+            ultimo: dataInv
+          });
+        }
+      });
 
-      const leadsUnicos = (() => {
-        const seen = new Set<string>();
-        const out: typeof leads = [];
+      // Buscar dados dos usuários da Tokeniza
+      const userIds = Array.from(investimentosPorUsuario.keys());
+      const { data: usuarios, error: userError } = await supabase
+        .from("tokeniza_usuario")
+        .select("user_id_tokeniza, email, phone, first_name, last_name")
+        .in("user_id_tokeniza", userIds);
 
-        leads.forEach((lead, idx) => {
-          const key =
-            normalizeEmail(lead.email) ||
-            normalizePhone(lead.telefone) ||
-            (lead.nome_lead ? lead.nome_lead.trim().toLowerCase() : "") ||
-            `__row_${idx}`;
+      if (userError) throw userError;
 
-          if (seen.has(key)) return;
-          seen.add(key);
-          out.push(lead);
+      // Montar dados para exportação
+      type ExportRow = {
+        nome: string;
+        email: string;
+        telefone: string;
+        valor_investido: number;
+        qtd_investimentos: number;
+        primeiro_investimento: Date;
+        ultimo_investimento: Date;
+      };
+
+      const dadosExportacao: ExportRow[] = [];
+      const emailsVistos = new Set<string>();
+
+      usuarios?.forEach(usuario => {
+        const userId = usuario.user_id_tokeniza;
+        const inv = investimentosPorUsuario.get(userId);
+        if (!inv) return;
+
+        const email = (usuario.email || "").trim().toLowerCase();
+        if (email && emailsVistos.has(email)) return;
+        if (email) emailsVistos.add(email);
+
+        dadosExportacao.push({
+          nome: `${usuario.first_name || ""} ${usuario.last_name || ""}`.trim(),
+          email: usuario.email || "",
+          telefone: usuario.phone || "",
+          valor_investido: inv.total,
+          qtd_investimentos: inv.qtd,
+          primeiro_investimento: inv.primeiro,
+          ultimo_investimento: inv.ultimo
         });
+      });
 
-        return out;
-      })();
+      // Ordenar por valor investido (maior primeiro)
+      dadosExportacao.sort((a, b) => b.valor_investido - a.valor_investido);
 
-      // Criar CSV com apenas os campos solicitados
+      if (dadosExportacao.length === 0) {
+        toast.warning("Nenhum investidor encontrado para esta oferta");
+        return;
+      }
+
+      // Criar CSV
       const headers = [
         "Nome",
         "Email",
@@ -152,14 +195,14 @@ export default function Relatorios() {
         "Último Investimento"
       ];
 
-      const rows = leadsUnicos.map(lead => [
-        lead.nome_lead || "",
-        lead.email || "",
-        lead.telefone || "",
-        lead.tokeniza_valor_investido?.toString() || "0",
-        lead.tokeniza_qtd_investimentos?.toString() || "0",
-        lead.tokeniza_primeiro_investimento ? format(new Date(lead.tokeniza_primeiro_investimento), "dd/MM/yyyy") : "",
-        lead.tokeniza_ultimo_investimento ? format(new Date(lead.tokeniza_ultimo_investimento), "dd/MM/yyyy") : ""
+      const rows = dadosExportacao.map(row => [
+        row.nome,
+        row.email,
+        row.telefone,
+        row.valor_investido.toFixed(2).replace(".", ","),
+        row.qtd_investimentos.toString(),
+        format(row.primeiro_investimento, "dd/MM/yyyy"),
+        format(row.ultimo_investimento, "dd/MM/yyyy")
       ]);
 
       const csvContent = [
@@ -181,7 +224,8 @@ export default function Relatorios() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success(`${leadsUnicos.length} leads únicos exportados com sucesso`);
+      const totalInvestido = dadosExportacao.reduce((sum, r) => sum + r.valor_investido, 0);
+      toast.success(`${dadosExportacao.length} investidores exportados (Total: R$ ${totalInvestido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`);
     } catch (error) {
       console.error("Erro ao exportar:", error);
       toast.error("Erro ao exportar leads");
