@@ -95,6 +95,7 @@ export default function Relatorios() {
     setIsExporting(true);
     try {
       // Buscar leads que contêm o project_id no array tokeniza_projetos
+      // Usando filter com operador cs (contains) para array JSONB
       const { data: leads, error } = await supabase
         .from("lead")
         .select(`
@@ -110,8 +111,8 @@ export default function Relatorios() {
           data_criacao
         `)
         .eq("tokeniza_investidor", true)
-        .contains("tokeniza_projetos", [ofertaSelecionada])
-        .order("tokeniza_valor_investido", { ascending: false });
+        .filter("tokeniza_projetos", "cs", `["${ofertaSelecionada}"]`)
+        .order("tokeniza_valor_investido", { ascending: false, nullsFirst: false });
 
       if (error) throw error;
 
