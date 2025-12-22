@@ -125,3 +125,6 @@ verify_jwt = false
 
 [functions.enriquecer-leads-stape]
 verify_jwt = false
+
+[functions.stape-api]
+verify_jwt = false

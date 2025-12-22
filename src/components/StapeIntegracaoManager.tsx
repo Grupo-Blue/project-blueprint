@@ -5,14 +5,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Save, TestTube2, AlertCircle, ExternalLink, Copy, Check, Server } from "lucide-react";
+import { Save, TestTube2, AlertCircle, ExternalLink, Copy, Check, Server, Wifi, WifiOff, BarChart3 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface StapeConfig {
   meta_pixel_id: string;
   meta_capi_token: string;
   stape_container_url: string;
+  stape_container_id: string;
+  stape_region: "global" | "eu";
   ativo: boolean;
+}
+
+interface StapeStats {
+  total_requests?: number;
+  successful_requests?: number;
+  failed_requests?: number;
+  last_request_at?: string;
 }
 
 export function StapeIntegracaoManager() {
@@ -20,12 +31,17 @@ export function StapeIntegracaoManager() {
     meta_pixel_id: "",
     meta_capi_token: "",
     stape_container_url: "",
+    stape_container_id: "",
+    stape_region: "global",
     ativo: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
+  const [testingWebhook, setTestingWebhook] = useState(false);
+  const [testingApi, setTestingApi] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [apiConnected, setApiConnected] = useState<boolean | null>(null);
+  const [stapeStats, setStapeStats] = useState<StapeStats | null>(null);
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stape-webhook`;
 
@@ -35,16 +51,49 @@ export function StapeIntegracaoManager() {
 
   const loadConfig = async () => {
     try {
-      // Buscar configuração existente do tipo STAPE (se existir no futuro)
-      // Por agora, vamos usar localStorage para armazenar a configuração
       const savedConfig = localStorage.getItem("stape_config");
       if (savedConfig) {
-        setConfig(JSON.parse(savedConfig));
+        const parsed = JSON.parse(savedConfig);
+        setConfig({
+          meta_pixel_id: parsed.meta_pixel_id || "",
+          meta_capi_token: parsed.meta_capi_token || "",
+          stape_container_url: parsed.stape_container_url || "",
+          stape_container_id: parsed.stape_container_id || "",
+          stape_region: parsed.stape_region || "global",
+          ativo: parsed.ativo || false,
+        });
+
+        // Se tem container_id configurado, tentar buscar estatísticas
+        if (parsed.stape_container_id) {
+          fetchStapeStats(parsed.stape_container_id, parsed.stape_region || "global");
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar configuração Stape:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStapeStats = async (containerId: string, region: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("stape-api", {
+        body: {
+          action: "statistics",
+          container_id: containerId,
+          region,
+        },
+      });
+
+      if (!error && data?.success) {
+        setStapeStats(data.data);
+        setApiConnected(true);
+      } else {
+        setApiConnected(false);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar estatísticas Stape:", error);
+      setApiConnected(false);
     }
   };
 
@@ -56,14 +105,14 @@ export function StapeIntegracaoManager() {
 
     setSaving(true);
     try {
-      // Salvar no localStorage (configuração local)
       localStorage.setItem("stape_config", JSON.stringify({ ...config, ativo: true }));
-      
-      // Nota: Os secrets META_PIXEL_ID e META_CAPI_TOKEN precisam ser configurados
-      // diretamente no Supabase Secrets para que as edge functions funcionem
-      
       setConfig(prev => ({ ...prev, ativo: true }));
-      toast.success("Configuração salva localmente. Lembre-se de configurar os secrets no backend!");
+      toast.success("Configuração salva! Lembre-se de configurar os secrets no backend.");
+
+      // Se tem container_id, buscar estatísticas
+      if (config.stape_container_id) {
+        fetchStapeStats(config.stape_container_id, config.stape_region);
+      }
     } catch (error: any) {
       toast.error("Erro ao salvar configuração: " + error.message);
     } finally {
@@ -71,10 +120,9 @@ export function StapeIntegracaoManager() {
     }
   };
 
-  const handleTest = async () => {
-    setTesting(true);
+  const handleTestWebhook = async () => {
+    setTestingWebhook(true);
     try {
-      // Testar o webhook do Stape
       const { data, error } = await supabase.functions.invoke("stape-webhook", {
         body: {
           event_name: "test_event",
@@ -94,14 +142,49 @@ export function StapeIntegracaoManager() {
       console.error("Erro ao testar Stape:", error);
       toast.error("Erro ao testar: " + error.message);
     } finally {
-      setTesting(false);
+      setTestingWebhook(false);
+    }
+  };
+
+  const handleTestApiConnection = async () => {
+    if (!config.stape_container_id) {
+      toast.error("Preencha o Container ID para testar a conexão");
+      return;
+    }
+
+    setTestingApi(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("stape-api", {
+        body: {
+          action: "test-connection",
+          container_id: config.stape_container_id,
+          region: config.stape_region,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        setApiConnected(true);
+        setStapeStats(data.data);
+        toast.success("Conexão com API Stape estabelecida!");
+      } else {
+        setApiConnected(false);
+        toast.error("Falha na conexão: " + (data?.error || "Erro desconhecido"));
+      }
+    } catch (error: any) {
+      console.error("Erro ao testar API Stape:", error);
+      setApiConnected(false);
+      toast.error("Erro ao testar API: " + error.message);
+    } finally {
+      setTestingApi(false);
     }
   };
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopied(key);
-    toast.success("Copiado para a área de transferência!");
+    toast.success("Copiado!");
     setTimeout(() => setCopied(null), 2000);
   };
 
@@ -114,27 +197,130 @@ export function StapeIntegracaoManager() {
       {/* Visão Geral */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Server className="w-5 h-5" />
-            Stape.io - Server-Side Tracking
-          </CardTitle>
-          <CardDescription>
-            Configure o tracking server-side para melhorar a qualidade dos dados do Meta CAPI
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Server className="w-5 h-5" />
+                Stape.io - Server-Side Tracking
+              </CardTitle>
+              <CardDescription>
+                Configure o tracking server-side para melhorar a qualidade dos dados do Meta CAPI
+              </CardDescription>
+            </div>
+            {apiConnected !== null && (
+              <Badge variant={apiConnected ? "default" : "secondary"} className="flex items-center gap-1">
+                {apiConnected ? (
+                  <>
+                    <Wifi className="w-3 h-3" />
+                    API Conectada
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="w-3 h-3" />
+                    API Desconectada
+                  </>
+                )}
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertTitle className="text-blue-900 dark:text-blue-100">Como funciona</AlertTitle>
             <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm space-y-2">
-              <p>O Stape atua como intermediário entre seu site e o Meta, enviando eventos via server-side:</p>
+              <p>O sistema usa <strong>dois modos complementares</strong>:</p>
               <ol className="list-decimal ml-4 space-y-1">
-                <li><strong>GTM Server Container:</strong> Recebe eventos do GTM web</li>
-                <li><strong>Stape Webhook:</strong> Recebe dados e envia para o Meta CAPI</li>
-                <li><strong>Deduplicação:</strong> Eventos são comparados para evitar duplicatas</li>
+                <li><strong>Webhook (tempo real):</strong> Recebe eventos do GTM Server e processa</li>
+                <li><strong>API Stape (monitoramento):</strong> Busca estatísticas, logs e analytics</li>
               </ol>
             </AlertDescription>
           </Alert>
+
+          {/* Estatísticas da API se conectado */}
+          {apiConnected && stapeStats && (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-secondary/50 rounded-lg p-3 text-center">
+                <BarChart3 className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                <div className="text-lg font-bold">{stapeStats.total_requests || 0}</div>
+                <div className="text-xs text-muted-foreground">Requests Total</div>
+              </div>
+              <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-3 text-center">
+                <Check className="h-4 w-4 mx-auto mb-1 text-green-600" />
+                <div className="text-lg font-bold text-green-700 dark:text-green-400">
+                  {stapeStats.successful_requests || 0}
+                </div>
+                <div className="text-xs text-muted-foreground">Sucesso</div>
+              </div>
+              <div className="bg-red-100 dark:bg-red-900/30 rounded-lg p-3 text-center">
+                <AlertCircle className="h-4 w-4 mx-auto mb-1 text-red-600" />
+                <div className="text-lg font-bold text-red-700 dark:text-red-400">
+                  {stapeStats.failed_requests || 0}
+                </div>
+                <div className="text-xs text-muted-foreground">Erros</div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Configuração API Stape */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">API do Stape (Monitoramento)</CardTitle>
+          <CardDescription>
+            Configure para acessar estatísticas, logs e analytics do container
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert className="bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800">
+            <AlertCircle className="h-4 w-4 text-purple-600" />
+            <AlertTitle className="text-purple-900 dark:text-purple-100">Onde obter esses valores</AlertTitle>
+            <AlertDescription className="text-purple-800 dark:text-purple-200 text-sm space-y-2">
+              <p><strong>Container ID:</strong></p>
+              <ol className="list-decimal ml-4 space-y-1">
+                <li>Acesse <a href="https://stape.io/containers" target="_blank" rel="noopener noreferrer" className="underline">Stape Containers</a></li>
+                <li>Clique no seu container</li>
+                <li>O ID está na URL (ex: containers/<strong>abc123</strong>)</li>
+              </ol>
+              <p className="mt-3"><strong>API Key:</strong> Deve ser configurada como secret STAPE_API_KEY no backend</p>
+            </AlertDescription>
+          </Alert>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Container ID *</Label>
+              <Input
+                value={config.stape_container_id}
+                onChange={(e) => setConfig(prev => ({ ...prev, stape_container_id: e.target.value }))}
+                placeholder="abc123xyz"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Região do Container</Label>
+              <Select
+                value={config.stape_region}
+                onValueChange={(value: "global" | "eu") => setConfig(prev => ({ ...prev, stape_region: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="global">Global (stape.io)</SelectItem>
+                  <SelectItem value="eu">Europa (eu.stape.io)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Button 
+            variant="outline" 
+            onClick={handleTestApiConnection} 
+            disabled={testingApi || !config.stape_container_id}
+          >
+            <Wifi className="w-4 h-4 mr-2" />
+            {testingApi ? "Testando..." : "Testar Conexão API"}
+          </Button>
         </CardContent>
       </Card>
 
@@ -226,25 +412,7 @@ export function StapeIntegracaoManager() {
                 {copied === "webhook" ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Use esta URL no seu GTM Server Container como destino dos eventos
-            </p>
           </div>
-
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Configuração no GTM Server Container</AlertTitle>
-            <AlertDescription className="text-sm space-y-2">
-              <p>No seu container GTM Server-Side:</p>
-              <ol className="list-decimal ml-4 space-y-1">
-                <li>Crie uma Tag do tipo "HTTP Request"</li>
-                <li>Configure a URL acima como destino</li>
-                <li>Método: POST</li>
-                <li>Content-Type: application/json</li>
-                <li>Corpo: envie os dados do evento em JSON</li>
-              </ol>
-            </AlertDescription>
-          </Alert>
         </CardContent>
       </Card>
 
@@ -256,14 +424,11 @@ export function StapeIntegracaoManager() {
               <Save className="w-4 h-4 mr-2" />
               {saving ? "Salvando..." : "Salvar Configuração"}
             </Button>
-            <Button variant="outline" onClick={handleTest} disabled={testing}>
+            <Button variant="outline" onClick={handleTestWebhook} disabled={testingWebhook}>
               <TestTube2 className="w-4 h-4 mr-2" />
-              {testing ? "Testando..." : "Testar Webhook"}
+              {testingWebhook ? "Testando..." : "Testar Webhook"}
             </Button>
-            <Button 
-              variant="outline" 
-              asChild
-            >
+            <Button variant="outline" asChild>
               <a href="https://stape.io" target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Acessar Stape.io
@@ -276,62 +441,15 @@ export function StapeIntegracaoManager() {
               <Check className="h-4 w-4 text-green-600" />
               <AlertTitle className="text-green-900 dark:text-green-100">Configuração Ativa</AlertTitle>
               <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
-                <p><strong>Importante:</strong> Para que o CAPI funcione, você precisa configurar os secrets:</p>
+                <p><strong>Secrets necessários no backend:</strong></p>
                 <ul className="list-disc ml-4 mt-2">
-                  <li><code>META_PIXEL_ID</code> = {config.meta_pixel_id || "(não definido)"}</li>
-                  <li><code>META_CAPI_TOKEN</code> = (token seguro)</li>
+                  <li><code>META_PIXEL_ID</code> - ID do Pixel Meta</li>
+                  <li><code>META_CAPI_TOKEN</code> - Token de acesso CAPI</li>
+                  <li><code>STAPE_API_KEY</code> - Chave da API Stape (para monitoramento)</li>
                 </ul>
-                <p className="mt-2">Esses valores devem ser adicionados como Secrets no backend do projeto.</p>
               </AlertDescription>
             </Alert>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Instruções de Configuração */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Próximos Passos</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium shrink-0">1</div>
-              <div>
-                <p className="font-medium">Configurar Secrets no Backend</p>
-                <p className="text-sm text-muted-foreground">
-                  Adicione META_PIXEL_ID e META_CAPI_TOKEN como secrets do projeto
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium shrink-0">2</div>
-              <div>
-                <p className="font-medium">Configurar GTM Server Container</p>
-                <p className="text-sm text-muted-foreground">
-                  Configure o webhook no seu container Stape/GTM para enviar eventos
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium shrink-0">3</div>
-              <div>
-                <p className="font-medium">Testar Integração</p>
-                <p className="text-sm text-muted-foreground">
-                  Use o botão "Testar Webhook" para verificar se está funcionando
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium shrink-0">4</div>
-              <div>
-                <p className="font-medium">Monitorar no Dashboard</p>
-                <p className="text-sm text-muted-foreground">
-                  Acompanhe os widgets Stape Health e Server-Side Comparison no Dashboard
-                </p>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>
