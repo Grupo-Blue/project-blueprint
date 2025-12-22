@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Package, Check, AlertCircle, Save, RefreshCw } from "lucide-react";
+import { Package, Check, AlertCircle, Save, RefreshCw, Search } from "lucide-react";
 
 interface ProjetoComContagem {
   project_id: string;
@@ -19,6 +19,7 @@ export function TokenizaProjetosManager() {
   const queryClient = useQueryClient();
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const [isUpdatingLeads, setIsUpdatingLeads] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Buscar projetos cadastrados
   const { data: projetosCadastrados } = useQuery({
@@ -73,6 +74,17 @@ export function TokenizaProjetosManager() {
           return b.investimentos_count - a.investimentos_count;
         })
     : [];
+
+  // Filtrar projetos pela busca
+  const projetosFiltrados = useMemo(() => {
+    if (!searchTerm.trim()) return projetosConsolidados;
+    
+    const termo = searchTerm.toLowerCase().trim();
+    return projetosConsolidados.filter(projeto => 
+      projeto.project_id.toLowerCase().includes(termo) ||
+      (projeto.nome && projeto.nome.toLowerCase().includes(termo))
+    );
+  }, [projetosConsolidados, searchTerm]);
 
   // Mutation para salvar nome
   const saveMutation = useMutation({
@@ -207,7 +219,23 @@ export function TokenizaProjetosManager() {
           </p>
         ) : (
           <>
-            <div className="border rounded-md max-h-[400px] overflow-y-auto">
+            {/* Campo de busca */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por Project ID ou Nome..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {projetosFiltrados.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">
+                Nenhum projeto encontrado para "{searchTerm}"
+              </p>
+            ) : (
+              <div className="border rounded-md max-h-[400px] overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -219,7 +247,7 @@ export function TokenizaProjetosManager() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {projetosConsolidados.map((projeto) => (
+                  {projetosFiltrados.map((projeto) => (
                     <TableRow key={projeto.project_id}>
                       <TableCell className="font-mono text-xs">
                         {projeto.project_id.substring(0, 8)}...
@@ -264,6 +292,7 @@ export function TokenizaProjetosManager() {
                 </TableBody>
               </Table>
             </div>
+            )}
 
             <div className="flex justify-end">
               <Button
