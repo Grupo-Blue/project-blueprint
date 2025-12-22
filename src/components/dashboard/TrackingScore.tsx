@@ -41,7 +41,7 @@ export function TrackingScore({ empresaId }: TrackingScoreProps) {
       // Buscar leads para verificar match
       let leadsQuery = supabase
         .from("lead")
-        .select("id_lead, id_criativo, utm_content");
+        .select("id_lead, id_criativo, utm_content, stape_client_id");
 
       if (empresaId) {
         leadsQuery = leadsQuery.eq("id_empresa", empresaId);
@@ -74,18 +74,23 @@ export function TrackingScore({ empresaId }: TrackingScoreProps) {
         (c.campanha?.url_esperada && c.campanha.url_esperada.trim() !== "")
       ).length || 0;
 
+      // 5. Leads com dados Stape
+      const leadsComStape = leads?.filter((l: any) => l.stape_client_id !== null).length || 0;
+
       // Calcular percentuais
       const percentUtm = totalCriativos > 0 ? (criativosComUtm / totalCriativos) * 100 : 0;
       const percentMatch = totalLeads > 0 ? (leadsComMatch / totalLeads) * 100 : 0;
       const percentUrl = totalCriativos > 0 ? (criativosComUrl / totalCriativos) * 100 : 0;
       const percentEsperada = totalCriativos > 0 ? (criativosComUrlEsperada / totalCriativos) * 100 : 0;
+      const percentStape = totalLeads > 0 ? (leadsComStape / totalLeads) * 100 : 0;
 
-      // Score ponderado (0-100)
+      // Score ponderado (0-100) - ajustado para incluir Stape
       const score = (
-        (percentUtm * 0.25) +
-        (percentMatch * 0.25) +
-        (percentUrl * 0.25) +
-        (percentEsperada * 0.25)
+        (percentUtm * 0.20) +
+        (percentMatch * 0.20) +
+        (percentUrl * 0.15) +
+        (percentEsperada * 0.15) +
+        (percentStape * 0.30)
       );
 
       return {
@@ -114,6 +119,12 @@ export function TrackingScore({ empresaId }: TrackingScoreProps) {
             valor: criativosComUrlEsperada,
             total: totalCriativos,
             percent: percentEsperada,
+          },
+          {
+            nome: "Dados Stape (Server-Side)",
+            valor: leadsComStape,
+            total: totalLeads,
+            percent: percentStape,
           },
         ],
       };
