@@ -49,7 +49,7 @@ export default function Relatorios() {
     },
   });
 
-  // Buscar projetos Tokeniza
+  // Buscar projetos Tokeniza cadastrados
   const { data: projetosTokeniza } = useQuery({
     queryKey: ["tokeniza-projetos-relatorios"],
     queryFn: async () => {
@@ -62,20 +62,27 @@ export default function Relatorios() {
     },
   });
 
-  // Buscar project_ids únicos dos leads investidores
+  // Buscar project_ids únicos do array tokeniza_projetos dos leads investidores
   const { data: projectIdsLeads } = useQuery({
-    queryKey: ["tokeniza-project-ids-leads"],
+    queryKey: ["tokeniza-project-ids-leads-array"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("lead")
-        .select("tokeniza_projeto_nome")
-        .eq("tokeniza_investidor", true)
-        .not("tokeniza_projeto_nome", "is", null);
+        .select("tokeniza_projetos")
+        .eq("tokeniza_investidor", true);
       if (error) throw error;
       
-      // Extrair project_ids únicos
-      const uniqueProjectIds = [...new Set(data?.map(l => l.tokeniza_projeto_nome).filter(Boolean))];
-      return uniqueProjectIds;
+      // Extrair todos os project_ids únicos do array tokeniza_projetos
+      const allProjectIds = new Set<string>();
+      data?.forEach(lead => {
+        if (lead.tokeniza_projetos && Array.isArray(lead.tokeniza_projetos)) {
+          lead.tokeniza_projetos.forEach((pid: string) => {
+            if (pid) allProjectIds.add(pid);
+          });
+        }
+      });
+      
+      return Array.from(allProjectIds);
     },
   });
 
@@ -87,6 +94,7 @@ export default function Relatorios() {
 
     setIsExporting(true);
     try {
+      // Buscar leads que contêm o project_id no array tokeniza_projetos
       const { data: leads, error } = await supabase
         .from("lead")
         .select(`
@@ -102,7 +110,7 @@ export default function Relatorios() {
           data_criacao
         `)
         .eq("tokeniza_investidor", true)
-        .eq("tokeniza_projeto_nome", ofertaSelecionada)
+        .contains("tokeniza_projetos", [ofertaSelecionada])
         .order("tokeniza_valor_investido", { ascending: false });
 
       if (error) throw error;
@@ -167,23 +175,26 @@ export default function Relatorios() {
     }
   };
 
-  // Consolidar ofertas (projetos cadastrados + project_ids dos leads)
+  // Consolidar ofertas (projetos cadastrados + project_ids dos leads) - sem duplicatas
   const ofertasDisponiveis = (() => {
     const mapa = new Map<string, string>();
     
-    // Adicionar projetos cadastrados
+    // Adicionar projetos cadastrados com seus nomes
     projetosTokeniza?.forEach(p => {
       mapa.set(p.project_id, p.nome || p.project_id);
     });
     
-    // Adicionar project_ids dos leads que não estão cadastrados
+    // Adicionar project_ids dos leads que não estão cadastrados (mostrar ID)
     projectIdsLeads?.forEach(pid => {
       if (!mapa.has(pid)) {
-        mapa.set(pid, pid);
+        mapa.set(pid, `Projeto ${pid.substring(0, 8)}...`);
       }
     });
     
-    return Array.from(mapa.entries()).map(([id, nome]) => ({ project_id: id, nome }));
+    // Ordenar por nome
+    return Array.from(mapa.entries())
+      .map(([id, nome]) => ({ project_id: id, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
   })();
 
   const { data: relatorios, isLoading } = useQuery({
