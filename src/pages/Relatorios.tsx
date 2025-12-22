@@ -118,6 +118,29 @@ export default function Relatorios() {
         return;
       }
 
+      // Deduplicar antes de exportar (o banco pode ter múltiplos registros por email/telefone)
+      const normalizeEmail = (v: string | null | undefined) => (v ?? "").trim().toLowerCase();
+      const normalizePhone = (v: string | null | undefined) => (v ?? "").replace(/[^\d+]/g, "").trim();
+
+      const leadsUnicos = (() => {
+        const seen = new Set<string>();
+        const out: typeof leads = [];
+
+        leads.forEach((lead, idx) => {
+          const key =
+            normalizeEmail(lead.email) ||
+            normalizePhone(lead.telefone) ||
+            (lead.nome_lead ? lead.nome_lead.trim().toLowerCase() : "") ||
+            `__row_${idx}`;
+
+          if (seen.has(key)) return;
+          seen.add(key);
+          out.push(lead);
+        });
+
+        return out;
+      })();
+
       // Criar CSV com apenas os campos solicitados
       const headers = [
         "Nome",
@@ -129,7 +152,7 @@ export default function Relatorios() {
         "Último Investimento"
       ];
 
-      const rows = leads.map(lead => [
+      const rows = leadsUnicos.map(lead => [
         lead.nome_lead || "",
         lead.email || "",
         lead.telefone || "",
@@ -158,7 +181,7 @@ export default function Relatorios() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success(`${leads.length} leads exportados com sucesso`);
+      toast.success(`${leadsUnicos.length} leads únicos exportados com sucesso`);
     } catch (error) {
       console.error("Erro ao exportar:", error);
       toast.error("Erro ao exportar leads");
