@@ -18,6 +18,7 @@ import { CronjobsMonitor } from "@/components/CronjobsMonitor";
 import { TokenizaProjetosManager } from "@/components/TokenizaProjetosManager";
 import { WebhookDestinosManager } from "@/components/WebhookDestinosManager";
 import { ConsultaIRPFTester } from "@/components/ConsultaIRPFTester";
+import { StapeIntegracaoManager } from "@/components/StapeIntegracaoManager";
 import type { Database } from "@/integrations/supabase/types";
 
 type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
@@ -1049,6 +1050,7 @@ export default function Integracoes() {
           <TabsTrigger value="metricool" className="text-xs md:text-sm">Metricool</TabsTrigger>
           <TabsTrigger value="chatwoot" className="text-xs md:text-sm">Chatwoot</TabsTrigger>
           <TabsTrigger value="ga4" className="text-xs md:text-sm">GA4</TabsTrigger>
+          <TabsTrigger value="stape" className="text-xs md:text-sm">Stape</TabsTrigger>
         </TabsList>
 
         <TabsContent value="meta" className="space-y-4">
@@ -1721,6 +1723,10 @@ export default function Integracoes() {
               );
             })
           )}
+        </TabsContent>
+
+        <TabsContent value="stape" className="space-y-4">
+          <StapeIntegracaoManager />
         </TabsContent>
       </Tabs>
 
