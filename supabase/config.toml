@@ -116,3 +116,12 @@ verify_jwt = false
 
 [functions.atualizar-dados-empresa]
 verify_jwt = false
+
+[functions.stape-webhook]
+verify_jwt = false
+
+[functions.stape-meta-capi]
+verify_jwt = false
+
+[functions.enriquecer-leads-stape]
+verify_jwt = false

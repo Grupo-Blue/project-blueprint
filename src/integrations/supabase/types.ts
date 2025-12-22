@@ -2878,6 +2878,19 @@ export type Database = {
           pipeline_id: string | null
           reuniao_realizada: boolean
           stage_atual: string | null
+          stape_client_id: string | null
+          stape_eventos: Json | null
+          stape_fbc: string | null
+          stape_fbp: string | null
+          stape_first_visit: string | null
+          stape_gclid: string | null
+          stape_ip_address: string | null
+          stape_last_activity: string | null
+          stape_paginas_visitadas: Json | null
+          stape_referrer: string | null
+          stape_session_id: string | null
+          stape_tempo_total_segundos: number | null
+          stape_user_agent: string | null
           telefone: string | null
           tem_reuniao: boolean
           tokeniza_carrinho_abandonado: boolean | null
@@ -2975,6 +2988,19 @@ export type Database = {
           pipeline_id?: string | null
           reuniao_realizada?: boolean
           stage_atual?: string | null
+          stape_client_id?: string | null
+          stape_eventos?: Json | null
+          stape_fbc?: string | null
+          stape_fbp?: string | null
+          stape_first_visit?: string | null
+          stape_gclid?: string | null
+          stape_ip_address?: string | null
+          stape_last_activity?: string | null
+          stape_paginas_visitadas?: Json | null
+          stape_referrer?: string | null
+          stape_session_id?: string | null
+          stape_tempo_total_segundos?: number | null
+          stape_user_agent?: string | null
           telefone?: string | null
           tem_reuniao?: boolean
           tokeniza_carrinho_abandonado?: boolean | null
@@ -3072,6 +3098,19 @@ export type Database = {
           pipeline_id?: string | null
           reuniao_realizada?: boolean
           stage_atual?: string | null
+          stape_client_id?: string | null
+          stape_eventos?: Json | null
+          stape_fbc?: string | null
+          stape_fbp?: string | null
+          stape_first_visit?: string | null
+          stape_gclid?: string | null
+          stape_ip_address?: string | null
+          stape_last_activity?: string | null
+          stape_paginas_visitadas?: Json | null
+          stape_referrer?: string | null
+          stape_session_id?: string | null
+          stape_tempo_total_segundos?: number | null
+          stape_user_agent?: string | null
           telefone?: string | null
           tem_reuniao?: boolean
           tokeniza_carrinho_abandonado?: boolean | null
@@ -3563,6 +3602,86 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "empresa"
             referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      stape_evento: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          custom_data: Json | null
+          event_name: string
+          event_timestamp: string | null
+          fbc: string | null
+          fbp: string | null
+          gclid: string | null
+          id: string
+          id_empresa: string | null
+          id_lead: string | null
+          ip_address: string | null
+          page_title: string | null
+          page_url: string | null
+          session_id: string | null
+          user_agent: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          custom_data?: Json | null
+          event_name: string
+          event_timestamp?: string | null
+          fbc?: string | null
+          fbp?: string | null
+          gclid?: string | null
+          id?: string
+          id_empresa?: string | null
+          id_lead?: string | null
+          ip_address?: string | null
+          page_title?: string | null
+          page_url?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          custom_data?: Json | null
+          event_name?: string
+          event_timestamp?: string | null
+          fbc?: string | null
+          fbp?: string | null
+          gclid?: string | null
+          id?: string
+          id_empresa?: string | null
+          id_lead?: string | null
+          ip_address?: string | null
+          page_title?: string | null
+          page_url?: string | null
+          session_id?: string | null
+          user_agent?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stape_evento_id_lead_fkey"
+            columns: ["id_lead"]
+            isOneToOne: false
+            referencedRelation: "lead"
+            referencedColumns: ["id_lead"]
           },
         ]
       }
