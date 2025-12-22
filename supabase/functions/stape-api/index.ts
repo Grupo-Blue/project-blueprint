@@ -11,6 +11,8 @@ interface StapeApiRequest {
   /** Obrigatório para ações por-container (exceto test-connection) */
   container_id?: string;
   region?: "global" | "eu";
+  /** API key específica da empresa (opcional, fallback para env) */
+  api_key?: string;
   start_date?: string;
   end_date?: string;
   limit?: number;
@@ -26,19 +28,21 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseKey);
-  const stapeApiKey = Deno.env.get("STAPE_API_KEY");
 
   try {
+    const body: StapeApiRequest = await req.json();
+    const { action, container_id, region = "global", api_key, start_date, end_date, limit = 100 } = body;
+
+    // Usar api_key do body ou fallback para env
+    const stapeApiKey = api_key || Deno.env.get("STAPE_API_KEY");
+
     if (!stapeApiKey) {
-      console.error("[stape-api] STAPE_API_KEY não configurada");
+      console.error("[stape-api] API Key não fornecida nem configurada");
       return new Response(
-        JSON.stringify({ success: false, error: "STAPE_API_KEY não configurada" }),
+        JSON.stringify({ success: false, error: "API Key do Stape não configurada. Configure nas Integrações da empresa." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const body: StapeApiRequest = await req.json();
-    const { action, container_id, region = "global", start_date, end_date, limit = 100 } = body;
 
     // container_id só é obrigatório quando a ação é específica de um container
     const requiresContainer = action !== "test-connection";
@@ -52,9 +56,9 @@ serve(async (req) => {
     // Determinar URL base baseado na região (API v2 do Stape)
     const baseUrl = region === "eu" ? "https://api.app.eu.stape.io" : "https://api.app.stape.io";
 
-    // Auth do Stape: header Authorization com a API key (sem 'Bearer')
+    // Auth do Stape: tentar múltiplos formatos de autenticação
     const headers = {
-      Authorization: stapeApiKey,
+      Authorization: `Bearer ${stapeApiKey}`,
       "X-API-Key": stapeApiKey,
       "Content-Type": "application/json",
     };

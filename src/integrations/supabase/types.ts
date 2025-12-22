@@ -1015,6 +1015,56 @@ export type Database = {
           },
         ]
       }
+      empresa_stape_config: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          id: string
+          id_empresa: string
+          meta_capi_token: string | null
+          meta_pixel_id: string | null
+          stape_api_key: string | null
+          stape_container_id: string | null
+          stape_container_url: string | null
+          stape_region: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          id?: string
+          id_empresa: string
+          meta_capi_token?: string | null
+          meta_pixel_id?: string | null
+          stape_api_key?: string | null
+          stape_container_id?: string | null
+          stape_container_url?: string | null
+          stape_region?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          id?: string
+          id_empresa?: string
+          meta_capi_token?: string | null
+          meta_pixel_id?: string | null
+          stape_api_key?: string | null
+          stape_container_id?: string | null
+          stape_container_url?: string | null
+          stape_region?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "empresa_stape_config_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: true
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       hipotese_teste: {
         Row: {
           anexos: Json | null
