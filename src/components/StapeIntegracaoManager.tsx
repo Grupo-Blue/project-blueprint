@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Save, TestTube2, AlertCircle, ExternalLink, Copy, Check, Server, Wifi, WifiOff, BarChart3 } from "lucide-react";
+import { Save, TestTube2, AlertCircle, ExternalLink, Copy, Check, Server, Wifi, WifiOff, BarChart3, Key, KeyRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface StapeConfig {
@@ -19,7 +19,8 @@ interface StapeConfig {
   stape_container_url: string;
   stape_container_id: string;
   stape_region: "global" | "eu";
-  stape_api_key: string;
+  stape_account_api_key: string;
+  stape_container_api_key: string;
   ativo: boolean;
 }
 
@@ -40,7 +41,8 @@ export function StapeIntegracaoManager() {
     stape_container_url: "",
     stape_container_id: "",
     stape_region: "global",
-    stape_api_key: "",
+    stape_account_api_key: "",
+    stape_container_api_key: "",
     ativo: false,
   });
   const [loading, setLoading] = useState(true);
@@ -94,13 +96,14 @@ export function StapeIntegracaoManager() {
           stape_container_url: data.stape_container_url || "",
           stape_container_id: data.stape_container_id || "",
           stape_region: (data.stape_region as "global" | "eu") || "global",
-          stape_api_key: data.stape_api_key || "",
+          stape_account_api_key: data.stape_account_api_key || "",
+          stape_container_api_key: data.stape_container_api_key || "",
           ativo: data.ativo ?? false,
         });
 
-        // Se tem container_id e api_key, tentar buscar estatísticas
-        if (data.stape_container_id && data.stape_api_key) {
-          fetchStapeStats(data.stape_container_id, data.stape_region || "global", data.stape_api_key);
+        // Se tem container_id e account_api_key, tentar buscar estatísticas
+        if (data.stape_container_id && data.stape_account_api_key) {
+          fetchStapeStats(data.stape_container_id, data.stape_region || "global", data.stape_account_api_key);
         }
       } else {
         // Reset para nova empresa
@@ -111,7 +114,8 @@ export function StapeIntegracaoManager() {
           stape_container_url: "",
           stape_container_id: "",
           stape_region: "global",
-          stape_api_key: "",
+          stape_account_api_key: "",
+          stape_container_api_key: "",
           ativo: false,
         });
       }
@@ -130,7 +134,7 @@ export function StapeIntegracaoManager() {
           action: "statistics",
           container_id: containerId,
           region,
-          api_key: apiKey, // Passar a API key específica da empresa
+          api_key: apiKey,
         },
       });
 
@@ -166,7 +170,8 @@ export function StapeIntegracaoManager() {
         stape_container_url: config.stape_container_url || null,
         stape_container_id: config.stape_container_id || null,
         stape_region: config.stape_region,
-        stape_api_key: config.stape_api_key || null,
+        stape_account_api_key: config.stape_account_api_key || null,
+        stape_container_api_key: config.stape_container_api_key || null,
         ativo: true,
       };
 
@@ -191,9 +196,9 @@ export function StapeIntegracaoManager() {
       setConfig(prev => ({ ...prev, ativo: true }));
       toast.success("Configuração salva com sucesso!");
 
-      // Se tem container_id e api_key, buscar estatísticas
-      if (config.stape_container_id && config.stape_api_key) {
-        fetchStapeStats(config.stape_container_id, config.stape_region, config.stape_api_key);
+      // Se tem container_id e account_api_key, buscar estatísticas
+      if (config.stape_container_id && config.stape_account_api_key) {
+        fetchStapeStats(config.stape_container_id, config.stape_region, config.stape_account_api_key);
       }
     } catch (error: any) {
       console.error("Erro ao salvar:", error);
@@ -235,8 +240,8 @@ export function StapeIntegracaoManager() {
       return;
     }
 
-    if (!config.stape_api_key) {
-      toast.error("Preencha a API Key do Stape para testar a conexão");
+    if (!config.stape_account_api_key) {
+      toast.error("Preencha a Account API Key do Stape para testar a conexão");
       return;
     }
 
@@ -247,7 +252,7 @@ export function StapeIntegracaoManager() {
           action: "test-connection",
           container_id: config.stape_container_id,
           region: config.stape_region,
-          api_key: config.stape_api_key,
+          api_key: config.stape_account_api_key,
         },
       });
 
@@ -259,7 +264,16 @@ export function StapeIntegracaoManager() {
         toast.success("Conexão com API Stape estabelecida!");
       } else {
         setApiConnected(false);
-        toast.error("Falha na conexão: " + (data?.error || "Erro desconhecido"));
+        // Diagnóstico detalhado
+        let errorMessage = data?.error || "Erro desconhecido";
+        if (data?.stape_status_code === 401) {
+          errorMessage = "Chave inválida ou sem permissão. Verifique se você está usando a Account API Key (não Container API Key).";
+        } else if (data?.stape_status_code === 403) {
+          errorMessage = "Acesso negado. Verifique as permissões da API Key.";
+        } else if (data?.stape_status_code === 404) {
+          errorMessage = "Container não encontrado. Verifique o Container ID.";
+        }
+        toast.error("Falha na conexão: " + errorMessage);
       }
     } catch (error: any) {
       console.error("Erro ao testar API Stape:", error);
@@ -280,8 +294,6 @@ export function StapeIntegracaoManager() {
   if (loading && empresaSelecionada) {
     return <div className="p-4">Carregando...</div>;
   }
-
-  const nomeEmpresa = empresasPermitidas.find(e => e.id_empresa === empresaSelecionada)?.nome;
 
   return (
     <div className="space-y-6">
@@ -382,29 +394,38 @@ export function StapeIntegracaoManager() {
           {/* Configuração API Stape */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">API do Stape (Monitoramento)</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Key className="w-5 h-5" />
+                API do Stape (Monitoramento)
+              </CardTitle>
               <CardDescription>
                 Configure para acessar estatísticas, logs e analytics do container
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Alert className="bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800">
-                <AlertCircle className="h-4 w-4 text-purple-600" />
-                <AlertTitle className="text-purple-900 dark:text-purple-100">Onde obter esses valores</AlertTitle>
-                <AlertDescription className="text-purple-800 dark:text-purple-200 text-sm space-y-2">
-                  <p><strong>Container ID:</strong> Acesse <a href="https://stape.io/containers" target="_blank" rel="noopener noreferrer" className="underline">Stape Containers</a> → Clique no container → ID na URL</p>
-                  <p><strong>API Key:</strong> Acesse <a href="https://stape.io/account/api" target="_blank" rel="noopener noreferrer" className="underline">Stape API Settings</a> → Crie/copie sua API Key</p>
+              <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <AlertTitle className="text-amber-900 dark:text-amber-100">⚠️ Importante: Dois tipos de API Key</AlertTitle>
+                <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm space-y-2">
+                  <p>O Stape usa <strong>dois tipos diferentes</strong> de API Key:</p>
+                  <ul className="list-disc ml-4 space-y-1">
+                    <li><strong>Account API Key:</strong> Para monitoramento e estatísticas (formato: hash simples)</li>
+                    <li><strong>Container API Key:</strong> Para enviar eventos (formato: <code>sar:container_id:hash</code>)</li>
+                  </ul>
                 </AlertDescription>
               </Alert>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Container ID</Label>
+                  <Label>Container ID (Identifier)</Label>
                   <Input
                     value={config.stape_container_id}
                     onChange={(e) => setConfig(prev => ({ ...prev, stape_container_id: e.target.value }))}
-                    placeholder="abc123xyz"
+                    placeholder="uizvxhep"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Em <a href="https://stape.io/containers" target="_blank" rel="noopener noreferrer" className="underline">Stape Containers</a> → "Container identifier"
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Região do Container</Label>
@@ -416,34 +437,70 @@ export function StapeIntegracaoManager() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="global">Global (stape.io)</SelectItem>
-                      <SelectItem value="eu">Europa (eu.stape.io)</SelectItem>
+                      <SelectItem value="global">Global (US, SA East/Brazil, etc.)</SelectItem>
+                      <SelectItem value="eu">Europa (EU)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    SA East (Brazil), US, Asia = Global | Europa = EU
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Stape API Key *</Label>
+                <Label className="flex items-center gap-2">
+                  <Key className="w-4 h-4" />
+                  Account API Key (para monitoramento)
+                </Label>
                 <Input
                   type="password"
-                  value={config.stape_api_key}
-                  onChange={(e) => setConfig(prev => ({ ...prev, stape_api_key: e.target.value }))}
-                  placeholder="sua-api-key-do-stape"
+                  value={config.stape_account_api_key}
+                  onChange={(e) => setConfig(prev => ({ ...prev, stape_account_api_key: e.target.value }))}
+                  placeholder="5f7ba5b1ae2ddd6a621aaba5370279d02beb60ae"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Obtenha em <a href="https://stape.io/account/api" target="_blank" rel="noopener noreferrer" className="underline">stape.io/account/api</a>
+                  Obtenha em <a href="https://stape.io/account/api" target="_blank" rel="noopener noreferrer" className="underline">stape.io/account/api</a> → "Account API Key"
                 </p>
               </div>
 
               <Button 
                 variant="outline" 
                 onClick={handleTestApiConnection} 
-                disabled={testingApi || !config.stape_container_id || !config.stape_api_key}
+                disabled={testingApi || !config.stape_container_id || !config.stape_account_api_key}
               >
                 <Wifi className="w-4 h-4 mr-2" />
                 {testingApi ? "Testando..." : "Testar Conexão API"}
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* Configuração Container API Key */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <KeyRound className="w-5 h-5" />
+                Container API Key (para eventos)
+              </CardTitle>
+              <CardDescription>
+                Usada para enviar eventos server-side via webhook
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4" />
+                  Container API Key
+                </Label>
+                <Input
+                  type="password"
+                  value={config.stape_container_api_key}
+                  onChange={(e) => setConfig(prev => ({ ...prev, stape_container_api_key: e.target.value }))}
+                  placeholder="sar:uizvxhep:fc3820b201c3eb42c8361b085799847783e1c389uizvxhep"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Em <a href="https://stape.io/containers" target="_blank" rel="noopener noreferrer" className="underline">Stape Containers</a> → Selecione o container → "Container API Key" (formato: <code>sar:xxx:xxx</code>)
+                </p>
+              </div>
             </CardContent>
           </Card>
 
@@ -456,10 +513,10 @@ export function StapeIntegracaoManager() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-                <AlertCircle className="h-4 w-4 text-amber-600" />
-                <AlertTitle className="text-amber-900 dark:text-amber-100">Onde obter esses valores</AlertTitle>
-                <AlertDescription className="text-amber-800 dark:text-amber-200 text-sm space-y-2">
+              <Alert className="bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800">
+                <AlertCircle className="h-4 w-4 text-purple-600" />
+                <AlertTitle className="text-purple-900 dark:text-purple-100">Onde obter esses valores</AlertTitle>
+                <AlertDescription className="text-purple-800 dark:text-purple-200 text-sm space-y-2">
                   <p><strong>META_PIXEL_ID:</strong> Events Manager → Selecione seu Pixel → ID no topo</p>
                   <p><strong>META_CAPI_TOKEN:</strong> Pixel → Configurações → Conversions API → "Gerar Token de Acesso"</p>
                 </AlertDescription>

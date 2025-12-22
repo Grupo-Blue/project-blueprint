@@ -18,15 +18,23 @@ interface StapeApiStats {
 }
 
 export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
-  // Configuração local do Stape
-  const stapeConfig = (() => {
-    try {
-      const saved = localStorage.getItem("stape_config");
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  })();
+  // Buscar configuração Stape do banco
+  const { data: stapeConfig } = useQuery({
+    queryKey: ["stape-config", empresaId],
+    queryFn: async () => {
+      if (!empresaId) return null;
+      
+      const { data } = await supabase
+        .from("empresa_stape_config")
+        .select("stape_container_id, stape_region, stape_account_api_key, ativo")
+        .eq("id_empresa", empresaId)
+        .eq("ativo", true)
+        .maybeSingle();
+      
+      return data;
+    },
+    enabled: !!empresaId,
+  });
 
   // Buscar dados internos do banco
   const { data: internalData, isLoading: loadingInternal } = useQuery({
@@ -141,24 +149,25 @@ export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
     refetchInterval: 60000,
   });
 
-  // Buscar dados da API Stape (se configurado)
+  // Buscar dados da API Stape (se configurado com Account API Key)
   const { data: apiData, isLoading: loadingApi, refetch: refetchApi } = useQuery({
-    queryKey: ["stape-health-api", stapeConfig?.stape_container_id],
+    queryKey: ["stape-health-api", stapeConfig?.stape_container_id, stapeConfig?.stape_account_api_key],
     queryFn: async () => {
-      if (!stapeConfig?.stape_container_id) return null;
+      if (!stapeConfig?.stape_container_id || !stapeConfig?.stape_account_api_key) return null;
 
       const { data, error } = await supabase.functions.invoke("stape-api", {
         body: {
           action: "statistics",
           container_id: stapeConfig.stape_container_id,
           region: stapeConfig.stape_region || "global",
+          api_key: stapeConfig.stape_account_api_key,
         },
       });
 
       if (error || !data?.success) return null;
       return data.data as StapeApiStats;
     },
-    enabled: !!stapeConfig?.stape_container_id,
+    enabled: !!stapeConfig?.stape_container_id && !!stapeConfig?.stape_account_api_key,
     refetchInterval: 300000, // 5 minutos
   });
 

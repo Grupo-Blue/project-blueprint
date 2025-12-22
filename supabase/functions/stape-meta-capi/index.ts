@@ -22,17 +22,6 @@ serve(async (req) => {
   const startTime = Date.now();
 
   try {
-    const META_PIXEL_ID = Deno.env.get("META_PIXEL_ID");
-    const META_CAPI_TOKEN = Deno.env.get("META_CAPI_TOKEN");
-
-    if (!META_PIXEL_ID || !META_CAPI_TOKEN) {
-      console.error("❌ META_PIXEL_ID ou META_CAPI_TOKEN não configurados");
-      return new Response(
-        JSON.stringify({ error: "Meta CAPI não configurado" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -41,7 +30,7 @@ serve(async (req) => {
     console.log("📥 Meta CAPI request:", JSON.stringify(payload, null, 2));
 
     const {
-      event_name, // Lead, CompleteRegistration, Purchase, etc.
+      event_name,
       event_time,
       event_source_url,
       action_source = "website",
@@ -67,12 +56,40 @@ serve(async (req) => {
       content_type,
       // Para deduplicação
       event_id,
+      // Empresa para buscar credenciais
+      id_empresa,
     } = payload;
 
     if (!event_name) {
       return new Response(
         JSON.stringify({ error: "event_name é obrigatório" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Buscar credenciais Meta da empresa (se id_empresa fornecido)
+    let META_PIXEL_ID = Deno.env.get("META_PIXEL_ID");
+    let META_CAPI_TOKEN = Deno.env.get("META_CAPI_TOKEN");
+
+    if (id_empresa) {
+      const { data: config } = await supabase
+        .from("empresa_stape_config")
+        .select("meta_pixel_id, meta_capi_token")
+        .eq("id_empresa", id_empresa)
+        .eq("ativo", true)
+        .maybeSingle();
+
+      if (config?.meta_pixel_id && config?.meta_capi_token) {
+        META_PIXEL_ID = config.meta_pixel_id;
+        META_CAPI_TOKEN = config.meta_capi_token;
+      }
+    }
+
+    if (!META_PIXEL_ID || !META_CAPI_TOKEN) {
+      console.error("❌ META_PIXEL_ID ou META_CAPI_TOKEN não configurados");
+      return new Response(
+        JSON.stringify({ error: "Meta CAPI não configurado" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -142,6 +159,7 @@ serve(async (req) => {
         has_email: !!email,
         has_fbp: !!fbp,
         has_fbc: !!fbc,
+        id_empresa,
       },
       mensagem_erro: metaResponse.ok ? null : JSON.stringify(metaResult),
     });
