@@ -20,6 +20,8 @@ import { AlertasAnomalias } from "@/components/dashboard/AlertasAnomalias";
 import { PacingOrcamento } from "@/components/dashboard/PacingOrcamento";
 import { TempoCiclo } from "@/components/dashboard/TempoCiclo";
 import { MetricasMultiRede } from "@/components/dashboard/MetricasMultiRede";
+import { StapeHealthWidget } from "@/components/dashboard/StapeHealthWidget";
+import { ServerSideComparison } from "@/components/dashboard/ServerSideComparison";
 
 const Dashboard = () => {
   const { getDataReferencia, tipoFiltro, labelPeriodo } = usePeriodo();
@@ -205,6 +207,20 @@ const Dashboard = () => {
       <div className="mb-6 md:mb-8">
         <TrackingScore empresaId={empresaIdQuery || undefined} />
       </div>
+
+      {/* Stape Health - Monitoramento Server-Side */}
+      {empresaIdQuery && (
+        <div className="mb-6 md:mb-8">
+          <StapeHealthWidget empresaId={empresaIdQuery} />
+        </div>
+      )}
+
+      {/* Comparativo Server-Side vs Client-Side */}
+      {empresaIdQuery && (
+        <div className="mb-6 md:mb-8">
+          <ServerSideComparison empresaId={empresaIdQuery} />
+        </div>
+      )}
 
       {/* FASE 2: Alertas de Anomalias */}
       {empresaIdQuery && (
