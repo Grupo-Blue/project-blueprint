@@ -62,29 +62,7 @@ export default function Relatorios() {
     },
   });
 
-  // Buscar project_ids únicos do array tokeniza_projetos dos leads investidores
-  const { data: projectIdsLeads } = useQuery({
-    queryKey: ["tokeniza-project-ids-leads-array"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("lead")
-        .select("tokeniza_projetos")
-        .eq("tokeniza_investidor", true);
-      if (error) throw error;
-      
-      // Extrair todos os project_ids únicos do array tokeniza_projetos
-      const allProjectIds = new Set<string>();
-      data?.forEach(lead => {
-        if (lead.tokeniza_projetos && Array.isArray(lead.tokeniza_projetos)) {
-          lead.tokeniza_projetos.forEach((pid: string) => {
-            if (pid) allProjectIds.add(pid);
-          });
-        }
-      });
-      
-      return Array.from(allProjectIds);
-    },
-  });
+  // Removido: busca de project_ids dos leads - usar apenas projetosTokeniza cadastrados
 
   const handleExportLeads = async () => {
     if (!ofertaSelecionada) {
@@ -234,27 +212,8 @@ export default function Relatorios() {
     }
   };
 
-  // Consolidar ofertas (projetos cadastrados + project_ids dos leads) - sem duplicatas
-  const ofertasDisponiveis = (() => {
-    const mapa = new Map<string, string>();
-    
-    // Adicionar projetos cadastrados com seus nomes
-    projetosTokeniza?.forEach(p => {
-      mapa.set(p.project_id, p.nome || p.project_id);
-    });
-    
-    // Adicionar project_ids dos leads que não estão cadastrados (mostrar ID)
-    projectIdsLeads?.forEach(pid => {
-      if (!mapa.has(pid)) {
-        mapa.set(pid, `Projeto ${pid.substring(0, 8)}...`);
-      }
-    });
-    
-    // Ordenar por nome
-    return Array.from(mapa.entries())
-      .map(([id, nome]) => ({ project_id: id, nome }))
-      .sort((a, b) => a.nome.localeCompare(b.nome));
-  })();
+  // Lista de ofertas: usar apenas projetos cadastrados na tabela tokeniza_projeto
+  const ofertasDisponiveis = projetosTokeniza || [];
 
   const { data: relatorios, isLoading } = useQuery({
     queryKey: ["relatorios", filtroStatus, filtroEmpresa],
