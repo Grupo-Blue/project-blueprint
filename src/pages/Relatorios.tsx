@@ -252,9 +252,7 @@ export default function Relatorios() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-4xl font-bold text-foreground">Relatórios</h1>
-            <p className="text-muted-foreground mt-2">
-              Gerencie e visualize os relatórios de desempenho semanais
-            </p>
+            <p className="text-muted-foreground mt-2">Gerencie e visualize os relatórios de desempenho</p>
           </div>
           <Button onClick={() => navigate("/relatorios/novo")}>
             <Plus className="mr-2 h-4 w-4" />
