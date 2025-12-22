@@ -8,7 +8,8 @@ const corsHeaders = {
 
 interface StapeApiRequest {
   action: "statistics" | "statistics-by-day" | "logs" | "test-connection" | "container-info";
-  container_id: string;
+  /** Obrigatório para ações por-container (exceto test-connection) */
+  container_id?: string;
   region?: "global" | "eu";
   start_date?: string;
   end_date?: string;
@@ -39,7 +40,9 @@ serve(async (req) => {
     const body: StapeApiRequest = await req.json();
     const { action, container_id, region = "global", start_date, end_date, limit = 100 } = body;
 
-    if (!container_id) {
+    // container_id só é obrigatório quando a ação é específica de um container
+    const requiresContainer = action !== "test-connection";
+    if (requiresContainer && !container_id) {
       return new Response(
         JSON.stringify({ success: false, error: "container_id é obrigatório" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -47,12 +50,12 @@ serve(async (req) => {
     }
 
     // Determinar URL base baseado na região (API v2 do Stape)
-    const baseUrl = region === "eu" 
-      ? "https://api.app.eu.stape.io" 
-      : "https://api.app.stape.io";
+    const baseUrl = region === "eu" ? "https://api.app.eu.stape.io" : "https://api.app.stape.io";
 
+    // Auth do Stape: header Authorization com a API key (sem 'Bearer')
     const headers = {
-      "Authorization": `Bearer ${stapeApiKey}`,
+      Authorization: stapeApiKey,
+      "X-API-Key": stapeApiKey,
       "Content-Type": "application/json",
     };
 
