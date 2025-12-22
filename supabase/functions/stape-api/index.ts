@@ -74,51 +74,6 @@ serve(async (req) => {
     // SA East (Brazil), US, Asia = Global | Europa = EU
     const baseUrl = region === "eu" ? "https://api.app.eu.stape.io" : "https://api.app.stape.io";
 
-    // Auth do Stape: tentar múltiplos formatos
-    const headerCandidates: Array<{ mode: string; headers: Record<string, string> }> = [
-      {
-        mode: "authorization_bearer",
-        headers: {
-          Authorization: `Bearer ${stapeAccountApiKey}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      },
-      {
-        mode: "authorization_raw",
-        headers: {
-          Authorization: stapeAccountApiKey,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      },
-      {
-        mode: "authorization_apikey",
-        headers: {
-          Authorization: `ApiKey ${stapeAccountApiKey}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      },
-      {
-        mode: "x_api_key_only",
-        headers: {
-          "X-API-Key": stapeAccountApiKey,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      },
-      {
-        mode: "x_api_key_and_bearer",
-        headers: {
-          Authorization: `Bearer ${stapeAccountApiKey}`,
-          "X-API-Key": stapeAccountApiKey,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-      },
-    ];
-
     let endpoint = "";
     let queryParams = "";
 
@@ -129,13 +84,13 @@ serve(async (req) => {
         break;
 
       case "statistics":
-        // Endpoint de analytics do container
-        endpoint = `/api/v2/containers/${container_id}/analytics/info`;
+        // Endpoint correto de estatísticas do container (documentação Swagger)
+        endpoint = `/api/v2/containers/${container_id}/statistics`;
         break;
 
       case "statistics-by-day":
-        // Uso de analytics com clientes por período
-        endpoint = `/api/v2/containers/${container_id}/analytics/clients`;
+        // Estatísticas por dia
+        endpoint = `/api/v2/containers/${container_id}/statistics-by-day`;
         if (start_date || end_date) {
           const params = new URLSearchParams();
           if (start_date) params.append("start_date", start_date);
@@ -169,39 +124,59 @@ serve(async (req) => {
     const fullUrl = `${baseUrl}${endpoint}${queryParams}`;
     console.log(`[stape-api] Chamando: ${fullUrl}`);
 
-    let response: Response | null = null;
-    let authModeUsed: string | null = null;
-    let attempts: Array<{ mode: string; status: number }> = [];
+    // Tentar múltiplos formatos de autenticação
+    const authMethods: Array<{ name: string; headers: Record<string, string> }> = [
+      { name: "Bearer", headers: { "Authorization": `Bearer ${stapeAccountApiKey}`, "Content-Type": "application/json", "Accept": "application/json" } },
+      { name: "ApiKey", headers: { "Authorization": `ApiKey ${stapeAccountApiKey}`, "Content-Type": "application/json", "Accept": "application/json" } },
+      { name: "Direct", headers: { "Authorization": stapeAccountApiKey, "Content-Type": "application/json", "Accept": "application/json" } },
+      { name: "X-Api-Key", headers: { "X-Api-Key": stapeAccountApiKey, "Content-Type": "application/json", "Accept": "application/json" } },
+      { name: "api-key header", headers: { "api-key": stapeAccountApiKey, "Content-Type": "application/json", "Accept": "application/json" } },
+    ];
 
-    for (const candidate of headerCandidates) {
+    let response: Response | null = null;
+    let successfulMethod = "";
+    const attempts: Array<{ method: string; status: number; body?: string }> = [];
+
+    for (const auth of authMethods) {
+      console.log(`[stape-api] Tentando auth: ${auth.name}`);
+      
       const res = await fetch(fullUrl, {
         method: "GET",
-        headers: candidate.headers,
+        headers: auth.headers,
       });
 
-      authModeUsed = candidate.mode;
-      attempts.push({ mode: candidate.mode, status: res.status });
+      const bodyText = await res.text();
+      attempts.push({ method: auth.name, status: res.status, body: bodyText.substring(0, 200) });
 
-      // Se funcionou, paramos
       if (res.ok) {
-        response = res;
+        response = new Response(bodyText, { status: res.status, headers: res.headers });
+        successfulMethod = auth.name;
+        console.log(`[stape-api] Auth bem-sucedida: ${auth.name}`);
         break;
       }
 
-      // Se não funcionou e é 401/403, tentamos outro formato de auth
+      // Se for 401/403, continuar tentando
       if (res.status === 401 || res.status === 403) {
-        console.warn(`[stape-api] Auth falhou (${candidate.mode}) -> ${res.status}`);
-        response = res;
+        console.warn(`[stape-api] Auth falhou (${auth.name}): ${res.status}`);
         continue;
       }
 
-      // Outros erros (400/404/500...) não valem retry de auth
-      response = res;
+      // Outros erros (404, 500, etc.) não valem retry
+      response = new Response(bodyText, { status: res.status, headers: res.headers });
       break;
     }
 
     if (!response) {
-      throw new Error("Falha ao chamar API do Stape (sem resposta)");
+      // Todas as tentativas falharam com 401/403
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Todas as tentativas de autenticação falharam",
+          attempts,
+          hint: "Verifique se a Account API Key está correta. A chave deve ser criada em stape.io -> Account Settings -> API Keys.",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const responseText = await response.text();
@@ -224,10 +199,8 @@ serve(async (req) => {
         action,
         container_id,
         region,
-        stape_auth_mode: authModeUsed,
         status_code: response.status,
         success: response.ok,
-        attempts_count: attempts.length,
       },
       mensagem_erro: response.ok ? null : responseText.substring(0, 500),
     });
@@ -238,7 +211,7 @@ serve(async (req) => {
       
       let errorHint = "";
       if (response.status === 401) {
-        errorHint = "Verifique se você está usando a Account API Key (não Container API Key) e se a região está correta.";
+        errorHint = "Verifique se você está usando a Account API Key correta. A chave deve ser criada em stape.io -> Account Settings -> API Keys.";
       } else if (response.status === 403) {
         errorHint = "A API Key não tem permissão. Verifique as configurações no Stape.";
       } else if (response.status === 404) {
@@ -252,7 +225,7 @@ serve(async (req) => {
           stape_status_code: response.status,
           hint: errorHint,
           details: responseData,
-          attempts,
+          request_url: fullUrl,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
