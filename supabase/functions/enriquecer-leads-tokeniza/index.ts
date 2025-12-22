@@ -140,8 +140,13 @@ async function enrichLeadByEmail(supabase: any, email: string, id_lead?: string)
     }
 
     // 4. Calcular métricas
-    const investimentosFinished = (investimentos || []).filter((i: any) => i.status === 'FINISHED');
-    const investimentosPendentes = (investimentos || []).filter((i: any) => i.status === 'CREATED');
+    // Considera como investimento válido: FINISHED, PAID, ou was_paid = true
+    const investimentosFinished = (investimentos || []).filter((i: any) => 
+      i.status === 'FINISHED' || i.status === 'PAID' || i.was_paid === true
+    );
+    const investimentosPendentes = (investimentos || []).filter((i: any) => 
+      i.status === 'CREATED' && !i.was_paid
+    );
     
     const valorInvestido = investimentosFinished.reduce((sum: number, i: any) => sum + (Number(i.amount) || 0), 0);
     const qtdInvestimentos = investimentosFinished.length;
