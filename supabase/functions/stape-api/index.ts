@@ -144,15 +144,19 @@ serve(async (req) => {
       mensagem_erro: response.ok ? null : responseText.substring(0, 500),
     });
 
+    // Importante: não propagar o status HTTP do Stape para o cliente.
+    // Quando retornamos 401/403/etc, o supabase-js lança FunctionsHttpError ("non-2xx"),
+    // o que quebra o fluxo do frontend. Em vez disso, retornamos 200 e sinalizamos erro no payload.
     if (!response.ok) {
       console.error(`[stape-api] Erro na API Stape: ${response.status}`, responseText);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
+        JSON.stringify({
+          success: false,
           error: `Erro na API Stape: ${response.status}`,
-          details: responseData 
+          stape_status_code: response.status,
+          details: responseData,
         }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
