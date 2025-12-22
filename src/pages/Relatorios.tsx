@@ -105,10 +105,7 @@ export default function Relatorios() {
           tokeniza_valor_investido,
           tokeniza_qtd_investimentos,
           tokeniza_primeiro_investimento,
-          tokeniza_ultimo_investimento,
-          cidade_mautic,
-          estado_mautic,
-          data_criacao
+          tokeniza_ultimo_investimento
         `)
         .eq("tokeniza_investidor", true)
         .filter("tokeniza_projetos", "cs", `["${ofertaSelecionada}"]`)
@@ -121,7 +118,7 @@ export default function Relatorios() {
         return;
       }
 
-      // Criar CSV
+      // Criar CSV com apenas os campos solicitados
       const headers = [
         "Nome",
         "Email",
@@ -129,10 +126,7 @@ export default function Relatorios() {
         "Valor Investido",
         "Qtd Investimentos",
         "Primeiro Investimento",
-        "Último Investimento",
-        "Cidade",
-        "Estado",
-        "Data Criação"
+        "Último Investimento"
       ];
 
       const rows = leads.map(lead => [
@@ -142,10 +136,7 @@ export default function Relatorios() {
         lead.tokeniza_valor_investido?.toString() || "0",
         lead.tokeniza_qtd_investimentos?.toString() || "0",
         lead.tokeniza_primeiro_investimento ? format(new Date(lead.tokeniza_primeiro_investimento), "dd/MM/yyyy") : "",
-        lead.tokeniza_ultimo_investimento ? format(new Date(lead.tokeniza_ultimo_investimento), "dd/MM/yyyy") : "",
-        lead.cidade_mautic || "",
-        lead.estado_mautic || "",
-        lead.data_criacao ? format(new Date(lead.data_criacao), "dd/MM/yyyy") : ""
+        lead.tokeniza_ultimo_investimento ? format(new Date(lead.tokeniza_ultimo_investimento), "dd/MM/yyyy") : ""
       ]);
 
       const csvContent = [
