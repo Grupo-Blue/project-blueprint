@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Package, Check, AlertCircle, Save, RefreshCw, Search } from "lucide-react";
+import { Package, Check, AlertCircle, Save, RefreshCw, Search, Copy } from "lucide-react";
 
 interface ProjetoComContagem {
   project_id: string;
@@ -250,7 +250,21 @@ export function TokenizaProjetosManager() {
                   {projetosFiltrados.map((projeto) => (
                     <TableRow key={projeto.project_id}>
                       <TableCell className="font-mono text-xs">
-                        {projeto.project_id.substring(0, 8)}...
+                        <div className="flex items-center gap-1">
+                          <span title={projeto.project_id}>{projeto.project_id.substring(0, 8)}...</span>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6"
+                            onClick={() => {
+                              navigator.clipboard.writeText(projeto.project_id);
+                              toast.success("Project ID copiado!");
+                            }}
+                            title="Copiar Project ID completo"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Input
