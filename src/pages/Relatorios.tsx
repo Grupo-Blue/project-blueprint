@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, Calendar, AlertCircle } from "lucide-react";
+import { FileText, Plus, Calendar, AlertCircle, Download, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
 
 interface Relatorio {
   id_relatorio: string;
@@ -34,6 +35,8 @@ export default function Relatorios() {
   const navigate = useNavigate();
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroEmpresa, setFiltroEmpresa] = useState<string>("todas");
+  const [ofertaSelecionada, setOfertaSelecionada] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data: empresas } = useQuery({
     queryKey: ["empresas"],
@@ -45,6 +48,143 @@ export default function Relatorios() {
       return data;
     },
   });
+
+  // Buscar projetos Tokeniza
+  const { data: projetosTokeniza } = useQuery({
+    queryKey: ["tokeniza-projetos-relatorios"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tokeniza_projeto")
+        .select("project_id, nome")
+        .order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Buscar project_ids únicos dos leads investidores
+  const { data: projectIdsLeads } = useQuery({
+    queryKey: ["tokeniza-project-ids-leads"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lead")
+        .select("tokeniza_projeto_nome")
+        .eq("tokeniza_investidor", true)
+        .not("tokeniza_projeto_nome", "is", null);
+      if (error) throw error;
+      
+      // Extrair project_ids únicos
+      const uniqueProjectIds = [...new Set(data?.map(l => l.tokeniza_projeto_nome).filter(Boolean))];
+      return uniqueProjectIds;
+    },
+  });
+
+  const handleExportLeads = async () => {
+    if (!ofertaSelecionada) {
+      toast.error("Selecione uma oferta primeiro");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const { data: leads, error } = await supabase
+        .from("lead")
+        .select(`
+          nome_lead,
+          email,
+          telefone,
+          tokeniza_valor_investido,
+          tokeniza_qtd_investimentos,
+          tokeniza_primeiro_investimento,
+          tokeniza_ultimo_investimento,
+          cidade_mautic,
+          estado_mautic,
+          data_criacao
+        `)
+        .eq("tokeniza_investidor", true)
+        .eq("tokeniza_projeto_nome", ofertaSelecionada)
+        .order("tokeniza_valor_investido", { ascending: false });
+
+      if (error) throw error;
+
+      if (!leads || leads.length === 0) {
+        toast.warning("Nenhum lead investidor encontrado para esta oferta");
+        return;
+      }
+
+      // Criar CSV
+      const headers = [
+        "Nome",
+        "Email",
+        "Telefone",
+        "Valor Investido",
+        "Qtd Investimentos",
+        "Primeiro Investimento",
+        "Último Investimento",
+        "Cidade",
+        "Estado",
+        "Data Criação"
+      ];
+
+      const rows = leads.map(lead => [
+        lead.nome_lead || "",
+        lead.email || "",
+        lead.telefone || "",
+        lead.tokeniza_valor_investido?.toString() || "0",
+        lead.tokeniza_qtd_investimentos?.toString() || "0",
+        lead.tokeniza_primeiro_investimento ? format(new Date(lead.tokeniza_primeiro_investimento), "dd/MM/yyyy") : "",
+        lead.tokeniza_ultimo_investimento ? format(new Date(lead.tokeniza_ultimo_investimento), "dd/MM/yyyy") : "",
+        lead.cidade_mautic || "",
+        lead.estado_mautic || "",
+        lead.data_criacao ? format(new Date(lead.data_criacao), "dd/MM/yyyy") : ""
+      ]);
+
+      const csvContent = [
+        headers.join(";"),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))
+      ].join("\n");
+
+      // Download
+      const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      
+      const nomeOferta = projetosTokeniza?.find(p => p.project_id === ofertaSelecionada)?.nome || ofertaSelecionada;
+      link.download = `investidores_${nomeOferta.replace(/[^a-zA-Z0-9]/g, "_")}_${format(new Date(), "yyyy-MM-dd")}.csv`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`${leads.length} leads exportados com sucesso`);
+    } catch (error) {
+      console.error("Erro ao exportar:", error);
+      toast.error("Erro ao exportar leads");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Consolidar ofertas (projetos cadastrados + project_ids dos leads)
+  const ofertasDisponiveis = (() => {
+    const mapa = new Map<string, string>();
+    
+    // Adicionar projetos cadastrados
+    projetosTokeniza?.forEach(p => {
+      mapa.set(p.project_id, p.nome || p.project_id);
+    });
+    
+    // Adicionar project_ids dos leads que não estão cadastrados
+    projectIdsLeads?.forEach(pid => {
+      if (!mapa.has(pid)) {
+        mapa.set(pid, pid);
+      }
+    });
+    
+    return Array.from(mapa.entries()).map(([id, nome]) => ({ project_id: id, nome }));
+  })();
 
   const { data: relatorios, isLoading } = useQuery({
     queryKey: ["relatorios", filtroStatus, filtroEmpresa],
@@ -138,6 +278,44 @@ export default function Relatorios() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Exportar Leads Investidores */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Exportar Leads Investidores
+            </CardTitle>
+            <CardDescription>
+              Selecione uma oferta Tokeniza para exportar a lista de investidores
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <Select value={ofertaSelecionada} onValueChange={setOfertaSelecionada}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma oferta..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ofertasDisponiveis.map((oferta) => (
+                      <SelectItem key={oferta.project_id} value={oferta.project_id}>
+                        {oferta.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button 
+                onClick={handleExportLeads} 
+                disabled={!ofertaSelecionada || isExporting}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {isExporting ? "Exportando..." : "Exportar CSV"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6">
           {relatorios?.map((relatorio) => (
