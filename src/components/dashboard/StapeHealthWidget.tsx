@@ -1,18 +1,36 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, AlertCircle, Server, Activity, Link2, Zap } from "lucide-react";
-import { format, subDays, subHours } from "date-fns";
+import { CheckCircle2, XCircle, AlertCircle, Server, Activity, Link2, Zap, Wifi, WifiOff, RefreshCw } from "lucide-react";
+import { subDays, subHours } from "date-fns";
+import { Button } from "@/components/ui/button";
 
 interface StapeHealthWidgetProps {
   empresaId?: string;
 }
 
+interface StapeApiStats {
+  total_requests?: number;
+  successful_requests?: number;
+  failed_requests?: number;
+  requests_by_day?: Array<{ date: string; count: number }>;
+}
+
 export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
-  const { data, isLoading } = useQuery({
-    queryKey: ["stape-health", empresaId],
+  // Configuração local do Stape
+  const stapeConfig = (() => {
+    try {
+      const saved = localStorage.getItem("stape_config");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  // Buscar dados internos do banco
+  const { data: internalData, isLoading: loadingInternal } = useQuery({
+    queryKey: ["stape-health-internal", empresaId],
     queryFn: async () => {
       const agora = new Date();
       const ultimas24h = subHours(agora, 24);
@@ -68,7 +86,6 @@ export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
 
       const { data: leads, count: totalLeads } = await leadsQuery;
 
-      // Leads com dados Stape
       const leadsComStape = leads?.filter(l => l.stape_client_id !== null).length || 0;
       const leadsComFbp = leads?.filter(l => l.stape_fbp !== null).length || 0;
       const leadsComGclid = leads?.filter(l => l.stape_gclid !== null).length || 0;
@@ -121,8 +138,31 @@ export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
         taxaMatch,
       };
     },
-    refetchInterval: 60000, // Atualiza a cada minuto
+    refetchInterval: 60000,
   });
+
+  // Buscar dados da API Stape (se configurado)
+  const { data: apiData, isLoading: loadingApi, refetch: refetchApi } = useQuery({
+    queryKey: ["stape-health-api", stapeConfig?.stape_container_id],
+    queryFn: async () => {
+      if (!stapeConfig?.stape_container_id) return null;
+
+      const { data, error } = await supabase.functions.invoke("stape-api", {
+        body: {
+          action: "statistics",
+          container_id: stapeConfig.stape_container_id,
+          region: stapeConfig.stape_region || "global",
+        },
+      });
+
+      if (error || !data?.success) return null;
+      return data.data as StapeApiStats;
+    },
+    enabled: !!stapeConfig?.stape_container_id,
+    refetchInterval: 300000, // 5 minutos
+  });
+
+  const isLoading = loadingInternal || loadingApi;
 
   if (isLoading) {
     return (
@@ -154,6 +194,8 @@ export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
     return <XCircle className="h-4 w-4 text-red-500" />;
   };
 
+  const apiConnected = !!apiData;
+
   return (
     <Card>
       <CardHeader className="p-3 md:p-6">
@@ -163,31 +205,68 @@ export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
               <Server className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               Stape Server-Side
             </CardTitle>
-            <CardDescription className="text-xs md:text-sm">
+            <CardDescription className="text-xs md:text-sm flex items-center gap-2">
               Tracking via GTM Server
+              {stapeConfig?.stape_container_id && (
+                <Badge variant={apiConnected ? "default" : "secondary"} className="text-xs">
+                  {apiConnected ? <Wifi className="w-3 h-3 mr-1" /> : <WifiOff className="w-3 h-3 mr-1" />}
+                  API
+                </Badge>
+              )}
             </CardDescription>
           </div>
-          <Badge variant={data?.eventos24h && data.eventos24h > 0 ? "default" : "secondary"} className="shrink-0">
-            {data?.eventos24h || 0} eventos/24h
-          </Badge>
+          <div className="flex items-center gap-2 shrink-0">
+            {stapeConfig?.stape_container_id && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => refetchApi()}>
+                <RefreshCw className="h-3 w-3" />
+              </Button>
+            )}
+            <Badge variant={internalData?.eventos24h && internalData.eventos24h > 0 ? "default" : "secondary"}>
+              {internalData?.eventos24h || 0} eventos/24h
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-3 md:p-6 pt-0 md:pt-0 space-y-4">
-        {/* Eventos recebidos */}
+        {/* Dados da API Stape (se conectado) */}
+        {apiConnected && apiData && (
+          <div className="bg-primary/5 rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-primary">
+              <Wifi className="h-3 w-3" />
+              Dados da API Stape
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className="text-lg font-bold">{apiData.total_requests || 0}</div>
+                <div className="text-xs text-muted-foreground">Total</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-green-600">{apiData.successful_requests || 0}</div>
+                <div className="text-xs text-muted-foreground">Sucesso</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-red-600">{apiData.failed_requests || 0}</div>
+                <div className="text-xs text-muted-foreground">Erros</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Eventos recebidos (dados internos) */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-secondary/50 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1">
               <Activity className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Últimas 24h</span>
             </div>
-            <div className="text-lg md:text-xl font-bold">{data?.eventos24h || 0}</div>
+            <div className="text-lg md:text-xl font-bold">{internalData?.eventos24h || 0}</div>
           </div>
           <div className="bg-secondary/50 rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1">
               <Zap className="h-4 w-4 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Últimos 7 dias</span>
             </div>
-            <div className="text-lg md:text-xl font-bold">{data?.eventos7d || 0}</div>
+            <div className="text-lg md:text-xl font-bold">{internalData?.eventos7d || 0}</div>
           </div>
         </div>
 
@@ -198,43 +277,43 @@ export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                {getStatusIcon(data?.percentStape || 0)}
+                {getStatusIcon(internalData?.percentStape || 0)}
                 <span className="text-xs md:text-sm truncate">Com dados Stape</span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="text-xs text-muted-foreground">
-                  {data?.leadsComStape || 0}/{data?.totalLeads || 0}
+                  {internalData?.leadsComStape || 0}/{internalData?.totalLeads || 0}
                 </span>
                 <Badge variant="secondary" className="min-w-[50px] justify-center text-xs">
-                  {(data?.percentStape || 0).toFixed(0)}%
+                  {(internalData?.percentStape || 0).toFixed(0)}%
                 </Badge>
               </div>
             </div>
             <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
               <div
-                className={`h-full transition-all ${getProgressColor(data?.percentStape || 0)}`}
-                style={{ width: `${data?.percentStape || 0}%` }}
+                className={`h-full transition-all ${getProgressColor(internalData?.percentStape || 0)}`}
+                style={{ width: `${internalData?.percentStape || 0}%` }}
               />
             </div>
           </div>
 
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              {getStatusIcon(data?.percentFbp || 0)}
+              {getStatusIcon(internalData?.percentFbp || 0)}
               <span className="text-xs md:text-sm truncate">Com Facebook ID (fbp)</span>
             </div>
             <Badge variant="secondary" className="min-w-[50px] justify-center text-xs">
-              {(data?.percentFbp || 0).toFixed(0)}%
+              {(internalData?.percentFbp || 0).toFixed(0)}%
             </Badge>
           </div>
 
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              {getStatusIcon(data?.percentGclid || 0)}
+              {getStatusIcon(internalData?.percentGclid || 0)}
               <span className="text-xs md:text-sm truncate">Com Google Click ID</span>
             </div>
             <Badge variant="secondary" className="min-w-[50px] justify-center text-xs">
-              {(data?.percentGclid || 0).toFixed(0)}%
+              {(internalData?.percentGclid || 0).toFixed(0)}%
             </Badge>
           </div>
         </div>
@@ -247,23 +326,23 @@ export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
               <span className="text-xs md:text-sm">Match Eventos → Leads</span>
             </div>
             <Badge 
-              variant={data?.taxaMatch && data.taxaMatch >= 30 ? "default" : "secondary"}
+              variant={internalData?.taxaMatch && internalData.taxaMatch >= 30 ? "default" : "secondary"}
               className="text-xs"
             >
-              {(data?.taxaMatch || 0).toFixed(0)}%
+              {(internalData?.taxaMatch || 0).toFixed(0)}%
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            {data?.eventosVinculados || 0} de {data?.eventos7d || 0} eventos vinculados • {data?.clientIdsUnicos || 0} visitantes únicos
+            {internalData?.eventosVinculados || 0} de {internalData?.eventos7d || 0} eventos vinculados • {internalData?.clientIdsUnicos || 0} visitantes únicos
           </p>
         </div>
 
         {/* Eventos por tipo */}
-        {data?.eventosPorTipo && Object.keys(data.eventosPorTipo).length > 0 && (
+        {internalData?.eventosPorTipo && Object.keys(internalData.eventosPorTipo).length > 0 && (
           <div className="pt-3 border-t">
             <h4 className="text-xs md:text-sm font-medium text-muted-foreground mb-2">Eventos por tipo (7d):</h4>
             <div className="flex flex-wrap gap-1">
-              {Object.entries(data.eventosPorTipo)
+              {Object.entries(internalData.eventosPorTipo)
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 5)
                 .map(([nome, count]) => (
