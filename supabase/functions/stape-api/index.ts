@@ -7,8 +7,8 @@ const corsHeaders = {
 };
 
 interface StapeApiRequest {
-  action: "statistics" | "statistics-by-day" | "logs" | "test-connection" | "container-info";
-  /** Container identifier (obrigatório exceto para test-connection) */
+  action: "statistics" | "statistics-by-day" | "logs" | "test-connection" | "container-info" | "list-containers";
+  /** Container identifier (obrigatório exceto para test-connection e list-containers) */
   container_id?: string;
   region?: "global" | "eu";
   /** Account API key da empresa (para API v2 de monitoramento) */
@@ -32,6 +32,8 @@ serve(async (req) => {
   try {
     const body: StapeApiRequest = await req.json();
     const { action, container_id, region = "global", api_key, start_date, end_date, limit = 100 } = body;
+
+    console.log(`[stape-api] Ação solicitada: ${action}, container: ${container_id || "N/A"}, região: ${region}`);
 
     // Usar api_key do body (Account API Key) ou fallback para env
     const stapeAccountApiKey = api_key || Deno.env.get("STAPE_API_KEY");
@@ -61,11 +63,11 @@ serve(async (req) => {
       );
     }
 
-    // container_id só é obrigatório quando a ação é específica de um container
-    const requiresContainer = action !== "test-connection";
+    // container_id só é obrigatório para ações específicas de container
+    const requiresContainer = !["test-connection", "list-containers"].includes(action);
     if (requiresContainer && !container_id) {
       return new Response(
-        JSON.stringify({ success: false, error: "container_id é obrigatório" }),
+        JSON.stringify({ success: false, error: "container_id é obrigatório para esta ação" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -78,8 +80,13 @@ serve(async (req) => {
     let queryParams = "";
 
     switch (action) {
+      case "list-containers":
+        // Listar todos os containers (valida API key sem depender de container específico)
+        endpoint = `/api/v2/containers`;
+        break;
+
       case "test-connection":
-        // Testar conexão listando containers
+        // Testar conexão listando containers (não precisa de container_id)
         endpoint = `/api/v2/containers`;
         break;
 
@@ -123,65 +130,22 @@ serve(async (req) => {
 
     const fullUrl = `${baseUrl}${endpoint}${queryParams}`;
     console.log(`[stape-api] Chamando: ${fullUrl}`);
+    console.log(`[stape-api] API Key (primeiros 8 chars): ${stapeAccountApiKey.substring(0, 8)}...`);
 
-    // Tentar múltiplos formatos de autenticação
-    const authMethods: Array<{ name: string; headers: Record<string, string> }> = [
-      { name: "Bearer", headers: { "Authorization": `Bearer ${stapeAccountApiKey}`, "Content-Type": "application/json", "Accept": "application/json" } },
-      { name: "ApiKey", headers: { "Authorization": `ApiKey ${stapeAccountApiKey}`, "Content-Type": "application/json", "Accept": "application/json" } },
-      { name: "Direct", headers: { "Authorization": stapeAccountApiKey, "Content-Type": "application/json", "Accept": "application/json" } },
-      { name: "X-Api-Key", headers: { "X-Api-Key": stapeAccountApiKey, "Content-Type": "application/json", "Accept": "application/json" } },
-      { name: "api-key header", headers: { "api-key": stapeAccountApiKey, "Content-Type": "application/json", "Accept": "application/json" } },
-    ];
-
-    let response: Response | null = null;
-    let successfulMethod = "";
-    const attempts: Array<{ method: string; status: number; body?: string }> = [];
-
-    for (const auth of authMethods) {
-      console.log(`[stape-api] Tentando auth: ${auth.name}`);
-      
-      const res = await fetch(fullUrl, {
-        method: "GET",
-        headers: auth.headers,
-      });
-
-      const bodyText = await res.text();
-      attempts.push({ method: auth.name, status: res.status, body: bodyText.substring(0, 200) });
-
-      if (res.ok) {
-        response = new Response(bodyText, { status: res.status, headers: res.headers });
-        successfulMethod = auth.name;
-        console.log(`[stape-api] Auth bem-sucedida: ${auth.name}`);
-        break;
-      }
-
-      // Se for 401/403, continuar tentando
-      if (res.status === 401 || res.status === 403) {
-        console.warn(`[stape-api] Auth falhou (${auth.name}): ${res.status}`);
-        continue;
-      }
-
-      // Outros erros (404, 500, etc.) não valem retry
-      response = new Response(bodyText, { status: res.status, headers: res.headers });
-      break;
-    }
-
-    if (!response) {
-      // Todas as tentativas falharam com 401/403
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Todas as tentativas de autenticação falharam",
-          attempts,
-          hint: "Verifique se a Account API Key está correta. A chave deve ser criada em stape.io -> Account Settings -> API Keys.",
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Usar apenas Bearer - conforme documentação oficial
+    const response = await fetch(fullUrl, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${stapeAccountApiKey}`,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+    });
 
     const responseText = await response.text();
-    let responseData;
+    console.log(`[stape-api] Status: ${response.status}, Response: ${responseText.substring(0, 500)}`);
 
+    let responseData;
     try {
       responseData = JSON.parse(responseText);
     } catch {
@@ -201,6 +165,7 @@ serve(async (req) => {
         region,
         status_code: response.status,
         success: response.ok,
+        url_called: fullUrl,
       },
       mensagem_erro: response.ok ? null : responseText.substring(0, 500),
     });
@@ -210,12 +175,17 @@ serve(async (req) => {
       console.error(`[stape-api] Erro na API Stape: ${response.status}`, responseText);
       
       let errorHint = "";
+      let errorDetail = "";
+      
       if (response.status === 401) {
-        errorHint = "Verifique se você está usando a Account API Key correta. A chave deve ser criada em stape.io -> Account Settings -> API Keys.";
+        errorHint = "Chave inválida. Verifique se você está usando a Account API Key correta.";
+        errorDetail = "A chave deve ser criada em stape.io → Account Settings → API Keys. Copie a chave completa e cole aqui.";
       } else if (response.status === 403) {
-        errorHint = "A API Key não tem permissão. Verifique as configurações no Stape.";
+        errorHint = "A API Key não tem permissão para acessar este recurso.";
+        errorDetail = "Verifique as permissões da API Key no Stape.";
       } else if (response.status === 404) {
-        errorHint = "Container não encontrado. Verifique o Container ID.";
+        errorHint = "Container não encontrado.";
+        errorDetail = "Verifique o Container ID (identifier) no painel do Stape.";
       }
 
       return new Response(
@@ -224,8 +194,13 @@ serve(async (req) => {
           error: `Erro na API Stape: ${response.status}`,
           stape_status_code: response.status,
           hint: errorHint,
-          details: responseData,
-          request_url: fullUrl,
+          detail: errorDetail,
+          stape_response: responseData,
+          request_info: {
+            url: fullUrl,
+            region,
+            container_id: container_id || null,
+          },
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -233,12 +208,27 @@ serve(async (req) => {
 
     console.log(`[stape-api] Sucesso - ${action} em ${duration}ms`);
 
+    // Para list-containers e test-connection, extrair info útil
+    let parsedData = responseData;
+    if ((action === "list-containers" || action === "test-connection") && Array.isArray(responseData)) {
+      parsedData = {
+        containers: responseData,
+        total_containers: responseData.length,
+        container_ids: responseData.map((c: any) => c.identifier || c.id),
+      };
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        data: responseData,
+        data: parsedData,
         action,
-        duration_ms: duration 
+        duration_ms: duration,
+        request_info: {
+          url: fullUrl,
+          region,
+          container_id: container_id || null,
+        },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -31,6 +31,16 @@ interface StapeStats {
   last_request_at?: string;
 }
 
+interface ApiTestResult {
+  success: boolean;
+  apiKeyValid: boolean;
+  containerFound: boolean;
+  containers?: Array<{ identifier: string; name?: string }>;
+  error?: string;
+  hint?: string;
+  detail?: string;
+}
+
 export function StapeIntegracaoManager() {
   const { empresasPermitidas, empresaSelecionada: empresaContexto } = useEmpresa();
   const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("");
@@ -49,9 +59,11 @@ export function StapeIntegracaoManager() {
   const [saving, setSaving] = useState(false);
   const [testingWebhook, setTestingWebhook] = useState(false);
   const [testingApi, setTestingApi] = useState(false);
+  const [testingApiKey, setTestingApiKey] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [apiConnected, setApiConnected] = useState<boolean | null>(null);
   const [stapeStats, setStapeStats] = useState<StapeStats | null>(null);
+  const [apiTestResult, setApiTestResult] = useState<ApiTestResult | null>(null);
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stape-webhook`;
 
@@ -234,6 +246,70 @@ export function StapeIntegracaoManager() {
     }
   };
 
+  // Teste 1: Testar apenas a API Key (listar containers)
+  const handleTestApiKey = async () => {
+    if (!config.stape_account_api_key) {
+      toast.error("Preencha a Account API Key do Stape");
+      return;
+    }
+
+    setTestingApiKey(true);
+    setApiTestResult(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("stape-api", {
+        body: {
+          action: "list-containers",
+          region: config.stape_region,
+          api_key: config.stape_account_api_key,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        const containers = data.data?.containers || [];
+        const containerIds = data.data?.container_ids || [];
+        
+        setApiTestResult({
+          success: true,
+          apiKeyValid: true,
+          containerFound: config.stape_container_id ? containerIds.includes(config.stape_container_id) : false,
+          containers: containers.map((c: any) => ({ identifier: c.identifier, name: c.name })),
+        });
+        
+        toast.success(`API Key válida! ${containers.length} container(s) encontrado(s).`);
+        
+        // Verificar se o container configurado está na lista
+        if (config.stape_container_id && !containerIds.includes(config.stape_container_id)) {
+          toast.warning(`Container "${config.stape_container_id}" não encontrado. Containers disponíveis: ${containerIds.join(", ")}`);
+        }
+      } else {
+        setApiTestResult({
+          success: false,
+          apiKeyValid: false,
+          containerFound: false,
+          error: data?.error,
+          hint: data?.hint,
+          detail: data?.detail,
+        });
+        toast.error(data?.hint || "API Key inválida");
+      }
+    } catch (error: any) {
+      console.error("Erro ao testar API Key:", error);
+      setApiTestResult({
+        success: false,
+        apiKeyValid: false,
+        containerFound: false,
+        error: error.message,
+      });
+      toast.error("Erro ao testar: " + error.message);
+    } finally {
+      setTestingApiKey(false);
+    }
+  };
+
+  // Teste 2: Testar conexão completa (API Key + Container)
   const handleTestApiConnection = async () => {
     if (!config.stape_container_id) {
       toast.error("Preencha o Container ID para testar a conexão");
@@ -247,9 +323,51 @@ export function StapeIntegracaoManager() {
 
     setTestingApi(true);
     try {
+      // Primeiro testar se a API Key é válida
+      const { data: listData } = await supabase.functions.invoke("stape-api", {
+        body: {
+          action: "list-containers",
+          region: config.stape_region,
+          api_key: config.stape_account_api_key,
+        },
+      });
+
+      if (!listData?.success) {
+        setApiConnected(false);
+        setApiTestResult({
+          success: false,
+          apiKeyValid: false,
+          containerFound: false,
+          error: listData?.error,
+          hint: listData?.hint,
+          detail: listData?.detail,
+        });
+        toast.error(listData?.hint || "API Key inválida");
+        return;
+      }
+
+      // API Key válida, verificar se container existe
+      const containerIds = listData.data?.container_ids || [];
+      const containerFound = containerIds.includes(config.stape_container_id);
+
+      if (!containerFound) {
+        setApiConnected(false);
+        setApiTestResult({
+          success: false,
+          apiKeyValid: true,
+          containerFound: false,
+          containers: listData.data?.containers || [],
+          error: `Container "${config.stape_container_id}" não encontrado`,
+          hint: `Containers disponíveis: ${containerIds.join(", ")}`,
+        });
+        toast.error(`Container "${config.stape_container_id}" não encontrado na sua conta Stape`);
+        return;
+      }
+
+      // Agora testar estatísticas do container
       const { data, error } = await supabase.functions.invoke("stape-api", {
         body: {
-          action: "test-connection",
+          action: "statistics",
           container_id: config.stape_container_id,
           region: config.stape_region,
           api_key: config.stape_account_api_key,
@@ -261,19 +379,22 @@ export function StapeIntegracaoManager() {
       if (data?.success) {
         setApiConnected(true);
         setStapeStats(data.data);
+        setApiTestResult({
+          success: true,
+          apiKeyValid: true,
+          containerFound: true,
+        });
         toast.success("Conexão com API Stape estabelecida!");
       } else {
         setApiConnected(false);
-        // Diagnóstico detalhado
-        let errorMessage = data?.error || "Erro desconhecido";
-        if (data?.stape_status_code === 401) {
-          errorMessage = "Chave inválida ou sem permissão. Verifique se você está usando a Account API Key (não Container API Key).";
-        } else if (data?.stape_status_code === 403) {
-          errorMessage = "Acesso negado. Verifique as permissões da API Key.";
-        } else if (data?.stape_status_code === 404) {
-          errorMessage = "Container não encontrado. Verifique o Container ID.";
-        }
-        toast.error("Falha na conexão: " + errorMessage);
+        setApiTestResult({
+          success: false,
+          apiKeyValid: true,
+          containerFound: true,
+          error: data?.error,
+          hint: data?.hint,
+        });
+        toast.error("Falha ao obter estatísticas: " + (data?.hint || data?.error));
       }
     } catch (error: any) {
       console.error("Erro ao testar API Stape:", error);
@@ -463,14 +584,46 @@ export function StapeIntegracaoManager() {
                 </p>
               </div>
 
-              <Button 
-                variant="outline" 
-                onClick={handleTestApiConnection} 
-                disabled={testingApi || !config.stape_container_id || !config.stape_account_api_key}
-              >
-                <Wifi className="w-4 h-4 mr-2" />
-                {testingApi ? "Testando..." : "Testar Conexão API"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleTestApiKey} 
+                  disabled={testingApiKey || !config.stape_account_api_key}
+                >
+                  <Key className="w-4 h-4 mr-2" />
+                  {testingApiKey ? "Testando..." : "1. Testar API Key"}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleTestApiConnection} 
+                  disabled={testingApi || !config.stape_container_id || !config.stape_account_api_key}
+                >
+                  <Wifi className="w-4 h-4 mr-2" />
+                  {testingApi ? "Testando..." : "2. Testar Conexão Completa"}
+                </Button>
+              </div>
+
+              {/* Resultado do teste */}
+              {apiTestResult && (
+                <Alert className={apiTestResult.success ? "bg-green-50 dark:bg-green-950 border-green-200" : "bg-red-50 dark:bg-red-950 border-red-200"}>
+                  <AlertCircle className={`h-4 w-4 ${apiTestResult.success ? "text-green-600" : "text-red-600"}`} />
+                  <AlertTitle className={apiTestResult.success ? "text-green-900 dark:text-green-100" : "text-red-900 dark:text-red-100"}>
+                    {apiTestResult.success ? "Conexão OK" : "Falha na conexão"}
+                  </AlertTitle>
+                  <AlertDescription className={`text-sm space-y-1 ${apiTestResult.success ? "text-green-800 dark:text-green-200" : "text-red-800 dark:text-red-200"}`}>
+                    <p>• API Key: {apiTestResult.apiKeyValid ? "✅ Válida" : "❌ Inválida"}</p>
+                    {config.stape_container_id && (
+                      <p>• Container: {apiTestResult.containerFound ? "✅ Encontrado" : "❌ Não encontrado"}</p>
+                    )}
+                    {apiTestResult.error && <p>• Erro: {apiTestResult.error}</p>}
+                    {apiTestResult.hint && <p>• Dica: {apiTestResult.hint}</p>}
+                    {apiTestResult.detail && <p>• Detalhe: {apiTestResult.detail}</p>}
+                    {apiTestResult.containers && apiTestResult.containers.length > 0 && (
+                      <p>• Containers disponíveis: {apiTestResult.containers.map(c => c.identifier).join(", ")}</p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 
