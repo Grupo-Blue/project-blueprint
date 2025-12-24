@@ -204,6 +204,7 @@ export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
   };
 
   const apiConnected = !!apiData;
+  const apiConfigured = !!stapeConfig?.stape_container_id && !!stapeConfig?.stape_account_api_key;
 
   return (
     <Card>
@@ -216,16 +217,22 @@ export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
             </CardTitle>
             <CardDescription className="text-xs md:text-sm flex items-center gap-2">
               Tracking via GTM Server
-              {stapeConfig?.stape_container_id && (
-                <Badge variant={apiConnected ? "default" : "secondary"} className="text-xs">
+              {apiConfigured && (
+                <Badge variant={apiConnected ? "default" : "destructive"} className="text-xs">
                   {apiConnected ? <Wifi className="w-3 h-3 mr-1" /> : <WifiOff className="w-3 h-3 mr-1" />}
-                  API
+                  {apiConnected ? "API OK" : "API Erro"}
+                </Badge>
+              )}
+              {!apiConfigured && stapeConfig?.stape_container_id && (
+                <Badge variant="secondary" className="text-xs">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  API não configurada
                 </Badge>
               )}
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {stapeConfig?.stape_container_id && (
+            {apiConfigured && (
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => refetchApi()}>
                 <RefreshCw className="h-3 w-3" />
               </Button>
@@ -237,6 +244,19 @@ export function StapeHealthWidget({ empresaId }: StapeHealthWidgetProps) {
         </div>
       </CardHeader>
       <CardContent className="p-3 md:p-6 pt-0 md:pt-0 space-y-4">
+        {/* Status da API quando configurada mas não conectada */}
+        {apiConfigured && !apiConnected && !loadingApi && (
+          <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-red-600 dark:text-red-400">
+              <WifiOff className="h-3 w-3" />
+              Falha na conexão com API Stape
+            </div>
+            <p className="text-xs text-red-700 dark:text-red-300">
+              Verifique a Account API Key nas Integrações. A chave deve ser obtida em stape.io → Account Settings → API Keys.
+            </p>
+          </div>
+        )}
+
         {/* Dados da API Stape (se conectado) */}
         {apiConnected && apiData && (
           <div className="bg-primary/5 rounded-lg p-3 space-y-2">
