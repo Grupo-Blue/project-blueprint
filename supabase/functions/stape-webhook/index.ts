@@ -21,6 +21,19 @@ serve(async (req) => {
     const payload = await req.json();
     console.log("📥 Stape webhook recebido:", JSON.stringify(payload, null, 2));
 
+    // Verificar se é um evento de teste
+    if (payload.test === true) {
+      console.log("✅ Evento de teste recebido com sucesso");
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Webhook de teste recebido com sucesso",
+          test: true 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Extrair dados do evento GTM Server
     const {
       client_id,
