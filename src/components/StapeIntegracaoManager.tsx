@@ -60,10 +60,12 @@ export function StapeIntegracaoManager() {
   const [testingWebhook, setTestingWebhook] = useState(false);
   const [testingApi, setTestingApi] = useState(false);
   const [testingApiKey, setTestingApiKey] = useState(false);
+  const [testingMetaCapi, setTestingMetaCapi] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [apiConnected, setApiConnected] = useState<boolean | null>(null);
   const [stapeStats, setStapeStats] = useState<StapeStats | null>(null);
   const [apiTestResult, setApiTestResult] = useState<ApiTestResult | null>(null);
+  const [metaCapiResult, setMetaCapiResult] = useState<{ success: boolean; message: string; details?: any } | null>(null);
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stape-webhook`;
 
@@ -243,6 +245,59 @@ export function StapeIntegracaoManager() {
       toast.error("Erro ao testar: " + error.message);
     } finally {
       setTestingWebhook(false);
+    }
+  };
+
+  // Teste Meta CAPI
+  const handleTestMetaCapi = async () => {
+    if (!config.meta_pixel_id || !config.meta_capi_token) {
+      toast.error("Preencha o Pixel ID e o Token da Meta CAPI");
+      return;
+    }
+
+    setTestingMetaCapi(true);
+    setMetaCapiResult(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("stape-meta-capi", {
+        body: {
+          event_name: "PageView",
+          event_time: Math.floor(Date.now() / 1000),
+          event_source_url: window.location.href,
+          action_source: "website",
+          id_empresa: empresaSelecionada,
+          // Dados de teste
+          email: "test@lovable.dev",
+          client_user_agent: navigator.userAgent,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        setMetaCapiResult({
+          success: true,
+          message: `Evento enviado com sucesso! events_received: ${data.events_received}`,
+          details: data,
+        });
+        toast.success("Meta CAPI funcionando! Evento de teste enviado.");
+      } else {
+        setMetaCapiResult({
+          success: false,
+          message: data?.error || "Erro desconhecido",
+          details: data?.details,
+        });
+        toast.error("Erro ao enviar para Meta: " + (data?.error || "Verifique as credenciais"));
+      }
+    } catch (error: any) {
+      console.error("Erro ao testar Meta CAPI:", error);
+      setMetaCapiResult({
+        success: false,
+        message: error.message,
+      });
+      toast.error("Erro ao testar: " + error.message);
+    } finally {
+      setTestingMetaCapi(false);
     }
   };
 
@@ -706,6 +761,31 @@ export function StapeIntegracaoManager() {
                   URL do seu container GTM server-side no Stape
                 </p>
               </div>
+
+              <Button 
+                variant="outline" 
+                onClick={handleTestMetaCapi} 
+                disabled={testingMetaCapi || !config.meta_pixel_id || !config.meta_capi_token}
+              >
+                <TestTube2 className="w-4 h-4 mr-2" />
+                {testingMetaCapi ? "Testando..." : "Testar Meta CAPI"}
+              </Button>
+
+              {/* Resultado do teste Meta CAPI */}
+              {metaCapiResult && (
+                <Alert className={metaCapiResult.success ? "bg-green-50 dark:bg-green-950 border-green-200" : "bg-red-50 dark:bg-red-950 border-red-200"}>
+                  <AlertCircle className={`h-4 w-4 ${metaCapiResult.success ? "text-green-600" : "text-red-600"}`} />
+                  <AlertTitle className={metaCapiResult.success ? "text-green-900 dark:text-green-100" : "text-red-900 dark:text-red-100"}>
+                    {metaCapiResult.success ? "Meta CAPI OK" : "Falha na Meta CAPI"}
+                  </AlertTitle>
+                  <AlertDescription className={`text-sm ${metaCapiResult.success ? "text-green-800 dark:text-green-200" : "text-red-800 dark:text-red-200"}`}>
+                    <p>{metaCapiResult.message}</p>
+                    {metaCapiResult.details?.fbtrace_id && (
+                      <p className="text-xs mt-1">fbtrace_id: {metaCapiResult.details.fbtrace_id}</p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 
