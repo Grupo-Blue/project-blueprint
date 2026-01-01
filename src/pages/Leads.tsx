@@ -256,18 +256,9 @@ const Leads = () => {
     });
   };
 
-  // Filtrar leads
+  // Filtrar leads (sem filtro de período - mostra todos os leads independente do mês)
   const filteredLeads = leads?.filter((lead) => {
-    const leadDate = lead.venda_realizada && lead.data_venda 
-      ? parseISO(lead.data_venda) 
-      : parseISO(lead.data_criacao);
-    
-    const dataReferencia = getDataReferencia();
-    const inicioMes = startOfMonth(dataReferencia);
-    const fimMes = endOfMonth(dataReferencia);
-    const matchesPeriodo = leadDate >= inicioMes && leadDate <= fimMes;
-
-    const matchesSearch = 
+    const matchesSearch =
       !searchTerm ||
       lead.nome_lead?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lead.organizacao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -318,7 +309,7 @@ const Leads = () => {
       return dias > 7 && !stagesFinais.includes(lead.stage_atual || '') && !lead.venda_realizada;
     })();
 
-    return matchesPeriodo && matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus && matchesEmpresa && matchesInvestidor && matchesOrigem && matchesParados7Dias;
+    return matchesSearch && matchesStatus && matchesStage && matchesScore && matchesClienteStatus && matchesEmpresa && matchesInvestidor && matchesOrigem && matchesParados7Dias;
   });
 
   // Ordenar leads
