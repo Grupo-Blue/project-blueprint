@@ -132,11 +132,11 @@ serve(async (req) => {
     console.log(`[stape-api] Chamando: ${fullUrl}`);
     console.log(`[stape-api] API Key (primeiros 8 chars): ${stapeAccountApiKey.substring(0, 8)}...`);
 
-    // Usar apenas Bearer - conforme documentação oficial
+    // Usar X-AUTH-TOKEN conforme documentação oficial do Stape
     const response = await fetch(fullUrl, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${stapeAccountApiKey}`,
+        "X-AUTH-TOKEN": stapeAccountApiKey,
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
