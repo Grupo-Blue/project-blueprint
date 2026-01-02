@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Package, Check, AlertCircle, Save, RefreshCw, Search, Copy } from "lucide-react";
+import { Package, Check, AlertCircle, Save, RefreshCw, Search, Copy, Download } from "lucide-react";
 
 interface ProjetoComContagem {
   project_id: string;
@@ -174,6 +174,40 @@ export function TokenizaProjetosManager() {
     }
   };
 
+  // Exportar lista de projetos para CSV
+  const handleExportProjetos = () => {
+    if (projetosConsolidados.length === 0) {
+      toast.error("Nenhum projeto para exportar");
+      return;
+    }
+
+    // Cabeçalho CSV
+    const headers = ["Project ID", "Nome do Crowdfunding", "Investimentos"];
+    
+    // Dados
+    const rows = projetosConsolidados.map(projeto => [
+      projeto.project_id,
+      projeto.nome || "",
+      projeto.investimentos_count.toString()
+    ]);
+
+    // Montar CSV com BOM para UTF-8
+    const csvContent = "\uFEFF" + [headers, ...rows]
+      .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(";"))
+      .join("\n");
+
+    // Download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `projetos_tokeniza_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast.success(`${projetosConsolidados.length} projetos exportados!`);
+  };
+
   const semNome = projetosConsolidados.filter(p => !p.nome).length;
   const comNome = projetosConsolidados.filter(p => p.nome).length;
 
@@ -201,6 +235,15 @@ export function TokenizaProjetosManager() {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleExportProjetos}
+              disabled={projetosConsolidados.length === 0}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
             <Badge variant="outline" className="gap-1">
               <Check className="h-3 w-3 text-green-600" /> {comNome} cadastrados
             </Badge>
