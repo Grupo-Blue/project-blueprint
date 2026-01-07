@@ -3415,6 +3415,56 @@ export type Database = {
         }
         Relationships: []
       }
+      registro_otimizacao: {
+        Row: {
+          created_at: string
+          descricao: string
+          id_empresa: string | null
+          id_registro: string
+          id_usuario: string
+          impacto_resultado: string | null
+          plataforma: Database["public"]["Enums"]["plataforma_otimizacao"]
+          semana_referencia: string
+          tags: string[] | null
+          tipo_otimizacao: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          descricao: string
+          id_empresa?: string | null
+          id_registro?: string
+          id_usuario: string
+          impacto_resultado?: string | null
+          plataforma?: Database["public"]["Enums"]["plataforma_otimizacao"]
+          semana_referencia: string
+          tags?: string[] | null
+          tipo_otimizacao: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string
+          id_empresa?: string | null
+          id_registro?: string
+          id_usuario?: string
+          impacto_resultado?: string | null
+          plataforma?: Database["public"]["Enums"]["plataforma_otimizacao"]
+          semana_referencia?: string
+          tags?: string[] | null
+          tipo_otimizacao?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registro_otimizacao_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       relatorio_acao: {
         Row: {
           created_at: string
@@ -4116,6 +4166,7 @@ export type Database = {
       perfil_usuario: "TRAFEGO" | "SDR_COMERCIAL" | "DIRECAO" | "ADMIN"
       plataforma_ads: "META" | "GOOGLE"
       plataforma_midia: "META" | "GOOGLE"
+      plataforma_otimizacao: "META" | "GOOGLE" | "AMBAS" | "GERAL"
       prioridade_demanda: "ALTA" | "MEDIA" | "BAIXA"
       rede_social:
         | "INSTAGRAM"
@@ -4292,6 +4343,7 @@ export const Constants = {
       perfil_usuario: ["TRAFEGO", "SDR_COMERCIAL", "DIRECAO", "ADMIN"],
       plataforma_ads: ["META", "GOOGLE"],
       plataforma_midia: ["META", "GOOGLE"],
+      plataforma_otimizacao: ["META", "GOOGLE", "AMBAS", "GERAL"],
       prioridade_demanda: ["ALTA", "MEDIA", "BAIXA"],
       rede_social: [
         "INSTAGRAM",
