@@ -109,8 +109,9 @@ const RegistroOtimizacoes = ({ empresas, profile }: RegistroOtimizacoesProps) =>
         .select("*")
         .order("created_at", { ascending: false });
 
+      // Quando uma empresa está selecionada, mostra registros dessa empresa OU registros gerais (id_empresa = null)
       if (empresaSelecionada && empresaSelecionada !== "todas") {
-        query = query.eq("id_empresa", empresaSelecionada);
+        query = query.or(`id_empresa.eq.${empresaSelecionada},id_empresa.is.null`);
       }
 
       const { data, error } = await query;
