@@ -295,12 +295,12 @@ const RegistroOtimizacoes = ({ empresas, profile }: RegistroOtimizacoesProps) =>
                 <div className="space-y-2">
                   <Label htmlFor="empresa">Empresa (opcional)</Label>
                   <Select 
-                    value={formData.id_empresa} 
-                    onValueChange={(value) => setFormData({ ...formData, id_empresa: value })}
+                    value={formData.id_empresa || "__NONE__"} 
+                    onValueChange={(value) => setFormData({ ...formData, id_empresa: value === "__NONE__" ? "" : value })}
                   >
                     <SelectTrigger id="empresa"><SelectValue placeholder="Geral/Todas" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Geral/Todas</SelectItem>
+                      <SelectItem value="__NONE__">Geral/Todas</SelectItem>
                       {empresas.map(e => (
                         <SelectItem key={e.id_empresa} value={e.id_empresa}>{e.nome}</SelectItem>
                       ))}
