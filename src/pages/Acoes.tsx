@@ -30,7 +30,8 @@ import {
   DollarSign,
   Image,
   ClipboardList,
-  ListChecks
+  ListChecks,
+  FileEdit
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -38,6 +39,7 @@ import { SugestoesIA } from "@/components/SugestoesIA";
 import FormularioDemandaCampanha from "@/components/demandas/FormularioDemandaCampanha";
 import SugestoesIACampanhas from "@/components/demandas/SugestoesIACampanhas";
 import DetalheDemanda from "@/components/demandas/DetalheDemanda";
+import RegistroOtimizacoes from "@/components/RegistroOtimizacoes";
 
 type CategoriaAcao = "A" | "B" | "C";
 type StatusAcao = "PENDENTE" | "APROVADA" | "REPROVADA" | "EXECUTADA";
@@ -421,7 +423,7 @@ const Acoes = () => {
       </div>
 
       <Tabs defaultValue="acoes" className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-xl grid-cols-3">
           <TabsTrigger value="acoes" className="gap-2">
             <ListChecks className="h-4 w-4" />
             Ações A/B/C
@@ -434,6 +436,10 @@ const Acoes = () => {
                 {demandasPendentes}
               </Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="otimizacoes" className="gap-2">
+            <FileEdit className="h-4 w-4" />
+            Otimizações
           </TabsTrigger>
         </TabsList>
 
@@ -787,6 +793,11 @@ const Acoes = () => {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Aba de Registro de Otimizações */}
+        <TabsContent value="otimizacoes" className="space-y-6">
+          <RegistroOtimizacoes empresas={empresas} profile={profile} />
         </TabsContent>
       </Tabs>
 
