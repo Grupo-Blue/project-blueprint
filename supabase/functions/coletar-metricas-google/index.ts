@@ -213,7 +213,7 @@ serve(async (req) => {
             data: hoje,
             impressoes: parseInt(result.metrics.impressions || "0"),
             cliques: parseInt(result.metrics.clicks || "0"),
-            verba_investida: parseFloat(result.metrics.cost_micros || "0") / 1000000,
+            verba_investida: parseFloat(result.metrics.costMicros || "0") / 1000000,
             leads: parseInt(result.metrics.conversions || "0"),
           };
 
