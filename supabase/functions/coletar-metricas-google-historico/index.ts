@@ -155,7 +155,7 @@ serve(async (req) => {
           const campanha = campanhas.find(c => c.id_campanha_externo === String(result.campaign.id));
           if (!campanha) continue;
 
-          const gasto = parseFloat(result.metrics.cost_micros || "0") / 1000000;
+          const gasto = parseFloat(result.metrics.costMicros || "0") / 1000000;
           gastoTotal += gasto;
 
           const metricasDia = {
