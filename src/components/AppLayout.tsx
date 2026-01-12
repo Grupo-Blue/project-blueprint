@@ -56,6 +56,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import sgtLogo from "@/assets/sgt-logo.png";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { DataStatusIndicator } from "@/components/DataStatusIndicator";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -508,6 +509,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             {/* Filtros globais no header (desktop) */}
             <div className="hidden lg:flex items-center gap-3">
               <GlobalFilters />
+              <DataStatusIndicator />
               <div className="h-8 w-px bg-border" />
               <Button 
                 variant="outline" 
