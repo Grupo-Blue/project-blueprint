@@ -36,6 +36,7 @@ export function KPIsHistoricos({ empresaId }: KPIsHistoricosProps) {
       return data || [];
     },
     enabled: !!empresaId,
+    refetchInterval: 10 * 60 * 1000, // Auto-refresh a cada 10 minutos
   });
 
   // Agrupar dados por semana para visualização mais clara

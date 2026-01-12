@@ -727,6 +727,7 @@ export default function DashboardTrafego() {
       if (error) throw error;
       return data;
     },
+    refetchInterval: 5 * 60 * 1000, // Auto-refresh a cada 5 minutos
   });
 
   // Query para distribuição de MQLs por critério
@@ -868,6 +869,7 @@ export default function DashboardTrafego() {
     staleTime: 30 * 1000, // 30 segundos
     refetchOnWindowFocus: true,
     refetchOnMount: 'always',
+    refetchInterval: 3 * 60 * 1000, // Auto-refresh a cada 3 minutos
   });
 
   // Buscar totais gerais da empresa da tabela empresa_metricas_dia
@@ -908,6 +910,7 @@ export default function DashboardTrafego() {
     staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
     refetchOnMount: 'always',
+    refetchInterval: 3 * 60 * 1000, // Auto-refresh a cada 3 minutos
   });
 
   // Funil de conversão baseado nos leads com stages do Pipedrive - usando COUNT para evitar limite de 1000

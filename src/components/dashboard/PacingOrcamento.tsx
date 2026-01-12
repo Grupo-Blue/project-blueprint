@@ -35,6 +35,7 @@ export const PacingOrcamento = ({ empresaId }: PacingOrcamentoProps) => {
       return data;
     },
     enabled: !!empresaId,
+    refetchInterval: 10 * 60 * 1000, // Auto-refresh a cada 10 minutos
   });
 
   // Buscar métricas diárias do período
@@ -68,6 +69,7 @@ export const PacingOrcamento = ({ empresaId }: PacingOrcamentoProps) => {
       return data;
     },
     enabled: !!empresaId,
+    refetchInterval: 10 * 60 * 1000, // Auto-refresh a cada 10 minutos
   });
 
   const metaMensal = empresa?.meta_verba_mensal || 0;

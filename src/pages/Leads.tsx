@@ -22,6 +22,7 @@ import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LeadCardMobile } from "@/components/leads/LeadCardMobile";
 import { FiltrosMobileSheet } from "@/components/leads/FiltrosMobileSheet";
+import { useLeadsRealtime } from "@/hooks/useLeadsRealtime";
 
 // Helpers - Canal simplificado
 const getCanal = (source: string | null) => {
@@ -145,6 +146,10 @@ const Leads = () => {
   const { tipoFiltro, getDataReferencia } = usePeriodo();
   const { empresaSelecionada, empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
   const isMobile = useIsMobile();
+  
+  // Hook de realtime para novos leads
+  useLeadsRealtime();
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [stageFilter, setStageFilter] = useState<string[]>([]);
@@ -178,6 +183,7 @@ const Leads = () => {
       if (error) throw error;
       return count || 0;
     },
+    refetchInterval: 2 * 60 * 1000, // Auto-refresh a cada 2 minutos
   });
 
   // Query para buscar todas as vendas do período (para cálculo correto do valor total)
@@ -211,6 +217,7 @@ const Leads = () => {
       
       return { valorTotal, qtdVendas, vendas: data || [] };
     },
+    refetchInterval: 2 * 60 * 1000, // Auto-refresh a cada 2 minutos
   });
 
   const { data: leads, isLoading } = useQuery({
@@ -242,6 +249,7 @@ const Leads = () => {
       if (error) throw error;
       return data;
     },
+    refetchInterval: 2 * 60 * 1000, // Auto-refresh a cada 2 minutos
   });
 
   const toggleRowExpansion = (id: string) => {

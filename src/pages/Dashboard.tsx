@@ -43,6 +43,7 @@ const Dashboard = () => {
       if (error) throw error;
       return data;
     },
+    refetchInterval: 5 * 60 * 1000, // Auto-refresh a cada 5 minutos
   });
 
   // ID da empresa para queries (null se "todas")
@@ -65,6 +66,7 @@ const Dashboard = () => {
       return data;
     },
     enabled: !!empresaIdQuery,
+    refetchInterval: 5 * 60 * 1000, // Auto-refresh a cada 5 minutos
   });
 
   // Estatísticas calculadas das métricas diárias
