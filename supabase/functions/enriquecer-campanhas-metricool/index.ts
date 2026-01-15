@@ -28,6 +28,165 @@ interface AdsCampaignData {
   cpm: number;
   ctr: number;
   roas: number;
+  plataforma: 'GOOGLE' | 'META';
+}
+
+// Função para buscar dados de Ads de uma plataforma específica
+async function fetchAdsPlatformData(
+  config: MetricoolConfig,
+  plataforma: 'google' | 'facebook',
+  initDate: string,
+  endDate: string,
+  headers: Record<string, string>
+): Promise<AdsCampaignData[]> {
+  const campanhas: AdsCampaignData[] = [];
+  const plataformaNome = plataforma === 'google' ? 'GOOGLE' : 'META';
+  
+  console.log(`  🔍 Buscando dados ${plataformaNome} Ads do Metricool...`);
+  
+  // Tentar endpoints diferentes
+  const endpoints = [
+    `${METRICOOL_API_BASE}/ads/${plataforma}/campaigns?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}`,
+    `${METRICOOL_API_BASE}/ads/campaigns?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}&network=${plataforma}`,
+  ];
+  
+  let adsData: any = null;
+  
+  for (const url of endpoints) {
+    try {
+      console.log(`    🔗 Tentando: ${url}`);
+      const resp = await fetch(url, { headers });
+      
+      if (resp.ok) {
+        adsData = await resp.json();
+        console.log(`    ✅ Dados recebidos: ${JSON.stringify(adsData).substring(0, 300)}...`);
+        break;
+      } else {
+        console.log(`    ⚠️ Endpoint falhou (${resp.status})`);
+      }
+    } catch (err) {
+      console.log(`    ⚠️ Erro ao acessar endpoint:`, err);
+    }
+  }
+  
+  if (!adsData) {
+    console.log(`  ⚠️ Nenhum endpoint de ${plataformaNome} Ads funcionou`);
+    return campanhas;
+  }
+  
+  // Processar campanhas
+  const campaigns = Array.isArray(adsData) ? adsData : adsData.campaigns || adsData.data || [];
+  
+  for (const campaign of campaigns) {
+    const stats = campaign.stats || campaign.metrics || campaign.daily || [campaign];
+    
+    for (const stat of (Array.isArray(stats) ? stats : [stats])) {
+      let dataStr = stat.date || stat.day || stat.datetime || campaign.date;
+      
+      // Converter YYYYMMDD para YYYY-MM-DD
+      if (dataStr && dataStr.length === 8 && !dataStr.includes('-')) {
+        dataStr = `${dataStr.substring(0, 4)}-${dataStr.substring(4, 6)}-${dataStr.substring(6, 8)}`;
+      }
+      
+      // Converter timestamp para YYYY-MM-DD
+      if (dataStr && /^\d{13}$/.test(String(dataStr))) {
+        dataStr = new Date(parseInt(dataStr)).toISOString().split('T')[0];
+      }
+      
+      if (!dataStr || !/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) {
+        continue;
+      }
+
+      campanhas.push({
+        campaignId: campaign.id || campaign.campaignId || campaign.campaign_id || '',
+        campaignName: campaign.name || campaign.campaignName || campaign.campaign_name || '',
+        data: dataStr,
+        impressions: parseInt(stat.impressions || stat.reach || '0'),
+        clicks: parseInt(stat.clicks || stat.link_clicks || '0'),
+        spent: parseFloat(stat.spent || stat.cost || stat.spend || '0'),
+        conversions: parseInt(stat.conversions || stat.results || stat.actions || '0'),
+        conversionValue: parseFloat(stat.conversionValue || stat.conversion_value || stat.revenue || stat.purchase_value || '0'),
+        cpc: parseFloat(stat.cpc || '0'),
+        cpm: parseFloat(stat.cpm || '0'),
+        ctr: parseFloat(stat.ctr || '0'),
+        roas: parseFloat(stat.roas || '0'),
+        plataforma: plataformaNome,
+      });
+    }
+  }
+  
+  console.log(`  📊 ${campanhas.length} registros de ${plataformaNome} encontrados`);
+  return campanhas;
+}
+
+// Função para buscar métricas timeline agregadas
+async function fetchTimelineMetrics(
+  config: MetricoolConfig,
+  plataforma: 'google' | 'facebook',
+  initDate: string,
+  endDate: string,
+  headers: Record<string, string>
+): Promise<Map<string, Record<string, number>>> {
+  const metricasPorData = new Map<string, Record<string, number>>();
+  const prefixo = plataforma === 'google' ? 'googleAds' : 'facebookAds';
+  
+  const metricsToFetch = [
+    { nome: `${prefixo}Conversions`, campo: 'conversions' },
+    { nome: `${prefixo}ConversionValue`, campo: 'conversionValue' },
+    { nome: `${prefixo}Spent`, campo: 'spent' },
+    { nome: `${prefixo}Clicks`, campo: 'clicks' },
+    { nome: `${prefixo}Impressions`, campo: 'impressions' },
+    { nome: `${prefixo}Results`, campo: 'results' },
+  ];
+
+  for (const metrica of metricsToFetch) {
+    try {
+      const url = `${METRICOOL_API_BASE}/stats/timeline/${metrica.nome}?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}`;
+      const resp = await fetch(url, { headers });
+      
+      if (resp.ok) {
+        const data = await resp.json();
+        console.log(`    ✅ ${metrica.nome}: ${data?.length || 0} registros`);
+        
+        for (const item of (data || [])) {
+          let dataStr: string | null = null;
+          let valor: number = 0;
+          
+          if (Array.isArray(item) && item.length >= 2) {
+            const primeiroStr = String(item[0]);
+            const segundoStr = String(item[1]);
+            const primeiroNum = parseFloat(primeiroStr);
+            
+            if (primeiroStr.length >= 13 && primeiroNum > 1000000000000) {
+              dataStr = new Date(primeiroNum).toISOString().split('T')[0];
+              valor = parseFloat(segundoStr) || 0;
+            } else if (primeiroStr.length === 8 && /^\d{8}$/.test(primeiroStr)) {
+              dataStr = `${primeiroStr.substring(0, 4)}-${primeiroStr.substring(4, 6)}-${primeiroStr.substring(6, 8)}`;
+              valor = parseFloat(segundoStr) || 0;
+            }
+          }
+          
+          if (dataStr) {
+            if (!metricasPorData.has(dataStr)) {
+              metricasPorData.set(dataStr, {
+                conversions: 0,
+                conversionValue: 0,
+                spent: 0,
+                clicks: 0,
+                impressions: 0,
+                results: 0,
+              });
+            }
+            metricasPorData.get(dataStr)![metrica.campo] = valor;
+          }
+        }
+      }
+    } catch (err) {
+      console.log(`    ⚠️ Erro ao buscar ${metrica.nome}:`, err);
+    }
+  }
+  
+  return metricasPorData;
 }
 
 serve(async (req) => {
@@ -41,7 +200,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    console.log("🚀 Iniciando enriquecimento de campanhas via Metricool...");
+    console.log("🚀 Iniciando enriquecimento de campanhas via Metricool (Google + Meta)...");
 
     // Buscar todas as integrações Metricool ativas
     const { data: integracoes, error: intError } = await supabase
@@ -76,287 +235,229 @@ serve(async (req) => {
         const trintaDiasAtras = new Date();
         trintaDiasAtras.setDate(hoje.getDate() - 30);
         
-        // Formato de data YYYYMMDD (sem hífens)
         const initDate = trintaDiasAtras.toISOString().split('T')[0].replace(/-/g, '');
         const endDate = hoje.toISOString().split('T')[0].replace(/-/g, '');
         
         console.log(`  📅 Período: ${initDate} a ${endDate}`);
 
-        // Headers de autenticação Metricool
         const headers = {
           'X-Mc-Auth': config.user_token,
           'Content-Type': 'application/json',
         };
 
-        // Buscar dados de Google Ads do Metricool
-        console.log("  🔍 Buscando dados Google Ads do Metricool...");
+        const resultadoEmpresa: any = {
+          empresa_id: empresaId,
+          google: { campanhas: 0, metricas_atualizadas: 0 },
+          meta: { campanhas: 0, metricas_atualizadas: 0 },
+          status: "success",
+        };
+
+        // ============ GOOGLE ADS ============
+        console.log("\n  === GOOGLE ADS ===");
         
-        // Endpoint para Google Ads campaigns
-        const googleAdsUrl = `${METRICOOL_API_BASE}/ads/google/campaigns?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}`;
-        console.log(`  🔗 URL: ${googleAdsUrl}`);
+        const campanhasGoogle = await fetchAdsPlatformData(config, 'google', initDate, endDate, headers);
+        resultadoEmpresa.google.campanhas = campanhasGoogle.length;
         
-        const googleAdsResp = await fetch(googleAdsUrl, { headers });
-        
-        if (!googleAdsResp.ok) {
-          const errorText = await googleAdsResp.text();
-          console.log(`  ⚠️ Google Ads não disponível (${googleAdsResp.status}): ${errorText}`);
-          
-          // Tentar endpoint alternativo
-          const altUrl = `${METRICOOL_API_BASE}/ads/campaigns?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}&network=google`;
-          console.log(`  🔗 Tentando URL alternativa: ${altUrl}`);
-          
-          const altResp = await fetch(altUrl, { headers });
-          if (!altResp.ok) {
-            console.log(`  ⚠️ Endpoint alternativo também falhou (${altResp.status})`);
-            resultados.push({
-              empresa_id: empresaId,
-              status: "no_google_ads_data",
-              message: "Dados de Google Ads não disponíveis no Metricool"
-            });
-            continue;
-          }
-        }
+        if (campanhasGoogle.length > 0) {
+          // Buscar campanhas locais do Google
+          const { data: contasGoogle } = await supabase
+            .from('conta_anuncio')
+            .select('id_conta')
+            .eq('id_empresa', empresaId)
+            .eq('plataforma', 'GOOGLE');
 
-        const adsData = await googleAdsResp.json();
-        console.log(`  ✅ Dados recebidos: ${JSON.stringify(adsData).substring(0, 500)}...`);
+          if (contasGoogle && contasGoogle.length > 0) {
+            const { data: campanhasLocaisGoogle } = await supabase
+              .from('campanha')
+              .select('id_campanha, id_campanha_externo, nome')
+              .in('id_conta', contasGoogle.map(c => c.id_conta));
 
-        // Processar campanhas do Google Ads
-        const campanhasMetricool: AdsCampaignData[] = [];
-        
-        // A API pode retornar diferentes formatos
-        const campaigns = Array.isArray(adsData) ? adsData : adsData.campaigns || adsData.data || [];
-        
-        for (const campaign of campaigns) {
-          // Processar dados por data
-          const stats = campaign.stats || campaign.metrics || [campaign];
-          
-          for (const stat of (Array.isArray(stats) ? stats : [stats])) {
-            let dataStr = stat.date || stat.day || stat.datetime;
-            
-            // Converter YYYYMMDD para YYYY-MM-DD
-            if (dataStr && dataStr.length === 8 && !dataStr.includes('-')) {
-              dataStr = `${dataStr.substring(0, 4)}-${dataStr.substring(4, 6)}-${dataStr.substring(6, 8)}`;
-            }
-            
-            if (!dataStr || !/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) {
-              continue;
-            }
+            if (campanhasLocaisGoogle) {
+              for (const metricoolCamp of campanhasGoogle) {
+                const campanhaLocal = campanhasLocaisGoogle.find(c => 
+                  c.id_campanha_externo === metricoolCamp.campaignId ||
+                  c.nome?.toLowerCase().trim() === metricoolCamp.campaignName?.toLowerCase().trim()
+                );
 
-            campanhasMetricool.push({
-              campaignId: campaign.id || campaign.campaignId || campaign.campaign_id || '',
-              campaignName: campaign.name || campaign.campaignName || campaign.campaign_name || '',
-              data: dataStr,
-              impressions: parseInt(stat.impressions || stat.reach || '0'),
-              clicks: parseInt(stat.clicks || '0'),
-              spent: parseFloat(stat.spent || stat.cost || stat.spend || '0'),
-              conversions: parseInt(stat.conversions || stat.results || '0'),
-              conversionValue: parseFloat(stat.conversionValue || stat.conversion_value || stat.revenue || '0'),
-              cpc: parseFloat(stat.cpc || '0'),
-              cpm: parseFloat(stat.cpm || '0'),
-              ctr: parseFloat(stat.ctr || '0'),
-              roas: parseFloat(stat.roas || '0'),
-            });
-          }
-        }
+                if (campanhaLocal && (metricoolCamp.conversions > 0 || metricoolCamp.conversionValue > 0)) {
+                  const { error } = await supabase
+                    .from('campanha_metricas_dia')
+                    .upsert({
+                      id_campanha: campanhaLocal.id_campanha,
+                      data: metricoolCamp.data,
+                      impressoes: metricoolCamp.impressions,
+                      cliques: metricoolCamp.clicks,
+                      verba_investida: metricoolCamp.spent,
+                      leads: metricoolCamp.conversions,
+                      conversoes: metricoolCamp.conversions,
+                      valor_conversao: metricoolCamp.conversionValue,
+                      fonte_conversoes: 'METRICOOL_GOOGLE',
+                    }, {
+                      onConflict: 'id_campanha,data',
+                    });
 
-        console.log(`  📊 Campanhas encontradas no Metricool: ${campanhasMetricool.length}`);
-
-        if (campanhasMetricool.length === 0) {
-          // Tentar buscar métricas agregadas por timeline
-          console.log("  🔄 Tentando buscar métricas timeline de Google Ads...");
-          
-          const metricsToFetch = [
-            { nome: 'googleAdsConversions', campo: 'conversions' },
-            { nome: 'googleAdsConversionValue', campo: 'conversionValue' },
-            { nome: 'googleAdsSpent', campo: 'spent' },
-            { nome: 'googleAdsClicks', campo: 'clicks' },
-            { nome: 'googleAdsImpressions', campo: 'impressions' },
-          ];
-
-          const metricasPorData = new Map<string, Record<string, number>>();
-
-          for (const metrica of metricsToFetch) {
-            try {
-              const url = `${METRICOOL_API_BASE}/stats/timeline/${metrica.nome}?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}`;
-              const resp = await fetch(url, { headers });
-              
-              if (resp.ok) {
-                const data = await resp.json();
-                console.log(`    ✅ ${metrica.nome}: ${data?.length || 0} registros`);
-                
-                for (const item of (data || [])) {
-                  let dataStr: string | null = null;
-                  let valor: number = 0;
-                  
-                  if (Array.isArray(item) && item.length >= 2) {
-                    const primeiroStr = String(item[0]);
-                    const segundoStr = String(item[1]);
-                    const primeiroNum = parseFloat(primeiroStr);
-                    
-                    if (primeiroStr.length >= 13 && primeiroNum > 1000000000000) {
-                      dataStr = new Date(primeiroNum).toISOString().split('T')[0];
-                      valor = parseFloat(segundoStr) || 0;
-                    } else if (primeiroStr.length === 8 && /^\d{8}$/.test(primeiroStr)) {
-                      dataStr = `${primeiroStr.substring(0, 4)}-${primeiroStr.substring(4, 6)}-${primeiroStr.substring(6, 8)}`;
-                      valor = parseFloat(segundoStr) || 0;
-                    }
-                  }
-                  
-                  if (dataStr) {
-                    if (!metricasPorData.has(dataStr)) {
-                      metricasPorData.set(dataStr, {
-                        conversions: 0,
-                        conversionValue: 0,
-                        spent: 0,
-                        clicks: 0,
-                        impressions: 0,
-                      });
-                    }
-                    metricasPorData.get(dataStr)![metrica.campo] = valor;
+                  if (!error) {
+                    resultadoEmpresa.google.metricas_atualizadas++;
+                    console.log(`    ✅ Google: ${metricoolCamp.campaignName} - ${metricoolCamp.data}: ${metricoolCamp.conversions} conversões`);
                   }
                 }
               }
-            } catch (err) {
-              console.log(`    ⚠️ Erro ao buscar ${metrica.nome}:`, err);
             }
           }
+        } else {
+          // Tentar métricas agregadas para Google
+          console.log("  🔄 Tentando métricas timeline de Google Ads...");
+          const metricasGoogle = await fetchTimelineMetrics(config, 'google', initDate, endDate, headers);
+          
+          if (metricasGoogle.size > 0) {
+            console.log(`  📊 ${metricasGoogle.size} dias de métricas agregadas Google`);
+            // Salvar como métricas agregadas na empresa
+            for (const [data, metricas] of metricasGoogle) {
+              if (metricas.conversions > 0 || metricas.conversionValue > 0) {
+                resultadoEmpresa.google.metricas_atualizadas++;
+              }
+            }
+          }
+        }
 
-          // Converter para formato de campanhas (agregado por empresa, não por campanha)
-          if (metricasPorData.size > 0) {
-            console.log(`  📊 Métricas agregadas encontradas para ${metricasPorData.size} dias`);
+        // ============ META ADS (Facebook/Instagram) ============
+        console.log("\n  === META ADS ===");
+        
+        const campanhasMeta = await fetchAdsPlatformData(config, 'facebook', initDate, endDate, headers);
+        resultadoEmpresa.meta.campanhas = campanhasMeta.length;
+        
+        if (campanhasMeta.length > 0) {
+          // Buscar campanhas locais do Meta
+          const { data: contasMeta } = await supabase
+            .from('conta_anuncio')
+            .select('id_conta')
+            .eq('id_empresa', empresaId)
+            .eq('plataforma', 'META');
+
+          if (contasMeta && contasMeta.length > 0) {
+            const { data: campanhasLocaisMeta } = await supabase
+              .from('campanha')
+              .select('id_campanha, id_campanha_externo, nome')
+              .in('id_conta', contasMeta.map(c => c.id_conta));
+
+            if (campanhasLocaisMeta) {
+              for (const metricoolCamp of campanhasMeta) {
+                const campanhaLocal = campanhasLocaisMeta.find(c => 
+                  c.id_campanha_externo === metricoolCamp.campaignId ||
+                  c.nome?.toLowerCase().trim() === metricoolCamp.campaignName?.toLowerCase().trim()
+                );
+
+                if (campanhaLocal && (metricoolCamp.conversions > 0 || metricoolCamp.conversionValue > 0)) {
+                  // Só atualizar se não tiver dados do Meta direto ou se Metricool tiver mais info
+                  const { data: existente } = await supabase
+                    .from('campanha_metricas_dia')
+                    .select('conversoes, fonte_conversoes')
+                    .eq('id_campanha', campanhaLocal.id_campanha)
+                    .eq('data', metricoolCamp.data)
+                    .single();
+
+                  // Só sobrescrever se não tiver conversões ou se fonte for null/METRICOOL
+                  const deveAtualizar = !existente || 
+                    !existente.conversoes || 
+                    existente.conversoes === 0 ||
+                    existente.fonte_conversoes === null ||
+                    existente.fonte_conversoes?.startsWith('METRICOOL');
+
+                  if (deveAtualizar) {
+                    const { error } = await supabase
+                      .from('campanha_metricas_dia')
+                      .upsert({
+                        id_campanha: campanhaLocal.id_campanha,
+                        data: metricoolCamp.data,
+                        impressoes: metricoolCamp.impressions,
+                        cliques: metricoolCamp.clicks,
+                        verba_investida: metricoolCamp.spent,
+                        leads: metricoolCamp.conversions,
+                        conversoes: metricoolCamp.conversions,
+                        valor_conversao: metricoolCamp.conversionValue,
+                        fonte_conversoes: 'METRICOOL_META',
+                      }, {
+                        onConflict: 'id_campanha,data',
+                      });
+
+                    if (!error) {
+                      resultadoEmpresa.meta.metricas_atualizadas++;
+                      console.log(`    ✅ Meta: ${metricoolCamp.campaignName} - ${metricoolCamp.data}: ${metricoolCamp.conversions} conversões, R$ ${metricoolCamp.conversionValue}`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          // Tentar métricas agregadas para Meta
+          console.log("  🔄 Tentando métricas timeline de Meta Ads...");
+          const metricasMeta = await fetchTimelineMetrics(config, 'facebook', initDate, endDate, headers);
+          
+          if (metricasMeta.size > 0) {
+            console.log(`  📊 ${metricasMeta.size} dias de métricas agregadas Meta`);
             
-            // Buscar campanhas Google da empresa para enriquecer
-            const { data: contasGoogle } = await supabase
+            // Buscar campanhas Meta da empresa para distribuir ou agregar
+            const { data: contasMeta } = await supabase
               .from('conta_anuncio')
               .select('id_conta')
               .eq('id_empresa', empresaId)
-              .eq('plataforma', 'GOOGLE');
+              .eq('plataforma', 'META');
               
-            if (contasGoogle && contasGoogle.length > 0) {
-              const { data: campanhasGoogle } = await supabase
+            if (contasMeta && contasMeta.length > 0) {
+              const { data: campanhasMeta } = await supabase
                 .from('campanha')
                 .select('id_campanha, nome')
-                .in('id_conta', contasGoogle.map(c => c.id_conta))
-                .eq('ativa', true);
+                .in('id_conta', contasMeta.map(c => c.id_conta))
+                .eq('ativa', true)
+                .limit(1); // Pegar primeira campanha ativa para associar métricas agregadas
                 
-              if (campanhasGoogle && campanhasGoogle.length > 0) {
-                // Para métricas agregadas, distribuir proporcionalmente ou aplicar à primeira campanha
-                // Por simplicidade, vamos somar tudo em empresa_metricas_dia ao invés de campanha
-                console.log(`  📊 ${campanhasGoogle.length} campanhas Google para enriquecer`);
+              if (campanhasMeta && campanhasMeta.length > 0) {
+                const campanhaRef = campanhasMeta[0];
                 
-                // Salvar métricas agregadas por empresa
-                let metricasSalvas = 0;
-                for (const [data, metricas] of metricasPorData) {
-                  if (metricas.conversions > 0 || metricas.conversionValue > 0) {
-                    // Atualizar empresa_metricas_dia com conversões do Metricool
-                    const { error } = await supabase
-                      .from('empresa_metricas_dia')
-                      .upsert({
-                        id_empresa: empresaId,
-                        data,
-                        // Manter métricas existentes, adicionar conversões
-                        vendas: metricas.conversions,
-                        valor_vendas: metricas.conversionValue,
-                        updated_at: new Date().toISOString(),
-                      }, {
-                        onConflict: 'id_empresa,data',
-                      });
-                      
-                    if (!error) metricasSalvas++;
+                for (const [data, metricas] of metricasMeta) {
+                  const conversoes = metricas.conversions || metricas.results || 0;
+                  if (conversoes > 0 || metricas.conversionValue > 0) {
+                    // Verificar se já existe com dados da API direta
+                    const { data: existente } = await supabase
+                      .from('campanha_metricas_dia')
+                      .select('conversoes, fonte_conversoes')
+                      .eq('id_campanha', campanhaRef.id_campanha)
+                      .eq('data', data)
+                      .single();
+
+                    const deveAtualizar = !existente || 
+                      !existente.conversoes || 
+                      existente.conversoes === 0 ||
+                      existente.fonte_conversoes === null ||
+                      existente.fonte_conversoes?.startsWith('METRICOOL');
+
+                    if (deveAtualizar) {
+                      const { error } = await supabase
+                        .from('campanha_metricas_dia')
+                        .upsert({
+                          id_campanha: campanhaRef.id_campanha,
+                          data,
+                          impressoes: metricas.impressions || 0,
+                          cliques: metricas.clicks || 0,
+                          verba_investida: metricas.spent || 0,
+                          conversoes: conversoes,
+                          valor_conversao: metricas.conversionValue || 0,
+                          fonte_conversoes: 'METRICOOL_META_AGREGADO',
+                        }, {
+                          onConflict: 'id_campanha,data',
+                        });
+                        
+                      if (!error) resultadoEmpresa.meta.metricas_atualizadas++;
+                    }
                   }
                 }
-                
-                resultados.push({
-                  empresa_id: empresaId,
-                  status: "success",
-                  metricas_agregadas: metricasSalvas,
-                  tipo: "empresa_metricas",
-                });
               }
             }
           }
-          
-          continue;
         }
 
-        // Se temos dados por campanha, tentar fazer match com nossas campanhas
-        const { data: contasGoogle } = await supabase
-          .from('conta_anuncio')
-          .select('id_conta')
-          .eq('id_empresa', empresaId)
-          .eq('plataforma', 'GOOGLE');
-
-        if (!contasGoogle || contasGoogle.length === 0) {
-          console.log("  ⚠️ Nenhuma conta Google Ads configurada para esta empresa");
-          resultados.push({
-            empresa_id: empresaId,
-            status: "no_google_account",
-          });
-          continue;
-        }
-
-        const { data: campanhasLocais } = await supabase
-          .from('campanha')
-          .select('id_campanha, id_campanha_externo, nome')
-          .in('id_conta', contasGoogle.map(c => c.id_conta));
-
-        if (!campanhasLocais || campanhasLocais.length === 0) {
-          console.log("  ⚠️ Nenhuma campanha local encontrada");
-          resultados.push({
-            empresa_id: empresaId,
-            status: "no_campaigns",
-          });
-          continue;
-        }
-
-        console.log(`  📋 ${campanhasLocais.length} campanhas locais para fazer match`);
-
-        // Match e enriquecimento
-        let metricasAtualizadas = 0;
-
-        for (const metricoolCamp of campanhasMetricool) {
-          // Tentar encontrar campanha local pelo ID externo ou nome
-          const campanhaLocal = campanhasLocais.find(c => 
-            c.id_campanha_externo === metricoolCamp.campaignId ||
-            c.nome?.toLowerCase().trim() === metricoolCamp.campaignName?.toLowerCase().trim()
-          );
-
-          if (campanhaLocal && (metricoolCamp.conversions > 0 || metricoolCamp.conversionValue > 0)) {
-            // Atualizar métricas com dados do Metricool
-            const { error } = await supabase
-              .from('campanha_metricas_dia')
-              .upsert({
-                id_campanha: campanhaLocal.id_campanha,
-                data: metricoolCamp.data,
-                impressoes: metricoolCamp.impressions,
-                cliques: metricoolCamp.clicks,
-                verba_investida: metricoolCamp.spent,
-                leads: metricoolCamp.conversions, // Usar conversions como leads se não tiver
-                conversoes: metricoolCamp.conversions,
-                valor_conversao: metricoolCamp.conversionValue,
-                fonte_conversoes: 'METRICOOL',
-              }, {
-                onConflict: 'id_campanha,data',
-              });
-
-            if (!error) {
-              metricasAtualizadas++;
-              console.log(`    ✅ Atualizada: ${metricoolCamp.campaignName} - ${metricoolCamp.data}: ${metricoolCamp.conversions} conversões`);
-            } else {
-              console.log(`    ⚠️ Erro ao atualizar ${metricoolCamp.campaignName}:`, error.message);
-            }
-          }
-        }
-
-        console.log(`  ✅ ${metricasAtualizadas} métricas atualizadas`);
-
-        resultados.push({
-          empresa_id: empresaId,
-          status: "success",
-          campanhas_metricool: campanhasMetricool.length,
-          campanhas_locais: campanhasLocais.length,
-          metricas_atualizadas: metricasAtualizadas,
-        });
+        resultados.push(resultadoEmpresa);
 
       } catch (empresaError: any) {
         console.error(`❌ Erro na empresa ${empresaId}:`, empresaError.message);
@@ -383,7 +484,7 @@ serve(async (req) => {
     console.log(`\n✅ Enriquecimento concluído em ${duracao}ms`);
 
     return new Response(JSON.stringify({
-      message: "Enriquecimento de campanhas concluído",
+      message: "Enriquecimento de campanhas concluído (Google + Meta)",
       duracao_ms: duracao,
       resultados,
     }), {
