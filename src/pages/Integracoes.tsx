@@ -260,7 +260,7 @@ export default function Integracoes() {
           functionNames = ['sincronizar-notion'];
           break;
         case 'METRICOOL':
-          functionNames = ['sincronizar-metricool'];
+          functionNames = ['sincronizar-metricool', 'enriquecer-campanhas-metricool'];
           break;
         case 'CHATWOOT':
           // Chatwoot usa webhooks, não tem função de coleta
