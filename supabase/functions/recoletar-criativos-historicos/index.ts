@@ -246,8 +246,9 @@ serve(async (req) => {
 
             // Buscar TODOS os ads da campanha (incluindo archived/paused/deleted)
             // Usar effective_status para pegar todos os status possíveis
+            // IMPORTANTE: Incluindo preview_shareable_link para URLs de preview
             const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?` +
-              `fields=id,name,status,effective_status,adset_id,creative{id,name,object_story_spec,thumbnail_url,image_url,video_id,asset_feed_spec,template_url_spec,url_tags},tracking_specs,conversion_specs` +
+              `fields=id,name,status,effective_status,adset_id,preview_shareable_link,creative{id,name,object_story_spec,thumbnail_url,image_url,video_id,asset_feed_spec,template_url_spec,url_tags},tracking_specs,conversion_specs` +
               `&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED","ARCHIVED","DELETED","PENDING_REVIEW","DISAPPROVED","PREAPPROVED","PENDING_BILLING_INFO","CAMPAIGN_PAUSED","ADSET_PAUSED","IN_PROCESS"]}]` +
               `&limit=500` +
               `&access_token=${accessToken}`;
@@ -317,6 +318,7 @@ serve(async (req) => {
                       tipo,
                       url_midia: urlMidia,
                       url_final: urlFinal,
+                      url_preview: ad.preview_shareable_link || null,
                       ativo,
                       updated_at: new Date().toISOString(),
                     })
@@ -340,6 +342,7 @@ serve(async (req) => {
                       tipo,
                       url_midia: urlMidia,
                       url_final: urlFinal,
+                      url_preview: ad.preview_shareable_link || null,
                       ativo,
                     });
 
@@ -417,6 +420,7 @@ serve(async (req) => {
                         tipo,
                         url_midia: urlMidia,
                         url_final: urlFinal,
+                        url_preview: ad.preview_shareable_link || null,
                         ativo,
                         updated_at: new Date().toISOString(),
                       })
@@ -433,6 +437,7 @@ serve(async (req) => {
                         tipo,
                         url_midia: urlMidia,
                         url_final: urlFinal,
+                        url_preview: ad.preview_shareable_link || null,
                         ativo,
                       });
 

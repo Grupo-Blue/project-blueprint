@@ -128,3 +128,6 @@ verify_jwt = false
 
 [functions.stape-api]
 verify_jwt = false
+
+[functions.atualizar-preview-criativos]
+verify_jwt = false
