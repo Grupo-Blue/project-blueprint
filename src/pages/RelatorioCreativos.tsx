@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Eye, TrendingUp, AlertTriangle, ArrowUpDown, RefreshCw, Download, Image, Video, FileText, BarChart3 } from "lucide-react";
+import { Eye, TrendingUp, AlertTriangle, ArrowUpDown, RefreshCw, Download, Image, Video, FileText, BarChart3, ExternalLink } from "lucide-react";
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import jsPDF from "jspdf";
@@ -246,22 +246,48 @@ const RelatorioCreativos = () => {
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">Campanha: {criativoPreview?.campanha_nome}</div>
             
-            {criativoPreview?.url_midia || criativoPreview?.url_preview ? (
-              <div className="flex justify-center bg-muted rounded-lg p-4 min-h-[300px]">
-                {criativoPreview.tipo === "VIDEO" ? (
-                  <video src={criativoPreview.url_midia || criativoPreview.url_preview || ""} controls className="max-h-[500px] rounded-lg" />
-                ) : (
-                  <img src={criativoPreview.url_midia || criativoPreview.url_preview || ""} alt={criativoPreview.descricao || "Criativo"} className="max-h-[500px] object-contain rounded-lg" />
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center bg-muted rounded-lg p-8 min-h-[300px] text-muted-foreground">
-                <div className="text-center">
-                  <Image className="h-16 w-16 mx-auto mb-4 opacity-30" />
-                  <p>Preview não disponível</p>
-                </div>
-              </div>
-            )}
+            {(() => {
+              const mediaUrl = criativoPreview?.url_midia;
+              const previewUrl = criativoPreview?.url_preview;
+              const isExternalPreview = previewUrl && (previewUrl.includes('fb.me') || previewUrl.includes('facebook.com'));
+              const directMediaUrl = mediaUrl && !mediaUrl.includes('fb.me');
+              
+              if (directMediaUrl) {
+                return (
+                  <div className="flex justify-center bg-muted rounded-lg p-4 min-h-[300px]">
+                    {criativoPreview?.tipo === "VIDEO" ? (
+                      <video src={mediaUrl} controls className="max-h-[500px] rounded-lg" />
+                    ) : (
+                      <img src={mediaUrl} alt={criativoPreview?.descricao || "Criativo"} className="max-h-[500px] object-contain rounded-lg" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                    )}
+                  </div>
+                );
+              } else if (isExternalPreview || previewUrl) {
+                return (
+                  <div className="flex flex-col items-center justify-center bg-muted rounded-lg p-8 min-h-[200px] text-muted-foreground">
+                    <div className="text-center">
+                      {criativoPreview?.tipo === "VIDEO" ? <Video className="h-16 w-16 mx-auto mb-4 opacity-50" /> : <Image className="h-16 w-16 mx-auto mb-4 opacity-50" />}
+                      <p className="mb-4">Visualizar na plataforma</p>
+                      <Button asChild>
+                        <a href={previewUrl || ""} target="_blank" rel="noopener noreferrer" className="gap-2">
+                          <ExternalLink className="h-4 w-4" />Ver no Facebook/Meta
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="flex items-center justify-center bg-muted rounded-lg p-8 min-h-[200px] text-muted-foreground">
+                    <div className="text-center">
+                      {criativoPreview?.tipo === "VIDEO" ? <Video className="h-16 w-16 mx-auto mb-4 opacity-30" /> : <Image className="h-16 w-16 mx-auto mb-4 opacity-30" />}
+                      <p className="font-medium">Preview não disponível</p>
+                      <p className="text-xs mt-1">A mídia do criativo não foi coletada</p>
+                    </div>
+                  </div>
+                );
+              }
+            })()}
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
               <div className="text-center"><div className="text-xs text-muted-foreground">Impressões</div><div className="text-lg font-bold">{formatNumber(criativoPreview?.impressoes || 0)}</div></div>
@@ -270,18 +296,20 @@ const RelatorioCreativos = () => {
               <div className="text-center"><div className="text-xs text-muted-foreground">ROAS</div><div className="text-lg font-bold">{(criativoPreview?.roas || 0).toFixed(2)}x</div></div>
             </div>
 
-            <div className="flex gap-2 pt-2">
-              {criativoPreview && criativoPreview.total_leads > 0 && (
-                <Button variant="outline" onClick={() => { setCriativoPreview(null); setCriativoSelecionado(criativoPreview.id_criativo); }}>
-                  <Eye className="h-4 w-4 mr-2" />Ver Leads ({criativoPreview.total_leads})
-                </Button>
-              )}
-              {(criativoPreview?.url_midia || criativoPreview?.url_preview) && (
-                <Button variant="outline" asChild>
-                  <a href={criativoPreview.url_midia || criativoPreview.url_preview || ""} target="_blank" rel="noopener noreferrer">Abrir em nova aba</a>
-                </Button>
-              )}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-2">
+              <div className="text-center"><div className="text-xs text-muted-foreground">Verba</div><div className="text-lg font-bold">R$ {(criativoPreview?.verba_investida || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div></div>
+              <div className="text-center"><div className="text-xs text-muted-foreground">CPL</div><div className="text-lg font-bold">{criativoPreview?.cpl ? `R$ ${criativoPreview.cpl.toFixed(2)}` : "-"}</div></div>
+              <div className="text-center"><div className="text-xs text-muted-foreground">Vendas</div><div className="text-lg font-bold">{criativoPreview?.vendas || 0}</div></div>
+              <div className="text-center"><div className="text-xs text-muted-foreground">Receita</div><div className="text-lg font-bold">R$ {(criativoPreview?.valor_total_vendas || 0).toLocaleString("pt-BR")}</div></div>
             </div>
+
+            {criativoPreview && criativoPreview.total_leads > 0 && (
+              <div className="pt-2 border-t">
+                <Button variant="outline" className="w-full" onClick={() => { setCriativoPreview(null); setCriativoSelecionado(criativoPreview.id_criativo); }}>
+                  <Eye className="h-4 w-4 mr-2" />Ver {criativoPreview.total_leads} Leads Gerados
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
