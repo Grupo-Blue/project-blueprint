@@ -54,26 +54,37 @@ const getTipoIcon = (tipo: string) => {
 };
 
 const getExternalLink = (criativo: CriativoPerformance): { url: string; label: string } | null => {
-  // Se tiver url_preview direto, usar ele
+  // Se tiver url_preview direto (shareable link do Facebook), usar ele
   if (criativo.url_preview) {
     return { url: criativo.url_preview, label: "Ver Preview" };
   }
   
-  const adId = criativo.id_anuncio_externo || criativo.id_criativo_externo;
-  if (!adId) return null;
-  
+  // Para Meta, montar link do Ads Manager com o ID do anúncio
   if (criativo.plataforma === "META") {
-    // Link para o Facebook Ads Manager
-    const actId = criativo.id_conta_externo?.replace("act_", "") || adId.split("_")[0];
-    return { 
-      url: `https://business.facebook.com/adsmanager/manage/ads?act=${actId}&selected_ad_ids=${adId}`,
-      label: "Ver no Facebook Ads"
-    };
+    const adId = criativo.id_anuncio_externo;
+    if (adId) {
+      const actId = criativo.id_conta_externo?.replace("act_", "") || "";
+      return { 
+        url: `https://www.facebook.com/adsmanager/manage/ads?act=${actId}&selected_ad_ids=${adId}`,
+        label: "Abrir no Ads Manager"
+      };
+    }
+    // Fallback: link genérico para o Ads Manager da conta
+    if (criativo.id_conta_externo) {
+      const actId = criativo.id_conta_externo.replace("act_", "");
+      return {
+        url: `https://www.facebook.com/adsmanager/manage/ads?act=${actId}`,
+        label: "Abrir Ads Manager"
+      };
+    }
   } else if (criativo.plataforma === "GOOGLE") {
-    return { 
-      url: `https://ads.google.com/aw/ads?adId=${adId}`,
-      label: "Ver no Google Ads"
-    };
+    const adId = criativo.id_anuncio_externo || criativo.id_criativo_externo;
+    if (adId) {
+      return { 
+        url: `https://ads.google.com/aw/ads?adId=${adId}`,
+        label: "Ver no Google Ads"
+      };
+    }
   }
   
   return null;

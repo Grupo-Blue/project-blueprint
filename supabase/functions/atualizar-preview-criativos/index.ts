@@ -26,12 +26,13 @@ serve(async (req) => {
     const maxCriativos = body.max_criativos || 50;
     const apenasAtivos = body.apenas_ativos !== false; // Default true
 
-    // Buscar criativos sem url_preview
+    // Buscar criativos sem url_preview (com ou sem id_anuncio_externo)
     let query = supabase
       .from("criativo")
       .select(`
         id_criativo,
         id_anuncio_externo,
+        id_criativo_externo,
         id_campanha,
         descricao,
         campanha:id_campanha (
@@ -39,12 +40,12 @@ serve(async (req) => {
           nome,
           id_conta,
           conta_anuncio:id_conta (
-            id_empresa
+            id_empresa,
+            id_externo
           )
         )
       `)
       .is("url_preview", null)
-      .not("id_anuncio_externo", "is", null)
       .order("created_at", { ascending: false })
       .limit(maxCriativos);
 
@@ -133,14 +134,47 @@ serve(async (req) => {
         const promises = batch.map(async (criativo) => {
           try {
             estatisticas.total_processados++;
-            const adId = criativo.id_anuncio_externo;
+            let adId = criativo.id_anuncio_externo;
+            const creativeId = criativo.id_criativo_externo;
+            const accountId = (criativo.campanha as any)?.conta_anuncio?.id_externo;
+
+            // Se não tiver id_anuncio_externo, tentar buscar via creative
+            if (!adId && creativeId && accountId) {
+              console.log(`🔍 Buscando anúncio para creative ${creativeId}...`);
+              
+              // Buscar anúncios que usam este creative na conta
+              const searchUrl = `https://graph.facebook.com/v18.0/${accountId}/ads?fields=id,creative{id}&filtering=[{"field":"creative.id","operator":"EQUAL","value":"${creativeId}"}]&limit=1&access_token=${accessToken}`;
+              
+              try {
+                const searchResp = await fetch(searchUrl);
+                if (searchResp.ok) {
+                  const searchData = await searchResp.json();
+                  if (searchData.data && searchData.data.length > 0) {
+                    adId = searchData.data[0].id;
+                    console.log(`✅ Encontrado ad ${adId} para creative ${creativeId}`);
+                    
+                    // Atualizar id_anuncio_externo no banco
+                    await supabase
+                      .from("criativo")
+                      .update({ id_anuncio_externo: adId })
+                      .eq("id_criativo", criativo.id_criativo);
+                  }
+                }
+              } catch (searchErr) {
+                console.log(`⚠️ Erro ao buscar anúncio por creative: ${searchErr}`);
+              }
+            }
+
+            if (!adId) {
+              console.log(`⚠️ Criativo ${criativo.id_criativo} não possui id_anuncio_externo`);
+              return;
+            }
 
             // Buscar preview_shareable_link da API Meta
             const adUrl = `https://graph.facebook.com/v18.0/${adId}?fields=preview_shareable_link&access_token=${accessToken}`;
             const response = await fetch(adUrl);
 
             if (!response.ok) {
-              const errorText = await response.text();
               console.log(`❌ Erro ao buscar ad ${adId}: ${response.status}`);
               estatisticas.erros++;
               return;
