@@ -31,6 +31,26 @@ interface AdsCampaignData {
   plataforma: 'GOOGLE' | 'META';
 }
 
+interface AdsCreativeData {
+  adId: string;
+  adName: string;
+  campaignId: string;
+  campaignName: string;
+  adsetId?: string;
+  adsetName?: string;
+  data: string;
+  impressions: number;
+  clicks: number;
+  spent: number;
+  conversions: number;
+  conversionValue: number;
+  cpc: number;
+  cpm: number;
+  ctr: number;
+  roas: number;
+  plataforma: 'GOOGLE' | 'META';
+}
+
 // Função para buscar dados de Ads de uma plataforma específica
 async function fetchAdsPlatformData(
   config: MetricoolConfig,
@@ -117,6 +137,114 @@ async function fetchAdsPlatformData(
   
   console.log(`  📊 ${campanhas.length} registros de ${plataformaNome} encontrados`);
   return campanhas;
+}
+
+// Função para buscar dados a nível de anúncios/criativos
+async function fetchAdsCreativeData(
+  config: MetricoolConfig,
+  plataforma: 'google' | 'facebook',
+  initDate: string,
+  endDate: string,
+  headers: Record<string, string>
+): Promise<AdsCreativeData[]> {
+  const criativos: AdsCreativeData[] = [];
+  const plataformaNome = plataforma === 'google' ? 'GOOGLE' : 'META';
+  
+  console.log(`  🔍 Buscando dados de ANÚNCIOS/CRIATIVOS ${plataformaNome} do Metricool...`);
+  
+  // Tentar múltiplos endpoints para dados de anúncios
+  const endpoints = [
+    `${METRICOOL_API_BASE}/ads/${plataforma}/ads?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}`,
+    `${METRICOOL_API_BASE}/ads/ads?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}&network=${plataforma}`,
+    `${METRICOOL_API_BASE}/ads/${plataforma}/adsets?blogId=${config.blog_id}&userId=${config.user_id}&start=${initDate}&end=${endDate}`,
+  ];
+  
+  let adsData: any = null;
+  
+  for (const url of endpoints) {
+    try {
+      console.log(`    🔗 Tentando: ${url}`);
+      const resp = await fetch(url, { headers });
+      
+      if (resp.ok) {
+        const responseText = await resp.text();
+        console.log(`    📋 Resposta raw (primeiros 500 chars): ${responseText.substring(0, 500)}`);
+        
+        try {
+          adsData = JSON.parse(responseText);
+          console.log(`    ✅ Dados de anúncios recebidos!`);
+          break;
+        } catch (parseError) {
+          console.log(`    ⚠️ Erro ao parsear JSON:`, parseError);
+        }
+      } else {
+        const errorText = await resp.text();
+        console.log(`    ⚠️ Endpoint falhou (${resp.status}): ${errorText.substring(0, 200)}`);
+      }
+    } catch (err) {
+      console.log(`    ⚠️ Erro ao acessar endpoint:`, err);
+    }
+  }
+  
+  if (!adsData) {
+    console.log(`  ⚠️ Nenhum endpoint de anúncios ${plataformaNome} funcionou`);
+    return criativos;
+  }
+  
+  // Processar anúncios - pode vir em múltiplos formatos
+  const ads = Array.isArray(adsData) ? adsData : adsData.ads || adsData.adsets || adsData.data || [];
+  console.log(`  📊 Total de ${ads.length} anúncios/adsets encontrados`);
+  
+  for (const ad of ads) {
+    const stats = ad.stats || ad.metrics || ad.daily || ad.data || [ad];
+    const adId = ad.id || ad.adId || ad.ad_id || ad.adset_id || '';
+    const adName = ad.name || ad.adName || ad.ad_name || ad.title || '';
+    const campaignId = ad.campaignId || ad.campaign_id || ad.campaign?.id || '';
+    const campaignName = ad.campaignName || ad.campaign_name || ad.campaign?.name || '';
+    const adsetId = ad.adsetId || ad.adset_id || '';
+    const adsetName = ad.adsetName || ad.adset_name || '';
+    
+    for (const stat of (Array.isArray(stats) ? stats : [stats])) {
+      let dataStr = stat.date || stat.day || stat.datetime || ad.date;
+      
+      // Converter YYYYMMDD para YYYY-MM-DD
+      if (dataStr && dataStr.length === 8 && !dataStr.includes('-')) {
+        dataStr = `${dataStr.substring(0, 4)}-${dataStr.substring(4, 6)}-${dataStr.substring(6, 8)}`;
+      }
+      
+      // Converter timestamp para YYYY-MM-DD
+      if (dataStr && /^\d{13}$/.test(String(dataStr))) {
+        dataStr = new Date(parseInt(dataStr)).toISOString().split('T')[0];
+      }
+      
+      if (!dataStr || !/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) {
+        continue;
+      }
+
+      criativos.push({
+        adId,
+        adName,
+        campaignId,
+        campaignName,
+        adsetId,
+        adsetName,
+        data: dataStr,
+        impressions: parseInt(stat.impressions || stat.reach || '0'),
+        clicks: parseInt(stat.clicks || stat.link_clicks || '0'),
+        spent: parseFloat(stat.spent || stat.cost || stat.spend || '0'),
+        conversions: parseInt(stat.conversions || stat.results || stat.actions || '0'),
+        conversionValue: parseFloat(stat.conversionValue || stat.conversion_value || stat.revenue || stat.purchase_value || '0'),
+        cpc: parseFloat(stat.cpc || '0'),
+        cpm: parseFloat(stat.cpm || '0'),
+        ctr: parseFloat(stat.ctr || '0'),
+        roas: parseFloat(stat.roas || '0'),
+        plataforma: plataformaNome,
+      });
+    }
+  }
+  
+  console.log(`  📊 ${criativos.length} registros de anúncios/criativos ${plataformaNome} encontrados`);
+  return criativos;
 }
 
 // Função para buscar métricas timeline agregadas
@@ -247,8 +375,8 @@ serve(async (req) => {
 
         const resultadoEmpresa: any = {
           empresa_id: empresaId,
-          google: { campanhas: 0, metricas_atualizadas: 0 },
-          meta: { campanhas: 0, metricas_atualizadas: 0 },
+          google: { campanhas: 0, metricas_atualizadas: 0, criativos: 0 },
+          meta: { campanhas: 0, metricas_atualizadas: 0, criativos: 0 },
           status: "success",
         };
 
@@ -455,6 +583,98 @@ serve(async (req) => {
               }
             }
           }
+        }
+
+        // ============ CRIATIVOS/ANÚNCIOS (GOOGLE + META) ============
+        console.log("\n  === CRIATIVOS/ANÚNCIOS ===");
+        
+        // Buscar criativos locais da empresa para matching
+        const { data: contasEmpresa } = await supabase
+          .from('conta_anuncio')
+          .select('id_conta, plataforma')
+          .eq('id_empresa', empresaId);
+        
+        if (contasEmpresa && contasEmpresa.length > 0) {
+          const { data: campanhasLocais } = await supabase
+            .from('campanha')
+            .select('id_campanha, id_campanha_externo, nome')
+            .in('id_conta', contasEmpresa.map(c => c.id_conta));
+          
+          const { data: criativosLocais } = await supabase
+            .from('criativo')
+            .select('id_criativo, id_criativo_externo, id_anuncio_externo, id_campanha, descricao')
+            .in('id_campanha', (campanhasLocais || []).map(c => c.id_campanha));
+          
+          console.log(`  📋 ${criativosLocais?.length || 0} criativos locais encontrados`);
+          
+          // Coletar criativos do Google
+          const criativosGoogle = await fetchAdsCreativeData(config, 'google', initDate, endDate, headers);
+          if (criativosGoogle.length > 0) {
+            for (const criativoMetricool of criativosGoogle) {
+              // Tentar encontrar criativo local pelo ID do anúncio ou ID do criativo
+              const criativoLocal = (criativosLocais || []).find(c => 
+                c.id_anuncio_externo === criativoMetricool.adId ||
+                c.id_criativo_externo === criativoMetricool.adId
+              );
+              
+              if (criativoLocal) {
+                const { error } = await supabase
+                  .from('criativo_metricas_dia')
+                  .upsert({
+                    id_criativo: criativoLocal.id_criativo,
+                    data: criativoMetricool.data,
+                    impressoes: criativoMetricool.impressions,
+                    cliques: criativoMetricool.clicks,
+                    verba_investida: criativoMetricool.spent,
+                    leads: criativoMetricool.conversions,
+                  }, {
+                    onConflict: 'id_criativo,data',
+                  });
+                
+                if (!error) {
+                  resultadoEmpresa.google.criativos++;
+                  console.log(`    ✅ Criativo Google: ${criativoMetricool.adName || criativoMetricool.adId} - ${criativoMetricool.data}: ${criativoMetricool.impressions} impressões, ${criativoMetricool.conversions} conversões`);
+                }
+              }
+            }
+          }
+          
+          // Coletar criativos do Meta
+          const criativosMeta = await fetchAdsCreativeData(config, 'facebook', initDate, endDate, headers);
+          if (criativosMeta.length > 0) {
+            for (const criativoMetricool of criativosMeta) {
+              // Tentar encontrar criativo local pelo ID do anúncio ou ID do criativo
+              const criativoLocal = (criativosLocais || []).find(c => 
+                c.id_anuncio_externo === criativoMetricool.adId ||
+                c.id_criativo_externo === criativoMetricool.adId
+              );
+              
+              if (criativoLocal) {
+                const { error } = await supabase
+                  .from('criativo_metricas_dia')
+                  .upsert({
+                    id_criativo: criativoLocal.id_criativo,
+                    data: criativoMetricool.data,
+                    impressoes: criativoMetricool.impressions,
+                    cliques: criativoMetricool.clicks,
+                    verba_investida: criativoMetricool.spent,
+                    leads: criativoMetricool.conversions,
+                  }, {
+                    onConflict: 'id_criativo,data',
+                  });
+                
+                if (!error) {
+                  resultadoEmpresa.meta.criativos++;
+                  console.log(`    ✅ Criativo Meta: ${criativoMetricool.adName || criativoMetricool.adId} - ${criativoMetricool.data}: ${criativoMetricool.impressions} impressões, ${criativoMetricool.conversions} conversões`);
+                }
+              } else {
+                // Se não encontrou match direto, tentar criar/atualizar pelo nome ou ID da campanha
+                console.log(`    ℹ️ Criativo sem match: ${criativoMetricool.adId} (${criativoMetricool.adName})`);
+              }
+            }
+          }
+          
+          console.log(`  📊 Total criativos enriquecidos: Google=${resultadoEmpresa.google.criativos}, Meta=${resultadoEmpresa.meta.criativos}`);
         }
 
         resultados.push(resultadoEmpresa);
