@@ -607,14 +607,32 @@ serve(async (req) => {
           
           console.log(`  📋 ${criativosLocais?.length || 0} criativos locais encontrados`);
           
+          // Logar amostra de IDs locais para debug
+          if (criativosLocais && criativosLocais.length > 0) {
+            console.log(`  📋 Amostra de IDs locais (primeiros 5):`);
+            for (const c of criativosLocais.slice(0, 5)) {
+              console.log(`    - id_criativo_externo: ${c.id_criativo_externo}, id_anuncio_externo: ${c.id_anuncio_externo}`);
+            }
+          }
+          
           // Coletar criativos do Google
           const criativosGoogle = await fetchAdsCreativeData(config, 'google', initDate, endDate, headers);
+          console.log(`  📊 ${criativosGoogle.length} criativos Google retornados da API`);
+          
           if (criativosGoogle.length > 0) {
+            // Logar amostra de IDs do Metricool
+            console.log(`  📋 Amostra de IDs Google Metricool (primeiros 5):`);
+            for (const c of criativosGoogle.slice(0, 5)) {
+              console.log(`    - adId: ${c.adId}, adName: ${c.adName}, campaignId: ${c.campaignId}`);
+            }
+            
             for (const criativoMetricool of criativosGoogle) {
               // Tentar encontrar criativo local pelo ID do anúncio ou ID do criativo
               const criativoLocal = (criativosLocais || []).find(c => 
                 c.id_anuncio_externo === criativoMetricool.adId ||
-                c.id_criativo_externo === criativoMetricool.adId
+                c.id_criativo_externo === criativoMetricool.adId ||
+                c.id_anuncio_externo === criativoMetricool.adsetId ||
+                c.id_criativo_externo === criativoMetricool.adsetId
               );
               
               if (criativoLocal) {
@@ -635,18 +653,30 @@ serve(async (req) => {
                   resultadoEmpresa.google.criativos++;
                   console.log(`    ✅ Criativo Google: ${criativoMetricool.adName || criativoMetricool.adId} - ${criativoMetricool.data}: ${criativoMetricool.impressions} impressões, ${criativoMetricool.conversions} conversões`);
                 }
+              } else {
+                console.log(`    ℹ️ Criativo Google sem match: adId=${criativoMetricool.adId}, adsetId=${criativoMetricool.adsetId || 'N/A'}`);
               }
             }
           }
           
           // Coletar criativos do Meta
           const criativosMeta = await fetchAdsCreativeData(config, 'facebook', initDate, endDate, headers);
+          console.log(`  📊 ${criativosMeta.length} criativos Meta retornados da API`);
+          
           if (criativosMeta.length > 0) {
+            // Logar amostra de IDs do Metricool
+            console.log(`  📋 Amostra de IDs Meta Metricool (primeiros 5):`);
+            for (const c of criativosMeta.slice(0, 5)) {
+              console.log(`    - adId: ${c.adId}, adName: ${c.adName}, campaignId: ${c.campaignId}`);
+            }
+            
             for (const criativoMetricool of criativosMeta) {
               // Tentar encontrar criativo local pelo ID do anúncio ou ID do criativo
               const criativoLocal = (criativosLocais || []).find(c => 
                 c.id_anuncio_externo === criativoMetricool.adId ||
-                c.id_criativo_externo === criativoMetricool.adId
+                c.id_criativo_externo === criativoMetricool.adId ||
+                c.id_anuncio_externo === criativoMetricool.adsetId ||
+                c.id_criativo_externo === criativoMetricool.adsetId
               );
               
               if (criativoLocal) {
@@ -668,8 +698,7 @@ serve(async (req) => {
                   console.log(`    ✅ Criativo Meta: ${criativoMetricool.adName || criativoMetricool.adId} - ${criativoMetricool.data}: ${criativoMetricool.impressions} impressões, ${criativoMetricool.conversions} conversões`);
                 }
               } else {
-                // Se não encontrou match direto, tentar criar/atualizar pelo nome ou ID da campanha
-                console.log(`    ℹ️ Criativo sem match: ${criativoMetricool.adId} (${criativoMetricool.adName})`);
+                console.log(`    ℹ️ Criativo Meta sem match: adId=${criativoMetricool.adId}, adsetId=${criativoMetricool.adsetId || 'N/A'}`);
               }
             }
           }
