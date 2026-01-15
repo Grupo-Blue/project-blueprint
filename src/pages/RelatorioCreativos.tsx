@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +12,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Eye, TrendingUp, AlertTriangle, ArrowUpDown, RefreshCw, Download, Image, Video, FileText, BarChart3, ExternalLink } from "lucide-react";
+import { Eye, TrendingUp, AlertTriangle, ArrowUpDown, RefreshCw, Download, Image, Video, FileText, BarChart3, ExternalLink, CloudDownload } from "lucide-react";
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import jsPDF from "jspdf";
+import { toast } from "sonner";
 
 interface CriativoPerformance {
   id_criativo: string;
@@ -163,6 +164,25 @@ const RelatorioCreativos = () => {
   const formatNumber = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n.toFixed(0);
   const exportarPDF = () => { const doc = new jsPDF(); doc.text("Relatório de Criativos", 20, 20); doc.text(`Criativos: ${stats.total} | Investido: R$ ${stats.investido.toFixed(2)} | ROAS: ${stats.roas.toFixed(2)}x`, 20, 30); doc.save("relatorio-criativos.pdf"); };
 
+  const criativosSemPreview = (criativos || []).filter((c) => !c.url_preview && !c.url_midia).length;
+
+  const sincronizarPreviews = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("atualizar-preview-criativos", {
+        body: { max_criativos: 50, apenas_ativos: true },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`${data.estatisticas?.atualizados || 0} previews atualizados`);
+      refetch();
+    },
+    onError: (error: any) => {
+      toast.error(`Erro ao sincronizar: ${error.message}`);
+    },
+  });
+
   if (isLoading) return <div className="p-6 space-y-6"><Skeleton className="h-8 w-64" /><div className="grid grid-cols-4 gap-4">{[1,2,3,4].map(i => <Skeleton key={i} className="h-24" />)}</div><Skeleton className="h-96" /></div>;
 
   return (
@@ -173,6 +193,12 @@ const RelatorioCreativos = () => {
           <Select value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoFiltro)}><SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="7d">Últimos 7 dias</SelectItem><SelectItem value="30d">Últimos 30 dias</SelectItem><SelectItem value="mes_atual">Mês atual</SelectItem><SelectItem value="mes_anterior">Mês anterior</SelectItem><SelectItem value="todos">Todo período</SelectItem></SelectContent></Select>
           <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md"><Switch id="sem-leads" checked={mostrarSemLeads} onCheckedChange={setMostrarSemLeads} /><Label htmlFor="sem-leads" className="text-sm">Sem leads</Label></div>
           <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCw className="h-4 w-4 mr-1" />Atualizar</Button>
+          {criativosSemPreview > 0 && (
+            <Button variant="outline" size="sm" onClick={() => sincronizarPreviews.mutate()} disabled={sincronizarPreviews.isPending}>
+              <CloudDownload className={`h-4 w-4 mr-1 ${sincronizarPreviews.isPending ? "animate-spin" : ""}`} />
+              Sincronizar Previews ({criativosSemPreview})
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={exportarPDF}><Download className="h-4 w-4 mr-1" />PDF</Button>
         </div>
       </div>
