@@ -352,32 +352,41 @@ export type Database = {
       campanha_metricas_dia: {
         Row: {
           cliques: number
+          conversoes: number | null
           created_at: string
           data: string
+          fonte_conversoes: string | null
           id_campanha: string
           id_metricas_dia: string
           impressoes: number
           leads: number
+          valor_conversao: number | null
           verba_investida: number
         }
         Insert: {
           cliques?: number
+          conversoes?: number | null
           created_at?: string
           data: string
+          fonte_conversoes?: string | null
           id_campanha: string
           id_metricas_dia?: string
           impressoes?: number
           leads?: number
+          valor_conversao?: number | null
           verba_investida?: number
         }
         Update: {
           cliques?: number
+          conversoes?: number | null
           created_at?: string
           data?: string
+          fonte_conversoes?: string | null
           id_campanha?: string
           id_metricas_dia?: string
           impressoes?: number
           leads?: number
+          valor_conversao?: number | null
           verba_investida?: number
         }
         Relationships: [
