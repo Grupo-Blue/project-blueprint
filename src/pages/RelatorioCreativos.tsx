@@ -70,7 +70,7 @@ const RelatorioCreativos = () => {
     queryKey: ["leads-criativo", criativoSelecionado],
     queryFn: async () => {
       if (!criativoSelecionado) return [];
-      const { data } = await supabase.from("lead").select("*").eq("id_criativo", criativoSelecionado).order("data_entrada", { ascending: false });
+      const { data } = await supabase.from("lead").select("*").eq("id_criativo", criativoSelecionado).order("data_criacao", { ascending: false });
       return data || [];
     },
     enabled: !!criativoSelecionado,
@@ -99,8 +99,8 @@ const RelatorioCreativos = () => {
         metricasPorCriativo[m.id_criativo].verba += m.verba_investida || 0;
       });
 
-      let qLeads = supabase.from("lead").select("id_criativo, status_atual, venda_realizada, valor_venda").in("id_criativo", ids);
-      if (dataInicio && dataFim) qLeads = qLeads.gte("data_entrada", format(dataInicio, "yyyy-MM-dd")).lte("data_entrada", format(dataFim, "yyyy-MM-dd"));
+      let qLeads = supabase.from("lead").select("id_criativo, stage_atual, is_mql, venda_realizada, valor_venda").in("id_criativo", ids);
+      if (dataInicio && dataFim) qLeads = qLeads.gte("data_criacao", format(dataInicio, "yyyy-MM-dd")).lte("data_criacao", format(dataFim, "yyyy-MM-dd"));
       const { data: leadsData } = await qLeads;
 
       const leadsPorCriativo: Record<string, { total: number; mqls: number; vendas: number; valor: number }> = {};
@@ -108,7 +108,7 @@ const RelatorioCreativos = () => {
         if (!l.id_criativo) return;
         if (!leadsPorCriativo[l.id_criativo]) leadsPorCriativo[l.id_criativo] = { total: 0, mqls: 0, vendas: 0, valor: 0 };
         leadsPorCriativo[l.id_criativo].total += 1;
-        if (["MQL", "Reunião Agendada", "Proposta", "Negociação", "Venda"].includes(l.status_atual || "")) leadsPorCriativo[l.id_criativo].mqls += 1;
+        if (l.is_mql) leadsPorCriativo[l.id_criativo].mqls += 1;
         if (l.venda_realizada) { leadsPorCriativo[l.id_criativo].vendas += 1; leadsPorCriativo[l.id_criativo].valor += l.valor_venda || 0; }
       });
 
@@ -229,7 +229,7 @@ const RelatorioCreativos = () => {
           <DialogHeader><DialogTitle>Leads do Criativo</DialogTitle></DialogHeader>
           {leadsCriativo && leadsCriativo.length > 0 ? (
             <Table><TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Email</TableHead><TableHead>Status</TableHead><TableHead>Entrada</TableHead><TableHead>Venda</TableHead></TableRow></TableHeader>
-              <TableBody>{leadsCriativo.map((l) => (<TableRow key={l.id_lead}><TableCell>{l.nome || "-"}</TableCell><TableCell>{l.email || "-"}</TableCell><TableCell><Badge variant="outline">{l.status_atual || "Novo"}</Badge></TableCell><TableCell>{l.data_entrada ? format(new Date(l.data_entrada), "dd/MM/yyyy") : "-"}</TableCell><TableCell>{l.venda_realizada ? <span className="text-green-600">R$ {(l.valor_venda || 0).toLocaleString("pt-BR")}</span> : "-"}</TableCell></TableRow>))}</TableBody>
+              <TableBody>{leadsCriativo.map((l) => (<TableRow key={l.id_lead}><TableCell>{l.nome_lead || "-"}</TableCell><TableCell>{l.email || "-"}</TableCell><TableCell><Badge variant="outline">{l.stage_atual || "Novo"}</Badge></TableCell><TableCell>{l.data_criacao ? format(new Date(l.data_criacao), "dd/MM/yyyy") : "-"}</TableCell><TableCell>{l.venda_realizada ? <span className="text-green-600">R$ {(l.valor_venda || 0).toLocaleString("pt-BR")}</span> : "-"}</TableCell></TableRow>))}</TableBody>
             </Table>
           ) : <div className="text-center py-8 text-muted-foreground">Nenhum lead encontrado.</div>}
         </DialogContent>
