@@ -366,26 +366,54 @@ const RelatorioCreativos = () => {
                 );
               }
               
-              // Para vídeos e carrosséis sem URL direta - mostrar placeholder informativo
+              // Para vídeos e carrosséis - mostrar thumbnail se disponível
               if (isVideo || isCarrossel) {
+                // url_midia pode conter a thumbnail do vídeo
+                const thumbnailUrl = mediaUrl && (mediaUrl.includes('.jpg') || mediaUrl.includes('.png') || mediaUrl.includes('.jpeg'))
+                  ? mediaUrl
+                  : null;
+                
                 return (
-                  <div className="flex flex-col items-center justify-center bg-muted rounded-lg p-8 min-h-[200px] text-muted-foreground">
-                    <div className="text-center">
-                      {isVideo ? (
-                        <Video className="h-20 w-20 mx-auto mb-4 opacity-50" />
-                      ) : (
-                        <FileText className="h-20 w-20 mx-auto mb-4 opacity-50" />
-                      )}
-                      <p className="font-medium mb-2">
-                        {isVideo ? "Vídeo" : "Carrossel"} - Preview externo
-                      </p>
-                      <p className="text-xs mb-4 max-w-[300px]">
-                        {isVideo 
-                          ? "Vídeos do Meta/Google não podem ser incorporados diretamente. Use o link abaixo para visualizar."
-                          : "Carrosséis precisam ser visualizados na plataforma de origem."
-                        }
-                      </p>
-                    </div>
+                  <div className="flex flex-col items-center justify-center bg-muted rounded-lg p-4 min-h-[200px]">
+                    {thumbnailUrl ? (
+                      <div className="relative">
+                        <img 
+                          src={thumbnailUrl} 
+                          alt={criativoPreview?.descricao || "Thumbnail"} 
+                          className="max-h-[400px] object-contain rounded-lg" 
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                        {/* Overlay de vídeo/carrossel */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-lg">
+                          {isVideo ? (
+                            <div className="bg-white/90 rounded-full p-4">
+                              <Video className="h-10 w-10 text-primary" />
+                            </div>
+                          ) : (
+                            <div className="bg-white/90 rounded-full p-4">
+                              <FileText className="h-10 w-10 text-primary" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center text-muted-foreground">
+                        {isVideo ? (
+                          <Video className="h-20 w-20 mx-auto mb-4 opacity-50" />
+                        ) : (
+                          <FileText className="h-20 w-20 mx-auto mb-4 opacity-50" />
+                        )}
+                        <p className="font-medium mb-2">
+                          {isVideo ? "Vídeo" : "Carrossel"} - Preview externo
+                        </p>
+                        <p className="text-xs mb-4 max-w-[300px]">
+                          {isVideo 
+                            ? "Vídeos do Meta/Google precisam ser visualizados na plataforma."
+                            : "Carrosséis precisam ser visualizados na plataforma de origem."
+                          }
+                        </p>
+                      </div>
+                    )}
                   </div>
                 );
               }
