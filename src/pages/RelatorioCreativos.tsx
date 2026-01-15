@@ -136,12 +136,13 @@ const RelatorioCreativos = () => {
       if (dataInicio && dataFim) qMetricas = qMetricas.gte("data", format(dataInicio, "yyyy-MM-dd")).lte("data", format(dataFim, "yyyy-MM-dd"));
       const { data: metricasData } = await qMetricas;
 
-      const metricasPorCriativo: Record<string, { impressoes: number; cliques: number; verba: number }> = {};
+      const metricasPorCriativo: Record<string, { impressoes: number; cliques: number; verba: number; leadsMetrica: number }> = {};
       (metricasData || []).forEach((m) => {
-        if (!metricasPorCriativo[m.id_criativo]) metricasPorCriativo[m.id_criativo] = { impressoes: 0, cliques: 0, verba: 0 };
+        if (!metricasPorCriativo[m.id_criativo]) metricasPorCriativo[m.id_criativo] = { impressoes: 0, cliques: 0, verba: 0, leadsMetrica: 0 };
         metricasPorCriativo[m.id_criativo].impressoes += m.impressoes || 0;
         metricasPorCriativo[m.id_criativo].cliques += m.cliques || 0;
         metricasPorCriativo[m.id_criativo].verba += m.verba_investida || 0;
+        metricasPorCriativo[m.id_criativo].leadsMetrica += m.leads || 0;
       });
 
       let qLeads = supabase.from("lead").select("id_criativo, stage_atual, is_mql, venda_realizada, valor_venda").in("id_criativo", ids);
@@ -158,14 +159,16 @@ const RelatorioCreativos = () => {
       });
 
       const result: CriativoPerformance[] = criativosDaEmpresa.map((c) => {
-        const m = metricasPorCriativo[c.id_criativo] || { impressoes: 0, cliques: 0, verba: 0 };
+        const m = metricasPorCriativo[c.id_criativo] || { impressoes: 0, cliques: 0, verba: 0, leadsMetrica: 0 };
         const l = leadsPorCriativo[c.id_criativo] || { total: 0, mqls: 0, vendas: 0, valor: 0 };
+        // Usar leads vinculados diretamente, ou fallback para leads da métrica (Metricool/API)
+        const totalLeads = l.total > 0 ? l.total : m.leadsMetrica;
         return {
           id_criativo: c.id_criativo, descricao: c.descricao, tipo: c.tipo, campanha_nome: c.campanha?.nome || "-",
           impressoes: m.impressoes, cliques: m.cliques, verba_investida: m.verba,
           ctr: m.impressoes > 0 ? (m.cliques / m.impressoes) * 100 : 0,
-          total_leads: l.total, mqls: l.mqls, vendas: l.vendas, valor_total_vendas: l.valor,
-          cpl: l.total > 0 ? m.verba / l.total : 0,
+          total_leads: totalLeads, mqls: l.mqls, vendas: l.vendas, valor_total_vendas: l.valor,
+          cpl: totalLeads > 0 ? m.verba / totalLeads : 0,
           roas: m.verba > 0 ? l.valor / m.verba : 0,
           url_preview: c.url_preview,
           url_midia: c.url_midia,
