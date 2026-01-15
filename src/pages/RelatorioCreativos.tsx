@@ -1,365 +1,220 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Image, TrendingUp, DollarSign, Users, Target, CheckCircle2, Eye, ExternalLink } from "lucide-react";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEmpresa } from "@/contexts/EmpresaContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Eye, TrendingUp, AlertTriangle, ArrowUpDown, RefreshCw, Download, Image, Video, FileText, BarChart3 } from "lucide-react";
+import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import jsPDF from "jspdf";
 
 interface CriativoPerformance {
   id_criativo: string;
-  id_criativo_externo: string;
   descricao: string | null;
   tipo: string;
   campanha_nome: string;
+  impressoes: number;
+  cliques: number;
+  verba_investida: number;
+  ctr: number;
   total_leads: number;
   mqls: number;
-  reunioes: number;
   vendas: number;
   valor_total_vendas: number;
-  taxa_conversao_mql: number;
-  taxa_conversao_venda: number;
-  cpl_estimado: number;
+  cpl: number;
+  roas: number;
 }
+
+type OrdenacaoCampo = 'leads' | 'roas' | 'cpl' | 'verba' | 'vendas' | 'ctr' | 'impressoes';
+type PeriodoFiltro = '7d' | '30d' | 'mes_atual' | 'mes_anterior' | 'todos';
+
+const getTipoIcon = (tipo: string) => {
+  switch (tipo) {
+    case 'IMAGE': return <Image className="h-4 w-4" />;
+    case 'VIDEO': return <Video className="h-4 w-4" />;
+    case 'CAROUSEL': return <FileText className="h-4 w-4" />;
+    default: return <BarChart3 className="h-4 w-4" />;
+  }
+};
 
 const RelatorioCreativos = () => {
   const { empresaSelecionada } = useEmpresa();
   const [criativoSelecionado, setCriativoSelecionado] = useState<string | null>(null);
-  
-  // Query para buscar leads do criativo selecionado
-  const { data: leadsDetalhados } = useQuery({
+  const [ordenacao, setOrdenacao] = useState<{ campo: OrdenacaoCampo; direcao: 'asc' | 'desc' }>({ campo: 'verba', direcao: 'desc' });
+  const [periodo, setPeriodo] = useState<PeriodoFiltro>('30d');
+  const [mostrarSemLeads, setMostrarSemLeads] = useState(false);
+
+  const getDatasDoPeríodo = () => {
+    const hoje = new Date();
+    switch (periodo) {
+      case '7d': return { inicio: subDays(hoje, 7), fim: hoje };
+      case '30d': return { inicio: subDays(hoje, 30), fim: hoje };
+      case 'mes_atual': return { inicio: startOfMonth(hoje), fim: endOfMonth(hoje) };
+      case 'mes_anterior': const m = subMonths(hoje, 1); return { inicio: startOfMonth(m), fim: endOfMonth(m) };
+      default: return { inicio: null, fim: null };
+    }
+  };
+
+  const { inicio: dataInicio, fim: dataFim } = getDatasDoPeríodo();
+
+  const { data: leadsCriativo } = useQuery({
     queryKey: ["leads-criativo", criativoSelecionado],
     queryFn: async () => {
       if (!criativoSelecionado) return [];
-      
-      const { data, error } = await supabase
-        .from("lead")
-        .select("*")
-        .eq("id_criativo", criativoSelecionado)
-        .order("data_criacao", { ascending: false });
-      
-      if (error) throw error;
-      return data;
+      const { data } = await supabase.from("lead").select("*").eq("id_criativo", criativoSelecionado).order("data_entrada", { ascending: false });
+      return data || [];
     },
     enabled: !!criativoSelecionado,
   });
 
-  const { data: empresas } = useQuery({
-    queryKey: ["empresas"],
+  const { data: criativos, isLoading, dataUpdatedAt, refetch } = useQuery({
+    queryKey: ["criativos-performance-v2", empresaSelecionada, periodo, mostrarSemLeads],
     queryFn: async () => {
-      const { data, error } = await supabase.from("empresa").select("id_empresa, nome");
-      if (error) throw error;
-      return data;
+      if (!empresaSelecionada) return [];
+
+      const { data: criativosData } = await supabase.from("criativo").select(`id_criativo, descricao, tipo, campanha:id_campanha(nome, conta_anuncio:id_conta(id_empresa))`).eq("ativo", true);
+      const criativosDaEmpresa = (criativosData || []).filter((c) => c.campanha?.conta_anuncio?.id_empresa === empresaSelecionada);
+      if (criativosDaEmpresa.length === 0) return [];
+
+      const ids = criativosDaEmpresa.map((c) => c.id_criativo);
+
+      let qMetricas = supabase.from("criativo_metricas_dia").select("*").in("id_criativo", ids);
+      if (dataInicio && dataFim) qMetricas = qMetricas.gte("data", format(dataInicio, "yyyy-MM-dd")).lte("data", format(dataFim, "yyyy-MM-dd"));
+      const { data: metricasData } = await qMetricas;
+
+      const metricasPorCriativo: Record<string, { impressoes: number; cliques: number; verba: number }> = {};
+      (metricasData || []).forEach((m) => {
+        if (!metricasPorCriativo[m.id_criativo]) metricasPorCriativo[m.id_criativo] = { impressoes: 0, cliques: 0, verba: 0 };
+        metricasPorCriativo[m.id_criativo].impressoes += m.impressoes || 0;
+        metricasPorCriativo[m.id_criativo].cliques += m.cliques || 0;
+        metricasPorCriativo[m.id_criativo].verba += m.verba_investida || 0;
+      });
+
+      let qLeads = supabase.from("lead").select("id_criativo, status_atual, venda_realizada, valor_venda").in("id_criativo", ids);
+      if (dataInicio && dataFim) qLeads = qLeads.gte("data_entrada", format(dataInicio, "yyyy-MM-dd")).lte("data_entrada", format(dataFim, "yyyy-MM-dd"));
+      const { data: leadsData } = await qLeads;
+
+      const leadsPorCriativo: Record<string, { total: number; mqls: number; vendas: number; valor: number }> = {};
+      (leadsData || []).forEach((l) => {
+        if (!l.id_criativo) return;
+        if (!leadsPorCriativo[l.id_criativo]) leadsPorCriativo[l.id_criativo] = { total: 0, mqls: 0, vendas: 0, valor: 0 };
+        leadsPorCriativo[l.id_criativo].total += 1;
+        if (["MQL", "Reunião Agendada", "Proposta", "Negociação", "Venda"].includes(l.status_atual || "")) leadsPorCriativo[l.id_criativo].mqls += 1;
+        if (l.venda_realizada) { leadsPorCriativo[l.id_criativo].vendas += 1; leadsPorCriativo[l.id_criativo].valor += l.valor_venda || 0; }
+      });
+
+      const result: CriativoPerformance[] = criativosDaEmpresa.map((c) => {
+        const m = metricasPorCriativo[c.id_criativo] || { impressoes: 0, cliques: 0, verba: 0 };
+        const l = leadsPorCriativo[c.id_criativo] || { total: 0, mqls: 0, vendas: 0, valor: 0 };
+        return {
+          id_criativo: c.id_criativo, descricao: c.descricao, tipo: c.tipo, campanha_nome: c.campanha?.nome || "-",
+          impressoes: m.impressoes, cliques: m.cliques, verba_investida: m.verba,
+          ctr: m.impressoes > 0 ? (m.cliques / m.impressoes) * 100 : 0,
+          total_leads: l.total, mqls: l.mqls, vendas: l.vendas, valor_total_vendas: l.valor,
+          cpl: l.total > 0 ? m.verba / l.total : 0,
+          roas: m.verba > 0 ? l.valor / m.verba : 0,
+        };
+      });
+
+      return mostrarSemLeads ? result : result.filter((c) => c.total_leads > 0 || c.verba_investida > 0);
     },
+    enabled: !!empresaSelecionada,
+    refetchInterval: 5 * 60 * 1000,
   });
 
-  const { data: criativos, isLoading } = useQuery({
-    queryKey: ["criativos-performance", empresaSelecionada],
-    queryFn: async () => {
-      // Query para buscar performance de criativos
-      let query = supabase
-        .from("criativo")
-        .select(`
-          id_criativo,
-          id_criativo_externo,
-          descricao,
-          tipo,
-          campanha:id_campanha (
-            nome,
-            conta_anuncio:id_conta (id_empresa)
-          ),
-          lead:lead!id_criativo (
-            id_lead,
-            is_mql,
-            tem_reuniao,
-            venda_realizada,
-            valor_venda
-          )
-        `)
-        .eq("ativo", true);
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Buscar métricas de investimento de todos os criativos
-      const { data: metricasData, error: metricasError } = await supabase
-        .from("criativo_metricas_dia")
-        .select("id_criativo, verba_investida, leads");
-
-      if (metricasError) {
-        console.error("Erro ao buscar métricas:", metricasError);
+  const criativosOrdenados = [...(criativos || [])].sort((a, b) => {
+    const getVal = (c: CriativoPerformance) => {
+      switch (ordenacao.campo) {
+        case 'leads': return c.total_leads; case 'roas': return c.roas; case 'cpl': return c.cpl;
+        case 'verba': return c.verba_investida; case 'vendas': return c.valor_total_vendas;
+        case 'ctr': return c.ctr; case 'impressoes': return c.impressoes; default: return c.verba_investida;
       }
-
-      // Agrupar métricas por criativo
-      const metricasPorCriativo = (metricasData || []).reduce((acc: any, m: any) => {
-        if (!acc[m.id_criativo]) {
-          acc[m.id_criativo] = { verba_total: 0, leads_total: 0 };
-        }
-        acc[m.id_criativo].verba_total += parseFloat(m.verba_investida || 0);
-        acc[m.id_criativo].leads_total += parseInt(m.leads || 0);
-        return acc;
-      }, {});
-
-      // Processar dados para calcular métricas
-      const performance: CriativoPerformance[] = (data || [])
-        .map((c: any) => {
-          const leads = c.lead || [];
-          
-          // Filtrar por empresa se necessário
-          if (empresaSelecionada && empresaSelecionada !== "todas") {
-            const empresaDoCriativo = c.campanha?.conta_anuncio?.id_empresa;
-            if (empresaDoCriativo !== empresaSelecionada) {
-              return null;
-            }
-          }
-
-          const totalLeads = leads.length;
-          const mqls = leads.filter((l: any) => l.is_mql).length;
-          const reunioes = leads.filter((l: any) => l.tem_reuniao).length;
-          const vendas = leads.filter((l: any) => l.venda_realizada).length;
-          const valorTotalVendas = leads.reduce((sum: number, l: any) => sum + (l.valor_venda || 0), 0);
-
-          // Calcular CPL com base nas métricas reais
-          const metricas = metricasPorCriativo[c.id_criativo];
-          const cplEstimado = metricas?.verba_total && metricas.leads_total > 0
-            ? metricas.verba_total / metricas.leads_total
-            : 0;
-
-          return {
-            id_criativo: c.id_criativo,
-            id_criativo_externo: c.id_criativo_externo,
-            descricao: c.descricao,
-            tipo: c.tipo,
-            campanha_nome: c.campanha?.nome || "Campanha não identificada",
-            total_leads: totalLeads,
-            mqls,
-            reunioes,
-            vendas,
-            valor_total_vendas: valorTotalVendas,
-            taxa_conversao_mql: totalLeads > 0 ? (mqls / totalLeads) * 100 : 0,
-            taxa_conversao_venda: mqls > 0 ? (vendas / mqls) * 100 : 0,
-            cpl_estimado: cplEstimado,
-          };
-        })
-        .filter((c): c is CriativoPerformance => c !== null)
-        .filter((c) => c.total_leads > 0) // Mostrar apenas criativos com leads
-        .sort((a, b) => b.total_leads - a.total_leads);
-
-      return performance;
-    },
+    };
+    return ordenacao.direcao === 'desc' ? getVal(b) - getVal(a) : getVal(a) - getVal(b);
   });
 
-  // Calcular estatísticas gerais
+  const criativosSemLeads = (criativos || []).filter((c) => c.verba_investida > 0 && c.total_leads === 0);
+  const verbaPerdida = criativosSemLeads.reduce((s, c) => s + c.verba_investida, 0);
+
   const stats = {
-    totalCreativos: criativos?.length || 0,
-    totalLeads: criativos?.reduce((sum, c) => sum + c.total_leads, 0) || 0,
-    totalVendas: criativos?.reduce((sum, c) => sum + c.vendas, 0) || 0,
-    valorTotal: criativos?.reduce((sum, c) => sum + c.valor_total_vendas, 0) || 0,
-    taxaMediaConversao: criativos?.length 
-      ? (criativos.reduce((sum, c) => sum + c.taxa_conversao_venda, 0) / criativos.length).toFixed(1)
-      : "0",
+    total: criativos?.length || 0,
+    investido: criativos?.reduce((s, c) => s + c.verba_investida, 0) || 0,
+    leads: criativos?.reduce((s, c) => s + c.total_leads, 0) || 0,
+    vendas: criativos?.reduce((s, c) => s + c.vendas, 0) || 0,
+    receita: criativos?.reduce((s, c) => s + c.valor_total_vendas, 0) || 0,
+    roas: (() => { const i = criativos?.reduce((s, c) => s + c.verba_investida, 0) || 0; const r = criativos?.reduce((s, c) => s + c.valor_total_vendas, 0) || 0; return i > 0 ? r / i : 0; })(),
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Carregando relatório...</p>
-        </div>
-      </div>
-    );
-  }
+  const alternarOrdenacao = (campo: OrdenacaoCampo) => setOrdenacao({ campo, direcao: ordenacao.campo === campo && ordenacao.direcao === 'desc' ? 'asc' : 'desc' });
+  const formatNumber = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n.toFixed(0);
+  const exportarPDF = () => { const doc = new jsPDF(); doc.text("Relatório de Criativos", 20, 20); doc.text(`Criativos: ${stats.total} | Investido: R$ ${stats.investido.toFixed(2)} | ROAS: ${stats.roas.toFixed(2)}x`, 20, 30); doc.save("relatorio-criativos.pdf"); };
+
+  if (isLoading) return <div className="p-6 space-y-6"><Skeleton className="h-8 w-64" /><div className="grid grid-cols-4 gap-4">{[1,2,3,4].map(i => <Skeleton key={i} className="h-24" />)}</div><Skeleton className="h-96" /></div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Performance de Criativos</h1>
-          <p className="text-muted-foreground">
-            Análise detalhada de performance por criativo de anúncio
-          </p>
+    <div className="p-6 space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div><h1 className="text-2xl font-bold">Relatório de Criativos</h1><p className="text-muted-foreground">Performance completa com métricas de funil e ROAS</p></div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoFiltro)}><SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="7d">Últimos 7 dias</SelectItem><SelectItem value="30d">Últimos 30 dias</SelectItem><SelectItem value="mes_atual">Mês atual</SelectItem><SelectItem value="mes_anterior">Mês anterior</SelectItem><SelectItem value="todos">Todo período</SelectItem></SelectContent></Select>
+          <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-md"><Switch id="sem-leads" checked={mostrarSemLeads} onCheckedChange={setMostrarSemLeads} /><Label htmlFor="sem-leads" className="text-sm">Sem leads</Label></div>
+          <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCw className="h-4 w-4 mr-1" />Atualizar</Button>
+          <Button variant="outline" size="sm" onClick={exportarPDF}><Download className="h-4 w-4 mr-1" />PDF</Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Criativos Ativos</CardTitle>
-            <Image className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalCreativos}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Com conversão de leads
-            </p>
-          </CardContent>
-        </Card>
+      {criativosSemLeads.length > 0 && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Verba sem conversão</AlertTitle><AlertDescription>{criativosSemLeads.length} criativos gastaram R$ {verbaPerdida.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} sem leads.</AlertDescription></Alert>}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalLeads}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Gerados pelos criativos
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Vendas Fechadas</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalVendas}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Taxa média: {stats.taxaMediaConversao}%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {new Intl.NumberFormat("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-                maximumFractionDigits: 0,
-              }).format(stats.valorTotal)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Receita gerada
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+        {[{ label: "Criativos", value: stats.total }, { label: "Investido", value: `R$ ${formatNumber(stats.investido)}` }, { label: "Leads", value: stats.leads }, { label: "Vendas", value: stats.vendas }, { label: "Receita", value: `R$ ${formatNumber(stats.receita)}` }, { label: "ROAS", value: `${stats.roas.toFixed(2)}x`, icon: stats.roas >= 1 ? <TrendingUp className="h-4 w-4 text-green-500" /> : null }].map((s, i) => (
+          <Card key={i}><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">{s.label}</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold flex items-center gap-1">{s.value}{s.icon}</div></CardContent></Card>
+        ))}
       </div>
 
-      {/* Tabela de Performance */}
       <Card>
-        <CardHeader>
-          <CardTitle>Performance Detalhada por Criativo</CardTitle>
-          <CardDescription>
-            Métricas de conversão e resultados de cada criativo de anúncio
-          </CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle className="flex justify-between"><span>Performance por Criativo</span>{dataUpdatedAt && <span className="text-xs font-normal text-muted-foreground">Atualizado {format(new Date(dataUpdatedAt), "HH:mm")}</span>}</CardTitle></CardHeader>
         <CardContent>
-          {!criativos || criativos.length === 0 ? (
-            <div className="text-center py-12">
-              <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                Nenhum criativo com leads rastreados ainda.
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Configure UTM parameters nos seus anúncios para começar o rastreamento.
-              </p>
-            </div>
-          ) : (
+          {criativosOrdenados.length === 0 ? <div className="text-center py-8 text-muted-foreground">Nenhum criativo encontrado.</div> : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Criativo</TableHead>
-                    <TableHead>Campanha</TableHead>
+                    <TableHead className="min-w-[180px]">Criativo</TableHead>
                     <TableHead>Tipo</TableHead>
-                    <TableHead className="text-center">Leads</TableHead>
-                    <TableHead className="text-center">MQLs</TableHead>
-                    <TableHead className="text-center">Reuniões</TableHead>
-                    <TableHead className="text-center">Vendas</TableHead>
-                    <TableHead className="text-center">CPL</TableHead>
-                    <TableHead className="text-center">Taxa Conv.</TableHead>
-                    <TableHead className="text-right">Valor Total</TableHead>
-                    <TableHead className="text-center">Ações</TableHead>
+                    <TableHead className="text-right cursor-pointer" onClick={() => alternarOrdenacao('impressoes')}>Impressões {ordenacao.campo === 'impressoes' && <ArrowUpDown className="h-3 w-3 inline" />}</TableHead>
+                    <TableHead className="text-right cursor-pointer" onClick={() => alternarOrdenacao('ctr')}>CTR {ordenacao.campo === 'ctr' && <ArrowUpDown className="h-3 w-3 inline" />}</TableHead>
+                    <TableHead className="text-right cursor-pointer" onClick={() => alternarOrdenacao('verba')}>Verba {ordenacao.campo === 'verba' && <ArrowUpDown className="h-3 w-3 inline" />}</TableHead>
+                    <TableHead className="text-right cursor-pointer" onClick={() => alternarOrdenacao('leads')}>Leads {ordenacao.campo === 'leads' && <ArrowUpDown className="h-3 w-3 inline" />}</TableHead>
+                    <TableHead className="text-right">CPL</TableHead>
+                    <TableHead className="text-right">MQLs</TableHead>
+                    <TableHead className="text-right cursor-pointer" onClick={() => alternarOrdenacao('vendas')}>Vendas {ordenacao.campo === 'vendas' && <ArrowUpDown className="h-3 w-3 inline" />}</TableHead>
+                    <TableHead className="text-right cursor-pointer" onClick={() => alternarOrdenacao('roas')}>ROAS {ordenacao.campo === 'roas' && <ArrowUpDown className="h-3 w-3 inline" />}</TableHead>
+                    <TableHead>Ação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {criativos.map((criativo) => (
-                    <TableRow key={criativo.id_criativo}>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <span className="font-medium">
-                            {criativo.descricao || criativo.id_criativo_externo}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            ID: {criativo.id_criativo_externo}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate">
-                        {criativo.campanha_nome}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{criativo.tipo}</Badge>
-                      </TableCell>
-                      <TableCell className="text-center font-semibold">
-                        {criativo.total_leads}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {criativo.mqls}
-                        <span className="text-xs text-muted-foreground ml-1">
-                          ({criativo.taxa_conversao_mql.toFixed(0)}%)
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {criativo.reunioes}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="font-semibold text-green-600">
-                          {criativo.vendas}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {criativo.cpl_estimado > 0 ? (
-                          <span className="font-mono text-sm">
-                            {new Intl.NumberFormat("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            }).format(criativo.cpl_estimado)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Target className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-mono">
-                            {criativo.taxa_conversao_venda.toFixed(1)}%
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {new Intl.NumberFormat("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        }).format(criativo.valor_total_vendas)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setCriativoSelecionado(criativo.id_criativo)}
-                          disabled={criativo.total_leads === 0}
-                          className="gap-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          Ver Leads
-                          <Badge variant="secondary" className="ml-1">
-                            {criativo.total_leads}
-                          </Badge>
-                        </Button>
-                      </TableCell>
+                  {criativosOrdenados.map((c) => (
+                    <TableRow key={c.id_criativo} className={c.verba_investida > 0 && c.total_leads === 0 ? "bg-destructive/10" : ""}>
+                      <TableCell><div className="flex flex-col"><span className="font-medium truncate max-w-[180px]">{c.descricao || c.id_criativo.slice(0, 8)}</span><span className="text-xs text-muted-foreground truncate">{c.campanha_nome}</span></div></TableCell>
+                      <TableCell><Badge variant="outline" className="gap-1">{getTipoIcon(c.tipo)}{c.tipo}</Badge></TableCell>
+                      <TableCell className="text-right">{formatNumber(c.impressoes)}</TableCell>
+                      <TableCell className="text-right"><Badge variant={c.ctr >= 1 ? "default" : "secondary"}>{c.ctr.toFixed(2)}%</Badge></TableCell>
+                      <TableCell className="text-right">R$ {c.verba_investida.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-right font-medium">{c.total_leads}</TableCell>
+                      <TableCell className="text-right">{c.cpl > 0 ? `R$ ${c.cpl.toFixed(2)}` : "-"}</TableCell>
+                      <TableCell className="text-right">{c.mqls}</TableCell>
+                      <TableCell className="text-right">{c.vendas > 0 ? <div><span className="font-medium">{c.vendas}</span><br /><span className="text-xs text-muted-foreground">R$ {c.valor_total_vendas.toLocaleString("pt-BR")}</span></div> : "-"}</TableCell>
+                      <TableCell className="text-right"><Badge variant={c.roas >= 1 ? "default" : "secondary"} className={c.roas >= 3 ? "bg-green-500" : c.roas >= 1 ? "bg-blue-500" : ""}>{c.roas.toFixed(2)}x</Badge></TableCell>
+                      <TableCell><Button variant="ghost" size="sm" onClick={() => setCriativoSelecionado(c.id_criativo)} disabled={c.total_leads === 0}><Eye className="h-4 w-4" /></Button></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -369,48 +224,14 @@ const RelatorioCreativos = () => {
         </CardContent>
       </Card>
 
-      {/* Dialog para mostrar leads do criativo */}
-      <Dialog open={!!criativoSelecionado} onOpenChange={(open) => !open && setCriativoSelecionado(null)}>
+      <Dialog open={!!criativoSelecionado} onOpenChange={() => setCriativoSelecionado(null)}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Leads do Criativo</DialogTitle>
-            <DialogDescription>
-              {criativos?.find(c => c.id_criativo === criativoSelecionado)?.descricao || 
-               criativos?.find(c => c.id_criativo === criativoSelecionado)?.id_criativo_externo}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {leadsDetalhados && leadsDetalhados.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Valor</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {leadsDetalhados.map((lead: any) => (
-                  <TableRow key={lead.id_lead}>
-                    <TableCell>{lead.nome_lead || "N/A"}</TableCell>
-                    <TableCell>{lead.email || "N/A"}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {lead.is_mql && <Badge variant="outline">MQL</Badge>}
-                        {lead.venda_realizada && <Badge className="bg-green-600">Venda</Badge>}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {lead.valor_venda ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(lead.valor_venda) : "-"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
+          <DialogHeader><DialogTitle>Leads do Criativo</DialogTitle></DialogHeader>
+          {leadsCriativo && leadsCriativo.length > 0 ? (
+            <Table><TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Email</TableHead><TableHead>Status</TableHead><TableHead>Entrada</TableHead><TableHead>Venda</TableHead></TableRow></TableHeader>
+              <TableBody>{leadsCriativo.map((l) => (<TableRow key={l.id_lead}><TableCell>{l.nome || "-"}</TableCell><TableCell>{l.email || "-"}</TableCell><TableCell><Badge variant="outline">{l.status_atual || "Novo"}</Badge></TableCell><TableCell>{l.data_entrada ? format(new Date(l.data_entrada), "dd/MM/yyyy") : "-"}</TableCell><TableCell>{l.venda_realizada ? <span className="text-green-600">R$ {(l.valor_venda || 0).toLocaleString("pt-BR")}</span> : "-"}</TableCell></TableRow>))}</TableBody>
             </Table>
-          ) : (
-            <p className="text-muted-foreground text-center py-8">Nenhum lead encontrado</p>
-          )}
+          ) : <div className="text-center py-8 text-muted-foreground">Nenhum lead encontrado.</div>}
         </DialogContent>
       </Dialog>
     </div>
