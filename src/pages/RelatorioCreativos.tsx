@@ -32,6 +32,8 @@ interface CriativoPerformance {
   valor_total_vendas: number;
   cpl: number;
   roas: number;
+  url_preview?: string | null;
+  url_midia?: string | null;
 }
 
 type OrdenacaoCampo = 'leads' | 'roas' | 'cpl' | 'verba' | 'vendas' | 'ctr' | 'impressoes';
@@ -49,6 +51,7 @@ const getTipoIcon = (tipo: string) => {
 const RelatorioCreativos = () => {
   const { empresaSelecionada } = useEmpresa();
   const [criativoSelecionado, setCriativoSelecionado] = useState<string | null>(null);
+  const [criativoPreview, setCriativoPreview] = useState<CriativoPerformance | null>(null);
   const [ordenacao, setOrdenacao] = useState<{ campo: OrdenacaoCampo; direcao: 'asc' | 'desc' }>({ campo: 'verba', direcao: 'desc' });
   const [periodo, setPeriodo] = useState<PeriodoFiltro>('30d');
   const [mostrarSemLeads, setMostrarSemLeads] = useState(false);
@@ -81,7 +84,7 @@ const RelatorioCreativos = () => {
     queryFn: async () => {
       if (!empresaSelecionada) return [];
 
-      const { data: criativosData } = await supabase.from("criativo").select(`id_criativo, descricao, tipo, campanha:id_campanha(nome, conta_anuncio:id_conta(id_empresa))`).eq("ativo", true);
+      const { data: criativosData } = await supabase.from("criativo").select(`id_criativo, descricao, tipo, url_preview, url_midia, campanha:id_campanha(nome, conta_anuncio:id_conta(id_empresa))`).eq("ativo", true);
       const criativosDaEmpresa = (criativosData || []).filter((c) => c.campanha?.conta_anuncio?.id_empresa === empresaSelecionada);
       if (criativosDaEmpresa.length === 0) return [];
 
@@ -122,6 +125,8 @@ const RelatorioCreativos = () => {
           total_leads: l.total, mqls: l.mqls, vendas: l.vendas, valor_total_vendas: l.valor,
           cpl: l.total > 0 ? m.verba / l.total : 0,
           roas: m.verba > 0 ? l.valor / m.verba : 0,
+          url_preview: c.url_preview,
+          url_midia: c.url_midia,
         };
       });
 
@@ -204,7 +209,7 @@ const RelatorioCreativos = () => {
                 <TableBody>
                   {criativosOrdenados.map((c) => (
                     <TableRow key={c.id_criativo} className={c.verba_investida > 0 && c.total_leads === 0 ? "bg-destructive/10" : ""}>
-                      <TableCell><div className="flex flex-col"><span className="font-medium truncate max-w-[180px]">{c.descricao || c.id_criativo.slice(0, 8)}</span><span className="text-xs text-muted-foreground truncate">{c.campanha_nome}</span></div></TableCell>
+                      <TableCell><div className="flex flex-col cursor-pointer hover:text-primary" onClick={() => setCriativoPreview(c)}><span className="font-medium truncate max-w-[180px]">{c.descricao || c.id_criativo.slice(0, 8)}</span><span className="text-xs text-muted-foreground truncate">{c.campanha_nome}</span></div></TableCell>
                       <TableCell><Badge variant="outline" className="gap-1">{getTipoIcon(c.tipo)}{c.tipo}</Badge></TableCell>
                       <TableCell className="text-right">{formatNumber(c.impressoes)}</TableCell>
                       <TableCell className="text-right"><Badge variant={c.ctr >= 1 ? "default" : "secondary"}>{c.ctr.toFixed(2)}%</Badge></TableCell>
@@ -232,6 +237,52 @@ const RelatorioCreativos = () => {
               <TableBody>{leadsCriativo.map((l) => (<TableRow key={l.id_lead}><TableCell>{l.nome_lead || "-"}</TableCell><TableCell>{l.email || "-"}</TableCell><TableCell><Badge variant="outline">{l.stage_atual || "Novo"}</Badge></TableCell><TableCell>{l.data_criacao ? format(new Date(l.data_criacao), "dd/MM/yyyy") : "-"}</TableCell><TableCell>{l.venda_realizada ? <span className="text-green-600">R$ {(l.valor_venda || 0).toLocaleString("pt-BR")}</span> : "-"}</TableCell></TableRow>))}</TableBody>
             </Table>
           ) : <div className="text-center py-8 text-muted-foreground">Nenhum lead encontrado.</div>}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!criativoPreview} onOpenChange={() => setCriativoPreview(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader><DialogTitle className="flex items-center gap-2">{getTipoIcon(criativoPreview?.tipo || "")} {criativoPreview?.descricao || "Criativo"}</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">Campanha: {criativoPreview?.campanha_nome}</div>
+            
+            {criativoPreview?.url_midia || criativoPreview?.url_preview ? (
+              <div className="flex justify-center bg-muted rounded-lg p-4 min-h-[300px]">
+                {criativoPreview.tipo === "VIDEO" ? (
+                  <video src={criativoPreview.url_midia || criativoPreview.url_preview || ""} controls className="max-h-[500px] rounded-lg" />
+                ) : (
+                  <img src={criativoPreview.url_midia || criativoPreview.url_preview || ""} alt={criativoPreview.descricao || "Criativo"} className="max-h-[500px] object-contain rounded-lg" />
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center bg-muted rounded-lg p-8 min-h-[300px] text-muted-foreground">
+                <div className="text-center">
+                  <Image className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                  <p>Preview não disponível</p>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+              <div className="text-center"><div className="text-xs text-muted-foreground">Impressões</div><div className="text-lg font-bold">{formatNumber(criativoPreview?.impressoes || 0)}</div></div>
+              <div className="text-center"><div className="text-xs text-muted-foreground">CTR</div><div className="text-lg font-bold">{(criativoPreview?.ctr || 0).toFixed(2)}%</div></div>
+              <div className="text-center"><div className="text-xs text-muted-foreground">Leads</div><div className="text-lg font-bold">{criativoPreview?.total_leads || 0}</div></div>
+              <div className="text-center"><div className="text-xs text-muted-foreground">ROAS</div><div className="text-lg font-bold">{(criativoPreview?.roas || 0).toFixed(2)}x</div></div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              {criativoPreview && criativoPreview.total_leads > 0 && (
+                <Button variant="outline" onClick={() => { setCriativoPreview(null); setCriativoSelecionado(criativoPreview.id_criativo); }}>
+                  <Eye className="h-4 w-4 mr-2" />Ver Leads ({criativoPreview.total_leads})
+                </Button>
+              )}
+              {(criativoPreview?.url_midia || criativoPreview?.url_preview) && (
+                <Button variant="outline" asChild>
+                  <a href={criativoPreview.url_midia || criativoPreview.url_preview || ""} target="_blank" rel="noopener noreferrer">Abrir em nova aba</a>
+                </Button>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
