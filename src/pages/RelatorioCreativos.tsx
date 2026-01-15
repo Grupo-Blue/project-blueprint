@@ -35,6 +35,10 @@ interface CriativoPerformance {
   roas: number;
   url_preview?: string | null;
   url_midia?: string | null;
+  id_anuncio_externo?: string | null;
+  id_criativo_externo?: string | null;
+  plataforma?: string | null;
+  id_conta_externo?: string | null;
 }
 
 type OrdenacaoCampo = 'leads' | 'roas' | 'cpl' | 'verba' | 'vendas' | 'ctr' | 'impressoes';
@@ -42,11 +46,37 @@ type PeriodoFiltro = '7d' | '30d' | 'mes_atual' | 'mes_anterior' | 'todos';
 
 const getTipoIcon = (tipo: string) => {
   switch (tipo) {
-    case 'IMAGE': return <Image className="h-4 w-4" />;
+    case 'IMAGE': case 'IMAGEM': return <Image className="h-4 w-4" />;
     case 'VIDEO': return <Video className="h-4 w-4" />;
-    case 'CAROUSEL': return <FileText className="h-4 w-4" />;
+    case 'CAROUSEL': case 'CARROSSEL': return <FileText className="h-4 w-4" />;
     default: return <BarChart3 className="h-4 w-4" />;
   }
+};
+
+const getExternalLink = (criativo: CriativoPerformance): { url: string; label: string } | null => {
+  // Se tiver url_preview direto, usar ele
+  if (criativo.url_preview) {
+    return { url: criativo.url_preview, label: "Ver Preview" };
+  }
+  
+  const adId = criativo.id_anuncio_externo || criativo.id_criativo_externo;
+  if (!adId) return null;
+  
+  if (criativo.plataforma === "META") {
+    // Link para o Facebook Ads Manager
+    const actId = criativo.id_conta_externo?.replace("act_", "") || adId.split("_")[0];
+    return { 
+      url: `https://business.facebook.com/adsmanager/manage/ads?act=${actId}&selected_ad_ids=${adId}`,
+      label: "Ver no Facebook Ads"
+    };
+  } else if (criativo.plataforma === "GOOGLE") {
+    return { 
+      url: `https://ads.google.com/aw/ads?adId=${adId}`,
+      label: "Ver no Google Ads"
+    };
+  }
+  
+  return null;
 };
 
 const RelatorioCreativos = () => {
@@ -85,7 +115,7 @@ const RelatorioCreativos = () => {
     queryFn: async () => {
       if (!empresaSelecionada) return [];
 
-      const { data: criativosData } = await supabase.from("criativo").select(`id_criativo, descricao, tipo, url_preview, url_midia, campanha:id_campanha(nome, conta_anuncio:id_conta(id_empresa))`).eq("ativo", true);
+      const { data: criativosData } = await supabase.from("criativo").select(`id_criativo, descricao, tipo, url_preview, url_midia, id_anuncio_externo, id_criativo_externo, campanha:id_campanha(nome, conta_anuncio:id_conta(id_empresa, id_externo, plataforma))`).eq("ativo", true);
       const criativosDaEmpresa = (criativosData || []).filter((c) => c.campanha?.conta_anuncio?.id_empresa === empresaSelecionada);
       if (criativosDaEmpresa.length === 0) return [];
 
@@ -128,6 +158,10 @@ const RelatorioCreativos = () => {
           roas: m.verba > 0 ? l.valor / m.verba : 0,
           url_preview: c.url_preview,
           url_midia: c.url_midia,
+          id_anuncio_externo: c.id_anuncio_externo,
+          id_criativo_externo: c.id_criativo_externo,
+          plataforma: c.campanha?.conta_anuncio?.plataforma,
+          id_conta_externo: c.campanha?.conta_anuncio?.id_externo,
         };
       });
 
@@ -268,51 +302,110 @@ const RelatorioCreativos = () => {
 
       <Dialog open={!!criativoPreview} onOpenChange={() => setCriativoPreview(null)}>
         <DialogContent className="max-w-3xl">
-          <DialogHeader><DialogTitle className="flex items-center gap-2">{getTipoIcon(criativoPreview?.tipo || "")} {criativoPreview?.descricao || "Criativo"}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {getTipoIcon(criativoPreview?.tipo || "")} 
+              {criativoPreview?.descricao || "Criativo"}
+              <Badge variant="outline" className="ml-2">{criativoPreview?.tipo}</Badge>
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-4">
-            <div className="text-sm text-muted-foreground">Campanha: {criativoPreview?.campanha_nome}</div>
+            <div className="text-sm text-muted-foreground flex items-center justify-between">
+              <span>Campanha: {criativoPreview?.campanha_nome}</span>
+              {criativoPreview?.plataforma && (
+                <Badge variant="secondary">{criativoPreview.plataforma}</Badge>
+              )}
+            </div>
             
             {(() => {
               const mediaUrl = criativoPreview?.url_midia;
               const previewUrl = criativoPreview?.url_preview;
-              const isExternalPreview = previewUrl && (previewUrl.includes('fb.me') || previewUrl.includes('facebook.com'));
-              const directMediaUrl = mediaUrl && !mediaUrl.includes('fb.me');
+              const tipo = criativoPreview?.tipo;
+              const isVideo = tipo === "VIDEO";
+              const isCarrossel = tipo === "CARROSSEL" || tipo === "CAROUSEL";
+              const directMediaUrl = mediaUrl && !mediaUrl.includes('fb.me') && !mediaUrl.includes('facebook.com');
               
-              if (directMediaUrl) {
+              // Para imagens com URL direta
+              if (directMediaUrl && !isVideo && !isCarrossel) {
                 return (
                   <div className="flex justify-center bg-muted rounded-lg p-4 min-h-[300px]">
-                    {criativoPreview?.tipo === "VIDEO" ? (
-                      <video src={mediaUrl} controls className="max-h-[500px] rounded-lg" />
-                    ) : (
-                      <img src={mediaUrl} alt={criativoPreview?.descricao || "Criativo"} className="max-h-[500px] object-contain rounded-lg" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                    )}
+                    <img 
+                      src={mediaUrl} 
+                      alt={criativoPreview?.descricao || "Criativo"} 
+                      className="max-h-[500px] object-contain rounded-lg" 
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+                    />
                   </div>
                 );
-              } else if (isExternalPreview || previewUrl) {
+              }
+              
+              // Para vídeos com URL direta que não seja do Facebook
+              if (directMediaUrl && isVideo) {
+                return (
+                  <div className="flex justify-center bg-muted rounded-lg p-4 min-h-[300px]">
+                    <video 
+                      src={mediaUrl} 
+                      controls 
+                      className="max-h-[500px] rounded-lg"
+                      poster="/placeholder.svg"
+                    >
+                      Seu navegador não suporta vídeo.
+                    </video>
+                  </div>
+                );
+              }
+              
+              // Para vídeos e carrosséis sem URL direta - mostrar placeholder informativo
+              if (isVideo || isCarrossel) {
                 return (
                   <div className="flex flex-col items-center justify-center bg-muted rounded-lg p-8 min-h-[200px] text-muted-foreground">
                     <div className="text-center">
-                      {criativoPreview?.tipo === "VIDEO" ? <Video className="h-16 w-16 mx-auto mb-4 opacity-50" /> : <Image className="h-16 w-16 mx-auto mb-4 opacity-50" />}
-                      <p className="mb-4">Visualizar na plataforma</p>
-                      <Button asChild>
-                        <a href={previewUrl || ""} target="_blank" rel="noopener noreferrer" className="gap-2">
-                          <ExternalLink className="h-4 w-4" />Ver no Facebook/Meta
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
-                );
-              } else {
-                return (
-                  <div className="flex items-center justify-center bg-muted rounded-lg p-8 min-h-[200px] text-muted-foreground">
-                    <div className="text-center">
-                      {criativoPreview?.tipo === "VIDEO" ? <Video className="h-16 w-16 mx-auto mb-4 opacity-30" /> : <Image className="h-16 w-16 mx-auto mb-4 opacity-30" />}
-                      <p className="font-medium">Preview não disponível</p>
-                      <p className="text-xs mt-1">A mídia do criativo não foi coletada</p>
+                      {isVideo ? (
+                        <Video className="h-20 w-20 mx-auto mb-4 opacity-50" />
+                      ) : (
+                        <FileText className="h-20 w-20 mx-auto mb-4 opacity-50" />
+                      )}
+                      <p className="font-medium mb-2">
+                        {isVideo ? "Vídeo" : "Carrossel"} - Preview externo
+                      </p>
+                      <p className="text-xs mb-4 max-w-[300px]">
+                        {isVideo 
+                          ? "Vídeos do Meta/Google não podem ser incorporados diretamente. Use o link abaixo para visualizar."
+                          : "Carrosséis precisam ser visualizados na plataforma de origem."
+                        }
+                      </p>
                     </div>
                   </div>
                 );
               }
+              
+              // Fallback para outros tipos sem mídia
+              return (
+                <div className="flex items-center justify-center bg-muted rounded-lg p-8 min-h-[200px] text-muted-foreground">
+                  <div className="text-center">
+                    <Image className="h-16 w-16 mx-auto mb-4 opacity-30" />
+                    <p className="font-medium">Preview não disponível</p>
+                    <p className="text-xs mt-1">A mídia do criativo não foi coletada</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Link externo para visualizar na plataforma */}
+            {criativoPreview && (() => {
+              const externalLink = getExternalLink(criativoPreview);
+              if (!externalLink) return null;
+              
+              return (
+                <div className="flex justify-center">
+                  <Button asChild variant="outline">
+                    <a href={externalLink.url} target="_blank" rel="noopener noreferrer" className="gap-2">
+                      <ExternalLink className="h-4 w-4" />
+                      {externalLink.label}
+                    </a>
+                  </Button>
+                </div>
+              );
             })()}
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
