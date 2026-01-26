@@ -1,9 +1,30 @@
-
 # Plano de Otimização de Dados - Sistema SGT Blue Consult
+
+**STATUS: ✅ IMPLEMENTADO** (26/01/2026)
 
 ## Resumo Executivo
 
-O diagnóstico revelou **5 gaps críticos** que, se corrigidos, aumentarão significativamente a qualidade e aproveitamento dos dados:
+| Gap | Status | Resultado |
+|-----|--------|-----------|
+| Vinculação Lead→Criativo | ✅ Implementado | +24 leads vinculados (regex melhorado) |
+| Enriquecimento Tokeniza | ✅ Executado | +133 leads enriquecidos |
+| Deduplicação | ✅ Já existia | Tab Duplicados funcionando |
+| Métricas Criativos | ✅ Melhorado | Matching com fallback por nome |
+| Alertas UTM | ✅ Criado | 2 funções: alertar-leads-sem-utm, detectar-discrepancias-utm |
+
+---
+
+## Funções Criadas/Atualizadas
+
+1. **vincular-leads-criativos** - Suporta IDs no final do utm_content (`_(\d{12,20})$`)
+2. **enriquecer-leads-tokeniza** - Aceita body vazio para modo batch
+3. **enriquecer-campanhas-metricool** - Matching melhorado (normalização + fallback por nome)
+4. **alertar-leads-sem-utm** - Detecta leads sem UTM nas últimas 24h
+5. **detectar-discrepancias-utm** - Compara URL esperada vs URL real
+
+---
+
+## Diagnóstico Original
 
 | Gap Identificado | Impacto Atual | Potencial Após Correção |
 |------------------|---------------|------------------------|
