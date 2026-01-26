@@ -91,13 +91,24 @@ serve(async (req) => {
       let idCriativoMatch: string | null = null;
       let tipoMatch = '';
 
-      // Extrair ID numérico se utm_content tem formato "ID_texto" (Google Ads)
+      // Extrair ID numérico do utm_content
+      // Suporta múltiplos formatos:
+      // - "texto_123456789012345" (Meta Ads - ID no final)
+      // - "123456789012_texto" (Google Ads - ID no início)
       let utmContentParaMatch = utmContent;
-      if (utmContent.includes('_')) {
+      
+      // Primeiro: tentar extrair ID do FINAL (formato "texto_123456789012345")
+      const matchFinal = utmContent.match(/_(\d{12,20})$/);
+      if (matchFinal) {
+        utmContentParaMatch = matchFinal[1];
+        console.log(`[utm_content] ID no final: "${utmContent}" → "${utmContentParaMatch}"`);
+      }
+      // Segundo: tentar extrair ID do INÍCIO (formato "123_texto")
+      else if (utmContent.includes('_')) {
         const partes = utmContent.split('_');
-        if (/^\d+$/.test(partes[0])) {
+        if (/^\d{12,20}$/.test(partes[0])) {
           utmContentParaMatch = partes[0];
-          console.log(`[utm_content] Formato híbrido: "${utmContent}" → ID: "${utmContentParaMatch}"`);
+          console.log(`[utm_content] ID no início: "${utmContent}" → "${utmContentParaMatch}"`);
         }
       }
 

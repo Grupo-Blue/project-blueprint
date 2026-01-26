@@ -14,7 +14,18 @@ serve(async (req) => {
   const startTime = Date.now();
   
   try {
-    const { email, id_lead } = await req.json();
+    // Aceitar body vazio para modo batch
+    let email: string | undefined;
+    let id_lead: string | undefined;
+    
+    try {
+      const body = await req.json();
+      email = body?.email;
+      id_lead = body?.id_lead;
+    } catch {
+      // Body vazio - modo batch
+      console.log('[enriquecer-leads-tokeniza] Body vazio, executando modo batch');
+    }
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
