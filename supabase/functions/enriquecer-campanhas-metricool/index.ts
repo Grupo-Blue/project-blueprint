@@ -627,13 +627,33 @@ serve(async (req) => {
             }
             
             for (const criativoMetricool of criativosGoogle) {
-              // Tentar encontrar criativo local pelo ID do anúncio ou ID do criativo
-              const criativoLocal = (criativosLocais || []).find(c => 
-                c.id_anuncio_externo === criativoMetricool.adId ||
-                c.id_criativo_externo === criativoMetricool.adId ||
-                c.id_anuncio_externo === criativoMetricool.adsetId ||
-                c.id_criativo_externo === criativoMetricool.adsetId
-              );
+              // Tentar encontrar criativo local com múltiplas estratégias de matching
+              const adIdNormalizado = String(criativoMetricool.adId || '').replace(/^0+/, '');
+              const adsetIdNormalizado = String(criativoMetricool.adsetId || '').replace(/^0+/, '');
+              const adNameLower = (criativoMetricool.adName || '').toLowerCase().trim();
+              
+              const criativoLocal = (criativosLocais || []).find(c => {
+                const localAnuncioNorm = String(c.id_anuncio_externo || '').replace(/^0+/, '');
+                const localCriativoNorm = String(c.id_criativo_externo || '').replace(/^0+/, '');
+                const localDescLower = (c.descricao || '').toLowerCase().trim();
+                
+                // Match por ID exato
+                if (c.id_anuncio_externo === criativoMetricool.adId) return true;
+                if (c.id_criativo_externo === criativoMetricool.adId) return true;
+                if (c.id_anuncio_externo === criativoMetricool.adsetId) return true;
+                if (c.id_criativo_externo === criativoMetricool.adsetId) return true;
+                
+                // Match por ID normalizado (sem zeros à esquerda)
+                if (localAnuncioNorm && localAnuncioNorm === adIdNormalizado) return true;
+                if (localCriativoNorm && localCriativoNorm === adIdNormalizado) return true;
+                if (localAnuncioNorm && localAnuncioNorm === adsetIdNormalizado) return true;
+                
+                // Match por nome (fallback)
+                if (adNameLower && localDescLower && localDescLower.includes(adNameLower)) return true;
+                if (adNameLower && localDescLower && adNameLower.includes(localDescLower)) return true;
+                
+                return false;
+              });
               
               if (criativoLocal) {
                 const { error } = await supabase
@@ -654,7 +674,7 @@ serve(async (req) => {
                   console.log(`    ✅ Criativo Google: ${criativoMetricool.adName || criativoMetricool.adId} - ${criativoMetricool.data}: ${criativoMetricool.impressions} impressões, ${criativoMetricool.conversions} conversões`);
                 }
               } else {
-                console.log(`    ℹ️ Criativo Google sem match: adId=${criativoMetricool.adId}, adsetId=${criativoMetricool.adsetId || 'N/A'}`);
+                console.log(`    ⚠️ Criativo Google SEM MATCH: adId=${criativoMetricool.adId} (norm: ${adIdNormalizado}), adsetId=${criativoMetricool.adsetId || 'N/A'}, nome="${criativoMetricool.adName}"`);
               }
             }
           }
@@ -671,13 +691,33 @@ serve(async (req) => {
             }
             
             for (const criativoMetricool of criativosMeta) {
-              // Tentar encontrar criativo local pelo ID do anúncio ou ID do criativo
-              const criativoLocal = (criativosLocais || []).find(c => 
-                c.id_anuncio_externo === criativoMetricool.adId ||
-                c.id_criativo_externo === criativoMetricool.adId ||
-                c.id_anuncio_externo === criativoMetricool.adsetId ||
-                c.id_criativo_externo === criativoMetricool.adsetId
-              );
+              // Tentar encontrar criativo local com múltiplas estratégias de matching
+              const adIdNormalizado = String(criativoMetricool.adId || '').replace(/^0+/, '');
+              const adsetIdNormalizado = String(criativoMetricool.adsetId || '').replace(/^0+/, '');
+              const adNameLower = (criativoMetricool.adName || '').toLowerCase().trim();
+              
+              const criativoLocal = (criativosLocais || []).find(c => {
+                const localAnuncioNorm = String(c.id_anuncio_externo || '').replace(/^0+/, '');
+                const localCriativoNorm = String(c.id_criativo_externo || '').replace(/^0+/, '');
+                const localDescLower = (c.descricao || '').toLowerCase().trim();
+                
+                // Match por ID exato
+                if (c.id_anuncio_externo === criativoMetricool.adId) return true;
+                if (c.id_criativo_externo === criativoMetricool.adId) return true;
+                if (c.id_anuncio_externo === criativoMetricool.adsetId) return true;
+                if (c.id_criativo_externo === criativoMetricool.adsetId) return true;
+                
+                // Match por ID normalizado (sem zeros à esquerda)
+                if (localAnuncioNorm && localAnuncioNorm === adIdNormalizado) return true;
+                if (localCriativoNorm && localCriativoNorm === adIdNormalizado) return true;
+                if (localAnuncioNorm && localAnuncioNorm === adsetIdNormalizado) return true;
+                
+                // Match por nome (fallback)
+                if (adNameLower && localDescLower && localDescLower.includes(adNameLower)) return true;
+                if (adNameLower && localDescLower && adNameLower.includes(localDescLower)) return true;
+                
+                return false;
+              });
               
               if (criativoLocal) {
                 const { error } = await supabase
@@ -698,7 +738,7 @@ serve(async (req) => {
                   console.log(`    ✅ Criativo Meta: ${criativoMetricool.adName || criativoMetricool.adId} - ${criativoMetricool.data}: ${criativoMetricool.impressions} impressões, ${criativoMetricool.conversions} conversões`);
                 }
               } else {
-                console.log(`    ℹ️ Criativo Meta sem match: adId=${criativoMetricool.adId}, adsetId=${criativoMetricool.adsetId || 'N/A'}`);
+                console.log(`    ⚠️ Criativo Meta SEM MATCH: adId=${criativoMetricool.adId} (norm: ${adIdNormalizado}), adsetId=${criativoMetricool.adsetId || 'N/A'}, nome="${criativoMetricool.adName}"`);
               }
             }
           }
