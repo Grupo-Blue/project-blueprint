@@ -76,9 +76,23 @@ const Usuarios = () => {
     enabled: isAdmin === true,
   });
 
+  // Buscar emails dos usuários via edge function
+  const { data: emailMap } = useQuery({
+    queryKey: ["usuarios-emails"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("listar-usuarios-admin");
+      if (error) {
+        console.error("Erro ao buscar emails:", error);
+        return {};
+      }
+      return data?.emailMap || {};
+    },
+    enabled: isAdmin === true,
+  });
+
   // Buscar todos os usuários
   const { data: usuarios, isLoading } = useQuery({
-    queryKey: ["usuarios"],
+    queryKey: ["usuarios", emailMap],
     queryFn: async () => {
       // Buscar profiles
       const { data: profilesData, error: profilesError } = await supabase
@@ -106,6 +120,7 @@ const Usuarios = () => {
       const usuarios: Usuario[] = (profilesData || []).map((profile) => ({
         id: profile.id,
         nome: profile.nome,
+        email: emailMap?.[profile.id] || "",
         perfil: profile.perfil,
         ativo: profile.ativo,
         aprovado: profile.aprovado,
@@ -115,7 +130,7 @@ const Usuarios = () => {
 
       return usuarios;
     },
-    enabled: isAdmin === true,
+    enabled: isAdmin === true && emailMap !== undefined,
   });
 
   // Mutation para atualizar usuário
@@ -418,6 +433,9 @@ const Usuarios = () => {
                         </Badge>
                       )}
                     </div>
+                    {usuario.email && (
+                      <p className="text-sm text-muted-foreground mb-1">{usuario.email}</p>
+                    )}
                     <CardDescription>
                       {getPerfilLabel(usuario.perfil)}
                     </CardDescription>
