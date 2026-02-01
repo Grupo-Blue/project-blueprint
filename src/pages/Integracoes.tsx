@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from '@supabase/supabase-js';
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { TokenizaProjetosManager } from "@/components/TokenizaProjetosManager";
 import { WebhookDestinosManager } from "@/components/WebhookDestinosManager";
 import { ConsultaIRPFTester } from "@/components/ConsultaIRPFTester";
 import { StapeIntegracaoManager } from "@/components/StapeIntegracaoManager";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 import type { Database } from "@/integrations/supabase/types";
 
 type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
@@ -26,6 +27,8 @@ type TipoIntegracao = Database["public"]["Enums"]["tipo_integracao"];
 type Empresa = Database["public"]["Tables"]["empresa"]["Row"];
 
 export default function Integracoes() {
+  const { empresaSelecionada: empresaFiltro } = useEmpresa();
+  
   const [integracoes, setIntegracoes] = useState<Integracao[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,8 +38,16 @@ export default function Integracoes() {
 
   // Form state
   const [tipoIntegracao, setTipoIntegracao] = useState<TipoIntegracao>("META_ADS");
-  const [empresaSelecionada, setEmpresaSelecionada] = useState<string>("");
+  const [empresaForm, setEmpresaForm] = useState<string>("");
   const [ativo, setAtivo] = useState(true);
+  
+  // Filter integrations based on global company filter
+  const integracoesFiltradas = useMemo(() => {
+    if (!empresaFiltro || empresaFiltro === "todas") {
+      return integracoes;
+    }
+    return integracoes.filter(i => i.id_empresa === empresaFiltro);
+  }, [integracoes, empresaFiltro]);
   
   // Meta Ads credentials
   const [metaAccessToken, setMetaAccessToken] = useState("");
@@ -112,7 +123,7 @@ export default function Integracoes() {
 
   const resetForm = () => {
     setTipoIntegracao("META_ADS");
-    setEmpresaSelecionada("");
+    setEmpresaForm("");
     setAtivo(true);
     setMetaAccessToken("");
     setMetaAdAccountId("");
@@ -215,7 +226,7 @@ export default function Integracoes() {
       setGa4SiteUrl(config.site_url || "");
     }
     
-    setEmpresaSelecionada(integracao.id_empresa || "");
+    setEmpresaForm(integracao.id_empresa || "");
     setDialogOpen(true);
   };
 
@@ -338,7 +349,7 @@ export default function Integracoes() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!empresaSelecionada) {
+    if (!empresaForm) {
       toast.error("Selecione uma empresa");
       return;
     }
@@ -461,14 +472,14 @@ export default function Integracoes() {
       if (editingId) {
         const { error } = await supabase
           .from("integracao")
-          .update({ tipo: tipoIntegracao, config_json: configJson, ativo, id_empresa: empresaSelecionada })
+          .update({ tipo: tipoIntegracao, config_json: configJson, ativo, id_empresa: empresaForm })
           .eq("id_integracao", editingId);
         if (error) throw error;
         toast.success("Integração atualizada com sucesso");
       } else {
         const { error } = await supabase
           .from("integracao")
-          .insert({ tipo: tipoIntegracao, config_json: configJson, ativo, id_empresa: empresaSelecionada });
+          .insert({ tipo: tipoIntegracao, config_json: configJson, ativo, id_empresa: empresaForm });
         if (error) throw error;
         toast.success("Integração criada com sucesso");
       }
@@ -507,7 +518,7 @@ export default function Integracoes() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Empresa</Label>
-                <Select value={empresaSelecionada} onValueChange={setEmpresaSelecionada}>
+                <Select value={empresaForm} onValueChange={setEmpresaForm}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a empresa" />
                   </SelectTrigger>
@@ -1054,14 +1065,14 @@ export default function Integracoes() {
         </TabsList>
 
         <TabsContent value="meta" className="space-y-4">
-          {integracoes.filter(i => i.tipo === "META_ADS").length === 0 ? (
+          {integracoesFiltradas.filter(i => i.tipo === "META_ADS").length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
                 Nenhuma integração Meta Ads configurada
               </CardContent>
             </Card>
           ) : (
-            integracoes.filter(i => i.tipo === "META_ADS").map((integracao) => {
+            integracoesFiltradas.filter(i => i.tipo === "META_ADS").map((integracao) => {
               const config = integracao.config_json as any;
               const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
@@ -1115,14 +1126,14 @@ export default function Integracoes() {
         </TabsContent>
 
         <TabsContent value="google" className="space-y-4">
-          {integracoes.filter(i => i.tipo === "GOOGLE_ADS").length === 0 ? (
+          {integracoesFiltradas.filter(i => i.tipo === "GOOGLE_ADS").length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
                 Nenhuma integração Google Ads configurada
               </CardContent>
             </Card>
           ) : (
-            integracoes.filter(i => i.tipo === "GOOGLE_ADS").map((integracao) => {
+            integracoesFiltradas.filter(i => i.tipo === "GOOGLE_ADS").map((integracao) => {
               const config = integracao.config_json as any;
               const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
@@ -1176,14 +1187,14 @@ export default function Integracoes() {
         </TabsContent>
 
         <TabsContent value="pipedrive" className="space-y-4">
-          {integracoes.filter(i => i.tipo === "PIPEDRIVE").length === 0 ? (
+          {integracoesFiltradas.filter(i => i.tipo === "PIPEDRIVE").length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
                 Nenhuma integração Pipedrive configurada
               </CardContent>
             </Card>
           ) : (
-            integracoes.filter(i => i.tipo === "PIPEDRIVE").map((integracao) => {
+            integracoesFiltradas.filter(i => i.tipo === "PIPEDRIVE").map((integracao) => {
               const config = integracao.config_json as any;
               const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
@@ -1284,14 +1295,14 @@ export default function Integracoes() {
         </TabsContent>
 
         <TabsContent value="tokeniza" className="space-y-4">
-          {integracoes.filter(i => i.tipo === "TOKENIZA").length === 0 ? (
+          {integracoesFiltradas.filter(i => i.tipo === "TOKENIZA").length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
                 Nenhuma integração Tokeniza configurada
               </CardContent>
             </Card>
           ) : (
-            integracoes.filter(i => i.tipo === "TOKENIZA").map((integracao) => {
+            integracoesFiltradas.filter(i => i.tipo === "TOKENIZA").map((integracao) => {
               const config = integracao.config_json as any;
               const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
@@ -1336,20 +1347,20 @@ export default function Integracoes() {
           )}
 
           {/* Gerenciador de Projetos Tokeniza */}
-          {integracoes.filter(i => i.tipo === "TOKENIZA").length > 0 && (
+          {integracoesFiltradas.filter(i => i.tipo === "TOKENIZA").length > 0 && (
             <TokenizaProjetosManager />
           )}
         </TabsContent>
 
         <TabsContent value="mautic" className="space-y-4">
-          {integracoes.filter(i => i.tipo === "MAUTIC").length === 0 ? (
+          {integracoesFiltradas.filter(i => i.tipo === "MAUTIC").length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
                 Nenhuma integração Mautic configurada
               </CardContent>
             </Card>
           ) : (
-            integracoes.filter(i => i.tipo === "MAUTIC").map((integracao) => {
+            integracoesFiltradas.filter(i => i.tipo === "MAUTIC").map((integracao) => {
               const config = integracao.config_json as any;
               const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
@@ -1448,14 +1459,14 @@ export default function Integracoes() {
         </TabsContent>
 
         <TabsContent value="notion" className="space-y-4">
-          {integracoes.filter(i => i.tipo === "NOTION").length === 0 ? (
+          {integracoesFiltradas.filter(i => i.tipo === "NOTION").length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
                 Nenhuma integração Notion configurada
               </CardContent>
             </Card>
           ) : (
-            integracoes.filter(i => i.tipo === "NOTION").map((integracao) => {
+            integracoesFiltradas.filter(i => i.tipo === "NOTION").map((integracao) => {
               const config = integracao.config_json as any;
               const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
@@ -1501,14 +1512,14 @@ export default function Integracoes() {
         </TabsContent>
 
         <TabsContent value="metricool" className="space-y-4">
-          {integracoes.filter(i => i.tipo === "METRICOOL").length === 0 ? (
+          {integracoesFiltradas.filter(i => i.tipo === "METRICOOL").length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
                 Nenhuma integração Metricool configurada
               </CardContent>
             </Card>
           ) : (
-            integracoes.filter(i => i.tipo === "METRICOOL").map((integracao) => {
+            integracoesFiltradas.filter(i => i.tipo === "METRICOOL").map((integracao) => {
               const config = integracao.config_json as any;
               const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
@@ -1554,14 +1565,14 @@ export default function Integracoes() {
         </TabsContent>
 
         <TabsContent value="chatwoot" className="space-y-4">
-          {integracoes.filter(i => i.tipo === "CHATWOOT").length === 0 ? (
+          {integracoesFiltradas.filter(i => i.tipo === "CHATWOOT").length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
                 Nenhuma integração Chatwoot configurada
               </CardContent>
             </Card>
           ) : (
-            integracoes.filter(i => i.tipo === "CHATWOOT").map((integracao) => {
+            integracoesFiltradas.filter(i => i.tipo === "CHATWOOT").map((integracao) => {
               const config = integracao.config_json as any;
               
               // Consolidar empresas duplicadas para exibição
@@ -1627,14 +1638,14 @@ export default function Integracoes() {
         </TabsContent>
 
         <TabsContent value="ga4" className="space-y-4">
-          {integracoes.filter(i => i.tipo === "GA4").length === 0 ? (
+          {integracoesFiltradas.filter(i => i.tipo === "GA4").length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
                 Nenhuma integração GA4 configurada
               </CardContent>
             </Card>
           ) : (
-            integracoes.filter(i => i.tipo === "GA4").map((integracao) => {
+            integracoesFiltradas.filter(i => i.tipo === "GA4").map((integracao) => {
               const config = integracao.config_json as any;
               const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
