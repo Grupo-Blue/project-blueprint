@@ -88,7 +88,7 @@ serve(async (req) => {
     }
 
     const config = targetIntegracao.config_json as any;
-    const idEmpresa = config.id_empresa;
+    const idEmpresa = targetIntegracao.id_empresa;
     const domain = config.domain.replace('.pipedrive.com', '');
 
     console.log(`Processando deal ${dealData.id} para empresa ${idEmpresa}`);

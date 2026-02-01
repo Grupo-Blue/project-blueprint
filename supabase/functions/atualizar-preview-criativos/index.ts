@@ -102,7 +102,7 @@ serve(async (req) => {
 
       // Encontrar integração desta empresa
       const integracao = integracoes?.find(
-        (i: any) => (i.config_json as any)?.id_empresa === idEmpresa
+        (i: any) => i.id_empresa === idEmpresa
       );
 
       if (!integracao) {

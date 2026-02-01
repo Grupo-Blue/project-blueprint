@@ -54,7 +54,7 @@ serve(async (req) => {
       .eq('ativo', true);
 
     if (id_empresa) {
-      query = query.eq('config_json->>id_empresa', id_empresa);
+      query = query.eq('id_empresa', id_empresa);
     }
 
     const { data: integracoes, error: intError } = await query;
@@ -73,7 +73,7 @@ serve(async (req) => {
 
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
-      const empresaId = config.id_empresa;
+      const empresaId = integracao.id_empresa;
 
       try {
         // Obter access token

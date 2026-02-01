@@ -48,7 +48,7 @@ serve(async (req) => {
         const config = integracao.config_json as any;
         const accessToken = config.access_token;
         const adAccountId = config.ad_account_id;
-        const idEmpresa = config.id_empresa;
+        const idEmpresa = integracao.id_empresa;
 
         console.log(`Processando integração para empresa ${idEmpresa}, ad account ${adAccountId}`);
 
