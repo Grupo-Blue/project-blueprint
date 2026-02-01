@@ -135,14 +135,26 @@ serve(async (req) => {
         const accessToken = config.access_token;
         const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
 
-        const { data: contasAnuncio } = await supabase
+        console.log(`🔍 Processando integração ${integracao.id_integracao}, id_empresa: ${idEmpresa}`);
+
+        const { data: contasAnuncio, error: contasError } = await supabase
           .from("conta_anuncio")
           .select("id_conta")
           .eq("id_empresa", idEmpresa)
           .eq("plataforma", "META")
           .eq("ativa", true);
 
-        if (!contasAnuncio || contasAnuncio.length === 0) continue;
+        if (contasError) {
+          console.error(`❌ Erro ao buscar contas de anúncio:`, contasError);
+          continue;
+        }
+
+        console.log(`📋 Contas encontradas para empresa ${idEmpresa}:`, contasAnuncio?.length || 0);
+
+        if (!contasAnuncio || contasAnuncio.length === 0) {
+          console.log(`⚠️ Nenhuma conta META ativa para empresa ${idEmpresa}, pulando...`);
+          continue;
+        }
 
         const idsContas = contasAnuncio.map(c => c.id_conta);
 
