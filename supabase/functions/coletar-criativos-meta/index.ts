@@ -133,7 +133,7 @@ serve(async (req) => {
       try {
         const config = integracao.config_json as any;
         const accessToken = config.access_token;
-        const idEmpresa = config.id_empresa;
+        const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
 
         const { data: contasAnuncio } = await supabase
           .from("conta_anuncio")
@@ -179,8 +179,8 @@ serve(async (req) => {
           try {
             console.log(`\n📢 [${campanhasProcessadas}/${maxCampanhasPorExecucao}] Campanha: ${campanha.nome}`);
 
-            // Campos mínimos necessários (removido busca por preview/adcreative/adset extras)
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,preview_shareable_link,adset{id,name},creative{id,name,object_story_spec{link_data{link,call_to_action{type,value{link}},picture,child_attachments{link,picture,call_to_action{type,value{link}}}}},asset_feed_spec{link_urls},image_url,video_id,thumbnail_url,url_tags,link_url}&access_token=${accessToken}&limit=50`;
+            // Campos mínimos necessários (PHASE 2: upgrade v18 → v22)
+            const adsUrl = `https://graph.facebook.com/v22.0/${campanha.id_campanha_externo}/ads?fields=id,name,status,preview_shareable_link,adset{id,name},creative{id,name,object_story_spec{link_data{link,call_to_action{type,value{link}},picture,child_attachments{link,picture,call_to_action{type,value{link}}}}},asset_feed_spec{link_urls},image_url,video_id,thumbnail_url,url_tags,link_url}&access_token=${accessToken}&limit=50`;
 
             const adsResponse = await fetch(adsUrl);
 

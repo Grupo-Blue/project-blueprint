@@ -49,7 +49,7 @@ serve(async (req) => {
       const config = integracao.config_json as any;
       const apiToken = config.api_token;
       let domain = config.domain.replace('.pipedrive.com', '');
-      const idEmpresa = config.id_empresa;
+      const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
       const pipelineId = config.pipeline_id;
 
       console.log(`\n📊 Processando empresa ${idEmpresa}, pipeline ${pipelineId}`);

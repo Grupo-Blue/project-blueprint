@@ -66,7 +66,7 @@ serve(async (req) => {
       const config = integracao.config_json as any;
       const accessToken = config.access_token;
       const adAccountId = config.ad_account_id;
-      const idEmpresa = config.id_empresa;
+      const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
 
       console.log(`Processando integração para empresa ${idEmpresa}, ad account ${adAccountId}`);
 
@@ -105,7 +105,7 @@ serve(async (req) => {
         const campanhIdsStr = campanhas.map(c => c.id_campanha_externo).join(",");
         
         // Usar time_increment=1 para obter dados diários
-        const url = `https://graph.facebook.com/v18.0/${adAccountId}/insights?fields=${fields}&level=campaign&time_range=${encodeURIComponent(timeRange)}&time_increment=1&access_token=${accessToken}&filtering=[{"field":"campaign.id","operator":"IN","value":["${campanhIdsStr.replace(/,/g, '","')}"]}]&limit=500`;
+        const url = `https://graph.facebook.com/v22.0/${adAccountId}/insights?fields=${fields}&level=campaign&time_range=${encodeURIComponent(timeRange)}&time_increment=1&access_token=${accessToken}&filtering=[{"field":"campaign.id","operator":"IN","value":["${campanhIdsStr.replace(/,/g, '","')}"]}]&limit=500`;
 
         console.log(`Chamando API Meta para período ${dataInicio} a ${dataFim}`);
 

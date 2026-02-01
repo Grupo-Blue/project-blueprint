@@ -243,7 +243,7 @@ serve(async (req) => {
 
     for (const integracao of integracoes) {
       const config = integracao.config_json as MetricoolConfig;
-      const empresaId = config.id_empresa;
+      const empresaId = integracao.id_empresa; // PHASE 2: usar coluna direta
 
       console.log(`\n📊 Processando empresa ${empresaId}...`);
 

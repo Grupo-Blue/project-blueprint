@@ -76,7 +76,7 @@ serve(async (req) => {
         const clientId = config.client_id;
         const clientSecret = config.client_secret;
         const developerToken = config.developer_token;
-        const idEmpresa = config.id_empresa;
+        const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
 
         console.log(`Processando integração para empresa ${idEmpresa}, customer ${customerId}`);
 

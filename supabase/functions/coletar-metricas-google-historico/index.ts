@@ -52,7 +52,7 @@ serve(async (req) => {
 
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
-      const idEmpresa = config.id_empresa;
+      const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
       const customerId = config.customer_id?.replace(/-/g, "");
       const loginCustomerId = config.login_customer_id?.replace(/-/g, "");
 

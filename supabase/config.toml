@@ -131,3 +131,9 @@ verify_jwt = false
 
 [functions.atualizar-preview-criativos]
 verify_jwt = false
+
+[functions.sincronizar-pipedrive-activities]
+verify_jwt = false
+
+[functions.detectar-alertas-automaticos]
+verify_jwt = false
