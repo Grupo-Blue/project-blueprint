@@ -147,6 +147,75 @@ export type Database = {
           },
         ]
       }
+      alerta_automatico: {
+        Row: {
+          acionavel: boolean | null
+          created_at: string
+          descricao: string | null
+          id_acao: string | null
+          id_alerta: string
+          id_empresa: string
+          metadados: Json | null
+          resolvido: boolean | null
+          resolvido_em: string | null
+          resolvido_por: string | null
+          severidade: string
+          tipo: string
+          titulo: string
+          updated_at: string
+          visualizado: boolean | null
+        }
+        Insert: {
+          acionavel?: boolean | null
+          created_at?: string
+          descricao?: string | null
+          id_acao?: string | null
+          id_alerta?: string
+          id_empresa: string
+          metadados?: Json | null
+          resolvido?: boolean | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          severidade: string
+          tipo: string
+          titulo: string
+          updated_at?: string
+          visualizado?: boolean | null
+        }
+        Update: {
+          acionavel?: boolean | null
+          created_at?: string
+          descricao?: string | null
+          id_acao?: string | null
+          id_alerta?: string
+          id_empresa?: string
+          metadados?: Json | null
+          resolvido?: boolean | null
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          severidade?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+          visualizado?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerta_automatico_id_acao_fkey"
+            columns: ["id_acao"]
+            isOneToOne: false
+            referencedRelation: "acao"
+            referencedColumns: ["id_acao"]
+          },
+          {
+            foreignKeyName: "alerta_automatico_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       alerta_utm: {
         Row: {
           created_at: string | null
@@ -299,6 +368,106 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "semana"
             referencedColumns: ["id_semana"]
+          },
+        ]
+      }
+      automacao_execucao_log: {
+        Row: {
+          acoes_executadas: Json | null
+          condicoes_atendidas: Json | null
+          created_at: string
+          duracao_ms: number | null
+          erro: string | null
+          id: string
+          id_automacao: string
+          sucesso: boolean
+        }
+        Insert: {
+          acoes_executadas?: Json | null
+          condicoes_atendidas?: Json | null
+          created_at?: string
+          duracao_ms?: number | null
+          erro?: string | null
+          id?: string
+          id_automacao: string
+          sucesso: boolean
+        }
+        Update: {
+          acoes_executadas?: Json | null
+          condicoes_atendidas?: Json | null
+          created_at?: string
+          duracao_ms?: number | null
+          erro?: string | null
+          id?: string
+          id_automacao?: string
+          sucesso?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automacao_execucao_log_id_automacao_fkey"
+            columns: ["id_automacao"]
+            isOneToOne: false
+            referencedRelation: "automacao_workflow"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automacao_workflow: {
+        Row: {
+          acoes: Json
+          ativo: boolean | null
+          condicoes: Json
+          created_at: string
+          descricao: string | null
+          id: string
+          id_empresa: string | null
+          nome: string
+          total_erros: number | null
+          total_execucoes: number | null
+          total_sucessos: number | null
+          trigger_type: string
+          ultima_execucao: string | null
+          updated_at: string
+        }
+        Insert: {
+          acoes: Json
+          ativo?: boolean | null
+          condicoes: Json
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          id_empresa?: string | null
+          nome: string
+          total_erros?: number | null
+          total_execucoes?: number | null
+          total_sucessos?: number | null
+          trigger_type: string
+          ultima_execucao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          acoes?: Json
+          ativo?: boolean | null
+          condicoes?: Json
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          id_empresa?: string | null
+          nome?: string
+          total_erros?: number | null
+          total_execucoes?: number | null
+          total_sucessos?: number | null
+          trigger_type?: string
+          ultima_execucao?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automacao_workflow_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
           },
         ]
       }
@@ -3518,6 +3687,118 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "relatorio_semanal"
             referencedColumns: ["id_relatorio"]
+          },
+        ]
+      }
+      relatorio_agendado: {
+        Row: {
+          ativo: boolean | null
+          created_at: string
+          cron_expression: string
+          descricao: string | null
+          destinatarios: string[]
+          formato: string | null
+          id: string
+          id_empresa: string | null
+          nome: string
+          proximo_envio: string | null
+          query_template: Json
+          tipo: string
+          total_envios: number | null
+          total_erros: number | null
+          ultimo_envio: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string
+          cron_expression: string
+          descricao?: string | null
+          destinatarios: string[]
+          formato?: string | null
+          id?: string
+          id_empresa?: string | null
+          nome: string
+          proximo_envio?: string | null
+          query_template: Json
+          tipo: string
+          total_envios?: number | null
+          total_erros?: number | null
+          ultimo_envio?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string
+          cron_expression?: string
+          descricao?: string | null
+          destinatarios?: string[]
+          formato?: string | null
+          id?: string
+          id_empresa?: string | null
+          nome?: string
+          proximo_envio?: string | null
+          query_template?: Json
+          tipo?: string
+          total_envios?: number | null
+          total_erros?: number | null
+          ultimo_envio?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relatorio_agendado_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      relatorio_envio_log: {
+        Row: {
+          created_at: string
+          destinatarios_enviados: string[] | null
+          duracao_envio_ms: number | null
+          duracao_geracao_ms: number | null
+          erro: string | null
+          id: string
+          id_relatorio: string
+          sucesso: boolean
+          tamanho_arquivo_bytes: number | null
+          url_arquivo: string | null
+        }
+        Insert: {
+          created_at?: string
+          destinatarios_enviados?: string[] | null
+          duracao_envio_ms?: number | null
+          duracao_geracao_ms?: number | null
+          erro?: string | null
+          id?: string
+          id_relatorio: string
+          sucesso: boolean
+          tamanho_arquivo_bytes?: number | null
+          url_arquivo?: string | null
+        }
+        Update: {
+          created_at?: string
+          destinatarios_enviados?: string[] | null
+          duracao_envio_ms?: number | null
+          duracao_geracao_ms?: number | null
+          erro?: string | null
+          id?: string
+          id_relatorio?: string
+          sucesso?: boolean
+          tamanho_arquivo_bytes?: number | null
+          url_arquivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relatorio_envio_log_id_relatorio_fkey"
+            columns: ["id_relatorio"]
+            isOneToOne: false
+            referencedRelation: "relatorio_agendado"
+            referencedColumns: ["id"]
           },
         ]
       }

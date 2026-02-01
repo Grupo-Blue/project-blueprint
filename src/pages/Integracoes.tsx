@@ -215,7 +215,7 @@ export default function Integracoes() {
       setGa4SiteUrl(config.site_url || "");
     }
     
-    setEmpresaSelecionada(config.id_empresa || "");
+    setEmpresaSelecionada(integracao.id_empresa || "");
     setDialogOpen(true);
   };
 
@@ -343,7 +343,7 @@ export default function Integracoes() {
       return;
     }
 
-    let configJson: any = { id_empresa: empresaSelecionada };
+    let configJson: any = {};
 
     if (tipoIntegracao === "META_ADS") {
       if (!metaAccessToken || !metaAdAccountId) {
@@ -461,14 +461,14 @@ export default function Integracoes() {
       if (editingId) {
         const { error } = await supabase
           .from("integracao")
-          .update({ tipo: tipoIntegracao, config_json: configJson, ativo })
+          .update({ tipo: tipoIntegracao, config_json: configJson, ativo, id_empresa: empresaSelecionada })
           .eq("id_integracao", editingId);
         if (error) throw error;
         toast.success("Integração atualizada com sucesso");
       } else {
         const { error } = await supabase
           .from("integracao")
-          .insert({ tipo: tipoIntegracao, config_json: configJson, ativo });
+          .insert({ tipo: tipoIntegracao, config_json: configJson, ativo, id_empresa: empresaSelecionada });
         if (error) throw error;
         toast.success("Integração criada com sucesso");
       }
