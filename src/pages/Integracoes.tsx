@@ -1063,7 +1063,7 @@ export default function Integracoes() {
           ) : (
             integracoes.filter(i => i.tipo === "META_ADS").map((integracao) => {
               const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
               return (
                 <div key={integracao.id_integracao} className="space-y-4">
@@ -1124,7 +1124,7 @@ export default function Integracoes() {
           ) : (
             integracoes.filter(i => i.tipo === "GOOGLE_ADS").map((integracao) => {
               const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
               return (
                 <div key={integracao.id_integracao} className="space-y-4">
@@ -1185,7 +1185,7 @@ export default function Integracoes() {
           ) : (
             integracoes.filter(i => i.tipo === "PIPEDRIVE").map((integracao) => {
               const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
               return (
                 <Card key={integracao.id_integracao}>
@@ -1246,7 +1246,7 @@ export default function Integracoes() {
                           
                           const { data, error } = await supabase.functions.invoke('sincronizar-emails-pipedrive', {
                             body: { 
-                              id_empresa: config.id_empresa
+                              id_empresa: integracao.id_empresa
                             }
                           });
 
@@ -1293,7 +1293,7 @@ export default function Integracoes() {
           ) : (
             integracoes.filter(i => i.tipo === "TOKENIZA").map((integracao) => {
               const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
               return (
                 <Card key={integracao.id_integracao}>
@@ -1351,7 +1351,7 @@ export default function Integracoes() {
           ) : (
             integracoes.filter(i => i.tipo === "MAUTIC").map((integracao) => {
               const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
               return (
                 <Card key={integracao.id_integracao}>
@@ -1410,7 +1410,7 @@ export default function Integracoes() {
                             
                             const { data, error } = await supabase.functions.invoke('enriquecer-leads-lote', {
                               body: { 
-                                id_empresa: config.id_empresa
+                                id_empresa: integracao.id_empresa
                               }
                             });
 
@@ -1457,7 +1457,7 @@ export default function Integracoes() {
           ) : (
             integracoes.filter(i => i.tipo === "NOTION").map((integracao) => {
               const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
               return (
                 <Card key={integracao.id_integracao}>
@@ -1510,7 +1510,7 @@ export default function Integracoes() {
           ) : (
             integracoes.filter(i => i.tipo === "METRICOOL").map((integracao) => {
               const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
               return (
                 <Card key={integracao.id_integracao}>
@@ -1636,7 +1636,7 @@ export default function Integracoes() {
           ) : (
             integracoes.filter(i => i.tipo === "GA4").map((integracao) => {
               const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === config.id_empresa);
+              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
               
               return (
                 <Card key={integracao.id_integracao}>
@@ -1670,7 +1670,7 @@ export default function Integracoes() {
                               
                               try {
                                 const { data, error } = await supabase.functions.invoke('coletar-metricas-ga4', {
-                                  body: { id_empresa: config.id_empresa }
+                                  body: { id_empresa: integracao.id_empresa }
                                 });
                                 
                                 if (error) throw error;
