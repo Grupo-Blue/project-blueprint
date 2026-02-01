@@ -57,7 +57,7 @@ serve(async (req) => {
       const config = integracao.config_json as any;
       const accessToken = config.access_token;
       const adAccountId = config.ad_account_id;
-      const idEmpresa = config.id_empresa;
+      const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
 
       console.log(`Processando integração para empresa ${idEmpresa}, ad account ${adAccountId}`);
 
@@ -81,7 +81,7 @@ serve(async (req) => {
 
         // Buscar informações atualizadas das campanhas da API
         const campanhIdsStr = campanhas.map(c => c.id_campanha_externo).join(",");
-        const campaignsUrl = `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?fields=id,name,status,objective&ids=${campanhIdsStr}&access_token=${accessToken}`;
+        const campaignsUrl = `https://graph.facebook.com/v22.0/${adAccountId}/campaigns?fields=id,name,status,objective&ids=${campanhIdsStr}&access_token=${accessToken}`;
         
         try {
           const campaignsResponse = await fetch(campaignsUrl);
@@ -107,9 +107,9 @@ serve(async (req) => {
           console.error("Erro ao atualizar campanhas:", err);
         }
 
-        // Buscar métricas da API do Meta
-        const fields = "campaign_id,impressions,clicks,spend,actions";
-        const url = `https://graph.facebook.com/v18.0/${adAccountId}/insights?fields=${fields}&level=campaign&date_preset=today&access_token=${accessToken}&filtering=[{"field":"campaign.id","operator":"IN","value":["${campanhIdsStr.replace(/,/g, '","')}"]}]`;
+        // Buscar métricas da API do Meta (PHASE 2: upgrade v18 → v22 com campos adicionais)
+        const fields = "campaign_id,impressions,clicks,spend,actions,reach,frequency,video_play_actions,video_avg_time_watched_actions,website_ctr,inline_link_clicks";
+        const url = `https://graph.facebook.com/v22.0/${adAccountId}/insights?fields=${fields}&level=campaign&date_preset=today&access_token=${accessToken}&filtering=[{"field":"campaign.id","operator":"IN","value":["${campanhIdsStr.replace(/,/g, '","')}"]}]`;
 
         const response = await fetch(url);
         if (!response.ok) {

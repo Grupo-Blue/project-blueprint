@@ -52,7 +52,7 @@ serve(async (req) => {
 
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
-      const idEmpresa = config.id_empresa;
+      const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
       const customerId = config.customer_id?.replace(/-/g, "");
       const loginCustomerId = config.login_customer_id?.replace(/-/g, "");
 
@@ -156,14 +156,18 @@ serve(async (req) => {
           console.error("Erro ao atualizar campanhas:", err);
         }
 
-        // Query GAQL para buscar métricas
+        // Query GAQL para buscar métricas (PHASE 2: campos adicionais)
         const query = `
           SELECT 
             campaign.id,
             metrics.impressions,
             metrics.clicks,
             metrics.cost_micros,
-            metrics.conversions
+            metrics.conversions,
+            metrics.average_cpc,
+            metrics.search_impression_share,
+            segments.device,
+            segments.ad_network_type
           FROM campaign
           WHERE campaign.id IN (${campaignIds.join(",")})
             AND segments.date = '${hoje}'

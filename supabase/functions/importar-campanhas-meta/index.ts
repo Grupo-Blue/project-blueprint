@@ -48,7 +48,7 @@ serve(async (req) => {
         const config = integracao.config_json as any;
         const accessToken = config.access_token;
         const adAccountId = config.ad_account_id;
-        const idEmpresa = config.id_empresa;
+        const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
 
         console.log(`Processando integração para empresa ${idEmpresa}, ad account ${adAccountId}`);
 
@@ -73,7 +73,7 @@ serve(async (req) => {
         }
 
         // Buscar campanhas da API do Meta (sem filtro na URL pois não é suportado)
-        const campaignsUrl = `https://graph.facebook.com/v18.0/${adAccountId}/campaigns?fields=id,name,status,objective&access_token=${accessToken}`;
+        const campaignsUrl = `https://graph.facebook.com/v22.0/${adAccountId}/campaigns?fields=id,name,status,objective&access_token=${accessToken}`;
 
         const campaignsResponse = await fetch(campaignsUrl);
 

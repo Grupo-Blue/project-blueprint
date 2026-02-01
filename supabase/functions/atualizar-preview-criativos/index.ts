@@ -100,9 +100,9 @@ serve(async (req) => {
         .eq("tipo", "META_ADS")
         .eq("ativo", true);
 
-      // Encontrar integração desta empresa
+      // Encontrar integração desta empresa (PHASE 2: usar coluna direta)
       const integracao = integracoes?.find(
-        (i: any) => (i.config_json as any)?.id_empresa === idEmpresa
+        (i: any) => i.id_empresa === idEmpresa
       );
 
       if (!integracao) {
@@ -143,7 +143,7 @@ serve(async (req) => {
               console.log(`🔍 Buscando anúncio para creative ${creativeId}...`);
               
               // Buscar anúncios que usam este creative na conta
-              const searchUrl = `https://graph.facebook.com/v18.0/${accountId}/ads?fields=id,creative{id}&filtering=[{"field":"creative.id","operator":"EQUAL","value":"${creativeId}"}]&limit=1&access_token=${accessToken}`;
+              const searchUrl = `https://graph.facebook.com/v22.0/${accountId}/ads?fields=id,creative{id}&filtering=[{"field":"creative.id","operator":"EQUAL","value":"${creativeId}"}]&limit=1&access_token=${accessToken}`;
               
               try {
                 const searchResp = await fetch(searchUrl);
@@ -171,7 +171,7 @@ serve(async (req) => {
             }
 
             // Buscar preview_shareable_link da API Meta
-            const adUrl = `https://graph.facebook.com/v18.0/${adId}?fields=preview_shareable_link&access_token=${accessToken}`;
+            const adUrl = `https://graph.facebook.com/v22.0/${adId}?fields=preview_shareable_link&access_token=${accessToken}`;
             const response = await fetch(adUrl);
 
             if (!response.ok) {

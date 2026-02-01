@@ -37,14 +37,14 @@ const CRONJOBS: CronjobConfig[] = [
     displayName: "Coletar Métricas Meta",
     functionName: "coletar-metricas-meta",
     schedule: "04:30",
-    description: "Coleta métricas diárias do Meta Ads"
+    description: "Coleta métricas diárias do Meta Ads (API v22)"
   },
   {
     name: "coletar-metricas-google",
     displayName: "Coletar Métricas Google",
     functionName: "coletar-metricas-google",
     schedule: "04:45",
-    description: "Coleta métricas diárias do Google Ads"
+    description: "Coleta métricas diárias do Google Ads (com campos adicionais)"
   },
   {
     name: "coletar-criativos-meta",
@@ -73,6 +73,13 @@ const CRONJOBS: CronjobConfig[] = [
     functionName: "sincronizar-pipedrive",
     schedule: "05:45",
     description: "Sincroniza leads e deals do Pipedrive"
+  },
+  {
+    name: "sincronizar-pipedrive-activities",
+    displayName: "Sincronizar Atividades Pipedrive",
+    functionName: "sincronizar-pipedrive-activities",
+    schedule: "08:00",
+    description: "Sincroniza atividades e notas do Pipedrive (calls, meetings, tasks)"
   },
   {
     name: "sincronizar-tokeniza",
@@ -122,6 +129,13 @@ const CRONJOBS: CronjobConfig[] = [
     functionName: "detectar-discrepancias-utm",
     schedule: "03:00",
     description: "Detecta discrepâncias entre URLs esperadas e capturadas nos criativos"
+  },
+  {
+    name: "detectar-alertas-automaticos",
+    displayName: "Detectar Alertas Automáticos",
+    functionName: "detectar-alertas-automaticos",
+    schedule: "06:00,12:00,18:00,00:00",
+    description: "Detecta CPL/CAC alto, campanhas paradas e leads sem follow-up (4x/dia)"
   },
   {
     name: "recoletar-criativos-historicos",

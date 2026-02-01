@@ -183,7 +183,7 @@ serve(async (req) => {
         const config = integracao.config_json as any;
         const accessToken = config.access_token;
         const adAccountId = config.ad_account_id;
-        const idEmpresa = config.id_empresa;
+        const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
 
         console.log(`\n🏢 Processando empresa ${idEmpresa}, ad account ${adAccountId}`);
         estatisticas.integracoes_processadas++;
@@ -247,7 +247,7 @@ serve(async (req) => {
             // Buscar TODOS os ads da campanha (incluindo archived/paused/deleted)
             // Usar effective_status para pegar todos os status possíveis
             // IMPORTANTE: Incluindo preview_shareable_link para URLs de preview
-            const adsUrl = `https://graph.facebook.com/v18.0/${campanha.id_campanha_externo}/ads?` +
+            const adsUrl = `https://graph.facebook.com/v22.0/${campanha.id_campanha_externo}/ads?` +
               `fields=id,name,status,effective_status,adset_id,preview_shareable_link,creative{id,name,object_story_spec,thumbnail_url,image_url,video_id,asset_feed_spec,template_url_spec,url_tags},tracking_specs,conversion_specs` +
               `&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED","ARCHIVED","DELETED","PENDING_REVIEW","DISAPPROVED","PREAPPROVED","PENDING_BILLING_INFO","CAMPAIGN_PAUSED","ADSET_PAUSED","IN_PROCESS"]}]` +
               `&limit=500` +
