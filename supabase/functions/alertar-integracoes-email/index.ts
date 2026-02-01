@@ -74,10 +74,10 @@ Deno.serve(async (req) => {
 
     if (execucoesError) throw execucoesError;
 
-    // Mapear integrações por empresa
+    // Mapear integrações por empresa (usando nova coluna id_empresa)
     const integracoesPorEmpresa = new Map<string, any[]>();
     for (const integ of integracoes || []) {
-      const empresaId = integ.config_json?.id_empresa;
+      const empresaId = integ.id_empresa;
       if (empresaId) {
         if (!integracoesPorEmpresa.has(empresaId)) {
           integracoesPorEmpresa.set(empresaId, []);
