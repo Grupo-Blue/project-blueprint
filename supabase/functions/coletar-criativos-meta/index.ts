@@ -133,7 +133,7 @@ serve(async (req) => {
       try {
         const config = integracao.config_json as any;
         const accessToken = config.access_token;
-        const idEmpresa = config.id_empresa;
+        const idEmpresa = integracao.id_empresa;
 
         const { data: contasAnuncio } = await supabase
           .from("conta_anuncio")

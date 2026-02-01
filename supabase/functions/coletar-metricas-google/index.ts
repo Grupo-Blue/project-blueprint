@@ -52,7 +52,7 @@ serve(async (req) => {
 
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
-      const idEmpresa = config.id_empresa;
+      const idEmpresa = integracao.id_empresa;
       const customerId = config.customer_id?.replace(/-/g, "");
       const loginCustomerId = config.login_customer_id?.replace(/-/g, "");
 
@@ -160,10 +160,16 @@ serve(async (req) => {
         const query = `
           SELECT 
             campaign.id,
+            campaign.name,
             metrics.impressions,
             metrics.clicks,
             metrics.cost_micros,
-            metrics.conversions
+            metrics.conversions,
+            metrics.average_cpc,
+            metrics.search_impression_share,
+            segments.device,
+            segments.ad_network_type,
+            segments.conversion_action_name
           FROM campaign
           WHERE campaign.id IN (${campaignIds.join(",")})
             AND segments.date = '${hoje}'

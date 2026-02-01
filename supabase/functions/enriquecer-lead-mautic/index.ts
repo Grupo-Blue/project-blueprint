@@ -122,7 +122,7 @@ serve(async (req) => {
     }
 
     // Filtrar integração pela empresa
-    const integracaoEmpresa = integracoes.find(i => i.config_json.id_empresa === id_empresa);
+    const integracaoEmpresa = integracoes.find(i => i.id_empresa === id_empresa);
 
     if (!integracaoEmpresa) {
       console.log(`[Mautic] Nenhuma integração Mautic ativa encontrada para empresa ${id_empresa}`);

@@ -107,7 +107,7 @@ serve(async (req) => {
         const { data: processResult, error: processError } = await supabase.functions.invoke('processar-irpf', {
           body: {
             pdfBase64,
-            id_empresa: config.id_empresa,
+            id_empresa: integracao.id_empresa,
             arquivo_origem: `gdrive:${file.name}`,
           },
         });

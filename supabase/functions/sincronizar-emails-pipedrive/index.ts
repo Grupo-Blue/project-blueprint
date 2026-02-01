@@ -36,7 +36,7 @@ serve(async (req) => {
       throw new Error(`Erro ao buscar integração: ${intError.message}`);
     }
 
-    const integracao = integracoes?.find((i: any) => i.config_json.id_empresa === id_empresa);
+    const integracao = integracoes?.find((i: any) => i.id_empresa === id_empresa);
 
     if (!integracao) {
       throw new Error('Nenhuma integração Pipedrive ativa encontrada para esta empresa');

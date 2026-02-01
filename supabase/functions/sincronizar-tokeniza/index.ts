@@ -123,7 +123,7 @@ serve(async (req) => {
     // Processar cada integração (empresa)
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
-      const idEmpresa = config.id_empresa;
+      const idEmpresa = integracao.id_empresa;
 
       if (!idEmpresa) {
         console.error("Integração sem id_empresa configurado");

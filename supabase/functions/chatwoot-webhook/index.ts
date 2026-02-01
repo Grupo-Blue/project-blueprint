@@ -336,7 +336,7 @@ serve(async (req) => {
             .eq('tipo', 'MAUTIC')
             .eq('ativo', true);
           
-          const mauticIntegracao = mauticIntegracoes?.find(i => (i.config_json as any)?.id_empresa === idEmpresa);
+          const mauticIntegracao = mauticIntegracoes?.find(i => i.id_empresa === idEmpresa);
           if (mauticIntegracao) {
             mauticConfig = mauticIntegracao.config_json as any;
           }
