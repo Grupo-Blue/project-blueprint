@@ -1205,6 +1205,7 @@ export type Database = {
           ativo: boolean
           config_json: Json
           created_at: string
+          id_empresa: string
           id_integracao: string
           tipo: Database["public"]["Enums"]["tipo_integracao"]
           updated_at: string
@@ -1213,6 +1214,7 @@ export type Database = {
           ativo?: boolean
           config_json: Json
           created_at?: string
+          id_empresa: string
           id_integracao?: string
           tipo: Database["public"]["Enums"]["tipo_integracao"]
           updated_at?: string
@@ -1221,11 +1223,20 @@ export type Database = {
           ativo?: boolean
           config_json?: Json
           created_at?: string
+          id_empresa?: string
           id_integracao?: string
           tipo?: Database["public"]["Enums"]["tipo_integracao"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_integracao_empresa"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
       }
       irpf_alimentando: {
         Row: {
