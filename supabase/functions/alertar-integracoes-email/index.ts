@@ -21,7 +21,7 @@ interface EmpresaRelatorio {
   integracoes: IntegracaoStatus[];
 }
 
-const TIPOS_INTEGRACAO = ["META_ADS", "GOOGLE_ADS", "PIPEDRIVE", "TOKENIZA", "METRICOOL"];
+const TIPOS_INTEGRACAO = ["META_ADS", "GOOGLE_ADS", "PIPEDRIVE", "TOKENIZA", "MAUTIC", "NOTION", "METRICOOL", "CHATWOOT", "GA4", "STAPE"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -106,24 +106,19 @@ Deno.serve(async (req) => {
         
         if (integ) {
           // Verificar se a integração está funcionando baseado nos cronjobs
-          let cronjobNome = "";
-          switch (tipo) {
-            case "META_ADS":
-              cronjobNome = "coletar-metricas-meta";
-              break;
-            case "GOOGLE_ADS":
-              cronjobNome = "coletar-metricas-google";
-              break;
-            case "PIPEDRIVE":
-              cronjobNome = "sincronizar-pipedrive";
-              break;
-            case "TOKENIZA":
-              cronjobNome = "sincronizar-tokeniza";
-              break;
-            case "METRICOOL":
-              cronjobNome = "sincronizar-metricool";
-              break;
-          }
+          const cronjobMap: Record<string, string> = {
+            "META_ADS": "coletar-metricas-meta",
+            "GOOGLE_ADS": "coletar-metricas-google",
+            "PIPEDRIVE": "sincronizar-pipedrive",
+            "TOKENIZA": "sincronizar-tokeniza",
+            "MAUTIC": "enriquecer-lead-mautic",
+            "NOTION": "sincronizar-notion",
+            "METRICOOL": "sincronizar-metricool",
+            "CHATWOOT": "chatwoot-webhook",
+            "GA4": "coletar-metricas-ga4",
+            "STAPE": "stape-webhook",
+          };
+          const cronjobNome = cronjobMap[tipo] || "";
 
           const ultimaExec = ultimasExecucoes.get(cronjobNome);
           const funcionando = ultimaExec?.status === "sucesso";
@@ -261,9 +256,15 @@ function gerarHtmlEmail(
     GOOGLE_ADS: "Google Ads",
     PIPEDRIVE: "Pipedrive",
     TOKENIZA: "Tokeniza",
+    MAUTIC: "Mautic",
+    NOTION: "Notion",
     METRICOOL: "Metricool",
+    CHATWOOT: "Chatwoot",
+    GA4: "GA4",
+    STAPE: "Stape",
   };
 
+  // Seção de problemas só aparece se houver problemas
   let problemasHtml = "";
   if (empresasComProblemas.length > 0) {
     problemasHtml = `
@@ -293,14 +294,6 @@ function gerarHtmlEmail(
         `
           )
           .join("")}
-      </div>
-    `;
-  } else {
-    problemasHtml = `
-      <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-        <h2 style="color: #16a34a; margin: 0; font-size: 18px;">
-          ✅ Todas as integrações configuradas estão funcionando!
-        </h2>
       </div>
     `;
   }
