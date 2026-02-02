@@ -106,22 +106,36 @@ Deno.serve(async (req) => {
         
         if (integ) {
           // Verificar se a integração está funcionando baseado nos cronjobs
-          const cronjobMap: Record<string, string> = {
-            "META_ADS": "coletar-metricas-meta",
-            "GOOGLE_ADS": "coletar-metricas-google",
-            "PIPEDRIVE": "sincronizar-pipedrive",
-            "TOKENIZA": "sincronizar-tokeniza",
-            "MAUTIC": "enriquecer-lead-mautic",
-            "NOTION": "sincronizar-notion",
-            "METRICOOL": "sincronizar-metricool",
-            "CHATWOOT": "chatwoot-webhook",
-            "GA4": "coletar-metricas-ga4",
-            "STAPE": "stape-webhook",
+          // Mapeamento para nomes reais dos cronjobs no sistema
+          const cronjobMap: Record<string, string[]> = {
+            "META_ADS": ["coletar-criativos-meta", "calcular-metricas-diarias"],
+            "GOOGLE_ADS": ["calcular-metricas-diarias"],
+            "PIPEDRIVE": ["sincronizar-pipedrive-activities", "disparar-webhook-leads"],
+            "TOKENIZA": ["sincronizar-tokeniza", "enriquecer-leads-tokeniza"],
+            "MAUTIC": ["monitorar-enriquecimento-leads"],
+            "NOTION": ["sincronizar-notion"],
+            "METRICOOL": ["sincronizar-metricool"],
+            "CHATWOOT": ["disparar-webhook-leads"], // Webhook - usa logs de lead dispatch
+            "GA4": ["calcular-metricas-diarias"],
+            "STAPE": ["stape-api"],
           };
-          const cronjobNome = cronjobMap[tipo] || "";
+          const cronjobNomes = cronjobMap[tipo] || [];
 
-          const ultimaExec = ultimasExecucoes.get(cronjobNome);
-          const funcionando = ultimaExec?.status === "sucesso";
+          // Verificar se algum dos cronjobs associados executou com sucesso ou parcialmente
+          let ultimaExec: any = null;
+          let funcionando = false;
+          for (const cronjob of cronjobNomes) {
+            const exec = ultimasExecucoes.get(cronjob);
+            if (exec) {
+              if (!ultimaExec || new Date(exec.data_execucao) > new Date(ultimaExec.data_execucao)) {
+                ultimaExec = exec;
+              }
+              // Sucesso ou parcial conta como funcionando
+              if (exec.status === "sucesso" || exec.status === "parcial") {
+                funcionando = true;
+              }
+            }
+          }
           const erro = ultimaExec?.status === "erro" ? ultimaExec.mensagem_erro : null;
 
           statusIntegracoes.push({
