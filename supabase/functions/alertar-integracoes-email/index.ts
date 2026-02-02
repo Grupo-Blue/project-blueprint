@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         sender: {
           name: "SGT Alertas",
-          email: "alertas@blueconsult.com.br",
+          email: "noreply@grupoblue.com.br",
         },
         to: toEmails,
         subject: `[SGT] Relatório de Integrações - ${new Date().toLocaleDateString("pt-BR")}`,
