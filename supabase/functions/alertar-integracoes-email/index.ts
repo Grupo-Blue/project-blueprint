@@ -149,21 +149,39 @@ Deno.serve(async (req) => {
             }
           }
           
-          // Se teve sucesso em algum cronjob, considera funcionando
-          // Se só teve parcial (sem sucesso), considera parcial
-          // Se só teve erro (sem sucesso nem parcial), considera com erro
-          if (!funcionando && !parcial && temErro) {
-            // Integração com erro
-          }
-          
-          // Verificar também os detalhes da execução para ver se retornou dados
+          // Verificar também os detalhes da execução para ver se retornou dados ou tem erros internos
           let detalhesProblema: string | null = erroMsg;
           if (ultimaExec?.detalhes_execucao) {
             const detalhes = ultimaExec.detalhes_execucao;
+            
             // Verificar se retornou 0 registros (pode indicar problema mesmo com status sucesso)
             if (detalhes.total === 0 || detalhes.registros === 0 || detalhes.leads === 0) {
               if (!detalhesProblema) {
                 detalhesProblema = `Última execução retornou 0 registros`;
+              }
+            }
+            
+            // NOVO: Verificar se há resultados com erros internos
+            if (detalhes.resultados && Array.isArray(detalhes.resultados)) {
+              const resultadosComErro = detalhes.resultados.filter((r: any) => r.status === "error" || r.error);
+              const totalResultados = detalhes.resultados.length;
+              
+              if (totalResultados > 0 && resultadosComErro.length > 0) {
+                // Pegar o primeiro erro como exemplo
+                const primeiroErro = resultadosComErro[0];
+                const msgErro = primeiroErro.error || "Erro desconhecido";
+                
+                // Se TODOS os resultados são erros, considerar como falha total
+                if (resultadosComErro.length === totalResultados) {
+                  funcionando = false;
+                  parcial = false;
+                  detalhesProblema = `${msgErro} (${resultadosComErro.length}/${totalResultados} falharam)`;
+                } else if (resultadosComErro.length > 0) {
+                  // Se alguns falharam, é parcial com detalhes
+                  if (!detalhesProblema) {
+                    detalhesProblema = `${msgErro} (${resultadosComErro.length}/${totalResultados} falharam)`;
+                  }
+                }
               }
             }
           }
