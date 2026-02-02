@@ -126,34 +126,56 @@ Deno.serve(async (req) => {
           let ultimaExec: any = null;
           let funcionando = false;
           let parcial = false;
+          let temErro = false;
+          let erroMsg: string | null = null;
+          
           for (const cronjob of cronjobNomes) {
             const exec = ultimasExecucoes.get(cronjob);
             if (exec) {
+              // Guardar a execução mais recente
               if (!ultimaExec || new Date(exec.data_execucao) > new Date(ultimaExec.data_execucao)) {
                 ultimaExec = exec;
               }
+              
+              // Verificar status - prioridade: sucesso > parcial > erro
               if (exec.status === "sucesso") {
                 funcionando = true;
               } else if (exec.status === "parcial") {
                 parcial = true;
+              } else if (exec.status === "erro") {
+                temErro = true;
+                erroMsg = exec.mensagem_erro;
               }
             }
           }
-          const erro = ultimaExec?.status === "erro" ? ultimaExec.mensagem_erro : null;
+          
+          // Se teve sucesso em algum cronjob, considera funcionando
+          // Se só teve parcial (sem sucesso), considera parcial
+          // Se só teve erro (sem sucesso nem parcial), considera com erro
+          if (!funcionando && !parcial && temErro) {
+            // Integração com erro
+          }
+          
+          // Verificar também os detalhes da execução para ver se retornou dados
+          let detalhesProblema: string | null = erroMsg;
+          if (ultimaExec?.detalhes_execucao) {
+            const detalhes = ultimaExec.detalhes_execucao;
+            // Verificar se retornou 0 registros (pode indicar problema mesmo com status sucesso)
+            if (detalhes.total === 0 || detalhes.registros === 0 || detalhes.leads === 0) {
+              if (!detalhesProblema) {
+                detalhesProblema = `Última execução retornou 0 registros`;
+              }
+            }
+          }
 
           statusIntegracoes.push({
             tipo,
             configurada: true,
             funcionando,
-            parcial,
+            parcial: parcial && !funcionando,
             ultimaExecucao: ultimaExec?.data_execucao || null,
-            erro,
+            erro: detalhesProblema,
           });
-
-          // Se configurada mas não funcionando, marcar como problema
-          if (!funcionando && ultimaExec?.status === "erro") {
-            // Será adicionado às empresas com problemas
-          }
         } else {
           statusIntegracoes.push({
             tipo,
