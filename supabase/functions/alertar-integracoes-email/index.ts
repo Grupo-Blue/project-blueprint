@@ -1,10 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 interface IntegracaoStatus {
   tipo: string;
@@ -31,17 +32,15 @@ Deno.serve(async (req) => {
   console.log("[alertar-integracoes-email] Iniciando verificação...");
 
   try {
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
     const alertEmailTo = Deno.env.get("ALERT_EMAIL_TO");
 
-    if (!resendApiKey) {
-      throw new Error("RESEND_API_KEY não configurada");
+    if (!brevoApiKey) {
+      throw new Error("BREVO_API_KEY não configurada");
     }
     if (!alertEmailTo) {
       throw new Error("ALERT_EMAIL_TO não configurado");
     }
-
-    const resend = new Resend(resendApiKey);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -173,15 +172,34 @@ Deno.serve(async (req) => {
     // Gerar HTML do email
     const html = gerarHtmlEmail(empresasComProblemas, relatorio);
 
-    // Enviar email
-    const emailResponse = await resend.emails.send({
-      from: "SGT Alertas <alertas@blueconsult.com.br>",
-      to: alertEmailTo.split(",").map((e) => e.trim()),
-      subject: `[SGT] Relatório de Integrações - ${new Date().toLocaleDateString("pt-BR")}`,
-      html,
+    // Enviar email via Brevo
+    const toEmails = alertEmailTo.split(",").map((e) => ({ email: e.trim() }));
+    
+    const emailResponse = await fetch(BREVO_API_URL, {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": brevoApiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: {
+          name: "SGT Alertas",
+          email: "alertas@blueconsult.com.br",
+        },
+        to: toEmails,
+        subject: `[SGT] Relatório de Integrações - ${new Date().toLocaleDateString("pt-BR")}`,
+        htmlContent: html,
+      }),
     });
 
-    console.log("[alertar-integracoes-email] Email enviado:", emailResponse);
+    if (!emailResponse.ok) {
+      const errorData = await emailResponse.text();
+      throw new Error(`Erro ao enviar email via Brevo: ${emailResponse.status} - ${errorData}`);
+    }
+
+    const emailResult = await emailResponse.json();
+    console.log("[alertar-integracoes-email] Email enviado via Brevo:", emailResult);
 
     // Registrar execução
     const duracao = Date.now() - startTime;
