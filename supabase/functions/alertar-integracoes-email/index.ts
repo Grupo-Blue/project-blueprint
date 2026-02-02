@@ -11,6 +11,7 @@ interface IntegracaoStatus {
   tipo: string;
   configurada: boolean;
   funcionando: boolean | null;
+  parcial: boolean;
   ultimaExecucao: string | null;
   erro: string | null;
 }
@@ -124,15 +125,17 @@ Deno.serve(async (req) => {
           // Verificar se algum dos cronjobs associados executou com sucesso ou parcialmente
           let ultimaExec: any = null;
           let funcionando = false;
+          let parcial = false;
           for (const cronjob of cronjobNomes) {
             const exec = ultimasExecucoes.get(cronjob);
             if (exec) {
               if (!ultimaExec || new Date(exec.data_execucao) > new Date(ultimaExec.data_execucao)) {
                 ultimaExec = exec;
               }
-              // Sucesso ou parcial conta como funcionando
-              if (exec.status === "sucesso" || exec.status === "parcial") {
+              if (exec.status === "sucesso") {
                 funcionando = true;
+              } else if (exec.status === "parcial") {
+                parcial = true;
               }
             }
           }
@@ -142,6 +145,7 @@ Deno.serve(async (req) => {
             tipo,
             configurada: true,
             funcionando,
+            parcial,
             ultimaExecucao: ultimaExec?.data_execucao || null,
             erro,
           });
@@ -155,6 +159,7 @@ Deno.serve(async (req) => {
             tipo,
             configurada: false,
             funcionando: null,
+            parcial: false,
             ultimaExecucao: null,
             erro: null,
           });
@@ -179,7 +184,7 @@ Deno.serve(async (req) => {
     }
 
     // Gerar HTML do email
-    const html = gerarHtmlEmail(empresasComProblemas, relatorio);
+    const html = gerarHtmlEmail(relatorio);
 
     // Enviar email via Brevo
     const toEmails = alertEmailTo.split(",").map((e) => ({ email: e.trim() }));
@@ -255,7 +260,6 @@ Deno.serve(async (req) => {
 });
 
 function gerarHtmlEmail(
-  empresasComProblemas: EmpresaRelatorio[],
   todasEmpresas: EmpresaRelatorio[]
 ): string {
   const dataHoje = new Date().toLocaleDateString("pt-BR", {
@@ -278,38 +282,19 @@ function gerarHtmlEmail(
     STAPE: "Stape",
   };
 
-  // Seção de problemas só aparece se houver problemas
-  let problemasHtml = "";
-  if (empresasComProblemas.length > 0) {
-    problemasHtml = `
-      <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-        <h2 style="color: #dc2626; margin: 0 0 16px 0; font-size: 18px;">
-          ⚠️ ${empresasComProblemas.length} Empresa(s) com Integrações com Problema
-        </h2>
-        ${empresasComProblemas
-          .map(
-            (empresa) => `
-          <div style="background: white; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
-            <strong style="color: #1f2937;">${empresa.nome}</strong>
-            <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-              ${empresa.integracoes
-                .filter((i) => i.configurada && i.funcionando === false)
-                .map(
-                  (i) => `
-                <li style="color: #dc2626;">
-                  ${tipoLabel[i.tipo] || i.tipo}: ${i.erro || "Erro desconhecido"}
-                  ${i.ultimaExecucao ? `<br><small style="color: #6b7280;">Última execução: ${new Date(i.ultimaExecucao).toLocaleString("pt-BR")}</small>` : ""}
-                </li>
-              `
-                )
-                .join("")}
-            </ul>
-          </div>
-        `
-          )
-          .join("")}
-      </div>
-    `;
+  // Coletar todos os problemas de todas as empresas
+  const todosProblemas: { empresa: string; integracao: string; erro: string; ultimaExec: string | null }[] = [];
+  for (const empresa of todasEmpresas) {
+    for (const integ of empresa.integracoes) {
+      if (integ.configurada && !integ.funcionando && !integ.parcial && integ.erro) {
+        todosProblemas.push({
+          empresa: empresa.nome,
+          integracao: tipoLabel[integ.tipo] || integ.tipo,
+          erro: integ.erro,
+          ultimaExec: integ.ultimaExecucao,
+        });
+      }
+    }
   }
 
   // Tabela de todas as empresas
@@ -341,6 +326,9 @@ function gerarHtmlEmail(
               if (integ.funcionando) {
                 return `<td style="text-align: center; padding: 12px; border: 1px solid #e5e7eb; background-color: #f0fdf4; color: #16a34a;">✅</td>`;
               }
+              if (integ.parcial) {
+                return `<td style="text-align: center; padding: 12px; border: 1px solid #e5e7eb; background-color: #fefce8; color: #ca8a04;">⚠️</td>`;
+              }
               return `<td style="text-align: center; padding: 12px; border: 1px solid #e5e7eb; background-color: #fef2f2; color: #dc2626;">❌</td>`;
             }).join("")}
           </tr>
@@ -350,9 +338,32 @@ function gerarHtmlEmail(
       </tbody>
     </table>
     <p style="color: #6b7280; font-size: 12px; margin-top: 8px;">
-      Legenda: ✅ Funcionando | ❌ Com erro | — Não configurada
+      Legenda: ✅ Funcionando | ⚠️ Parcial | ❌ Com erro | — Não configurada
     </p>
   `;
+
+  // Seção de problemas detalhados abaixo da tabela
+  let detalhesProblemasHtml = "";
+  if (todosProblemas.length > 0) {
+    detalhesProblemasHtml = `
+      <div style="margin-top: 24px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px;">
+        <h3 style="color: #dc2626; margin: 0 0 12px 0; font-size: 16px;">
+          🚨 Detalhes dos Problemas Encontrados (${todosProblemas.length})
+        </h3>
+        ${todosProblemas
+          .map(
+            (p) => `
+          <div style="background: white; border-radius: 6px; padding: 12px; margin-bottom: 8px; border-left: 4px solid #dc2626;">
+            <strong style="color: #1f2937;">${p.empresa}</strong> — <span style="color: #6b7280;">${p.integracao}</span>
+            <p style="margin: 8px 0 0 0; color: #dc2626; font-size: 13px;">${p.erro}</p>
+            ${p.ultimaExec ? `<p style="margin: 4px 0 0 0; color: #9ca3af; font-size: 11px;">Última execução: ${new Date(p.ultimaExec).toLocaleString("pt-BR")}</p>` : ""}
+          </div>
+        `
+          )
+          .join("")}
+      </div>
+    `;
+  }
 
   return `
     <!DOCTYPE html>
@@ -369,8 +380,8 @@ function gerarHtmlEmail(
         </div>
         
         <div style="padding: 24px;">
-          ${problemasHtml}
           ${tabelaEmpresas}
+          ${detalhesProblemasHtml}
         </div>
         
         <div style="background-color: #f3f4f6; padding: 16px; text-align: center; color: #6b7280; font-size: 12px;">
