@@ -84,7 +84,7 @@ export default function RelatorioNovo() {
           mes,
           ano,
           status: "EM_EDICAO",
-        })
+        } as any)
         .select()
         .single();
 

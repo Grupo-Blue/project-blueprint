@@ -10,10 +10,17 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+
+const MESES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+];
+
 interface Relatorio {
   id_relatorio: string;
   id_empresa: string;
-  id_semana: string;
+  mes: number | null;
+  ano: number | null;
   status: string;
   texto_comparacao: string | null;
   aprendizado_resumo: string | null;
@@ -22,49 +29,36 @@ interface Relatorio {
   empresa: {
     nome: string;
   };
-  semana: {
-    numero_semana: number;
-    ano: number;
-    data_inicio: string;
-    data_fim: string;
-  };
 }
+
 export default function Relatorios() {
   const navigate = useNavigate();
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroEmpresa, setFiltroEmpresa] = useState<string>("todas");
   const [ofertaSelecionada, setOfertaSelecionada] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
-  const {
-    data: empresas
-  } = useQuery({
+
+  const { data: empresas } = useQuery({
     queryKey: ["empresas"],
     queryFn: async () => {
-      const {
-        data,
-        error
-      } = await supabase.from("empresa").select("id_empresa, nome");
+      const { data, error } = await supabase.from("empresa").select("id_empresa, nome");
       if (error) throw error;
       return data;
     }
   });
 
   // Buscar projetos Tokeniza cadastrados
-  const {
-    data: projetosTokeniza
-  } = useQuery({
+  const { data: projetosTokeniza } = useQuery({
     queryKey: ["tokeniza-projetos-relatorios"],
     queryFn: async () => {
-      const {
-        data,
-        error
-      } = await supabase.from("tokeniza_projeto").select("project_id, nome").order("nome");
+      const { data, error } = await supabase
+        .from("tokeniza_projeto")
+        .select("project_id, nome")
+        .order("nome");
       if (error) throw error;
       return data;
     }
   });
-
-  // Removido: busca de project_ids dos leads - usar apenas projetosTokeniza cadastrados
 
   const handleExportLeads = async () => {
     if (!ofertaSelecionada) {
@@ -73,24 +67,24 @@ export default function Relatorios() {
     }
     setIsExporting(true);
     try {
-      // Buscar investimentos diretamente da tabela tokeniza_investimento para o projeto específico
-      const {
-        data: investimentos,
-        error: invError
-      } = await supabase.from("tokeniza_investimento").select("user_id_tokeniza, amount, data_criacao").eq("project_id", ofertaSelecionada);
+      const { data: investimentos, error: invError } = await supabase
+        .from("tokeniza_investimento")
+        .select("user_id_tokeniza, amount, data_criacao")
+        .eq("project_id", ofertaSelecionada);
+
       if (invError) throw invError;
       if (!investimentos || investimentos.length === 0) {
         toast.warning("Nenhum investimento encontrado para esta oferta");
         return;
       }
 
-      // Agrupar investimentos por usuário
       const investimentosPorUsuario = new Map<string, {
         total: number;
         qtd: number;
         primeiro: Date;
         ultimo: Date;
       }>();
+
       investimentos.forEach(inv => {
         const userId = inv.user_id_tokeniza;
         if (!userId) return;
@@ -112,15 +106,14 @@ export default function Relatorios() {
         }
       });
 
-      // Buscar dados dos usuários da Tokeniza
       const userIds = Array.from(investimentosPorUsuario.keys());
-      const {
-        data: usuarios,
-        error: userError
-      } = await supabase.from("tokeniza_usuario").select("user_id_tokeniza, email, phone, first_name, last_name").in("user_id_tokeniza", userIds);
+      const { data: usuarios, error: userError } = await supabase
+        .from("tokeniza_usuario")
+        .select("user_id_tokeniza, email, phone, first_name, last_name")
+        .in("user_id_tokeniza", userIds);
+
       if (userError) throw userError;
 
-      // Montar dados para exportação
       type ExportRow = {
         nome: string;
         email: string;
@@ -130,8 +123,10 @@ export default function Relatorios() {
         primeiro_investimento: Date;
         ultimo_investimento: Date;
       };
+
       const dadosExportacao: ExportRow[] = [];
       const emailsVistos = new Set<string>();
+
       usuarios?.forEach(usuario => {
         const userId = usuario.user_id_tokeniza;
         const inv = investimentosPorUsuario.get(userId);
@@ -150,22 +145,30 @@ export default function Relatorios() {
         });
       });
 
-      // Ordenar por valor investido (maior primeiro)
       dadosExportacao.sort((a, b) => b.valor_investido - a.valor_investido);
+
       if (dadosExportacao.length === 0) {
         toast.warning("Nenhum investidor encontrado para esta oferta");
         return;
       }
 
-      // Criar CSV
       const headers = ["Nome", "Email", "Telefone", "Valor Investido", "Qtd Investimentos", "Primeiro Investimento", "Último Investimento"];
-      const rows = dadosExportacao.map(row => [row.nome, row.email, row.telefone, row.valor_investido.toFixed(2).replace(".", ","), row.qtd_investimentos.toString(), format(row.primeiro_investimento, "dd/MM/yyyy"), format(row.ultimo_investimento, "dd/MM/yyyy")]);
-      const csvContent = [headers.join(";"), ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))].join("\n");
+      const rows = dadosExportacao.map(row => [
+        row.nome,
+        row.email,
+        row.telefone,
+        row.valor_investido.toFixed(2).replace(".", ","),
+        row.qtd_investimentos.toString(),
+        format(row.primeiro_investimento, "dd/MM/yyyy"),
+        format(row.ultimo_investimento, "dd/MM/yyyy")
+      ]);
 
-      // Download
-      const blob = new Blob(["\ufeff" + csvContent], {
-        type: "text/csv;charset=utf-8;"
-      });
+      const csvContent = [
+        headers.join(";"),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))
+      ].join("\n");
+
+      const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -175,10 +178,9 @@ export default function Relatorios() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
       const totalInvestido = dadosExportacao.reduce((sum, r) => sum + r.valor_investido, 0);
-      toast.success(`${dadosExportacao.length} investidores exportados (Total: R$ ${totalInvestido.toLocaleString("pt-BR", {
-        minimumFractionDigits: 2
-      })})`);
+      toast.success(`${dadosExportacao.length} investidores exportados (Total: R$ ${totalInvestido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`);
     } catch (error) {
       console.error("Erro ao exportar:", error);
       toast.error("Erro ao exportar leads");
@@ -187,72 +189,68 @@ export default function Relatorios() {
     }
   };
 
-  // Lista de ofertas: usar apenas projetos cadastrados na tabela tokeniza_projeto
   const ofertasDisponiveis = projetosTokeniza || [];
-  const {
-    data: relatorios,
-    isLoading
-  } = useQuery({
+
+  const { data: relatorios, isLoading } = useQuery({
     queryKey: ["relatorios", filtroStatus, filtroEmpresa],
     queryFn: async () => {
-      let query = supabase.from("relatorio_semanal").select(`
+      let query = supabase
+        .from("relatorio_semanal")
+        .select(`
           *,
-          empresa:id_empresa (nome),
-          semana:id_semana (numero_semana, ano, data_inicio, data_fim)
-        `).order("created_at", {
-        ascending: false
-      });
+          empresa:id_empresa (nome)
+        `)
+        .order("created_at", { ascending: false });
+
       if (filtroStatus !== "todos") {
         query = query.eq("status", filtroStatus as any);
       }
       if (filtroEmpresa !== "todas") {
         query = query.eq("id_empresa", filtroEmpresa);
       }
-      const {
-        data,
-        error
-      } = await query;
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as Relatorio[];
     }
   });
+
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, {
-      variant: "default" | "secondary" | "outline";
-      label: string;
-    }> = {
-      EM_EDICAO: {
-        variant: "secondary",
-        label: "Em Edição"
-      },
-      PRONTO: {
-        variant: "default",
-        label: "Pronto"
-      },
-      VALIDADO: {
-        variant: "outline",
-        label: "Validado"
-      }
+    const variants: Record<string, { variant: "default" | "secondary" | "outline"; label: string }> = {
+      EM_EDICAO: { variant: "secondary", label: "Em Edição" },
+      PRONTO: { variant: "default", label: "Pronto" },
+      VALIDADO: { variant: "outline", label: "Validado" }
     };
     const config = variants[status] || variants.EM_EDICAO;
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
+
+  const getInicioFimMes = (mes: number, ano: number) => {
+    const inicio = new Date(ano, mes - 1, 1);
+    const fim = new Date(ano, mes, 0);
+    return { inicio, fim };
+  };
+
   if (isLoading) {
-    return <div className="min-h-screen bg-background p-8">
+    return (
+      <div className="min-h-screen bg-background p-8">
         <div className="max-w-7xl mx-auto">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-muted rounded w-1/4"></div>
             <div className="h-64 bg-muted rounded"></div>
           </div>
         </div>
-      </div>;
+      </div>
+    );
   }
-  return <div className="min-h-screen bg-background p-8">
+
+  return (
+    <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-4xl font-bold text-foreground">Relatórios</h1>
-            <p className="text-muted-foreground mt-2">Gerencie e visualize os relatórios de desempenho</p>
+            <p className="text-muted-foreground mt-2">Gerencie e visualize os relatórios mensais de desempenho</p>
           </div>
           <Button onClick={() => navigate("/relatorios/novo")}>
             <Plus className="mr-2 h-4 w-4" />
@@ -267,9 +265,11 @@ export default function Relatorios() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todas as Empresas</SelectItem>
-              {empresas?.map(empresa => <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
+              {empresas?.map(empresa => (
+                <SelectItem key={empresa.id_empresa} value={empresa.id_empresa}>
                   {empresa.nome}
-                </SelectItem>)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -305,9 +305,11 @@ export default function Relatorios() {
                     <SelectValue placeholder="Selecione uma oferta..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {ofertasDisponiveis.map(oferta => <SelectItem key={oferta.project_id} value={oferta.project_id}>
+                    {ofertasDisponiveis.map(oferta => (
+                      <SelectItem key={oferta.project_id} value={oferta.project_id}>
                         {oferta.nome}
-                      </SelectItem>)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -320,56 +322,74 @@ export default function Relatorios() {
         </Card>
 
         <div className="grid gap-6">
-          {relatorios?.map(relatorio => <Card key={relatorio.id_relatorio} className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate(`/relatorios/${relatorio.id_relatorio}`)}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="space-y-2">
-                    <CardTitle className="text-2xl flex items-center gap-3">
-                      <FileText className="h-6 w-6" />
-                      Semana {relatorio.semana.numero_semana}/{relatorio.semana.ano}
-                      {getStatusBadge(relatorio.status)}
-                    </CardTitle>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        {format(new Date(relatorio.semana.data_inicio), "dd/MM", {
-                      locale: ptBR
-                    })} - {format(new Date(relatorio.semana.data_fim), "dd/MM/yyyy", {
-                      locale: ptBR
-                    })}
-                      </span>
-                      <span className="font-medium">{relatorio.empresa.nome}</span>
+          {relatorios?.map(relatorio => {
+            const mesNome = relatorio.mes ? MESES[relatorio.mes - 1] : "N/A";
+            const periodo = relatorio.mes && relatorio.ano 
+              ? getInicioFimMes(relatorio.mes, relatorio.ano) 
+              : null;
+
+            return (
+              <Card 
+                key={relatorio.id_relatorio} 
+                className="hover:shadow-lg transition-shadow cursor-pointer" 
+                onClick={() => navigate(`/relatorios/${relatorio.id_relatorio}`)}
+              >
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-2">
+                      <CardTitle className="text-2xl flex items-center gap-3">
+                        <FileText className="h-6 w-6" />
+                        {mesNome} {relatorio.ano}
+                        {getStatusBadge(relatorio.status)}
+                      </CardTitle>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        {periodo && (
+                          <span className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            {format(periodo.inicio, "dd/MM", { locale: ptBR })} - {format(periodo.fim, "dd/MM/yyyy", { locale: ptBR })}
+                          </span>
+                        )}
+                        <span className="font-medium">{relatorio.empresa?.nome}</span>
+                      </div>
                     </div>
+                    {relatorio.data_fechamento && (
+                      <div className="text-right text-sm text-muted-foreground">
+                        Fechado em<br />
+                        {format(new Date(relatorio.data_fechamento), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </div>
+                    )}
                   </div>
-                  {relatorio.data_fechamento && <div className="text-right text-sm text-muted-foreground">
-                      Fechado em<br />
-                      {format(new Date(relatorio.data_fechamento), "dd/MM/yyyy HH:mm", {
-                  locale: ptBR
-                })}
-                    </div>}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {relatorio.texto_comparacao && <p className="text-sm text-muted-foreground line-clamp-2">
-                      {relatorio.texto_comparacao}
-                    </p>}
-                  {!relatorio.texto_comparacao && relatorio.status === "EM_EDICAO" && <div className="flex items-center gap-2 text-sm text-yellow-600">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>Relatório incompleto - Continue a edição</span>
-                    </div>}
-                </div>
-              </CardContent>
-            </Card>)}
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {relatorio.texto_comparacao && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {relatorio.texto_comparacao}
+                      </p>
+                    )}
+                    {!relatorio.texto_comparacao && relatorio.status === "EM_EDICAO" && (
+                      <div className="flex items-center gap-2 text-sm text-yellow-600">
+                        <AlertCircle className="h-4 w-4" />
+                        <span>Relatório incompleto - Continue a edição</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
-        {relatorios?.length === 0 && <Card className="p-12">
+        {relatorios?.length === 0 && (
+          <Card className="p-12">
             <div className="text-center space-y-4">
               <FileText className="h-16 w-16 mx-auto text-muted-foreground" />
               <div>
                 <h3 className="text-xl font-semibold">Nenhum relatório encontrado</h3>
                 <p className="text-muted-foreground">
-                  {filtroStatus === "todos" && filtroEmpresa === "todas" ? "Crie seu primeiro relatório semanal." : "Ajuste os filtros para ver outros relatórios."}
+                  {filtroStatus === "todos" && filtroEmpresa === "todas" 
+                    ? "Crie seu primeiro relatório mensal." 
+                    : "Ajuste os filtros para ver outros relatórios."}
                 </p>
               </div>
               <Button onClick={() => navigate("/relatorios/novo")}>
@@ -377,7 +397,9 @@ export default function Relatorios() {
                 Criar Primeiro Relatório
               </Button>
             </div>
-          </Card>}
+          </Card>
+        )}
       </div>
-    </div>;
+    </div>
+  );
 }
