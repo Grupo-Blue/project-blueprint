@@ -7,60 +7,82 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
+
+const MESES = [
+  { value: 1, label: "Janeiro" },
+  { value: 2, label: "Fevereiro" },
+  { value: 3, label: "Março" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Maio" },
+  { value: 6, label: "Junho" },
+  { value: 7, label: "Julho" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Setembro" },
+  { value: 10, label: "Outubro" },
+  { value: 11, label: "Novembro" },
+  { value: 12, label: "Dezembro" },
+];
+
+// Gerar últimos 12 meses para seleção
+const gerarOpcoesMeses = () => {
+  const opcoes = [];
+  const hoje = new Date();
+  
+  for (let i = 0; i < 12; i++) {
+    const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    opcoes.push({
+      mes: data.getMonth() + 1,
+      ano: data.getFullYear(),
+      label: `${MESES[data.getMonth()].label} ${data.getFullYear()}`,
+    });
+  }
+  
+  return opcoes;
+};
 
 export default function RelatorioNovo() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { empresaSelecionada, empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
+  const { empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
   const [empresaRelatorio, setEmpresaRelatorio] = useState("");
-  const [semanaSelecionada, setSemanaSelecionada] = useState("");
+  const [mesSelecionado, setMesSelecionado] = useState("");
+
+  const opcoesMeses = gerarOpcoesMeses();
 
   // Usar empresa do contexto se for única
   const empresaParaRelatorio = empresasPermitidas.length === 1 
     ? empresasPermitidas[0].id_empresa 
     : empresaRelatorio;
 
-  const { data: semanas } = useQuery({
-    queryKey: ["semanas"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("semana")
-        .select("*")
-        .order("ano", { ascending: false })
-        .order("numero_semana", { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data;
-    },
-  });
-
   const criarRelatorioMutation = useMutation({
     mutationFn: async () => {
-      if (!empresaParaRelatorio || !semanaSelecionada) {
-        throw new Error("Selecione empresa e semana");
+      if (!empresaParaRelatorio || !mesSelecionado) {
+        throw new Error("Selecione empresa e mês");
       }
+
+      const [mes, ano] = mesSelecionado.split("-").map(Number);
 
       // Verificar se já existe relatório para esta combinação
       const { data: existente } = await supabase
         .from("relatorio_semanal")
         .select("id_relatorio")
         .eq("id_empresa", empresaParaRelatorio)
-        .eq("id_semana", semanaSelecionada)
+        .eq("mes", mes)
+        .eq("ano", ano)
         .single();
 
       if (existente) {
-        throw new Error("Já existe um relatório para esta empresa e semana");
+        throw new Error("Já existe um relatório para esta empresa e mês");
       }
 
       const { data, error } = await supabase
         .from("relatorio_semanal")
         .insert({
           id_empresa: empresaParaRelatorio,
-          id_semana: semanaSelecionada,
+          mes,
+          ano,
           status: "EM_EDICAO",
         })
         .select()
@@ -109,7 +131,7 @@ export default function RelatorioNovo() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">Criar Novo Relatório Semanal</CardTitle>
+            <CardTitle className="text-2xl">Criar Novo Relatório Mensal</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {empresasPermitidas.length > 1 && (
@@ -138,15 +160,15 @@ export default function RelatorioNovo() {
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Semana</label>
-              <Select value={semanaSelecionada} onValueChange={setSemanaSelecionada}>
+              <label className="text-sm font-medium">Mês</label>
+              <Select value={mesSelecionado} onValueChange={setMesSelecionado}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione a semana" />
+                  <SelectValue placeholder="Selecione o mês" />
                 </SelectTrigger>
                 <SelectContent>
-                  {semanas?.map((semana) => (
-                    <SelectItem key={semana.id_semana} value={semana.id_semana}>
-                      Semana {semana.numero_semana}/{semana.ano} ({format(new Date(semana.data_inicio), "dd/MM", { locale: ptBR })} - {format(new Date(semana.data_fim), "dd/MM/yyyy", { locale: ptBR })})
+                  {opcoesMeses.map((opcao) => (
+                    <SelectItem key={`${opcao.mes}-${opcao.ano}`} value={`${opcao.mes}-${opcao.ano}`}>
+                      {opcao.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -156,7 +178,7 @@ export default function RelatorioNovo() {
             <Button
               className="w-full"
               onClick={() => criarRelatorioMutation.mutate()}
-              disabled={!empresaParaRelatorio || !semanaSelecionada || criarRelatorioMutation.isPending}
+              disabled={!empresaParaRelatorio || !mesSelecionado || criarRelatorioMutation.isPending}
             >
               {criarRelatorioMutation.isPending ? (
                 <>

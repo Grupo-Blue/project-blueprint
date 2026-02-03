@@ -3969,34 +3969,40 @@ export type Database = {
       }
       relatorio_semanal: {
         Row: {
+          ano: number | null
           aprendizado_resumo: string | null
           created_at: string
           data_fechamento: string | null
           id_empresa: string
           id_relatorio: string
           id_semana: string
+          mes: number | null
           status: Database["public"]["Enums"]["status_relatorio"]
           texto_comparacao: string | null
           updated_at: string
         }
         Insert: {
+          ano?: number | null
           aprendizado_resumo?: string | null
           created_at?: string
           data_fechamento?: string | null
           id_empresa: string
           id_relatorio?: string
           id_semana: string
+          mes?: number | null
           status?: Database["public"]["Enums"]["status_relatorio"]
           texto_comparacao?: string | null
           updated_at?: string
         }
         Update: {
+          ano?: number | null
           aprendizado_resumo?: string | null
           created_at?: string
           data_fechamento?: string | null
           id_empresa?: string
           id_relatorio?: string
           id_semana?: string
+          mes?: number | null
           status?: Database["public"]["Enums"]["status_relatorio"]
           texto_comparacao?: string | null
           updated_at?: string
