@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +24,29 @@ import { AlertasRelatorio, AlertaRelatorio } from "@/components/relatorios/Alert
 import { MetricasTopoFunil } from "@/components/relatorios/MetricasTopoFunil";
 import { AnaliseFinanceira } from "@/components/relatorios/AnaliseFinanceira";
 
+const MESES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+];
+
+// Função para calcular início e fim do mês
+const getInicioFimMes = (mes: number, ano: number) => {
+  const inicio = new Date(ano, mes - 1, 1);
+  const fim = new Date(ano, mes, 0); // Último dia do mês
+  return {
+    inicio: inicio.toISOString().split('T')[0],
+    fim: fim.toISOString().split('T')[0],
+  };
+};
+
+// Função para obter mês anterior
+const getMesAnterior = (mes: number, ano: number) => {
+  if (mes === 1) {
+    return { mes: 12, ano: ano - 1 };
+  }
+  return { mes: mes - 1, ano };
+};
+
 export default function RelatorioEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -45,8 +68,7 @@ export default function RelatorioEditor() {
         .from("relatorio_semanal")
         .select(`
           *,
-          empresa:id_empresa (nome, cpl_maximo),
-          semana:id_semana (numero_semana, ano, data_inicio, data_fim)
+          empresa:id_empresa (nome, cpl_maximo)
         `)
         .eq("id_relatorio", id)
         .single();
@@ -57,79 +79,190 @@ export default function RelatorioEditor() {
     enabled: id !== "novo",
   });
 
-  // Métricas da semana atual
+  // Período do relatório (calculado a partir de mes/ano)
+  const periodo = useMemo(() => {
+    if (!relatorio?.mes || !relatorio?.ano) return null;
+    return getInicioFimMes(relatorio.mes, relatorio.ano);
+  }, [relatorio?.mes, relatorio?.ano]);
+
+  // Período anterior para comparação
+  const periodoAnterior = useMemo(() => {
+    if (!relatorio?.mes || !relatorio?.ano) return null;
+    const anterior = getMesAnterior(relatorio.mes, relatorio.ano);
+    return getInicioFimMes(anterior.mes, anterior.ano);
+  }, [relatorio?.mes, relatorio?.ano]);
+
+  // Métricas do mês atual (agregadas de empresa_metricas_dia)
   const { data: metricas } = useQuery({
-    queryKey: ["metricas-semana", relatorio?.id_semana],
+    queryKey: ["metricas-mes", relatorio?.id_empresa, periodo],
     queryFn: async () => {
-      if (!relatorio?.id_semana) return null;
+      if (!periodo || !relatorio?.id_empresa) return null;
 
       const { data, error } = await supabase
-        .from("empresa_semana_metricas")
+        .from("empresa_metricas_dia")
         .select("*")
         .eq("id_empresa", relatorio.id_empresa)
-        .eq("id_semana", relatorio.id_semana)
-        .single();
-
-      if (error && error.code !== "PGRST116") throw error;
-      return data;
-    },
-    enabled: !!relatorio?.id_semana,
-  });
-
-  // Métricas da semana anterior para comparativo
-  const { data: metricasAnterior } = useQuery({
-    queryKey: ["metricas-semana-anterior", relatorio?.id_empresa, relatorio?.semana],
-    queryFn: async () => {
-      if (!relatorio?.semana) return null;
-
-      // Buscar semana anterior
-      const { data: semanaAnterior } = await supabase
-        .from("semana")
-        .select("id_semana")
-        .eq("ano", relatorio.semana.ano)
-        .eq("numero_semana", relatorio.semana.numero_semana - 1)
-        .single();
-
-      if (!semanaAnterior) return null;
-
-      const { data, error } = await supabase
-        .from("empresa_semana_metricas")
-        .select("*")
-        .eq("id_empresa", relatorio.id_empresa)
-        .eq("id_semana", semanaAnterior.id_semana)
-        .single();
-
-      if (error && error.code !== "PGRST116") throw error;
-      return data;
-    },
-    enabled: !!relatorio?.semana,
-  });
-
-  // Métricas por campanha
-  const { data: metricasCampanha } = useQuery({
-    queryKey: ["metricas-campanha", relatorio?.id_semana],
-    queryFn: async () => {
-      if (!relatorio?.id_semana) return [];
-
-      const { data, error } = await supabase
-        .from("campanha_semana_metricas")
-        .select(`
-          *,
-          campanha:id_campanha (nome)
-        `)
-        .eq("id_semana", relatorio.id_semana);
+        .gte("data", periodo.inicio)
+        .lte("data", periodo.fim);
 
       if (error) throw error;
-      return data;
+
+      // Agregar métricas diárias
+      const agregado = {
+        verba_investida: 0,
+        leads_total: 0,
+        leads_pagos: 0,
+        mqls: 0,
+        levantadas: 0,
+        reunioes: 0,
+        vendas: 0,
+        valor_vendas: 0,
+        cpl: null as number | null,
+        cac: null as number | null,
+        ticket_medio: null as number | null,
+      };
+
+      data?.forEach((d) => {
+        agregado.verba_investida += d.verba_investida || 0;
+        agregado.leads_total += d.leads_total || 0;
+        agregado.leads_pagos += d.leads_pagos || 0;
+        agregado.mqls += d.mqls || 0;
+        agregado.levantadas += d.levantadas || 0;
+        agregado.reunioes += d.reunioes || 0;
+        agregado.vendas += d.vendas || 0;
+        agregado.valor_vendas += d.valor_vendas || 0;
+      });
+
+      // Calcular métricas derivadas
+      if (agregado.leads_pagos > 0) {
+        agregado.cpl = agregado.verba_investida / agregado.leads_pagos;
+      }
+      if (agregado.vendas > 0) {
+        agregado.cac = agregado.verba_investida / agregado.vendas;
+        agregado.ticket_medio = agregado.valor_vendas / agregado.vendas;
+      }
+
+      return agregado;
     },
-    enabled: !!relatorio?.id_semana,
+    enabled: !!periodo && !!relatorio?.id_empresa,
   });
 
-  // Métricas de topo de funil (campanha_metricas_dia agregado)
-  const { data: metricasTopoFunil } = useQuery({
-    queryKey: ["metricas-topo-funil", relatorio?.id_empresa, relatorio?.semana],
+  // Métricas do mês anterior para comparativo
+  const { data: metricasAnterior } = useQuery({
+    queryKey: ["metricas-mes-anterior", relatorio?.id_empresa, periodoAnterior],
     queryFn: async () => {
-      if (!relatorio?.semana) return { impressoes: 0, cliques: 0, verba: 0 };
+      if (!periodoAnterior || !relatorio?.id_empresa) return null;
+
+      const { data, error } = await supabase
+        .from("empresa_metricas_dia")
+        .select("*")
+        .eq("id_empresa", relatorio.id_empresa)
+        .gte("data", periodoAnterior.inicio)
+        .lte("data", periodoAnterior.fim);
+
+      if (error) throw error;
+
+      const agregado = {
+        verba_investida: 0,
+        leads_total: 0,
+        leads_pagos: 0,
+        mqls: 0,
+        levantadas: 0,
+        reunioes: 0,
+        vendas: 0,
+        valor_vendas: 0,
+        cpl: null as number | null,
+        cac: null as number | null,
+        ticket_medio: null as number | null,
+      };
+
+      data?.forEach((d) => {
+        agregado.verba_investida += d.verba_investida || 0;
+        agregado.leads_total += d.leads_total || 0;
+        agregado.leads_pagos += d.leads_pagos || 0;
+        agregado.mqls += d.mqls || 0;
+        agregado.levantadas += d.levantadas || 0;
+        agregado.reunioes += d.reunioes || 0;
+        agregado.vendas += d.vendas || 0;
+        agregado.valor_vendas += d.valor_vendas || 0;
+      });
+
+      if (agregado.leads_pagos > 0) {
+        agregado.cpl = agregado.verba_investida / agregado.leads_pagos;
+      }
+      if (agregado.vendas > 0) {
+        agregado.cac = agregado.verba_investida / agregado.vendas;
+        agregado.ticket_medio = agregado.valor_vendas / agregado.vendas;
+      }
+
+      return agregado;
+    },
+    enabled: !!periodoAnterior && !!relatorio?.id_empresa,
+  });
+
+  // Métricas por campanha (agregadas do mês)
+  const { data: metricasCampanha } = useQuery({
+    queryKey: ["metricas-campanha-mes", relatorio?.id_empresa, periodo],
+    queryFn: async () => {
+      if (!periodo || !relatorio?.id_empresa) return [];
+
+      const { data, error } = await supabase
+        .from("campanha_metricas_dia")
+        .select(`
+          id_campanha,
+          leads,
+          verba_investida,
+          impressoes,
+          cliques,
+          campanha:id_campanha (
+            nome,
+            conta:id_conta (id_empresa)
+          )
+        `)
+        .gte("data", periodo.inicio)
+        .lte("data", periodo.fim);
+
+      if (error) throw error;
+
+      // Filtrar por empresa e agregar por campanha
+      const porCampanha: Record<string, any> = {};
+      
+      data?.forEach((d: any) => {
+        if (d.campanha?.conta?.id_empresa !== relatorio.id_empresa) return;
+        
+        const id = d.id_campanha;
+        if (!porCampanha[id]) {
+          porCampanha[id] = {
+            id_campanha: id,
+            campanha: { nome: d.campanha?.nome || "Sem nome" },
+            leads: 0,
+            verba_investida: 0,
+            impressoes: 0,
+            cliques: 0,
+            cpl: null,
+          };
+        }
+        
+        porCampanha[id].leads += d.leads || 0;
+        porCampanha[id].verba_investida += d.verba_investida || 0;
+        porCampanha[id].impressoes += d.impressoes || 0;
+        porCampanha[id].cliques += d.cliques || 0;
+      });
+
+      // Calcular CPL
+      return Object.values(porCampanha).map((c: any) => ({
+        ...c,
+        cpl: c.leads > 0 ? c.verba_investida / c.leads : null,
+      })).sort((a: any, b: any) => (b.leads || 0) - (a.leads || 0));
+    },
+    enabled: !!periodo && !!relatorio?.id_empresa,
+  });
+
+  // Métricas de topo de funil
+  const { data: metricasTopoFunil } = useQuery({
+    queryKey: ["metricas-topo-funil-mes", relatorio?.id_empresa, periodo],
+    queryFn: async () => {
+      if (!periodo || !relatorio?.id_empresa) return { impressoes: 0, cliques: 0, verba: 0 };
 
       const { data, error } = await supabase
         .from("campanha_metricas_dia")
@@ -141,12 +274,11 @@ export default function RelatorioEditor() {
             conta:id_conta (id_empresa)
           )
         `)
-        .gte("data", relatorio.semana.data_inicio)
-        .lte("data", relatorio.semana.data_fim);
+        .gte("data", periodo.inicio)
+        .lte("data", periodo.fim);
 
       if (error) throw error;
 
-      // Filtrar por empresa e agregar
       const filtrado = data?.filter(
         (d: any) => d.campanha?.conta?.id_empresa === relatorio.id_empresa
       ) || [];
@@ -157,16 +289,15 @@ export default function RelatorioEditor() {
         verba: filtrado.reduce((acc: number, d: any) => acc + (d.verba_investida || 0), 0),
       };
     },
-    enabled: !!relatorio?.semana,
+    enabled: !!periodo && !!relatorio?.id_empresa,
   });
 
   // Top criativos com métricas
   const { data: topCriativos } = useQuery({
-    queryKey: ["top-criativos", relatorio?.id_empresa, relatorio?.semana],
+    queryKey: ["top-criativos-mes", relatorio?.id_empresa, periodo],
     queryFn: async () => {
-      if (!relatorio?.semana) return [];
+      if (!periodo || !relatorio?.id_empresa) return [];
 
-      // Buscar métricas de criativos agregadas
       const { data: criativosData, error } = await supabase
         .from("criativo_metricas_dia")
         .select(`
@@ -186,12 +317,11 @@ export default function RelatorioEditor() {
             )
           )
         `)
-        .gte("data", relatorio.semana.data_inicio)
-        .lte("data", relatorio.semana.data_fim);
+        .gte("data", periodo.inicio)
+        .lte("data", periodo.fim);
 
       if (error) throw error;
 
-      // Filtrar por empresa e agregar por criativo
       const porCriativo: Record<string, CriativoComMetricas> = {};
       
       criativosData?.forEach((d: any) => {
@@ -220,7 +350,6 @@ export default function RelatorioEditor() {
         porCriativo[id].cliques += d.cliques || 0;
       });
 
-      // Calcular CPL e ordenar
       const lista = Object.values(porCriativo).map((c) => ({
         ...c,
         cpl: c.leads > 0 ? c.verba / c.leads : null,
@@ -230,33 +359,32 @@ export default function RelatorioEditor() {
         .sort((a, b) => b.leads - a.leads)
         .slice(0, 10);
     },
-    enabled: !!relatorio?.semana,
+    enabled: !!periodo && !!relatorio?.id_empresa,
   });
 
-  // Ações da semana
+  // Ações do mês
   const { data: acoes } = useQuery({
-    queryKey: ["acoes-semana", relatorio?.id_semana],
+    queryKey: ["acoes-mes", relatorio?.id_empresa, periodo],
     queryFn: async () => {
-      if (!relatorio?.id_semana || !relatorio?.semana) return [];
+      if (!periodo || !relatorio?.id_empresa) return [];
 
       const { data, error } = await supabase
         .from("acao")
         .select("*")
         .eq("id_empresa", relatorio.id_empresa)
-        .gte("data_criacao", relatorio.semana.data_inicio)
-        .lte("data_criacao", relatorio.semana.data_fim)
+        .gte("data_criacao", periodo.inicio)
+        .lte("data_criacao", periodo.fim)
         .in("status", ["APROVADA", "EXECUTADA"]);
 
       if (error) throw error;
       return data;
     },
-    enabled: !!relatorio?.id_semana && !!relatorio?.semana,
+    enabled: !!periodo && !!relatorio?.id_empresa,
   });
 
   // Gerar alertas automaticamente
   const alertas: AlertaRelatorio[] = [];
   
-  // Criativos com verba mas sem leads
   topCriativos?.forEach((c) => {
     if (c.verba > 50 && c.leads === 0) {
       alertas.push({
@@ -270,7 +398,6 @@ export default function RelatorioEditor() {
     }
   });
 
-  // Campanhas com CPL alto
   const cplMaximo = (relatorio?.empresa as any)?.cpl_maximo || 100;
   metricasCampanha?.forEach((c: any) => {
     if (c.cpl && c.cpl > cplMaximo) {
@@ -351,7 +478,8 @@ export default function RelatorioEditor() {
         heightLeft -= pageHeight;
       }
 
-      pdf.save(`Relatorio_Semana_${relatorio?.semana.numero_semana}_${relatorio?.semana.ano}.pdf`);
+      const mesNome = relatorio?.mes ? MESES[relatorio.mes - 1] : "";
+      pdf.save(`Relatorio_${mesNome}_${relatorio?.ano}.pdf`);
 
       toast({
         title: "PDF exportado",
@@ -376,12 +504,7 @@ export default function RelatorioEditor() {
     );
   }
 
-  const formatPercent = (value: number | null) => {
-    if (!value) return "0%";
-    return `${value.toFixed(2)}%`;
-  };
-
-  // Dados para comparativo semanal
+  // Dados para comparativo mensal
   const metricasComparativas = [
     {
       label: "Verba",
@@ -409,6 +532,8 @@ export default function RelatorioEditor() {
       formato: "number" as const,
     },
   ];
+
+  const mesNome = relatorio?.mes ? MESES[relatorio.mes - 1] : "";
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -468,12 +593,10 @@ export default function RelatorioEditor() {
           {/* Cabeçalho */}
           <div className="text-center space-y-2">
             <h1 className="text-2xl md:text-3xl font-bold">
-              Relatório Semanal - Semana {relatorio?.semana.numero_semana}/{relatorio?.semana.ano}
+              Relatório Mensal - {mesNome} {relatorio?.ano}
             </h1>
             <p className="text-muted-foreground">
-              {relatorio?.empresa.nome} •{" "}
-              {relatorio?.semana && format(new Date(relatorio.semana.data_inicio), "dd/MM", { locale: ptBR })} -{" "}
-              {relatorio?.semana && format(new Date(relatorio.semana.data_fim), "dd/MM/yyyy", { locale: ptBR })}
+              {relatorio?.empresa?.nome} • {periodo?.inicio && format(new Date(periodo.inicio + 'T12:00:00'), "dd/MM", { locale: ptBR })} - {periodo?.fim && format(new Date(periodo.fim + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })}
             </p>
             <Badge variant={relatorio?.status === "PRONTO" ? "default" : "secondary"}>
               {relatorio?.status === "PRONTO" ? "Pronto" : "Em Edição"}
@@ -503,7 +626,7 @@ export default function RelatorioEditor() {
             <h2 className="text-xl font-semibold mb-4">3. CPL por Campanha</h2>
             <div className="space-y-2">
               {metricasCampanha?.map((campanha: any) => (
-                <Card key={campanha.id_campanha_semana}>
+                <Card key={campanha.id_campanha}>
                   <CardContent className="pt-4 flex justify-between items-center">
                     <div>
                       <span className="font-medium">{campanha.campanha.nome}</span>
@@ -563,9 +686,9 @@ export default function RelatorioEditor() {
 
           {/* 8. Comparação Textual */}
           <div>
-            <h2 className="text-xl font-semibold mb-4">8. Comparação com Semana Anterior</h2>
+            <h2 className="text-xl font-semibold mb-4">8. Comparação com Mês Anterior</h2>
             <Textarea
-              placeholder="Descreva as variações e tendências observadas em comparação com a semana anterior..."
+              placeholder="Descreva as variações e tendências observadas em comparação com o mês anterior..."
               value={textoComparacao}
               onChange={(e) => setTextoComparacao(e.target.value)}
               rows={4}
@@ -575,7 +698,7 @@ export default function RelatorioEditor() {
 
           {/* 9. Ações Tomadas */}
           <div>
-            <h2 className="text-xl font-semibold mb-4">9. Ações Tomadas na Semana</h2>
+            <h2 className="text-xl font-semibold mb-4">9. Ações Tomadas no Mês</h2>
             <div className="space-y-2">
               {acoes?.map((acao: any) => (
                 <Card key={acao.id_acao}>
@@ -592,7 +715,7 @@ export default function RelatorioEditor() {
                 </Card>
               ))}
               {(!acoes || acoes.length === 0) && (
-                <p className="text-sm text-muted-foreground">Nenhuma ação registrada nesta semana.</p>
+                <p className="text-sm text-muted-foreground">Nenhuma ação registrada neste mês.</p>
               )}
             </div>
           </div>
@@ -601,7 +724,7 @@ export default function RelatorioEditor() {
           <div>
             <h2 className="text-xl font-semibold mb-4">10. Aprendizados e Hipóteses</h2>
             <Textarea
-              placeholder="Registre os principais aprendizados da semana e hipóteses para testar na próxima semana..."
+              placeholder="Registre os principais aprendizados do mês e hipóteses para testar no próximo mês..."
               value={aprendizadoResumo}
               onChange={(e) => setAprendizadoResumo(e.target.value)}
               rows={6}
