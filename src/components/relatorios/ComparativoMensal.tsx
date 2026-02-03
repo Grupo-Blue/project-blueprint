@@ -10,11 +10,11 @@ interface MetricaComparativa {
   inverterCor?: boolean; // true para métricas onde menor é melhor (CPL, CAC)
 }
 
-interface ComparativoSemanalProps {
+interface ComparativoMensalProps {
   metricas: MetricaComparativa[];
 }
 
-export function ComparativoSemanal({ metricas }: ComparativoSemanalProps) {
+export function ComparativoMensal({ metricas }: ComparativoMensalProps) {
   const calcularVariacao = (atual: number | null, anterior: number | null): number | null => {
     if (!atual || !anterior || anterior === 0) return null;
     return ((atual - anterior) / anterior) * 100;
@@ -89,7 +89,7 @@ export function ComparativoSemanal({ metricas }: ComparativoSemanalProps) {
                 <span className="text-sm font-medium">{tendencia.texto}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Sem. anterior: {formatarValor(metrica.valorAnterior, metrica.formato)}
+                Mês anterior: {formatarValor(metrica.valorAnterior, metrica.formato)}
               </p>
             </CardContent>
           </Card>

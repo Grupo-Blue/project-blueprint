@@ -1,10 +1,10 @@
 
-# Plano: Relatorio Semanal Completo com Top Criativos Editaveis
+# Plano: Relatorio Mensal Completo com Top Criativos Editaveis
 
 ## Status: ✅ IMPLEMENTADO
 
 ## Objetivo
-Transformar o relatorio semanal em um documento completo e baseado em dados, com secao dedicada aos top criativos incluindo imagens editaveis.
+Transformar o relatorio em documento mensal completo e baseado em dados, com secao dedicada aos top criativos incluindo imagens editaveis.
 
 ---
 
@@ -24,8 +24,8 @@ Transformar o relatorio semanal em um documento completo e baseado em dados, com
    - Taxas de conversão entre etapas
    - Taxa geral Lead → Venda
 
-3. **`src/components/relatorios/ComparativoSemanal.tsx`** ✅
-   - Cards com métricas e variação vs semana anterior
+3. **`src/components/relatorios/ComparativoMensal.tsx`** ✅
+   - Cards com métricas e variação vs mês anterior
    - Indicadores visuais de tendência (setas verde/vermelha)
    - Suporte a inverter cores (para CPL, CAC)
 
@@ -47,7 +47,7 @@ Transformar o relatorio semanal em um documento completo e baseado em dados, com
 
 ## Seções do Relatório (RelatorioEditor.tsx)
 
-1. ✅ Resumo Executivo (comparativo semanal)
+1. ✅ Resumo Executivo (comparativo mensal)
 2. ✅ Métricas de Topo de Funil
 3. ✅ CPL por Campanha
 4. ✅ Top Criativos (editável)
@@ -66,15 +66,14 @@ Transformar o relatorio semanal em um documento completo e baseado em dados, com
 - **Upload de Imagem**: Permite trocar imagem de criativos sem preview
 - **Descrição Customizada**: Ajustar texto do criativo para o relatório
 - **Ocultar Criativo**: Toggle para excluir criativo específico
-- **Exportação PDF**: Multi-página com todas as seções
+- **Exportação PDF**: Multi-página com seções separadas, quebras inteligentes, header/rodapé
 - **Alertas Automáticos**: Detecta CPL acima do limite e criativos sem leads
 
 ---
 
 ## Queries Implementadas
 
-- `empresa_semana_metricas` (atual e anterior)
-- `campanha_semana_metricas`
-- `campanha_metricas_dia` (agregado para topo de funil)
-- `criativo_metricas_dia` (top criativos)
-- `acao` (ações da semana)
+- `empresa_metricas_dia` (agregado para mês atual e anterior)
+- `campanha_metricas_dia` (agregado para o mês)
+- `criativo_metricas_dia` (top criativos do mês)
+- `acao` (ações do mês)

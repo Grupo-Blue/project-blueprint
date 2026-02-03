@@ -19,7 +19,7 @@ import { formatCurrency } from "@/lib/utils";
 
 import { TopCriativosEditor, CriativoComMetricas, CriativoEditado } from "@/components/relatorios/TopCriativosEditor";
 import { FunilConversao } from "@/components/relatorios/FunilConversao";
-import { ComparativoSemanal } from "@/components/relatorios/ComparativoSemanal";
+import { ComparativoMensal } from "@/components/relatorios/ComparativoMensal";
 import { AlertasRelatorio, AlertaRelatorio } from "@/components/relatorios/AlertasRelatorio";
 import { MetricasTopoFunil } from "@/components/relatorios/MetricasTopoFunil";
 import { AnaliseFinanceira } from "@/components/relatorios/AnaliseFinanceira";
@@ -450,42 +450,98 @@ export default function RelatorioEditor() {
   const exportarPDF = async () => {
     setExportando(true);
     try {
-      const elemento = document.getElementById("relatorio-content");
-      if (!elemento) return;
+      const container = document.getElementById("relatorio-content");
+      if (!container) return;
 
-      const canvas = await html2canvas(elemento, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
+      const A4_WIDTH_MM = 210;
+      const A4_HEIGHT_MM = 297;
+      const MARGIN_MM = 12;
+      const CONTENT_WIDTH_MM = A4_WIDTH_MM - (MARGIN_MM * 2);
+      const SECTION_GAP_MM = 6;
 
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      let heightLeft = imgHeight;
-      let position = 0;
+      // Capturar cada seção individualmente para evitar cortes
+      const sections = Array.from(
+        container.querySelectorAll('[data-pdf-section]')
+      ) as HTMLElement[];
 
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      // Se não houver seções marcadas, usar cards como fallback
+      const elements = sections.length > 0 
+        ? sections 
+        : Array.from(container.querySelectorAll('.space-y-6 > div, .grid > div')) as HTMLElement[];
 
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      const sectionData: { canvas: HTMLCanvasElement; heightMM: number }[] = [];
+
+      for (const section of elements) {
+        const canvas = await html2canvas(section, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+        });
+
+        const widthPx = canvas.width / 2;
+        const heightPx = canvas.height / 2;
+        const scaleFactor = CONTENT_WIDTH_MM / widthPx;
+        const heightMM = heightPx * scaleFactor;
+
+        sectionData.push({ canvas, heightMM });
       }
 
+      // Criar PDF com quebras de página inteligentes
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       const mesNome = relatorio?.mes ? MESES[relatorio.mes - 1] : "";
-      pdf.save(`Relatorio_${mesNome}_${relatorio?.ano}.pdf`);
+      const empresaNome = (relatorio?.empresa as any)?.nome || "Empresa";
+      
+      // Header na primeira página
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Relatório Mensal - ${mesNome} ${relatorio?.ano}`, MARGIN_MM, MARGIN_MM + 8);
+      pdf.setFontSize(12);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(empresaNome, MARGIN_MM, MARGIN_MM + 16);
+      pdf.setFontSize(10);
+      pdf.setTextColor(100);
+      pdf.text(`Período: ${periodo?.inicio} a ${periodo?.fim}`, MARGIN_MM, MARGIN_MM + 22);
+      pdf.setTextColor(0);
+
+      let currentY = MARGIN_MM + 32;
+
+      for (const { canvas, heightMM } of sectionData) {
+        const remainingSpace = A4_HEIGHT_MM - MARGIN_MM - currentY;
+
+        // Se seção não cabe na página atual, criar nova página
+        if (heightMM > remainingSpace && currentY > MARGIN_MM + 35) {
+          pdf.addPage();
+          currentY = MARGIN_MM;
+        }
+
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', MARGIN_MM, currentY, CONTENT_WIDTH_MM, heightMM);
+        currentY += heightMM + SECTION_GAP_MM;
+      }
+
+      // Rodapé em todas as páginas
+      const totalPages = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(150);
+        pdf.text(
+          `Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })} - Página ${i} de ${totalPages}`,
+          A4_WIDTH_MM / 2,
+          A4_HEIGHT_MM - 8,
+          { align: 'center' }
+        );
+      }
+
+      pdf.save(`Relatorio_${empresaNome.replace(/\s+/g, '_')}_${mesNome}_${relatorio?.ano}.pdf`);
 
       toast({
         title: "PDF exportado",
         description: "O relatório foi exportado com sucesso.",
       });
     } catch (error) {
+      console.error("Erro ao exportar PDF:", error);
       toast({
         title: "Erro ao exportar",
         description: "Não foi possível gerar o PDF.",
@@ -591,7 +647,7 @@ export default function RelatorioEditor() {
         {/* Conteúdo do relatório */}
         <div id="relatorio-content" className="bg-card p-6 md:p-8 rounded-lg shadow-sm space-y-8">
           {/* Cabeçalho */}
-          <div className="text-center space-y-2">
+          <div data-pdf-section className="text-center space-y-2">
             <h1 className="text-2xl md:text-3xl font-bold">
               Relatório Mensal - {mesNome} {relatorio?.ano}
             </h1>
@@ -606,13 +662,13 @@ export default function RelatorioEditor() {
           <Separator />
 
           {/* 1. Resumo Executivo - Comparativo */}
-          <div>
+          <div data-pdf-section>
             <h2 className="text-xl font-semibold mb-4">1. Resumo Executivo</h2>
-            <ComparativoSemanal metricas={metricasComparativas} />
+            <ComparativoMensal metricas={metricasComparativas} />
           </div>
 
           {/* 2. Métricas de Topo de Funil */}
-          <div>
+          <div data-pdf-section>
             <h2 className="text-xl font-semibold mb-4">2. Métricas de Topo de Funil</h2>
             <MetricasTopoFunil
               impressoes={metricasTopoFunil?.impressoes || 0}
@@ -622,7 +678,7 @@ export default function RelatorioEditor() {
           </div>
 
           {/* 3. Performance por Campanha */}
-          <div>
+          <div data-pdf-section>
             <h2 className="text-xl font-semibold mb-4">3. CPL por Campanha</h2>
             <div className="space-y-2">
               {metricasCampanha?.map((campanha: any) => (
@@ -645,7 +701,7 @@ export default function RelatorioEditor() {
           </div>
 
           {/* 4. Top Criativos */}
-          <div>
+          <div data-pdf-section>
             <h2 className="text-xl font-semibold mb-4">4. Top Criativos</h2>
             <TopCriativosEditor
               criativos={topCriativos || []}
@@ -656,7 +712,7 @@ export default function RelatorioEditor() {
           </div>
 
           {/* 5. Funil de Conversão */}
-          <div>
+          <div data-pdf-section>
             <h2 className="text-xl font-semibold mb-4">5. Funil de Conversão</h2>
             <FunilConversao
               leads={metricas?.leads_total || 0}
@@ -668,7 +724,7 @@ export default function RelatorioEditor() {
           </div>
 
           {/* 6. Análise Financeira */}
-          <div>
+          <div data-pdf-section>
             <h2 className="text-xl font-semibold mb-4">6. Análise Financeira</h2>
             <AnaliseFinanceira
               verba={metricas?.verba_investida || 0}
@@ -679,13 +735,13 @@ export default function RelatorioEditor() {
           </div>
 
           {/* 7. Alertas */}
-          <div>
+          <div data-pdf-section>
             <h2 className="text-xl font-semibold mb-4">7. Alertas e Problemas</h2>
             <AlertasRelatorio alertas={alertas} />
           </div>
 
           {/* 8. Comparação Textual */}
-          <div>
+          <div data-pdf-section>
             <h2 className="text-xl font-semibold mb-4">8. Comparação com Mês Anterior</h2>
             <Textarea
               placeholder="Descreva as variações e tendências observadas em comparação com o mês anterior..."
@@ -697,7 +753,7 @@ export default function RelatorioEditor() {
           </div>
 
           {/* 9. Ações Tomadas */}
-          <div>
+          <div data-pdf-section>
             <h2 className="text-xl font-semibold mb-4">9. Ações Tomadas no Mês</h2>
             <div className="space-y-2">
               {acoes?.map((acao: any) => (
@@ -721,7 +777,7 @@ export default function RelatorioEditor() {
           </div>
 
           {/* 10. Aprendizados */}
-          <div>
+          <div data-pdf-section>
             <h2 className="text-xl font-semibold mb-4">10. Aprendizados e Hipóteses</h2>
             <Textarea
               placeholder="Registre os principais aprendizados do mês e hipóteses para testar no próximo mês..."
