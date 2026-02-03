@@ -3975,7 +3975,7 @@ export type Database = {
           data_fechamento: string | null
           id_empresa: string
           id_relatorio: string
-          id_semana: string
+          id_semana: string | null
           mes: number | null
           status: Database["public"]["Enums"]["status_relatorio"]
           texto_comparacao: string | null
@@ -3988,7 +3988,7 @@ export type Database = {
           data_fechamento?: string | null
           id_empresa: string
           id_relatorio?: string
-          id_semana: string
+          id_semana?: string | null
           mes?: number | null
           status?: Database["public"]["Enums"]["status_relatorio"]
           texto_comparacao?: string | null
@@ -4001,7 +4001,7 @@ export type Database = {
           data_fechamento?: string | null
           id_empresa?: string
           id_relatorio?: string
-          id_semana?: string
+          id_semana?: string | null
           mes?: number | null
           status?: Database["public"]["Enums"]["status_relatorio"]
           texto_comparacao?: string | null
