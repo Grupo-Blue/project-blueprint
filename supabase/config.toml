@@ -137,3 +137,15 @@ verify_jwt = false
 
 [functions.detectar-alertas-automaticos]
 verify_jwt = false
+
+[functions.recuperar-previews-apify]
+verify_jwt = false
+
+[functions.enriquecer-lead-linkedin]
+verify_jwt = false
+
+[functions.monitorar-concorrentes-apify]
+verify_jwt = false
+
+[functions.coletar-tendencias-cripto]
+verify_jwt = false

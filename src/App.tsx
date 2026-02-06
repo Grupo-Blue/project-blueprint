@@ -32,6 +32,7 @@ import CampanhasCadastro from "./pages/CampanhasCadastro";
 import GuiaUTM from "./pages/GuiaUTM";
 import DemandasCampanha from "./pages/DemandasCampanha";
 import AnaliseLandingPages from "./pages/AnaliseLandingPages";
+import AnaliseCompetitiva from "./pages/AnaliseCompetitiva";
 import IRPFImportacoes from "./pages/IRPFImportacoes";
 import NotFound from "./pages/NotFound";
 
@@ -73,6 +74,7 @@ const App = () => (
             <Route path="/demandas-campanhas" element={<AppLayout><DemandasCampanha /></AppLayout>} />
             <Route path="/analise-landing-pages" element={<AppLayout><AnaliseLandingPages /></AppLayout>} />
             <Route path="/irpf-importacoes" element={<AppLayout><IRPFImportacoes /></AppLayout>} />
+            <Route path="/analise-competitiva" element={<AppLayout><AnaliseCompetitiva /></AppLayout>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
