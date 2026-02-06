@@ -133,30 +133,32 @@ serve(async (req) => {
       try {
         const config = integracao.config_json as any;
         const accessToken = config.access_token;
-        const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
+        const adAccountId = config.ad_account_id;
+        const idEmpresa = integracao.id_empresa;
 
-        console.log(`🔍 Processando integração ${integracao.id_integracao}, id_empresa: ${idEmpresa}`);
+        console.log(`🔍 Processando integração ${integracao.id_integracao}, ad_account: ${adAccountId}, empresa: ${idEmpresa}`);
 
-        const { data: contasAnuncio, error: contasError } = await supabase
+        // Buscar a conta_anuncio específica desta integração pelo id_externo (ad_account_id)
+        const { data: contaAnuncio, error: contaError } = await supabase
           .from("conta_anuncio")
           .select("id_conta")
-          .eq("id_empresa", idEmpresa)
+          .eq("id_externo", adAccountId)
           .eq("plataforma", "META")
-          .eq("ativa", true);
+          .maybeSingle();
 
-        if (contasError) {
-          console.error(`❌ Erro ao buscar contas de anúncio:`, contasError);
+        if (contaError) {
+          console.error(`❌ Erro ao buscar conta de anúncio:`, contaError);
           continue;
         }
 
-        console.log(`📋 Contas encontradas para empresa ${idEmpresa}:`, contasAnuncio?.length || 0);
-
-        if (!contasAnuncio || contasAnuncio.length === 0) {
-          console.log(`⚠️ Nenhuma conta META ativa para empresa ${idEmpresa}, pulando...`);
+        if (!contaAnuncio) {
+          console.log(`⚠️ Conta de anúncio ${adAccountId} não encontrada no banco, pulando...`);
           continue;
         }
 
-        const idsContas = contasAnuncio.map(c => c.id_conta);
+        console.log(`📋 Conta encontrada: ${contaAnuncio.id_conta} para ad_account ${adAccountId}`);
+
+        const idsContas = [contaAnuncio.id_conta];
 
         // Buscar campanhas ATIVAS apenas
         let campanhasQuery = supabase
@@ -198,7 +200,7 @@ serve(async (req) => {
 
             if (!adsResponse.ok) {
               const errorText = await adsResponse.text();
-              console.error(`❌ Erro API Meta: ${adsResponse.status}`);
+              console.error(`❌ Erro API Meta: ${adsResponse.status}`, errorText);
               
               let errorMessage = "Erro ao buscar criativos";
               try {

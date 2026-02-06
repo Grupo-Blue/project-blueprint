@@ -66,29 +66,28 @@ serve(async (req) => {
       const config = integracao.config_json as any;
       const accessToken = config.access_token;
       const adAccountId = config.ad_account_id;
-      const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
+      const idEmpresa = integracao.id_empresa;
 
       console.log(`Processando integração para empresa ${idEmpresa}, ad account ${adAccountId}`);
 
       try {
-        // Buscar campanhas da conta de anúncio
-        const { data: contasAnuncio } = await supabase
+        // Buscar a conta_anuncio específica desta integração pelo id_externo
+        const { data: contaAnuncio } = await supabase
           .from("conta_anuncio")
           .select("id_conta")
-          .eq("id_empresa", idEmpresa)
-          .eq("plataforma", "META");
+          .eq("id_externo", adAccountId)
+          .eq("plataforma", "META")
+          .maybeSingle();
 
-        if (!contasAnuncio || contasAnuncio.length === 0) {
-          console.log(`Nenhuma conta de anúncio Meta encontrada para empresa ${idEmpresa}`);
+        if (!contaAnuncio) {
+          console.log(`Conta de anúncio ${adAccountId} não encontrada no banco, pulando...`);
           continue;
         }
-
-        const contaIds = contasAnuncio.map(c => c.id_conta);
 
         const { data: campanhas, error: campError } = await supabase
           .from("campanha")
           .select("id_campanha, id_campanha_externo, id_conta")
-          .in("id_conta", contaIds);
+          .eq("id_conta", contaAnuncio.id_conta);
 
         if (campError) throw campError;
         if (!campanhas || campanhas.length === 0) {
