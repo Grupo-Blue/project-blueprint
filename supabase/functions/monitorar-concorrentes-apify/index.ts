@@ -75,11 +75,16 @@ Deno.serve(async (req) => {
       if ((!plataforma || plataforma === "META") && config.facebook_page_name) {
         try {
           console.log(`Starting Meta ads collection for: ${config.nome_concorrente}`);
-          const url = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(config.facebook_page_name)}&search_type=keyword_unordered`;
+          // Use the Facebook page URL directly - the actor supports both Ad Library URLs and Page URLs
+          const pageUrl = `https://www.facebook.com/${config.facebook_page_name}`;
 
           const runId = await startApifyActor(
             "curious_coder~facebook-ads-library-scraper",
-            { urls: [url], maxItems: 50 },
+            { 
+              urls: [pageUrl],
+              action: "Scrape Ads of Given Facebook Pages",
+              maxAdsPerPage: 50,
+            },
             APIFY_API_TOKEN
           );
 
