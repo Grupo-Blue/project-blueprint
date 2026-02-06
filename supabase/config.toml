@@ -149,3 +149,6 @@ verify_jwt = false
 
 [functions.coletar-tendencias-cripto]
 verify_jwt = false
+
+[functions.verificar-coleta-concorrentes]
+verify_jwt = false
