@@ -1,96 +1,58 @@
 
 
-# Correção: Coleta de Anúncios de Concorrentes
+# Correção das Integrações Meta Ads
 
 ## Problemas Identificados
 
-### 1. Input incorreto para o Actor do Apify
-A resposta da API retorna:
-```
-"Input is not valid: Field input.urls is required"
-```
-O actor `curious_coder~facebook-ads-library-scraper` exige um campo `urls` contendo URLs da Facebook Ads Library. O codigo atual envia `searchQuery`, que nao e aceito.
+Foram identificados **dois problemas distintos** ao testar todas as 3 integrações Meta ativas:
 
-### 2. Timeout da Edge Function
-A funcao `runApifyActorAndWait` faz polling sincrono por ate 10 minutos. Edge Functions tem timeout maximo de ~150-400 segundos. Mesmo corrigindo o input, a funcao ira expirar antes do Apify concluir.
+### Problema 1: Tokens invalidados (2 integrações)
+As integrações `2a95ae46` (BlueConsult) e `d63b40e7` (Tokeniza) retornam **erro 190** da Meta API, indicando tokens inválidos. Apesar de terem sido configurados como System User Tokens (permanentes), a migração de v18 para v22 pode ter invalidado permissões necessárias, exigindo regeneração.
 
----
+### Problema 2: Conflito de campanhas entre contas (1 integração)
+A integração `f0fc054f` (BlueConsult, conta `act_1902838123192201`) tenta acessar campanhas que pertencem a outra conta (`act_419200126640368`). Isso ocorre porque a busca de campanhas filtra por empresa (`id_empresa`), e nao pela conta de anúncio (`ad_account_id`) vinculada à integração. Assim, uma integração tenta acessar campanhas da outra com o token errado.
 
-## Solucao Proposta
-
-Dividir o processo em **duas etapas** usando arquitetura assíncrona:
-
-### Etapa 1: Edge Function "Start" (resposta imediata)
-- Inicia o run no Apify com o input correto (campo `urls`)
-- Salva o `run_id` na tabela `cronjob_execucao` com status "em_andamento"
-- Retorna imediatamente ao frontend com o `run_id`
-
-### Etapa 2: Edge Function "Check" (polling do frontend)
-- Nova funcao `verificar-coleta-concorrentes` que recebe um `run_id`
-- Consulta o status do run no Apify
-- Se concluido: busca os resultados e salva no banco
-- Se ainda rodando: retorna status "em_andamento"
-- O frontend faz polling a cada 15 segundos ate concluir
-
-```text
-Frontend                    Edge Function (Start)           Apify
-   |                              |                           |
-   |--- POST /monitorar --------->|                           |
-   |                              |--- Start Actor ---------->|
-   |                              |<-- run_id ----------------|
-   |<-- { run_id, status } -------|                           |
-   |                              |                           |
-   |--- GET /verificar?run=X ---->|                           |
-   |                              |--- Check status --------->|
-   |<-- { status: "running" } ----|<-- RUNNING ---------------|
-   |                              |                           |
-   |  (15s later)                 |                           |
-   |--- GET /verificar?run=X ---->|                           |
-   |                              |--- Check status --------->|
-   |                              |<-- SUCCEEDED + dataset ---|
-   |                              |--- Save to DB             |
-   |<-- { status: "done", N } ----|                           |
-```
+### Problema 3: Falta de log do corpo do erro
+A função `coletar-criativos-meta` loga apenas o status code (`Erro API Meta: 400`), mas nao loga o corpo da resposta de erro. Isso dificulta o diagnóstico.
 
 ---
 
 ## Alteracoes Tecnicas
 
-### 1. Edge Function `monitorar-concorrentes-apify` (reescrever)
-- Remover `runApifyActorAndWait` (polling sincrono)
-- Apenas iniciar os runs do Apify e retornar os `run_id`s
-- Input correto para Meta:
-  ```typescript
-  {
-    urls: [`https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(config.facebook_page_name)}&search_type=keyword_unordered`],
-    maxItems: 50,
-  }
-  ```
+### 1. Fix: Filtrar campanhas pela conta de anuncio da integracao
 
-### 2. Nova Edge Function `verificar-coleta-concorrentes`
-- Recebe `run_ids` (array)
-- Para cada run, consulta status no Apify
-- Se SUCCEEDED: busca dados do dataset e faz upsert no banco
-- Retorna status consolidado
+Atualmente, a funcao busca campanhas por `id_empresa`, o que faz com que integrações para contas de anúncio diferentes da mesma empresa tentem acessar campanhas que nao pertencem a elas. A correção:
 
-### 3. Frontend `AnaliseCompetitiva.tsx`
-- Botao "Coletar Anuncios" inicia a coleta e recebe os `run_id`s
-- Ativa polling automatico (a cada 15s) chamando `verificar-coleta-concorrentes`
-- Mostra progresso: "Coletando... (aguardando Apify)"
-- Para o polling quando todos os runs terminarem
-- Atualiza a lista de anuncios automaticamente
+- Extrair o `ad_account_id` da integração
+- Buscar a `conta_anuncio` correspondente pelo `id_externo` (ex: `act_419200126640368`)
+- Filtrar campanhas apenas por essa conta específica, e nao por todas as contas META da empresa
 
-### 4. Config `supabase/config.toml`
-- Adicionar entrada para `verificar-coleta-concorrentes` com `verify_jwt = false`
+Isso afeta:
+- `coletar-criativos-meta` (principal)
+- `coletar-metricas-meta` (métricas diárias)
+- `coletar-metricas-meta-historico` (métricas históricas)
+
+### 2. Melhorar logging de erros
+
+Adicionar log do corpo completo da resposta de erro da API Meta em `coletar-criativos-meta`:
+
+```
+console.error(`Erro API Meta: ${adsResponse.status}`, errorText);
+```
+
+Isso permitirá diagnósticos mais rápidos no futuro.
+
+### 3. Sobre os tokens expirados
+
+Os tokens precisam ser regenerados no Meta Business Manager. Isso nao pode ser feito pelo sistema -- o usuário deve gerar novos System User Tokens com as permissões `ads_read` e `ads_management` e atualizar na página de Integrações.
 
 ---
 
-## Resumo dos Arquivos Modificados
+## Arquivos Modificados
 
-| Arquivo | Acao |
-|---------|------|
-| `supabase/functions/monitorar-concorrentes-apify/index.ts` | Reescrever (apenas inicia runs) |
-| `supabase/functions/verificar-coleta-concorrentes/index.ts` | Criar (verifica status e salva) |
-| `src/pages/AnaliseCompetitiva.tsx` | Atualizar (polling no frontend) |
-| `supabase/config.toml` | Adicionar nova funcao |
+| Arquivo | Alteração |
+|---------|-----------|
+| `supabase/functions/coletar-criativos-meta/index.ts` | Filtrar campanhas por conta de anúncio da integração + logging |
+| `supabase/functions/coletar-metricas-meta/index.ts` | Filtrar campanhas por conta de anúncio da integração |
+| `supabase/functions/coletar-metricas-meta-historico/index.ts` | Filtrar campanhas por conta de anúncio da integração |
 
