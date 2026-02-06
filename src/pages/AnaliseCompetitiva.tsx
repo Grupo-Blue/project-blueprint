@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
@@ -17,13 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   Eye,
   RefreshCw,
   ExternalLink,
@@ -37,6 +30,13 @@ import ConcorrenteConfigForm from "@/components/competitiva/ConcorrenteConfigFor
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+interface RunInfo {
+  run_id: string;
+  concorrente: string;
+  plataforma: string;
+  id_empresa: string;
+}
+
 export default function AnaliseCompetitiva() {
   const { empresaSelecionada } = useEmpresa();
   const { toast } = useToast();
@@ -44,6 +44,133 @@ export default function AnaliseCompetitiva() {
   const [busca, setBusca] = useState("");
   const [plataformaFiltro, setPlataformaFiltro] = useState("todas");
   const [tabAtiva, setTabAtiva] = useState("anuncios");
+
+  // Async polling state
+  const [pendingRuns, setPendingRuns] = useState<RunInfo[]>([]);
+  const [coletaStatus, setColetaStatus] = useState<string | null>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isColetando = pendingRuns.length > 0;
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  const verificarRuns = useCallback(async (runs: RunInfo[]) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("verificar-coleta-concorrentes", {
+        body: { runs },
+      });
+      if (error) throw error;
+
+      const stillRunning = data.results?.filter((r: any) => r.status === "RUNNING") || [];
+      const finished = data.results?.filter((r: any) => r.status !== "RUNNING") || [];
+
+      const succeeded = finished.filter((r: any) => r.status === "SUCCEEDED");
+      const failed = finished.filter((r: any) => ["FAILED", "ABORTED", "TIMED-OUT", "ERROR"].includes(r.status));
+
+      if (stillRunning.length > 0) {
+        setColetaStatus(`Aguardando Apify... (${stillRunning.length} pendente(s), ${succeeded.length} concluído(s))`);
+        // Keep only running ones for next poll
+        setPendingRuns(runs.filter((r) => stillRunning.some((sr: any) => sr.run_id === r.run_id)));
+      }
+
+      if (data.all_done) {
+        // Stop polling
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        setPendingRuns([]);
+        setColetaStatus(null);
+
+        queryClient.invalidateQueries({ queryKey: ["concorrente-anuncios"] });
+
+        const totalCollected = data.total_collected || 0;
+        toast({
+          title: failed.length > 0 ? "Coleta parcial" : "Coleta concluída",
+          description: failed.length > 0
+            ? `${totalCollected} anúncios coletados. ${failed.length} falha(s): ${failed[0]?.error?.substring(0, 100)}`
+            : `${totalCollected} anúncios coletados com sucesso!`,
+          variant: failed.length > 0 ? "destructive" : "default",
+        });
+      }
+    } catch (err) {
+      console.error("Erro ao verificar runs:", err);
+    }
+  }, [queryClient, toast]);
+
+  // Mutation: start competitor monitoring (async - returns immediately)
+  const monitorarMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("monitorar-concorrentes-apify", {
+        body: {
+          id_empresa: empresaSelecionada !== "todas" ? empresaSelecionada : undefined,
+        },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (!data.runs || data.runs.length === 0) {
+        toast({
+          title: data.errors?.length > 0 ? "Erro ao iniciar coleta" : "Nenhum concorrente configurado",
+          description: data.errors?.[0] || "Configure concorrentes na aba Configuração",
+          variant: data.errors?.length > 0 ? "destructive" : "default",
+        });
+        return;
+      }
+
+      // Start polling
+      setPendingRuns(data.runs);
+      setColetaStatus(`Coleta iniciada para ${data.runs.length} alvo(s)... aguardando Apify`);
+
+      toast({
+        title: "Coleta iniciada",
+        description: `${data.runs.length} coleta(s) em andamento. Aguarde...`,
+      });
+
+      // Poll every 15 seconds
+      const runsToTrack = data.runs as RunInfo[];
+      pollingRef.current = setInterval(() => verificarRuns(runsToTrack), 15000);
+
+      // First check after 10 seconds
+      setTimeout(() => verificarRuns(runsToTrack), 10000);
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro na coleta",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation: collect trends
+  const tendenciasMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("coletar-tendencias-cripto");
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Tendências coletadas",
+        description: `${data.collected} artigos coletados`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["tendencias-mercado"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro na coleta",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Fetch competitor ads
   const { data: anuncios, isLoading: loadingAnuncios } = useQuery({
@@ -85,7 +212,7 @@ export default function AnaliseCompetitiva() {
     },
   });
 
-  // Configs query still needed for KPI count
+  // Configs query for KPI count
   const { data: configs } = useQuery({
     queryKey: ["concorrente-configs", empresaSelecionada],
     queryFn: async () => {
@@ -96,60 +223,6 @@ export default function AnaliseCompetitiva() {
       const { data, error } = await query;
       if (error) throw error;
       return data || [];
-    },
-  });
-
-  // Mutation: run competitor monitoring
-  const monitorarMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("monitorar-concorrentes-apify", {
-        body: {
-          id_empresa: empresaSelecionada !== "todas" ? empresaSelecionada : undefined,
-        },
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      const hasErrors = data.errors && data.errors.length > 0;
-      toast({
-        title: hasErrors ? "Coleta parcial" : "Coleta concluída",
-        description: hasErrors
-          ? `${data.collected} anúncios coletados. ${data.errors.length} erro(s): ${data.errors[0]?.substring(0, 120)}...`
-          : `${data.collected} anúncios coletados de ${data.configs_processados} concorrente(s)`,
-        variant: hasErrors ? "destructive" : "default",
-      });
-      queryClient.invalidateQueries({ queryKey: ["concorrente-anuncios"] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Erro na coleta",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Mutation: collect trends
-  const tendenciasMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("coletar-tendencias-cripto");
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Tendências coletadas",
-        description: `${data.collected} artigos coletados`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["tendencias-mercado"] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Erro na coleta",
-        description: error instanceof Error ? error.message : "Erro desconhecido",
-        variant: "destructive",
-      });
     },
   });
 
@@ -181,14 +254,14 @@ export default function AnaliseCompetitiva() {
             variant="outline"
             size="sm"
             onClick={() => monitorarMutation.mutate()}
-            disabled={monitorarMutation.isPending}
+            disabled={monitorarMutation.isPending || isColetando}
           >
-            {monitorarMutation.isPending ? (
+            {(monitorarMutation.isPending || isColetando) ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="mr-2 h-4 w-4" />
             )}
-            Coletar Anúncios
+            {isColetando ? "Coletando..." : "Coletar Anúncios"}
           </Button>
           <Button
             variant="outline"
@@ -233,6 +306,15 @@ export default function AnaliseCompetitiva() {
           </CardContent>
         </Card>
       </div>
+
+      {coletaStatus && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="py-3 flex items-center gap-3">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span className="text-sm font-medium">{coletaStatus}</span>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={tabAtiva} onValueChange={setTabAtiva}>
         <TabsList>
