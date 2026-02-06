@@ -111,9 +111,13 @@ export default function AnaliseCompetitiva() {
       return data;
     },
     onSuccess: (data) => {
+      const hasErrors = data.errors && data.errors.length > 0;
       toast({
-        title: "Coleta concluída",
-        description: `${data.collected} anúncios coletados`,
+        title: hasErrors ? "Coleta parcial" : "Coleta concluída",
+        description: hasErrors
+          ? `${data.collected} anúncios coletados. ${data.errors.length} erro(s): ${data.errors[0]?.substring(0, 120)}...`
+          : `${data.collected} anúncios coletados de ${data.configs_processados} concorrente(s)`,
+        variant: hasErrors ? "destructive" : "default",
       });
       queryClient.invalidateQueries({ queryKey: ["concorrente-anuncios"] });
     },
