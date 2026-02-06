@@ -97,9 +97,7 @@ Deno.serve(async (req) => {
           const results = await runApifyActorAndWait(
             "curious_coder~facebook-ads-library-scraper",
             {
-              searchQuery: config.facebook_page_name,
-              adType: "ALL",
-              country: "BR",
+              urls: [`https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(config.facebook_page_name)}&search_type=keyword_unordered`],
               maxItems: 50,
             },
             APIFY_API_TOKEN
@@ -153,7 +151,7 @@ Deno.serve(async (req) => {
           const results = await runApifyActorAndWait(
             "silva95gustavo~linkedin-ad-library-scraper",
             {
-              urls: [config.linkedin_page_url],
+              startUrls: [{ url: config.linkedin_page_url }],
               maxItems: 30,
             },
             APIFY_API_TOKEN
