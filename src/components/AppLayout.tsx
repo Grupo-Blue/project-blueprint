@@ -309,7 +309,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           className="w-full justify-start hover:bg-accent transition-all"
         >
           <Eye className="mr-2 h-4 w-4" />
-          Análise Competitiva
+          Análise de Concorrentes
         </Button>
       </Link>
       {isDirecao && (

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,15 +26,14 @@ import {
 import {
   Eye,
   RefreshCw,
-  Plus,
   ExternalLink,
   Search,
-  Building2,
   TrendingUp,
   Newspaper,
   Settings,
   Loader2,
 } from "lucide-react";
+import ConcorrenteConfigForm from "@/components/competitiva/ConcorrenteConfigForm";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -86,11 +85,11 @@ export default function AnaliseCompetitiva() {
     },
   });
 
-  // Fetch competitor configs
-  const { data: configs, isLoading: loadingConfigs } = useQuery({
+  // Configs query still needed for KPI count
+  const { data: configs } = useQuery({
     queryKey: ["concorrente-configs", empresaSelecionada],
     queryFn: async () => {
-      let query = supabase.from("concorrente_config").select("*").order("nome_concorrente");
+      let query = supabase.from("concorrente_config").select("id").eq("ativo", true);
       if (empresaSelecionada && empresaSelecionada !== "todas") {
         query = query.eq("id_empresa", empresaSelecionada);
       }
@@ -168,7 +167,7 @@ export default function AnaliseCompetitiva() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Análise Competitiva</h1>
+          <h1 className="text-2xl font-bold">Análise de Concorrentes</h1>
           <p className="text-muted-foreground">
             Monitore anúncios de concorrentes e tendências do mercado
           </p>
@@ -421,57 +420,7 @@ export default function AnaliseCompetitiva() {
 
         {/* Tab: Configuração */}
         <TabsContent value="config" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Concorrentes Configurados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingConfigs ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-12" />
-                  ))}
-                </div>
-              ) : configs && configs.length > 0 ? (
-                <div className="space-y-3">
-                  {configs.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium text-sm">{c.nome_concorrente}</p>
-                        <div className="flex gap-2 mt-1">
-                          {c.facebook_page_name && (
-                            <Badge variant="outline" className="text-xs">
-                              Meta: {c.facebook_page_name}
-                            </Badge>
-                          )}
-                          {c.linkedin_page_url && (
-                            <Badge variant="outline" className="text-xs">LinkedIn</Badge>
-                          )}
-                          {c.google_advertiser_id && (
-                            <Badge variant="outline" className="text-xs">Google</Badge>
-                          )}
-                        </div>
-                      </div>
-                      <Badge variant={c.ativo ? "default" : "secondary"}>
-                        {c.ativo ? "Ativo" : "Inativo"}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Settings className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">
-                    Nenhum concorrente configurado. Adicione via banco de dados na tabela{" "}
-                    <code className="bg-muted px-1 rounded">concorrente_config</code>.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ConcorrenteConfigForm />
         </TabsContent>
       </Tabs>
     </div>
