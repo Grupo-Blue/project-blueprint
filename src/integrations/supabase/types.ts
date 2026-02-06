@@ -685,6 +685,115 @@ export type Database = {
         }
         Relationships: []
       }
+      concorrente_anuncio: {
+        Row: {
+          ad_id_externo: string | null
+          concorrente_nome: string
+          created_at: string
+          data_detectado: string
+          data_inicio_veiculo: string | null
+          id: string
+          id_empresa: string
+          impressoes_estimadas: number | null
+          metadados: Json | null
+          plataforma: string
+          status: string
+          texto_corpo: string | null
+          titulo: string | null
+          updated_at: string
+          url_destino: string | null
+          url_midia: string | null
+        }
+        Insert: {
+          ad_id_externo?: string | null
+          concorrente_nome: string
+          created_at?: string
+          data_detectado?: string
+          data_inicio_veiculo?: string | null
+          id?: string
+          id_empresa: string
+          impressoes_estimadas?: number | null
+          metadados?: Json | null
+          plataforma?: string
+          status?: string
+          texto_corpo?: string | null
+          titulo?: string | null
+          updated_at?: string
+          url_destino?: string | null
+          url_midia?: string | null
+        }
+        Update: {
+          ad_id_externo?: string | null
+          concorrente_nome?: string
+          created_at?: string
+          data_detectado?: string
+          data_inicio_veiculo?: string | null
+          id?: string
+          id_empresa?: string
+          impressoes_estimadas?: number | null
+          metadados?: Json | null
+          plataforma?: string
+          status?: string
+          texto_corpo?: string | null
+          titulo?: string | null
+          updated_at?: string
+          url_destino?: string | null
+          url_midia?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "concorrente_anuncio_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      concorrente_config: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          facebook_page_name: string | null
+          google_advertiser_id: string | null
+          id: string
+          id_empresa: string
+          linkedin_page_url: string | null
+          nome_concorrente: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          facebook_page_name?: string | null
+          google_advertiser_id?: string | null
+          id?: string
+          id_empresa: string
+          linkedin_page_url?: string | null
+          nome_concorrente: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          facebook_page_name?: string | null
+          google_advertiser_id?: string | null
+          id?: string
+          id_empresa?: string
+          linkedin_page_url?: string | null
+          nome_concorrente?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "concorrente_config_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       conta_anuncio: {
         Row: {
           ativa: boolean
@@ -3102,6 +3211,13 @@ export type Database = {
           is_mql: boolean
           lead_pago: boolean | null
           levantou_mao: boolean
+          linkedin_cargo: string | null
+          linkedin_conexoes: number | null
+          linkedin_empresa: string | null
+          linkedin_senioridade: string | null
+          linkedin_setor: string | null
+          linkedin_ultima_atualizacao: string | null
+          linkedin_url: string | null
           mautic_first_visit: string | null
           mautic_last_active: string | null
           mautic_page_hits: number | null
@@ -3212,6 +3328,13 @@ export type Database = {
           is_mql?: boolean
           lead_pago?: boolean | null
           levantou_mao?: boolean
+          linkedin_cargo?: string | null
+          linkedin_conexoes?: number | null
+          linkedin_empresa?: string | null
+          linkedin_senioridade?: string | null
+          linkedin_setor?: string | null
+          linkedin_ultima_atualizacao?: string | null
+          linkedin_url?: string | null
           mautic_first_visit?: string | null
           mautic_last_active?: string | null
           mautic_page_hits?: number | null
@@ -3322,6 +3445,13 @@ export type Database = {
           is_mql?: boolean
           lead_pago?: boolean | null
           levantou_mao?: boolean
+          linkedin_cargo?: string | null
+          linkedin_conexoes?: number | null
+          linkedin_empresa?: string | null
+          linkedin_senioridade?: string | null
+          linkedin_setor?: string | null
+          linkedin_ultima_atualizacao?: string | null
+          linkedin_url?: string | null
           mautic_first_visit?: string | null
           mautic_last_active?: string | null
           mautic_page_hits?: number | null
@@ -4230,6 +4360,48 @@ export type Database = {
             referencedColumns: ["id_lead"]
           },
         ]
+      }
+      tendencia_mercado: {
+        Row: {
+          categorias: string[] | null
+          created_at: string
+          data_publicacao: string | null
+          empresas_relacionadas: string[] | null
+          fonte: string
+          id: string
+          relevancia_score: number | null
+          resumo: string | null
+          titulo: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          categorias?: string[] | null
+          created_at?: string
+          data_publicacao?: string | null
+          empresas_relacionadas?: string[] | null
+          fonte: string
+          id?: string
+          relevancia_score?: number | null
+          resumo?: string | null
+          titulo: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          categorias?: string[] | null
+          created_at?: string
+          data_publicacao?: string | null
+          empresas_relacionadas?: string[] | null
+          fonte?: string
+          id?: string
+          relevancia_score?: number | null
+          resumo?: string | null
+          titulo?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
       }
       tokeniza_investimento: {
         Row: {

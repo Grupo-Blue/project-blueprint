@@ -302,6 +302,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           Alertas
         </Button>
       </Link>
+      <Link to="/analise-competitiva" onClick={() => setMobileMenuOpen(false)}>
+        <Button 
+          variant={location.pathname === "/analise-competitiva" ? "secondary" : "ghost"} 
+          size="sm"
+          className="w-full justify-start hover:bg-accent transition-all"
+        >
+          <Eye className="mr-2 h-4 w-4" />
+          Análise Competitiva
+        </Button>
+      </Link>
       {isDirecao && (
         <Link to="/irpf-importacoes" onClick={() => setMobileMenuOpen(false)}>
           <Button 
