@@ -246,94 +246,40 @@ export default function Integracoes() {
   const handleTestIntegration = async (integracao: Integracao) => {
     const integracaoId = integracao.id_integracao;
     
+    if (integracao.tipo === 'CHATWOOT') {
+      toast.info('Chatwoot usa webhooks para receber eventos. Configure o webhook no Chatwoot apontando para a URL do sistema.');
+      return;
+    }
+    
     setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
     
     try {
-      let functionNames: string[] = [];
+      const { data, error } = await supabase.functions.invoke('validar-integracao', {
+        body: { integracao_id: integracaoId }
+      });
       
-      switch (integracao.tipo) {
-        case 'META_ADS':
-          functionNames = ['coletar-metricas-meta', 'coletar-criativos-meta'];
-          break;
-        case 'GOOGLE_ADS':
-          functionNames = ['coletar-metricas-google', 'coletar-criativos-google'];
-          break;
-        case 'PIPEDRIVE':
-          functionNames = ['sincronizar-pipedrive'];
-          break;
-        case 'TOKENIZA':
-          functionNames = ['sincronizar-tokeniza'];
-          break;
-        case 'MAUTIC':
-          functionNames = ['enriquecer-lead-mautic'];
-          break;
-        case 'NOTION':
-          functionNames = ['sincronizar-notion'];
-          break;
-        case 'METRICOOL':
-          functionNames = ['sincronizar-metricool', 'enriquecer-campanhas-metricool'];
-          break;
-        case 'CHATWOOT':
-          // Chatwoot usa webhooks, não tem função de coleta
-          toast.info('Chatwoot usa webhooks para receber eventos. Configure o webhook no Chatwoot apontando para a URL do sistema.');
-          return;
-        default:
-          throw new Error('Tipo de integração não suportado');
-      }
-      
-      // Executar todas as funções de coleta sequencialmente
-      let hasError = false;
-      let errorMessage = '';
-      
-      for (const functionName of functionNames) {
-        // Para Mautic, precisamos de um email de teste
-        // Para Notion, não precisamos de parâmetros especiais
-        const body = integracao.tipo === 'MAUTIC' 
-          ? { email: 'teste@exemplo.com', id_empresa: (integracao.config_json as any).id_empresa }
-          : integracao.tipo === 'NOTION'
-            ? {}
-            : { integracao_id: integracaoId };
-          
-        const { data, error } = await supabase.functions.invoke(functionName, {
-          body
-        });
-        
-        if (error) {
-          hasError = true;
-          if (error instanceof FunctionsHttpError) {
-            const errorData = await error.context.json();
-            errorMessage = errorData.error || errorData.message || 'Erro desconhecido';
-          } else {
-            errorMessage = error.message;
-          }
-          break;
+      if (error) {
+        let errorMessage = 'Erro ao validar integração';
+        if (error instanceof FunctionsHttpError) {
+          const errorData = await error.context.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } else {
+          errorMessage = error.message;
         }
-        
-        const result = data as any;
-        if (result.error || (result.resultados && result.resultados.some((r: any) => r.status === "error"))) {
-          hasError = true;
-          errorMessage = result.error || result.resultados.find((r: any) => r.status === "error")?.error || 'Erro na coleta';
-          break;
-        }
-      }
-      
-      if (hasError) {
         toast.error(errorMessage);
         return;
       }
       
-      // Após coletar dados diários, recalcular métricas semanais para atualizar o dashboard
-      if (integracao.tipo === 'META_ADS' || integracao.tipo === 'GOOGLE_ADS') {
-        const { error: calcError } = await supabase.functions.invoke('calcular-metricas-semanais', {
-          body: {}
-        });
-        
-        if (calcError) {
-          console.error('Erro ao calcular métricas semanais:', calcError);
-        }
+      const result = data as any;
+      if (!result.success) {
+        toast.error(result.error || 'Falha na validação');
+        return;
       }
       
-      toast.success('Integração testada com sucesso! Dados coletados e dashboard atualizado.');
+      toast.success(result.message || 'Integração validada com sucesso!');
+      if (result.details) {
+        console.log('Detalhes da validação:', result.details);
+      }
     } catch (error: any) {
       console.error('Erro ao testar integração:', error);
       toast.error(`Erro inesperado: ${error.message}`);
