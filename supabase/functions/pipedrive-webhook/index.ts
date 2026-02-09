@@ -1,12 +1,11 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -30,22 +29,43 @@ serve(async (req) => {
     }
 
     const payload = await req.json();
-    console.log("Webhook recebido:", JSON.stringify(payload, null, 2));
+    console.log("📥 Webhook Pipedrive recebido:", JSON.stringify(payload, null, 2));
 
-    // Estrutura do webhook Pipedrive v2.0:
-    // { data: { id, title, ... }, previous: {...}, meta: { action: 'added'/'updated'/'deleted', ... } }
-    const event = payload.meta?.action; // 'added', 'updated', 'deleted', 'change', etc
-    const dealData = payload.data;
+    // Suportar tanto API v1 quanto v2 do Pipedrive
+    // v1: meta.object="deal", meta.id, payload.current
+    // v2: meta.entity="deal", meta.entity_id, payload.data
+    const entityType = payload.meta?.entity || payload.meta?.object;
+    const isDeal =
+      entityType === "deal" ||
+      (payload.current && typeof payload.current.pipeline_id === "number") ||
+      (payload.data && typeof payload.data.pipeline_id === "number");
 
-    if (!dealData) {
-      console.log("Nenhum dado do deal encontrado no payload");
+    if (!isDeal) {
+      console.log(`⚠️ Evento ignorado - tipo: ${entityType}, não é deal`);
+      return new Response(
+        JSON.stringify({ message: "Not a deal event, ignored" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Extrair dados do deal (v2 usa "data", v1 usa "current")
+    const dealData = payload.current || payload.data;
+    const dealId = dealData?.id || payload.meta?.entity_id || payload.meta?.id;
+
+    if (!dealData || !dealId) {
+      console.log("⚠️ Nenhum dado do deal encontrado no payload");
       return new Response(
         JSON.stringify({ message: "No deal data" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Evento: ${event}, Deal ID: ${dealData.id}`);
+    // Detectar ação (v1 e v2)
+    const event =
+      payload.meta?.action ||
+      (payload.event ? payload.event.split(".")[0] : "unknown");
+
+    console.log(`📊 Evento: ${event}, Deal ID: ${dealId}, Entity Type: ${entityType}`);
 
     // Buscar integração Pipedrive para mapear pipeline_id -> empresa
     const { data: integracoes, error: intError } = await supabase
@@ -80,7 +100,7 @@ serve(async (req) => {
     }
 
     if (!targetIntegracao) {
-      console.log(`Deal ${dealData.id} não pertence a nenhuma pipeline configurada (pipeline_id: ${dealData.pipeline_id})`);
+      console.log(`Deal ${dealId} não pertence a nenhuma pipeline configurada (pipeline_id: ${dealData.pipeline_id})`);
       return new Response(
         JSON.stringify({ message: "Deal not in configured pipeline" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -91,7 +111,7 @@ serve(async (req) => {
     const idEmpresa = targetIntegracao.id_empresa; // PHASE 2: usar coluna direta
     const domain = config.domain.replace('.pipedrive.com', '');
 
-    console.log(`Processando deal ${dealData.id} para empresa ${idEmpresa}`);
+    console.log(`Processando deal ${dealId} para empresa ${idEmpresa}`);
 
     // Buscar stages da pipeline para mapear stage_id -> nome
     const stagesMap: Record<number, string> = {};
@@ -187,7 +207,8 @@ serve(async (req) => {
     // Nível 1: MQL (inclui todos que levantaram a mão)
     const isMql = (dealAberto && stageAtual && stageAtual !== "Lead") || levantouMao;
     
-    const urlPipedrive = `https://${domain}.pipedrive.com/deal/${dealData.id}`;
+    const urlPipedrive = `https://${domain}.pipedrive.com/deal/${dealId}`;
+    // IMPORTANTE: valor_venda só é registrado para deals GANHOS na pipeline configurada
     const valorDeal = dealData.value ? parseFloat(dealData.value) : null;
 
     // IDs dos campos customizados do Pipedrive para UTMs
@@ -377,7 +398,7 @@ serve(async (req) => {
     const { data: leadByDealId } = await supabase
       .from("lead")
       .select("id_lead, id_lead_externo, is_mql, levantou_mao, tem_reuniao, reuniao_realizada, venda_realizada, data_mql, data_levantou_mao, data_reuniao")
-      .eq("id_lead_externo", String(dealData.id))
+      .eq("id_lead_externo", String(dealId))
       .eq("id_empresa", idEmpresa)
       .eq("merged", false)
       .maybeSingle();
@@ -399,7 +420,7 @@ serve(async (req) => {
       
       if (leadByEmail) {
         existingLead = leadByEmail;
-        console.log(`[Lookup] Lead encontrado por email ${personEmail}: ${existingLead.id_lead} (deal original: ${existingLead.id_lead_externo}, novo deal: ${dealData.id})`);
+        console.log(`[Lookup] Lead encontrado por email ${personEmail}: ${existingLead.id_lead} (deal original: ${existingLead.id_lead_externo}, novo deal: ${dealId})`);
       }
     }
 
@@ -413,24 +434,24 @@ serve(async (req) => {
     // Se acabou de virar MQL (não era MQL antes, agora é)
     if (isMql && !existingLead?.is_mql && !dataMql) {
       dataMql = agora;
-      console.log(`[Transição] Lead ${dealData.id} virou MQL em ${agora}`);
+      console.log(`[Transição] Lead ${dealId} virou MQL em ${agora}`);
     }
 
     // Se acabou de levantar a mão
     if (levantouMao && !existingLead?.levantou_mao && !dataLevantouMao) {
       dataLevantouMao = agora;
-      console.log(`[Transição] Lead ${dealData.id} levantou a mão em ${agora}`);
+      console.log(`[Transição] Lead ${dealId} levantou a mão em ${agora}`);
     }
 
     // Se acabou de ter reunião (tem_reuniao ou reuniao_realizada)
     if ((temReuniao || reuniaoRealizada) && !existingLead?.tem_reuniao && !existingLead?.reuniao_realizada && !dataReuniao) {
       dataReuniao = agora;
-      console.log(`[Transição] Lead ${dealData.id} tem reunião em ${agora}`);
+      console.log(`[Transição] Lead ${dealId} tem reunião em ${agora}`);
     }
 
     const leadData = {
       id_empresa: idEmpresa,
-      id_lead_externo: String(dealData.id),
+      id_lead_externo: String(dealId),
       nome_lead: dealData.person_name || dealData.title || "Lead sem nome",
       organizacao: dealData.org_name || null,
       stage_atual: stageAtual,
@@ -445,7 +466,8 @@ serve(async (req) => {
       reuniao_realizada: reuniaoRealizada,
       venda_realizada: vendaRealizada,
       data_venda: vendaRealizada ? (dealData.won_time || dealData.update_time) : null,
-      valor_venda: valorDeal,
+      // IMPORTANTE: valor_venda só é preenchido para deals GANHOS da pipeline configurada
+      valor_venda: vendaRealizada ? valorDeal : null,
       // Email e telefone capturados
       email: personEmail,
       telefone: personPhone,
@@ -473,7 +495,7 @@ serve(async (req) => {
       const { error: deleteError } = await supabase
         .from("lead")
         .delete()
-        .eq("id_lead_externo", String(dealData.id))
+        .eq("id_lead_externo", String(dealId))
         .eq("id_empresa", idEmpresa);
 
       if (deleteError) {
@@ -481,7 +503,7 @@ serve(async (req) => {
         throw deleteError;
       }
 
-      console.log(`Lead ${dealData.id} deletado com sucesso`);
+      console.log(`Lead ${dealId} deletado com sucesso`);
     } else {
       // Deal foi adicionado ou atualizado
       let savedLeadId: string | null = null;
@@ -504,7 +526,7 @@ serve(async (req) => {
         }
         
         savedLeadId = existingLead.id_lead;
-        console.log(`Lead ${existingLead.id_lead} ATUALIZADO com dados do deal ${dealData.id}`);
+        console.log(`Lead ${existingLead.id_lead} ATUALIZADO com dados do deal ${dealId}`);
       } else {
         // Lead não existe - INSERT
         const { data: newLead, error: insertError } = await supabase
@@ -541,11 +563,11 @@ serve(async (req) => {
           }
         } else {
           savedLeadId = newLead.id_lead;
-          console.log(`Lead ${savedLeadId} CRIADO para deal ${dealData.id}`);
+          console.log(`Lead ${savedLeadId} CRIADO para deal ${dealId}`);
         }
       }
 
-      console.log(`Lead ${dealData.id} processado com sucesso (${event})`);
+      console.log(`Lead ${dealId} processado com sucesso (${event})`);
       
       // Usar savedLeadId para o resto do processamento
       const upsertedLead = savedLeadId ? { id_lead: savedLeadId } : null;
@@ -614,7 +636,7 @@ serve(async (req) => {
         if (eventosError) {
           console.error("Erro ao inserir eventos de transição:", eventosError);
         } else {
-          console.log(`[Transição] ${eventosParaInserir.length} eventos registrados para lead ${dealData.id}`);
+          console.log(`[Transição] ${eventosParaInserir.length} eventos registrados para lead ${dealId}`);
         }
       }
 
@@ -724,7 +746,7 @@ serve(async (req) => {
             if (updateError) {
               console.error('[Mautic] Erro ao atualizar lead com dados enriquecidos:', updateError);
             } else {
-              console.log(`[Mautic] Lead ${dealData.id} enriquecido com sucesso`);
+              console.log(`[Mautic] Lead ${dealId} enriquecido com sucesso`);
             }
           } else {
             console.log('[Mautic] Enriquecimento não retornou dados:', enrichmentData);
@@ -789,7 +811,7 @@ serve(async (req) => {
       JSON.stringify({ 
         message: "Webhook processed successfully",
         event,
-        deal_id: dealData.id
+        deal_id: dealId
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
