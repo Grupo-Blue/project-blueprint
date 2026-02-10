@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useCallback, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,14 +9,22 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Upload, FileText, Eye, Users, Building2, Bitcoin, TrendingUp, AlertCircle, CheckCircle, Clock, Loader2, BarChart3, Link } from "lucide-react";
+import { Upload, FileText, Eye, Users, Building2, Bitcoin, TrendingUp, AlertCircle, CheckCircle, Clock, Loader2, BarChart3, Link, X, FolderUp } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { IRPFDashboardInsights } from "@/components/irpf/IRPFDashboardInsights";
 import { IRPFFilters } from "@/components/irpf/IRPFFilters";
 import { VincularLeadDialog } from "@/components/irpf/VincularLeadDialog";
 import { ComparativoAnual } from "@/components/irpf/ComparativoAnual";
+
+interface BatchFileItem {
+  file: File;
+  status: 'pending' | 'processing' | 'success' | 'error';
+  result?: string;
+}
 
 interface IRPFDeclaracao {
   id: string;
@@ -121,20 +129,32 @@ export default function IRPFImportacoes() {
     enabled: !!selectedDeclaracao,
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
+  // Batch upload state
+  const [batchFiles, setBatchFiles] = useState<BatchFileItem[]>([]);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+  const abortRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const batchStats = useMemo(() => {
+    const total = batchFiles.length;
+    const success = batchFiles.filter(f => f.status === 'success').length;
+    const errors = batchFiles.filter(f => f.status === 'error').length;
+    const pending = batchFiles.filter(f => f.status === 'pending').length;
+    const processing = batchFiles.filter(f => f.status === 'processing').length;
+    const progress = total > 0 ? ((success + errors) / total) * 100 : 0;
+    return { total, success, errors, pending, processing, progress };
+  }, [batchFiles]);
+
+  const processOneFile = useCallback(async (file: File): Promise<{ success: boolean; message: string }> => {
+    try {
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = () => {
-          const result = reader.result as string;
-          const base64Data = result.split(',')[1];
-          resolve(base64Data);
-        };
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
         reader.onerror = reject;
       });
 
-      // Sempre usa Blue Consult para importação IRPF
       const { data, error } = await supabase.functions.invoke('processar-irpf', {
         body: {
           pdfBase64: base64,
@@ -145,26 +165,76 @@ export default function IRPFImportacoes() {
 
       if (error) throw error;
       if (!data.success) throw new Error(data.error || 'Erro ao processar');
-      
-      return data;
-    },
-    onSuccess: (data) => {
-      toast.success(`IRPF de ${data.nome} (${data.exercicio}) importado com sucesso!`);
-      queryClient.invalidateQueries({ queryKey: ['irpf-declaracoes'] });
-    },
-    onError: (error) => {
-      toast.error(`Erro ao importar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-    },
-  });
+
+      return { success: true, message: `${data.nome} (${data.exercicio})` };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Erro desconhecido' };
+    }
+  }, []);
+
+  const startBatchProcessing = useCallback(async () => {
+    setIsBatchProcessing(true);
+    abortRef.current = false;
+
+    for (let i = 0; i < batchFiles.length; i++) {
+      if (abortRef.current) break;
+      if (batchFiles[i].status !== 'pending') continue;
+
+      setBatchFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'processing' } : f));
+
+      const result = await processOneFile(batchFiles[i].file);
+
+      setBatchFiles(prev => prev.map((f, idx) =>
+        idx === i ? { ...f, status: result.success ? 'success' : 'error', result: result.message } : f
+      ));
+
+      // Small delay between files to avoid overwhelming
+      if (i < batchFiles.length - 1 && !abortRef.current) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    setIsBatchProcessing(false);
+    queryClient.invalidateQueries({ queryKey: ['irpf-declaracoes'] });
+    toast.success('Processamento em lote concluído!');
+  }, [batchFiles, processOneFile, queryClient]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.type !== 'application/pdf') {
-        toast.error('Por favor, selecione um arquivo PDF');
-        return;
-      }
-      uploadMutation.mutate(file);
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const pdfFiles = Array.from(files).filter(f => f.type === 'application/pdf');
+    const skipped = files.length - pdfFiles.length;
+
+    if (skipped > 0) {
+      toast.warning(`${skipped} arquivo(s) ignorados (apenas PDF é aceito)`);
+    }
+
+    if (pdfFiles.length === 0) return;
+
+    if (pdfFiles.length === 1 && !isBatchProcessing) {
+      // Single file: process directly without dialog
+      setBatchFiles([{ file: pdfFiles[0], status: 'pending' }]);
+      setBatchDialogOpen(true);
+    } else {
+      // Multiple files: open batch dialog
+      const newItems: BatchFileItem[] = pdfFiles.map(f => ({ file: f, status: 'pending' as const }));
+      setBatchFiles(prev => isBatchProcessing ? prev : newItems);
+      setBatchDialogOpen(true);
+    }
+
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleCancelBatch = () => {
+    abortRef.current = true;
+  };
+
+  const handleCloseBatchDialog = () => {
+    if (!isBatchProcessing) {
+      setBatchDialogOpen(false);
+      setBatchFiles([]);
     }
   };
 
@@ -250,27 +320,103 @@ export default function IRPFImportacoes() {
 
         <div className="flex items-center gap-2">
           <Input
+            ref={fileInputRef}
             type="file"
             accept=".pdf"
+            multiple
             onChange={handleFileUpload}
             className="hidden"
             id="pdf-upload"
-            disabled={uploadMutation.isPending}
+            disabled={isBatchProcessing}
           />
           <label htmlFor="pdf-upload">
-            <Button asChild disabled={uploadMutation.isPending}>
+            <Button asChild disabled={isBatchProcessing}>
               <span>
-                {uploadMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Upload className="w-4 h-4 mr-2" />
-                )}
-                {uploadMutation.isPending ? 'Processando...' : 'Importar PDF'}
+                <FolderUp className="w-4 h-4 mr-2" />
+                Importar PDFs
               </span>
             </Button>
           </label>
         </div>
       </div>
+
+      {/* Batch Processing Dialog */}
+      <Dialog open={batchDialogOpen} onOpenChange={(open) => { if (!open) handleCloseBatchDialog(); }}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderUp className="w-5 h-5" />
+              Importação em Lote
+              {batchStats.total > 0 && (
+                <Badge variant="secondary">{batchStats.total} arquivo(s)</Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Progress bar */}
+            {isBatchProcessing && (
+              <div className="space-y-2">
+                <Progress value={batchStats.progress} />
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>{batchStats.success + batchStats.errors} de {batchStats.total} processados</span>
+                  <span className="flex items-center gap-3">
+                    {batchStats.success > 0 && <span className="text-green-600">✓ {batchStats.success}</span>}
+                    {batchStats.errors > 0 && <span className="text-destructive">✗ {batchStats.errors}</span>}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* File list */}
+            <ScrollArea className="max-h-[400px]">
+              <div className="space-y-1">
+                {batchFiles.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-2 rounded-md border text-sm">
+                    {item.status === 'pending' && <Clock className="w-4 h-4 text-muted-foreground shrink-0" />}
+                    {item.status === 'processing' && <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />}
+                    {item.status === 'success' && <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />}
+                    {item.status === 'error' && <AlertCircle className="w-4 h-4 text-destructive shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate font-medium">{item.file.name}</p>
+                      {item.result && (
+                        <p className={`text-xs truncate ${item.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
+                          {item.result}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {(item.file.size / 1024).toFixed(0)} KB
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2">
+              {isBatchProcessing ? (
+                <Button variant="destructive" size="sm" onClick={handleCancelBatch}>
+                  <X className="w-4 h-4 mr-2" /> Cancelar
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" size="sm" onClick={handleCloseBatchDialog}>
+                    Fechar
+                  </Button>
+                  {batchStats.pending > 0 && (
+                    <Button size="sm" onClick={startBatchProcessing}>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Processar {batchStats.pending} arquivo(s)
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Tabs principais */}
       <Tabs value={mainTab} onValueChange={setMainTab}>
