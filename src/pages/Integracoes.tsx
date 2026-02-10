@@ -195,12 +195,11 @@ export default function Integracoes() {
       setMetricoolUserId(config.user_id || "");
       setMetricoolBlogId(config.blog_id || "");
     } else if (integracao.tipo === "CHATWOOT") {
-      setChatwootUrlBase(config.url_base || "");
+      setChatwootUrlBase(config.api_url || config.url_base || "");
       setChatwootApiToken(config.api_token || "");
-      setChatwootAccountId(config.account_id || "");
+      setChatwootAccountId(config.webhook_secret || config.account_id || "");
       // Carregar e consolidar mapeamento de inboxes por empresa
       if (config.empresas && Array.isArray(config.empresas)) {
-        // Consolidar entradas duplicadas por empresa
         const consolidatedMap = new Map<string, string[]>();
         config.empresas.forEach((e: any) => {
           const inboxList = Array.isArray(e.inboxes) ? e.inboxes : [];
@@ -210,7 +209,7 @@ export default function Integracoes() {
         
         const consolidated = Array.from(consolidatedMap.entries()).map(([id_empresa, inboxes]) => ({
           id_empresa,
-          inboxes: [...new Set(inboxes)].join(', ') // Remove duplicatas
+          inboxes: [...new Set(inboxes)].join(', ')
         }));
         
         setChatwootEmpresasInboxes(consolidated);
@@ -246,10 +245,7 @@ export default function Integracoes() {
   const handleTestIntegration = async (integracao: Integracao) => {
     const integracaoId = integracao.id_integracao;
     
-    if (integracao.tipo === 'CHATWOOT') {
-      toast.info('Chatwoot usa webhooks para receber eventos. Configure o webhook no Chatwoot apontando para a URL do sistema.');
-      return;
-    }
+    // Chatblue agora suporta validação via API
     
     setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
     
@@ -380,8 +376,8 @@ export default function Integracoes() {
         blog_id: metricoolBlogId
       };
     } else if (tipoIntegracao === "CHATWOOT") {
-      if (!chatwootUrlBase || !chatwootAccountId) {
-        toast.error("Preencha todos os campos obrigatórios");
+      if (!chatwootUrlBase || !chatwootApiToken) {
+        toast.error("Preencha URL da API e API Token");
         return;
       }
       // Transformar mapeamento de inboxes por empresa
@@ -389,13 +385,14 @@ export default function Integracoes() {
         .filter(e => e.id_empresa && e.inboxes.trim())
         .map(e => ({
           id_empresa: e.id_empresa,
+          company_id: chatwootAccountId || null,
           inboxes: e.inboxes.split(',').map(i => i.trim()).filter(Boolean)
         }));
       
       configJson = {
-        url_base: chatwootUrlBase,
-        api_token: chatwootApiToken || null,
-        account_id: chatwootAccountId,
+        api_url: chatwootUrlBase,
+        api_token: chatwootApiToken,
+        webhook_secret: chatwootAccountId || null,
         empresas: empresasConfig
       };
     } else if (tipoIntegracao === "GA4") {
@@ -490,7 +487,7 @@ export default function Integracoes() {
                     <SelectItem value="MAUTIC">Mautic</SelectItem>
                     <SelectItem value="NOTION">Notion</SelectItem>
                     <SelectItem value="METRICOOL">Metricool</SelectItem>
-                    <SelectItem value="CHATWOOT">Chatwoot</SelectItem>
+                    <SelectItem value="CHATWOOT">Chatblue</SelectItem>
                     <SelectItem value="GA4">Google Analytics 4</SelectItem>
                   </SelectContent>
                 </Select>
@@ -775,45 +772,47 @@ export default function Integracoes() {
                 <>
                   <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
                     <AlertCircle className="h-4 w-4 text-green-600" />
-                    <AlertTitle className="text-green-900 dark:text-green-100">Configuração Chatwoot</AlertTitle>
+                    <AlertTitle className="text-green-900 dark:text-green-100">Configuração Chatblue</AlertTitle>
                     <AlertDescription className="text-green-800 dark:text-green-200 text-sm space-y-2">
-                      <p><strong>Integração de atendimento WhatsApp/Chat</strong></p>
-                      <p>Configure o webhook no Chatwoot para receber eventos em tempo real.</p>
+                      <p><strong>Integração de atendimento WhatsApp via Chatblue</strong></p>
+                      <p>Configure o webhook no Chatblue para receber eventos em tempo real.</p>
                       <p className="mt-2"><strong>URL do Webhook:</strong></p>
                       <code className="block bg-green-100 dark:bg-green-900 p-2 rounded text-xs break-all">
-                        {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatwoot-webhook`}
+                        {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatblue-webhook`}
                       </code>
-                      <p className="mt-2"><strong>Eventos recomendados:</strong> conversation_created, message_created, conversation_status_changed</p>
+                      <p className="mt-2"><strong>Eventos:</strong> ticket.created, ticket.updated, message.created</p>
                     </AlertDescription>
                   </Alert>
 
                   <div className="space-y-2">
-                    <Label>URL Base do Chatwoot *</Label>
+                    <Label>URL da API do Chatblue *</Label>
                     <Input
                       value={chatwootUrlBase}
                       onChange={(e) => setChatwootUrlBase(e.target.value)}
-                      placeholder="https://app.chatwoot.com"
+                      placeholder="https://chatblue.suaempresa.com/api"
                     />
-                    <p className="text-xs text-muted-foreground">URL da sua instância Chatwoot</p>
+                    <p className="text-xs text-muted-foreground">URL base da API do Chatblue (ex: https://chatblue.suaempresa.com/api)</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>Account ID *</Label>
-                    <Input
-                      value={chatwootAccountId}
-                      onChange={(e) => setChatwootAccountId(e.target.value)}
-                      placeholder="Ex: 1"
-                    />
-                    <p className="text-xs text-muted-foreground">ID da conta Chatwoot (visível na URL do painel)</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>API Token (opcional)</Label>
+                    <Label>API Token *</Label>
                     <Input
                       type="password"
                       value={chatwootApiToken}
                       onChange={(e) => setChatwootApiToken(e.target.value)}
                       placeholder="Token de acesso à API"
                     />
-                    <p className="text-xs text-muted-foreground">Necessário apenas para chamadas ativas à API do Chatwoot</p>
+                    <p className="text-xs text-muted-foreground">Token para autenticar chamadas à API do Chatblue</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Webhook Secret (opcional)</Label>
+                    <Input
+                      type="password"
+                      value={chatwootAccountId}
+                      onChange={(e) => setChatwootAccountId(e.target.value)}
+                      placeholder="Secret para validar webhooks recebidos"
+                    />
+                    <p className="text-xs text-muted-foreground">Se configurado, o Chatblue deve enviar este valor no header X-Webhook-Secret</p>
                   </div>
 
                   {/* Mapeamento de Inboxes por Empresa */}
@@ -831,7 +830,7 @@ export default function Integracoes() {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Configure quais inboxes do Chatwoot pertencem a cada empresa. Leads serão criados na empresa correspondente à inbox de origem.
+                      Configure quais inboxes/conexões do Chatblue pertencem a cada empresa.
                     </p>
                     
                     {chatwootEmpresasInboxes.length === 0 ? (
@@ -1005,7 +1004,7 @@ export default function Integracoes() {
           <TabsTrigger value="mautic" className="text-xs md:text-sm">Mautic</TabsTrigger>
           <TabsTrigger value="notion" className="text-xs md:text-sm">Notion</TabsTrigger>
           <TabsTrigger value="metricool" className="text-xs md:text-sm">Metricool</TabsTrigger>
-          <TabsTrigger value="chatwoot" className="text-xs md:text-sm">Chatwoot</TabsTrigger>
+          <TabsTrigger value="chatwoot" className="text-xs md:text-sm">Chatblue</TabsTrigger>
           <TabsTrigger value="ga4" className="text-xs md:text-sm">GA4</TabsTrigger>
           <TabsTrigger value="stape" className="text-xs md:text-sm">Stape</TabsTrigger>
         </TabsList>
@@ -1514,14 +1513,13 @@ export default function Integracoes() {
           {integracoesFiltradas.filter(i => i.tipo === "CHATWOOT").length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhuma integração Chatwoot configurada
+                Nenhuma integração Chatblue configurada
               </CardContent>
             </Card>
           ) : (
             integracoesFiltradas.filter(i => i.tipo === "CHATWOOT").map((integracao) => {
               const config = integracao.config_json as any;
               
-              // Consolidar empresas duplicadas para exibição
               const consolidatedEmpresas = (() => {
                 if (!config.empresas || !Array.isArray(config.empresas)) return [];
                 const map = new Map<string, string[]>();
@@ -1544,10 +1542,9 @@ export default function Integracoes() {
                   <CardHeader className="p-4 md:p-6">
                     <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
                       <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base md:text-lg">Chatwoot</CardTitle>
+                        <CardTitle className="text-base md:text-lg">Chatblue</CardTitle>
                         <CardDescription className="text-xs md:text-sm">
-                          <span className="truncate block">URL: {config.url_base}</span>
-                          <span className="text-xs">Account: {config.account_id}</span>
+                          <span className="truncate block">API: {config.api_url || config.url_base}</span>
                         </CardDescription>
                         <div className="mt-2 space-y-1">
                           {consolidatedEmpresas.length === 0 ? (
@@ -1567,6 +1564,16 @@ export default function Integracoes() {
                           {integracao.ativo ? 'Ativo' : 'Inativo'}
                         </span>
                         <div className="flex items-center gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleTestIntegration(integracao)}
+                            disabled={testingIntegracoes.has(integracao.id_integracao)}
+                            className="h-8 px-2 md:px-3"
+                          >
+                            <TestTube2 className="w-4 h-4 md:mr-2" />
+                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
                             <Edit className="w-4 h-4" />
                           </Button>

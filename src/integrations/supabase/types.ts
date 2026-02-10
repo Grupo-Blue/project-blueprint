@@ -3156,6 +3156,13 @@ export type Database = {
       }
       lead: {
         Row: {
+          chatblue_atendido_por_ia: boolean | null
+          chatblue_departamento: string | null
+          chatblue_prioridade: string | null
+          chatblue_protocolo: string | null
+          chatblue_sla_violado: boolean | null
+          chatblue_tempo_resolucao_seg: number | null
+          chatblue_ticket_id: string | null
           chatwoot_agente_atual: string | null
           chatwoot_contact_id: number | null
           chatwoot_conversas_total: number | null
@@ -3273,6 +3280,13 @@ export type Database = {
           webhook_enviado_em: string | null
         }
         Insert: {
+          chatblue_atendido_por_ia?: boolean | null
+          chatblue_departamento?: string | null
+          chatblue_prioridade?: string | null
+          chatblue_protocolo?: string | null
+          chatblue_sla_violado?: boolean | null
+          chatblue_tempo_resolucao_seg?: number | null
+          chatblue_ticket_id?: string | null
           chatwoot_agente_atual?: string | null
           chatwoot_contact_id?: number | null
           chatwoot_conversas_total?: number | null
@@ -3390,6 +3404,13 @@ export type Database = {
           webhook_enviado_em?: string | null
         }
         Update: {
+          chatblue_atendido_por_ia?: boolean | null
+          chatblue_departamento?: string | null
+          chatblue_prioridade?: string | null
+          chatblue_protocolo?: string | null
+          chatblue_sla_violado?: boolean | null
+          chatblue_tempo_resolucao_seg?: number | null
+          chatblue_ticket_id?: string | null
           chatwoot_agente_atual?: string | null
           chatwoot_contact_id?: number | null
           chatwoot_conversas_total?: number | null
@@ -3697,6 +3718,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "merge_ignorado_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      metricas_atendimento: {
+        Row: {
+          created_at: string | null
+          dados_departamentos: Json | null
+          data: string
+          id: string
+          id_empresa: string
+          nps_score: number | null
+          sla_compliance: number | null
+          tempo_resolucao_medio_seg: number | null
+          tempo_resposta_medio_seg: number | null
+          tickets_ia: number | null
+          tickets_pendentes: number | null
+          tickets_resolvidos: number | null
+          tickets_sla_violado: number | null
+          tickets_total: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          dados_departamentos?: Json | null
+          data: string
+          id?: string
+          id_empresa: string
+          nps_score?: number | null
+          sla_compliance?: number | null
+          tempo_resolucao_medio_seg?: number | null
+          tempo_resposta_medio_seg?: number | null
+          tickets_ia?: number | null
+          tickets_pendentes?: number | null
+          tickets_resolvidos?: number | null
+          tickets_sla_violado?: number | null
+          tickets_total?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          dados_departamentos?: Json | null
+          data?: string
+          id?: string
+          id_empresa?: string
+          nps_score?: number | null
+          sla_compliance?: number | null
+          tempo_resolucao_medio_seg?: number | null
+          tempo_resposta_medio_seg?: number | null
+          tickets_ia?: number | null
+          tickets_pendentes?: number | null
+          tickets_resolvidos?: number | null
+          tickets_sla_violado?: number | null
+          tickets_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metricas_atendimento_id_empresa_fkey"
             columns: ["id_empresa"]
             isOneToOne: false
             referencedRelation: "empresa"
@@ -4770,6 +4850,18 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      user_has_irpf_atividade_rural_access: {
+        Args: { _id_atividade_rural: string }
+        Returns: boolean
+      }
+      user_has_irpf_declaracao_access: {
+        Args: { _id_declaracao: string }
+        Returns: boolean
+      }
+      user_has_irpf_empresa_access: {
+        Args: { _id_empresa: string }
         Returns: boolean
       }
     }
