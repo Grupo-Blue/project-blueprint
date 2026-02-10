@@ -67,6 +67,9 @@ serve(async (req) => {
       case "GA4":
         result = await validarGA4(config);
         break;
+      case "CHATWOOT":
+        result = await validarChatblue(config);
+        break;
       default:
         result = { success: false, error: `Tipo ${integracao.tipo} não suportado para validação` };
     }
@@ -312,4 +315,28 @@ async function validarGA4(config: any) {
   }
 
   return { success: true, message: "Credenciais GA4 válidas" };
+}
+
+async function validarChatblue(config: any) {
+  const { api_url, api_token } = config;
+  if (!api_url || !api_token) {
+    return { success: false, error: "URL da API e API Token são obrigatórios" };
+  }
+
+  const healthUrl = `${api_url}/external/health`;
+  try {
+    const response = await fetch(healthUrl, {
+      headers: { "X-API-Key": api_token },
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      return { success: false, error: `Erro ${response.status}: ${errText}` };
+    }
+
+    const data = await response.json();
+    return { success: true, message: `Chatblue conectado: ${data.status || 'OK'}`, details: data };
+  } catch (error) {
+    return { success: false, error: `Não foi possível conectar em ${healthUrl}. Verifique se a URL está correta e a rota /api/external/health existe.` };
+  }
 }
