@@ -1,216 +1,166 @@
 
 
-# Integração SGT com Chatblue
+# Webhook Mautic para SGT (Tempo Real)
 
-## Contexto
+## Objetivo
 
-O Chatblue é o sistema de atendimento próprio (fork personalizado), com backend Node.js/Express, PostgreSQL/Prisma, e APIs REST completas. A integração atual com "Chatwoot" no SGT já funciona via webhook -- o Chatblue pode enviar os mesmos eventos. A estratégia é **dupla**: webhook (Chatblue envia para o SGT em tempo real) + API polling (SGT consulta métricas do Chatblue periodicamente).
+Criar uma edge function `mautic-webhook` que receba eventos do Mautic em tempo real (mudanca de score, tags, page hits) e atualize o lead no SGT automaticamente -- incluindo a logica de MQL e alerta para SDR.
 
-## O que será integrado
-
-### Dados em tempo real (via Webhook - já funciona parcialmente)
-- Leads que entram pelo WhatsApp sem passar por anúncios (orgânicos)
-- Status de atendimento (aberto, em andamento, resolvido)
-- Contagem de conversas e mensagens
-- Agente atual do atendimento
-- Inbox de origem
-
-### Dados de métricas (novos - via API do Chatblue)
-- **Tempo médio de primeira resposta** (responseTime do Ticket)
-- **Tempo médio de resolução** (resolutionTime do Ticket)
-- **SLA compliance** (% de tickets dentro do prazo)
-- **Tickets por departamento** (Triagem, Comercial, Suporte)
-- **Taxa de atendimento por IA** vs humano
-- **NPS** (se disponível)
-- **Tickets por período** (volume diário)
-
-## Arquitetura da integração
+## Fluxo completo
 
 ```text
-                    CHATBLUE                          SGT
-              +-----------------+           +------------------+
-              |  Ticket criado  |--webhook->| chatblue-webhook |
-              |  Msg recebida   |--webhook->|  (edge function) |
-              |  Status mudou   |--webhook->|    Upsert lead   |
-              +-----------------+           +------------------+
-              |                 |
-              |  GET /metrics/* |<--poll----|  coletar-metricas |
-              |  GET /tickets/* |<--poll----|  -chatblue        |
-              |  GET /contacts  |<--poll----|  (edge function)  |
-              +-----------------+           +------------------+
+Lead chega no Mautic (formulario, LP, WhatsApp)
+  |
+  v
+Mautic envia webhook para SGT (score, tags, page hits)
+  |
+  v
+mautic-webhook (edge function)
+  |-- Lead existe no SGT? (busca por email/telefone)
+  |     |-- SIM: Atualiza score, tags, page_hits, UTMs
+  |     |-- NAO: Cria lead basico (origem MAUTIC, organico)
+  |
+  v
+Logica de MQL automatica:
+  |-- score >= 50 OU page_hits >= 10? --> is_mql = true, data_mql = now()
+  |-- Tag contem "levantou_mao" ou "clicou_whatsapp"? --> levantou_mao = true
+  |
+  v
+Dispara webhook SDR (se houve mudanca relevante)
+  |-- Eventos: MQL, SCORE_ATUALIZADO, LEAD_NOVO
+  |
+  v
+Lead aquece no Mautic...
+  |
+  v
+Score >= 50 --> SGT ja marcou MQL
+Clicou WhatsApp --> SGT marca levantou_mao, alerta SDR
+SDR cria deal Pipedrive --> Pipedrive webhook --> SGT
+SGT busca Mautic (enriquecer-lead-mautic) --> Dados completos
 ```
 
-## Plano de implementação
+## Implementacao
 
-### Parte 1: Renomear integração de CHATWOOT para CHATBLUE
+### 1. Nova edge function: `mautic-webhook`
 
-Atualizar referências no código e na UI para refletir o novo nome. O tipo do enum `CHATWOOT` no banco será mantido por compatibilidade, mas a UI mostrará "Chatblue".
+Recebe webhooks do Mautic (configurados via "Webhooks" no painel do Mautic). O Mautic envia eventos como:
 
-**Arquivos afetados:**
-- `src/pages/Integracoes.tsx` - Label na UI
-- `supabase/functions/chatwoot-webhook/index.ts` - Logs e referências
+- `mautic.lead_post_save_update` (contato atualizado - score, tags mudaram)
+- `mautic.lead_post_save_new` (contato criado)
+- `mautic.page_on_hit` (visita a pagina)
+- `mautic.lead_points_change` (score mudou)
 
-### Parte 2: Configurar webhook no Chatblue (ação do usuário)
+**Logica principal:**
+1. Validar webhook secret (header `X-Webhook-Secret`)
+2. Extrair email/telefone do payload Mautic
+3. Buscar lead no SGT por email ou telefone
+4. Se nao existe: criar lead basico com `origem_tipo = 'ORGANICO'`, `origem_canal = 'MAUTIC'`
+5. Atualizar campos Mautic no lead: `mautic_score`, `mautic_page_hits`, `mautic_tags`, `mautic_last_active`, `id_mautic_contact`
+6. Aplicar regras de MQL:
+   - `score >= 50 OR page_hits >= 10` --> `is_mql = true`, `data_mql = now()`
+   - Tag contem palavras-chave (configuravel) --> `levantou_mao = true`
+7. Disparar webhook SDR se houve transicao (nao era MQL e agora e)
+8. Registrar evento no `lead_evento`
 
-No Chatblue, criar um webhook outgoing que envie eventos para:
-```
-POST https://<supabase-url>/functions/v1/chatblue-webhook
-```
+### 2. Configuracao no Mautic (sua parte)
 
-Eventos a configurar:
-- `ticket.created` (nova conversa)
-- `ticket.updated` (status mudou)
-- `message.created` (nova mensagem)
+No painel do Mautic:
+1. Ir em **Configuracoes > Webhooks**
+2. Criar webhook com URL: `https://unsznbmmqhihwctguvvr.supabase.co/functions/v1/mautic-webhook`
+3. Adicionar header customizado: `X-Webhook-Secret: [seu-secret]`
+4. Selecionar eventos:
+   - Contact Updated
+   - Contact Points Changed
+   - Contact Created (opcional)
+5. Salvar
 
-Isso substitui o webhook do Chatwoot com o mesmo payload adaptado.
+### 3. Atualizacao do `config.toml`
 
-### Parte 3: Nova edge function `chatblue-webhook`
+Adicionar a nova funcao com `verify_jwt = false` (webhook externo, validacao por secret).
 
-Criar nova edge function que recebe webhooks do Chatblue. A lógica é similar à `chatwoot-webhook` atual, mas adaptada ao formato de dados do Chatblue (modelo Prisma: Ticket, Contact, Message).
+### 4. Secret necessario
 
-**Mapeamento de campos Chatblue para lead:**
+Adicionar `MAUTIC_WEBHOOK_SECRET` nos secrets do projeto para validar autenticidade dos webhooks recebidos.
 
-| Campo Chatblue | Campo Lead SGT |
-|---|---|
-| `contact.phone` | `telefone` |
-| `contact.name` | `nome_lead` |
-| `contact.email` | `email` |
-| `ticket.status` | `chatwoot_status_atendimento` |
-| `ticket.responseTime` | `chatwoot_tempo_resposta_medio` |
-| `ticket.assignedTo.name` | `chatwoot_agente_atual` |
-| `connection.name` (inbox) | `chatwoot_inbox` |
+### 5. Integracao com webhooks SDR existentes
 
-### Parte 4: Nova edge function `coletar-metricas-chatblue`
+Quando o webhook Mautic detectar uma transicao relevante (lead virou MQL, ou levantou mao), a edge function invocara `disparar-webhook-leads` passando o `lead_id` e o evento especifico, garantindo que o SDR IA seja notificado em tempo real.
 
-Edge function que consulta a API REST do Chatblue periodicamente para trazer métricas agregadas:
+## Detalhes tecnicos
 
-- `GET /api/metrics/dashboard?period=7` - KPIs gerais
-- `GET /api/metrics/sla` - Dados de SLA por departamento
+### Formato do payload do Mautic (webhook nativo)
 
-**Dados coletados:**
-- Tempo médio de resposta e resolução
-- SLA compliance %
-- Volume de tickets (total, pendentes, resolvidos)
-- Taxa de atendimento por IA
-- Tickets por departamento
-
-Esses dados serão armazenados em uma nova tabela `metricas_atendimento`.
-
-### Parte 5: Nova tabela `metricas_atendimento`
-
-```sql
-CREATE TABLE metricas_atendimento (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  id_empresa UUID NOT NULL REFERENCES empresa(id_empresa),
-  data DATE NOT NULL,
-  tickets_total INT DEFAULT 0,
-  tickets_pendentes INT DEFAULT 0,
-  tickets_resolvidos INT DEFAULT 0,
-  tickets_sla_violado INT DEFAULT 0,
-  tickets_ia INT DEFAULT 0,
-  tempo_resposta_medio_seg INT,
-  tempo_resolucao_medio_seg INT,
-  sla_compliance NUMERIC(5,2),
-  nps_score INT,
-  dados_departamentos JSONB,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(id_empresa, data)
-);
-```
-
-### Parte 6: Novas colunas no lead (chatblue-specific)
-
-Adicionar colunas para dados mais ricos do Chatblue:
-
-```sql
-ALTER TABLE lead ADD COLUMN IF NOT EXISTS chatblue_ticket_id TEXT;
-ALTER TABLE lead ADD COLUMN IF NOT EXISTS chatblue_protocolo TEXT;
-ALTER TABLE lead ADD COLUMN IF NOT EXISTS chatblue_departamento TEXT;
-ALTER TABLE lead ADD COLUMN IF NOT EXISTS chatblue_prioridade TEXT;
-ALTER TABLE lead ADD COLUMN IF NOT EXISTS chatblue_sla_violado BOOLEAN DEFAULT false;
-ALTER TABLE lead ADD COLUMN IF NOT EXISTS chatblue_tempo_resolucao_seg INT;
-ALTER TABLE lead ADD COLUMN IF NOT EXISTS chatblue_atendido_por_ia BOOLEAN DEFAULT false;
-```
-
-### Parte 7: Atualizar config_json para tipo CHATBLUE
-
-O `config_json` para integração Chatblue terá:
+O Mautic envia payloads no formato:
 
 ```json
 {
-  "api_url": "https://chatblue.suaempresa.com/api",
-  "api_token": "jwt-token-ou-api-key",
-  "webhook_secret": "secret-para-validar-webhooks",
-  "empresas": [
+  "mautic.lead_post_save_update": [
     {
-      "id_empresa": "uuid-sgt",
-      "company_id": "cuid-chatblue",
-      "inboxes": ["WhatsApp BlueConsult", "WhatsApp Tokeniza"]
+      "contact": {
+        "id": 123,
+        "points": 55,
+        "fields": {
+          "core": {
+            "email": { "value": "joao@email.com" },
+            "phone": { "value": "+5561986263349" },
+            "firstname": { "value": "Joao" },
+            "lastname": { "value": "Silva" },
+            "city": { "value": "Brasilia" },
+            "state": { "value": "DF" }
+          }
+        },
+        "tags": [
+          { "tag": "investidor" },
+          { "tag": "clicou-whatsapp" }
+        ],
+        "utmtags": [
+          { "utmSource": "google", "utmMedium": "cpc", "utmCampaign": "irpf-2025" }
+        ]
+      },
+      "timestamp": "2026-02-11T10:30:00-03:00"
     }
   ]
 }
 ```
 
-### Parte 8: O que alterar no Chatblue (sua parte)
+### Mapeamento de campos
 
-1. **Criar rota de webhook outgoing** - No Chatblue, adicionar um sistema de webhooks de saída que dispare para URLs externas quando tickets/mensagens são criados/atualizados. Pode ser implementado como um serviço que escuta eventos do Prisma (middleware) ou via Bull job.
-
-2. **Criar rota pública de API para métricas** - Expor uma rota como `GET /api/external/metrics` autenticada por API key (header `X-API-Key`) que retorne os mesmos dados do `GET /api/metrics/dashboard` sem precisar do JWT de sessão do Chatblue.
-
-3. **Formato do payload do webhook:**
-
-```json
-{
-  "event": "ticket.created",
-  "company": { "id": "cuid", "name": "BlueConsult" },
-  "ticket": {
-    "id": "cuid",
-    "protocol": "BC-00123",
-    "status": "PENDING",
-    "priority": "MEDIUM",
-    "responseTime": null,
-    "resolutionTime": null,
-    "slaBreached": false,
-    "isAIHandled": false,
-    "departmentName": "Comercial"
-  },
-  "contact": {
-    "phone": "+5561986263349",
-    "name": "João Silva",
-    "email": "joao@email.com",
-    "isClient": false
-  },
-  "connection": {
-    "name": "WhatsApp BlueConsult",
-    "type": "BAILEYS"
-  },
-  "message": {
-    "content": "Olá, gostaria de informações",
-    "type": "TEXT",
-    "isFromMe": false
-  }
-}
-```
-
-### Parte 9: Validação da integração
-
-Adicionar case `CHATBLUE` (reutilizando o tipo `CHATWOOT` do enum) na edge function `validar-integracao` para testar a conectividade com a API do Chatblue via `GET /api/external/health`.
-
-## Resumo de arquivos
-
-| Arquivo | Ação |
+| Mautic Webhook | Campo Lead SGT |
 |---|---|
-| `supabase/functions/chatblue-webhook/index.ts` | Criar (nova edge function) |
-| `supabase/functions/coletar-metricas-chatblue/index.ts` | Criar (nova edge function) |
-| `supabase/functions/validar-integracao/index.ts` | Alterar (adicionar case CHATBLUE) |
-| `src/pages/Integracoes.tsx` | Alterar (UI para config Chatblue) |
-| `src/components/AlertaIntegracao.tsx` | Alterar (renomear referências) |
-| Migração SQL | Criar tabela `metricas_atendimento` + colunas no `lead` |
+| `contact.id` | `id_mautic_contact` |
+| `contact.points` | `mautic_score` |
+| `contact.fields.core.email.value` | `email` |
+| `contact.fields.core.phone.value` | `telefone` |
+| `contact.fields.core.firstname/lastname` | `nome_lead` |
+| `contact.fields.core.city.value` | `cidade_mautic` |
+| `contact.fields.core.state.value` | `estado_mautic` |
+| `contact.tags[].tag` | `mautic_tags` |
+| `contact.utmtags[0]` | `utm_source_mautic`, etc. |
 
-## Dependências no Chatblue (sua responsabilidade)
+### Tags que disparam acoes
 
-1. Criar sistema de webhook outgoing (disparar POST para URL configurável)
-2. Criar rota `GET /api/external/metrics` com auth por API key
-3. Criar rota `GET /api/external/health` para validação
-4. Definir o payload do webhook conforme especificação acima
+Tags configuradas para disparar `levantou_mao = true`:
+- `clicou-whatsapp`
+- `levantou-mao`
+- `pediu-contato`
+- `agendou-reuniao`
+
+Essas tags serao verificadas case-insensitive.
+
+## Arquivos afetados
+
+| Arquivo | Acao |
+|---|---|
+| `supabase/functions/mautic-webhook/index.ts` | Criar |
+| `supabase/config.toml` | Adicionar funcao com verify_jwt = false |
+
+## Beneficio vs. sistema atual
+
+| Aspecto | Antes (polling) | Depois (webhook) |
+|---|---|
+| Latencia | 10 min (cronjob) | Segundos |
+| Custo | Consulta API por lead | Apenas quando muda |
+| MQL detection | Proximo ciclo do cron | Imediato |
+| Alerta SDR | Atrasado | Tempo real |
+| Criacao de lead | Apenas via Pipedrive/Chatblue | Tambem via Mautic |
 
