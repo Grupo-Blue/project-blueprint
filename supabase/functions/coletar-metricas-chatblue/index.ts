@@ -36,13 +36,14 @@ serve(async (req) => {
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
       const apiUrl = config.api_url;
-      // Priorizar secret do ambiente, fallback para config_json
-      const apiToken = Deno.env.get('CHATBLUE_API_TOKEN') || config.api_token;
 
-      if (!apiUrl || !apiToken) {
-        resultados.push({ integracao: integracao.id_integracao, error: 'api_url ou api_token não configurado' });
+      if (!apiUrl) {
+        resultados.push({ integracao: integracao.id_integracao, error: 'api_url não configurado' });
         continue;
       }
+
+      // Token global (fallback)
+      const globalToken = Deno.env.get('CHATBLUE_API_TOKEN') || config.api_token;
 
       // Buscar empresas mapeadas
       const empresas = config.empresas || [];
@@ -56,6 +57,15 @@ serve(async (req) => {
         const companyId = empresaMapping.company_id;
 
         try {
+          // Selecionar token por empresa: CHATBLUE_API_TOKEN_TOKENIZA para Tokeniza, global para demais
+          const empresaTokenEnv = empresaMapping.token_env;
+          const apiToken = (empresaTokenEnv && Deno.env.get(empresaTokenEnv)) || globalToken;
+
+          if (!apiToken) {
+            resultados.push({ integracao: integracao.id_integracao, empresa: idEmpresa, error: 'Nenhum api_token disponível' });
+            continue;
+          }
+
           // Coletar métricas do dashboard
           const metricsUrl = `${apiUrl}/external/metrics${companyId ? `?companyId=${companyId}` : ''}`;
           console.log(`[Chatblue Metrics] Coletando de: ${metricsUrl}`);
