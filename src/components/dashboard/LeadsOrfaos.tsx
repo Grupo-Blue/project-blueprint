@@ -7,6 +7,7 @@ import { UserX, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useEmpresa } from "@/contexts/EmpresaContext";
+import { aplicarFiltroComercial } from "@/lib/empresa-constants";
 
 export function LeadsOrfaos() {
   const { empresaSelecionada } = useEmpresa();
@@ -24,9 +25,7 @@ export function LeadsOrfaos() {
         .order("data_criacao", { ascending: false })
         .limit(20);
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        query = query.eq("id_empresa", empresaSelecionada);
-      }
+      query = aplicarFiltroComercial(query, empresaSelecionada);
 
       const { data, error } = await query;
       if (error) throw error;

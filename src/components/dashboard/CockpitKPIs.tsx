@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { TrendingUp, TrendingDown, DollarSign, Users, Target, ShoppingCart, BarChart3, Ticket } from "lucide-react";
+import { aplicarFiltroComercial } from "@/lib/empresa-constants";
 
 interface KPIData {
   receita: number;
@@ -43,9 +44,7 @@ export const CockpitKPIs = ({ tipoNegocio }: CockpitKPIsProps) => {
         .gte("data", dataInicio)
         .lte("data", dataFim);
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        query = query.eq("id_empresa", empresaSelecionada);
-      }
+      query = aplicarFiltroComercial(query, empresaSelecionada);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -65,9 +64,7 @@ export const CockpitKPIs = ({ tipoNegocio }: CockpitKPIsProps) => {
         .gte("data", inicioAnterior)
         .lte("data", fimAnterior);
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        queryAnterior = queryAnterior.eq("id_empresa", empresaSelecionada);
-      }
+      queryAnterior = aplicarFiltroComercial(queryAnterior, empresaSelecionada);
 
       const { data: dataAnterior } = await queryAnterior;
       setKpisPeriodoAnterior(agregarMetricas(dataAnterior || []));

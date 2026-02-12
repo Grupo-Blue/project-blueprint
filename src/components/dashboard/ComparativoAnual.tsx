@@ -9,6 +9,7 @@ import { format, startOfYear, endOfYear, eachMonthOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { formatCurrency } from "@/lib/utils";
+import { aplicarFiltroComercial } from "@/lib/empresa-constants";
 
 const CORES = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))"];
 const MESES_LABEL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -40,9 +41,7 @@ export function ComparativoAnual() {
           .lte("data", fimAno)
           .eq("tipo_negocio", "total");
 
-        if (empresaSelecionada && empresaSelecionada !== "todas") {
-          query = query.eq("id_empresa", empresaSelecionada);
-        }
+        query = aplicarFiltroComercial(query, empresaSelecionada);
 
         const { data } = await query;
         result[anoStr] = data || [];

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { aplicarFiltroComercial } from "@/lib/empresa-constants";
 
 interface MetaVsRealizadoProps {
   tipoNegocio: string;
@@ -29,9 +30,7 @@ export const MetaVsRealizado = ({ tipoNegocio }: MetaVsRealizadoProps) => {
         .eq("ano", anoAtual)
         .eq("tipo_negocio", tipoNegocio);
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        queryMetas = queryMetas.eq("id_empresa", empresaSelecionada);
-      }
+      queryMetas = aplicarFiltroComercial(queryMetas, empresaSelecionada);
 
       const { data: metas } = await queryMetas;
 
@@ -46,9 +45,7 @@ export const MetaVsRealizado = ({ tipoNegocio }: MetaVsRealizadoProps) => {
         .gte("data", inicioAno)
         .lte("data", fimAno);
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        queryMetricas = queryMetricas.eq("id_empresa", empresaSelecionada);
-      }
+      queryMetricas = aplicarFiltroComercial(queryMetricas, empresaSelecionada);
 
       const { data: metricas } = await queryMetricas;
 

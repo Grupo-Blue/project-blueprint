@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Timer, CheckCircle, AlertTriangle } from "lucide-react";
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { useEmpresa } from "@/contexts/EmpresaContext";
+import { EMPRESAS_COMERCIAIS } from "@/lib/empresa-constants";
 
 const SLA_LIMITE_SEG = 900; // 15 minutos
 
@@ -20,9 +21,12 @@ export function SLACompliance() {
   const { data, isLoading } = useQuery({
     queryKey: ["sla-compliance", empresaSelecionada, dataInicio, dataFim],
     queryFn: async () => {
-      const query = empresaSelecionada === "todas"
-        ? supabase.from("lead").select("tempo_primeira_resposta_seg, proprietario_nome").gte("data_criacao", dataInicio).lte("data_criacao", dataFim + "T23:59:59").or("merged.is.null,merged.eq.false").not("nome_lead", "like", "%(cópia)%")
-        : supabase.from("lead").select("tempo_primeira_resposta_seg, proprietario_nome").eq("id_empresa", empresaSelecionada).gte("data_criacao", dataInicio).lte("data_criacao", dataFim + "T23:59:59").or("merged.is.null,merged.eq.false").not("nome_lead", "like", "%(cópia)%");
+      let query = supabase.from("lead").select("tempo_primeira_resposta_seg, proprietario_nome").gte("data_criacao", dataInicio).lte("data_criacao", dataFim + "T23:59:59").or("merged.is.null,merged.eq.false").not("nome_lead", "like", "%(cópia)%");
+      if (empresaSelecionada && empresaSelecionada !== "todas") {
+        query = query.eq("id_empresa", empresaSelecionada);
+      } else {
+        query = query.in("id_empresa", EMPRESAS_COMERCIAIS);
+      }
 
       const { data, error } = await query;
       if (error) throw error;

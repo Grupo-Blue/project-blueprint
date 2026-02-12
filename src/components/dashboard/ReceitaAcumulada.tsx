@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { aplicarFiltroComercial } from "@/lib/empresa-constants";
 
 interface ReceitaAcumuladaProps {
   tipoNegocio: string;
@@ -35,9 +36,7 @@ export const ReceitaAcumulada = ({ tipoNegocio }: ReceitaAcumuladaProps) => {
         .lte("data", dataFim)
         .order("data", { ascending: true });
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        query = query.eq("id_empresa", empresaSelecionada);
-      }
+      query = aplicarFiltroComercial(query, empresaSelecionada);
 
       const { data: metricas } = await query;
 
@@ -67,9 +66,7 @@ export const ReceitaAcumulada = ({ tipoNegocio }: ReceitaAcumuladaProps) => {
         .eq("mes", mesAtual)
         .eq("tipo_negocio", tipoNegocio);
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        queryMeta = queryMeta.eq("id_empresa", empresaSelecionada);
-      }
+      queryMeta = aplicarFiltroComercial(queryMeta, empresaSelecionada);
 
       const { data: metaData } = await queryMeta;
       const meta = (metaData || []).reduce((s, m) => s + (Number(m.meta_receita) || 0), 0);
