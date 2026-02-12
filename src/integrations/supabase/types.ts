@@ -1185,6 +1185,7 @@ export type Database = {
           mqls: number | null
           reunioes: number | null
           ticket_medio: number | null
+          tipo_negocio: string
           updated_at: string | null
           valor_vendas: number | null
           vendas: number | null
@@ -1203,6 +1204,7 @@ export type Database = {
           mqls?: number | null
           reunioes?: number | null
           ticket_medio?: number | null
+          tipo_negocio?: string
           updated_at?: string | null
           valor_vendas?: number | null
           vendas?: number | null
@@ -1221,6 +1223,7 @@ export type Database = {
           mqls?: number | null
           reunioes?: number | null
           ticket_medio?: number | null
+          tipo_negocio?: string
           updated_at?: string | null
           valor_vendas?: number | null
           vendas?: number | null
@@ -3235,12 +3238,15 @@ export type Database = {
           merged_at: string | null
           merged_by: string | null
           merged_into_lead_id: string | null
+          motivo_perda: string | null
           nome_lead: string | null
           organizacao: string | null
           origem_campanha: string | null
           origem_canal: Database["public"]["Enums"]["canal_origem"] | null
           origem_tipo: Database["public"]["Enums"]["origem_lead"] | null
           pipeline_id: string | null
+          proprietario_id: string | null
+          proprietario_nome: string | null
           reuniao_realizada: boolean
           stage_atual: string | null
           stape_client_id: string | null
@@ -3258,6 +3264,7 @@ export type Database = {
           stape_user_agent: string | null
           telefone: string | null
           tem_reuniao: boolean
+          tempo_primeira_resposta_seg: number | null
           tokeniza_carrinho_abandonado: boolean | null
           tokeniza_investidor: boolean | null
           tokeniza_primeiro_investimento: string | null
@@ -3359,12 +3366,15 @@ export type Database = {
           merged_at?: string | null
           merged_by?: string | null
           merged_into_lead_id?: string | null
+          motivo_perda?: string | null
           nome_lead?: string | null
           organizacao?: string | null
           origem_campanha?: string | null
           origem_canal?: Database["public"]["Enums"]["canal_origem"] | null
           origem_tipo?: Database["public"]["Enums"]["origem_lead"] | null
           pipeline_id?: string | null
+          proprietario_id?: string | null
+          proprietario_nome?: string | null
           reuniao_realizada?: boolean
           stage_atual?: string | null
           stape_client_id?: string | null
@@ -3382,6 +3392,7 @@ export type Database = {
           stape_user_agent?: string | null
           telefone?: string | null
           tem_reuniao?: boolean
+          tempo_primeira_resposta_seg?: number | null
           tokeniza_carrinho_abandonado?: boolean | null
           tokeniza_investidor?: boolean | null
           tokeniza_primeiro_investimento?: string | null
@@ -3483,12 +3494,15 @@ export type Database = {
           merged_at?: string | null
           merged_by?: string | null
           merged_into_lead_id?: string | null
+          motivo_perda?: string | null
           nome_lead?: string | null
           organizacao?: string | null
           origem_campanha?: string | null
           origem_canal?: Database["public"]["Enums"]["canal_origem"] | null
           origem_tipo?: Database["public"]["Enums"]["origem_lead"] | null
           pipeline_id?: string | null
+          proprietario_id?: string | null
+          proprietario_nome?: string | null
           reuniao_realizada?: boolean
           stage_atual?: string | null
           stape_client_id?: string | null
@@ -3506,6 +3520,7 @@ export type Database = {
           stape_user_agent?: string | null
           telefone?: string | null
           tem_reuniao?: boolean
+          tempo_primeira_resposta_seg?: number | null
           tokeniza_carrinho_abandonado?: boolean | null
           tokeniza_investidor?: boolean | null
           tokeniza_primeiro_investimento?: string | null
@@ -3756,6 +3771,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "merge_ignorado_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      meta_comercial: {
+        Row: {
+          ano: number
+          created_at: string
+          id: string
+          id_empresa: string
+          indice_sazonal: number | null
+          mes: number
+          meta_leads: number | null
+          meta_receita: number | null
+          meta_vendas: number | null
+          tipo_negocio: string
+          updated_at: string
+        }
+        Insert: {
+          ano: number
+          created_at?: string
+          id?: string
+          id_empresa: string
+          indice_sazonal?: number | null
+          mes: number
+          meta_leads?: number | null
+          meta_receita?: number | null
+          meta_vendas?: number | null
+          tipo_negocio?: string
+          updated_at?: string
+        }
+        Update: {
+          ano?: number
+          created_at?: string
+          id?: string
+          id_empresa?: string
+          indice_sazonal?: number | null
+          mes?: number
+          meta_leads?: number | null
+          meta_receita?: number | null
+          meta_vendas?: number | null
+          tipo_negocio?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_comercial_id_empresa_fkey"
             columns: ["id_empresa"]
             isOneToOne: false
             referencedRelation: "empresa"

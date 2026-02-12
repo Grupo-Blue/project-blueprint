@@ -34,6 +34,7 @@ import DemandasCampanha from "./pages/DemandasCampanha";
 import AnaliseLandingPages from "./pages/AnaliseLandingPages";
 import AnaliseCompetitiva from "./pages/AnaliseCompetitiva";
 import IRPFImportacoes from "./pages/IRPFImportacoes";
+import DashboardComercial from "./pages/DashboardComercial";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -75,6 +76,7 @@ const App = () => (
             <Route path="/analise-landing-pages" element={<AppLayout><AnaliseLandingPages /></AppLayout>} />
             <Route path="/irpf-importacoes" element={<AppLayout><IRPFImportacoes /></AppLayout>} />
             <Route path="/analise-competitiva" element={<AppLayout><AnaliseCompetitiva /></AppLayout>} />
+            <Route path="/dashboard-comercial" element={<AppLayout><DashboardComercial /></AppLayout>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
