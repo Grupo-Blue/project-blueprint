@@ -141,6 +141,15 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
     return filtered;
   }, [leads, preset, empresaSelecionada, mesesNegociacao, leadsComDisparo, exigirTelefone]);
 
+  const limparNomeLead = (nome: string | null): string => {
+    if (!nome) return "";
+    return nome
+      .replace(/\[.*?\]/g, "")    // remove [conteúdo entre colchetes]
+      .replace(/\s*-\s*/g, " ")   // substitui " - " por espaço
+      .replace(/\s+/g, " ")       // colapsa espaços múltiplos
+      .trim();
+  };
+
   const formatarTelefone = (tel: string | null): string => {
     if (!tel) return "";
     let digits = tel.replace(/\D/g, "");
@@ -202,7 +211,7 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
       // 3. Gerar e baixar CSV
       const headers = ["Nome", "Telefone", "Email", "Empresa", "Temperatura", "Score", "Stage Atual", "Data Entrada"];
       const rows = leadsFiltrados.map(l => [
-        l.nome_lead || "",
+        limparNomeLead(l.nome_lead),
         formatarTelefone(l.telefone),
         l.email || "",
         l.empresa?.nome || "",
