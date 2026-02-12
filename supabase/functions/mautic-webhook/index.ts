@@ -89,11 +89,16 @@ serve(async (req) => {
   console.log('[Mautic Webhook] Recebendo webhook...');
 
   try {
-    // 1. Validar secret
+    // 1. Validar secret (Mautic envia como query param ?secret=xxx OU header)
     const webhookSecret = Deno.env.get('MAUTIC_WEBHOOK_SECRET');
+    const url = new URL(req.url);
+    const querySecret = url.searchParams.get('secret');
     const headerSecret = req.headers.get('X-Webhook-Secret') || req.headers.get('x-webhook-secret');
+    const receivedSecret = querySecret || headerSecret;
 
-    if (!webhookSecret || headerSecret !== webhookSecret) {
+    console.log(`[Mautic Webhook] Secret recebido via: ${querySecret ? 'query_param' : headerSecret ? 'header' : 'nenhum'}`);
+
+    if (!webhookSecret || receivedSecret !== webhookSecret) {
       console.error('[Mautic Webhook] Secret inválido');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
