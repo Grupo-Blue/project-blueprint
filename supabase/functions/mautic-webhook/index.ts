@@ -89,29 +89,49 @@ serve(async (req) => {
   console.log('[Mautic Webhook] Recebendo webhook...');
 
   try {
-    // 1. Validar secret (Mautic envia como query param ?secret=xxx OU header)
+    // 1. Ler body como texto para validação HMAC
+    const rawBody = await req.text();
+
+    // 2. Validar secret via HMAC-SHA256 (Mautic envia signature no header `Webhook-Signature`)
     const webhookSecret = Deno.env.get('MAUTIC_WEBHOOK_SECRET');
-    const url = new URL(req.url);
-    const querySecret = url.searchParams.get('secret');
-    const headerSecret = req.headers.get('X-Webhook-Secret') || req.headers.get('x-webhook-secret');
-    const receivedSecret = querySecret || headerSecret;
+    const webhookSignature = req.headers.get('webhook-signature') || req.headers.get('Webhook-Signature');
 
-    // Debug: logar URL completa e headers para diagnosticar
-    console.log(`[Mautic Webhook] URL completa: ${req.url}`);
-    console.log(`[Mautic Webhook] Query secret: ${querySecret || 'null'}`);
-    console.log(`[Mautic Webhook] Header secret: ${headerSecret || 'null'}`);
-    console.log(`[Mautic Webhook] Headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
+    if (webhookSecret && webhookSignature) {
+      try {
+        const encoder = new TextEncoder();
+        const key = await crypto.subtle.importKey(
+          'raw',
+          encoder.encode(webhookSecret),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign'],
+        );
+        const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
+        const computedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)));
 
-    if (!webhookSecret || receivedSecret !== webhookSecret) {
-      console.error('[Mautic Webhook] Secret inválido');
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+        if (computedSignature !== webhookSignature) {
+          console.error(`[Mautic Webhook] HMAC inválido. Esperado: ${computedSignature}, Recebido: ${webhookSignature}`);
+          return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        console.log('[Mautic Webhook] ✅ Assinatura HMAC validada com sucesso');
+      } catch (hmacErr) {
+        console.error('[Mautic Webhook] Erro ao validar HMAC:', hmacErr);
+        return new Response(JSON.stringify({ error: 'Signature validation failed' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else if (!webhookSecret) {
+      console.warn('[Mautic Webhook] MAUTIC_WEBHOOK_SECRET não configurado, pulando validação');
+    } else {
+      console.warn('[Mautic Webhook] Webhook-Signature header ausente, pulando validação HMAC');
     }
 
-    // 2. Parse do body
-    const body = await req.json();
+    // 3. Parse do body
+    const body = JSON.parse(rawBody);
     console.log('[Mautic Webhook] Evento recebido:', JSON.stringify(body).substring(0, 500));
 
     // 3. Extrair contato
