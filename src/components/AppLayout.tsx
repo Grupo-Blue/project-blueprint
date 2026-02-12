@@ -91,36 +91,44 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate("/auth");
-        return;
-      }
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          navigate("/auth");
+          return;
+        }
 
-      setUser(session.user);
+        setUser(session.user);
 
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", session.user.id)
-        .single();
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
 
-      // Verificar se o usuário foi aprovado
-      if (profileData && !profileData.aprovado) {
-        await supabase.auth.signOut();
+        if (profileData && !profileData.aprovado) {
+          await supabase.auth.signOut();
+          toast({
+            title: "Acesso pendente",
+            description: "Seu cadastro ainda não foi aprovado pelo administrador",
+            variant: "destructive",
+          });
+          navigate("/auth");
+          return;
+        }
+
+        setProfile(profileData);
+      } catch (error) {
+        console.error("Erro ao verificar autenticação:", error);
         toast({
-          title: "Acesso pendente",
-          description: "Seu cadastro ainda não foi aprovado pelo administrador",
+          title: "Erro de conexão",
+          description: "Não foi possível carregar seus dados. Tente novamente.",
           variant: "destructive",
         });
-        navigate("/auth");
-        return;
+      } finally {
+        setLoading(false);
       }
-
-      setProfile(profileData);
-      setLoading(false);
     };
 
     checkAuth();
