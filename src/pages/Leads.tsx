@@ -221,6 +221,40 @@ const Leads = () => {
     refetchInterval: 2 * 60 * 1000, // Auto-refresh a cada 2 minutos
   });
 
+  // Query para contar disparos por lead
+  const { data: disparosPorLead } = useQuery({
+    queryKey: ["disparos-por-lead", empresaSelecionada],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("disparo_whatsapp_lead")
+        .select(`
+          id_lead,
+          created_at,
+          disparo_whatsapp:id_disparo (
+            nome,
+            id_empresa
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      // Agrupa por id_lead: { count, ultimo_disparo }
+      const map: Record<string, { count: number; ultimo: string }> = {};
+      for (const row of data || []) {
+        if (!map[row.id_lead]) {
+          map[row.id_lead] = { count: 0, ultimo: row.created_at };
+        }
+        map[row.id_lead].count++;
+        if (row.created_at > map[row.id_lead].ultimo) {
+          map[row.id_lead].ultimo = row.created_at;
+        }
+      }
+      return map;
+    },
+    refetchInterval: 5 * 60 * 1000,
+  });
+
   const toggleRowExpansion = (id: string) => {
     setExpandedRows(prev => {
       const newSet = new Set(prev);
@@ -740,6 +774,7 @@ const Leads = () => {
               lead={lead}
               isExpanded={expandedRows.has(lead.id_lead)}
               onToggleExpand={() => toggleRowExpansion(lead.id_lead)}
+              disparoInfo={disparosPorLead?.[lead.id_lead]}
             />
           ))}
           
@@ -885,6 +920,12 @@ const Leads = () => {
                                 {isCarrinhoAbandonado && (
                                   <Badge variant="outline" className="text-xs bg-orange-100 text-orange-700 border-orange-300">
                                     🛒
+                                  </Badge>
+                                )}
+                                {disparosPorLead?.[lead.id_lead] && (
+                                  <Badge variant="outline" className="text-xs bg-sky-100 text-sky-700 border-sky-300" title={`Último: ${format(parseISO(disparosPorLead[lead.id_lead].ultimo), "dd/MM/yy")}`}>
+                                    <Send className="h-3 w-3 mr-0.5" />
+                                    {disparosPorLead[lead.id_lead].count}
                                   </Badge>
                                 )}
                               </div>
