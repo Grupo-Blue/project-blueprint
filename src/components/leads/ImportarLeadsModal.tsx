@@ -1,4 +1,6 @@
 import { useState, useRef } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -7,8 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, FileSpreadsheet, Users, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Upload, FileSpreadsheet, Users, CheckCircle2, AlertTriangle, CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { toast } from "sonner";
 
@@ -69,12 +75,14 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
   const [fileName, setFileName] = useState("");
   const [nomeDisparo, setNomeDisparo] = useState("");
   const [isDisparo, setIsDisparo] = useState(false);
+  const [dataDisparo, setDataDisparo] = useState<Date>(new Date());
 
   const resetState = () => {
     setRows([]);
     setFileName("");
     setNomeDisparo("");
     setIsDisparo(false);
+    setDataDisparo(new Date());
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,7 +135,7 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
             qtd_leads: insertedLeads.length,
             preset_usado: "importação",
             enviado: true,
-            data_envio: new Date().toISOString(),
+            data_envio: dataDisparo.toISOString(),
           })
           .select("id")
           .single();
@@ -226,14 +234,42 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
 
           {/* Dispatch name */}
           {isDisparo && (
-            <div className="space-y-1.5">
-              <Label htmlFor="nome-disparo">Nome do disparo</Label>
-              <Input
-                id="nome-disparo"
-                value={nomeDisparo}
-                onChange={(e) => setNomeDisparo(e.target.value)}
-                placeholder="Ex: Campanha Janeiro 2026"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="nome-disparo">Nome do disparo</Label>
+                <Input
+                  id="nome-disparo"
+                  value={nomeDisparo}
+                  onChange={(e) => setNomeDisparo(e.target.value)}
+                  placeholder="Ex: Campanha Janeiro 2026"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Data do disparo</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dataDisparo && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(dataDisparo, "dd/MM/yyyy", { locale: ptBR })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dataDisparo}
+                      onSelect={(d) => d && setDataDisparo(d)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           )}
 
