@@ -210,6 +210,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           Dash Comercial
         </Button>
       </Link>
+      <Link to="/metas-comerciais" onClick={() => setMobileMenuOpen(false)}>
+        <Button 
+          variant={location.pathname === "/metas-comerciais" ? "secondary" : "ghost"} 
+          size="sm"
+          className="w-full justify-start hover:bg-accent transition-all"
+        >
+          <Target className="mr-2 h-4 w-4" />
+          Metas Comerciais
+        </Button>
+      </Link>
       <Link to="/dashboard-trafego" onClick={() => setMobileMenuOpen(false)}>
         <Button 
           variant={location.pathname === "/dashboard-trafego" ? "secondary" : "ghost"} 

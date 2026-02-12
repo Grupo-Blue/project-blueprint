@@ -21,6 +21,7 @@ import { LeadsOrfaos } from "@/components/dashboard/LeadsOrfaos";
 import { TempoCiclo } from "@/components/dashboard/TempoCiclo";
 import { PacingOrcamento } from "@/components/dashboard/PacingOrcamento";
 import { ComparativoAnual } from "@/components/dashboard/ComparativoAnual";
+import { InsightsIA } from "@/components/dashboard/InsightsIA";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 
 const DashboardComercial = () => {
@@ -60,6 +61,7 @@ const DashboardComercial = () => {
             <MetaVsRealizado tipoNegocio={tipoNegocio} />
             <ReceitaAcumulada tipoNegocio={tipoNegocio} />
           </div>
+          <InsightsIA />
         </TabsContent>
 
         <TabsContent value="funil" className="space-y-4">
