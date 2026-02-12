@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, FileSpreadsheet, Users, CheckCircle2, AlertTriangle, CalendarIcon } from "lucide-react";
+import { Upload, FileSpreadsheet, Users, CheckCircle2, AlertTriangle, CalendarIcon, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { useEmpresa } from "@/contexts/EmpresaContext";
@@ -102,14 +102,12 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
     reader.readAsText(file, "UTF-8");
   };
 
-  const [duplicados, setDuplicados] = useState<{ telefone: string[]; email: string[] }>({ telefone: [], email: [] });
+  const [duplicadosInfo, setDuplicadosInfo] = useState<{ id_lead: string; telefone: string | null; email: string | null }[]>([]);
   const [verificado, setVerificado] = useState(false);
 
-  const resetStateOriginal = resetState;
-  // Override resetState to also clear duplicados
   const resetAll = () => {
-    resetStateOriginal();
-    setDuplicados({ telefone: [], email: [] });
+    resetState();
+    setDuplicadosInfo([]);
     setVerificado(false);
   };
 
@@ -119,77 +117,115 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
     const telefones = rows.map(r => formatarTelefone(r.telefone)).filter(Boolean);
     const emails = rows.map(r => r.email?.trim().toLowerCase()).filter(Boolean) as string[];
 
-    const telDuplicados: string[] = [];
-    const emailDuplicados: string[] = [];
+    const existentes: { id_lead: string; telefone: string | null; email: string | null }[] = [];
 
-    // Check phones in batches of 100
     for (let i = 0; i < telefones.length; i += 100) {
       const batch = telefones.slice(i, i + 100);
       const { data } = await supabase
         .from("lead")
-        .select("telefone")
+        .select("id_lead, telefone, email")
         .eq("id_empresa", empresaSelecionada)
         .in("telefone", batch);
-      if (data) telDuplicados.push(...data.map(d => d.telefone!));
+      if (data) existentes.push(...data);
     }
 
-    // Check emails in batches of 100
     for (let i = 0; i < emails.length; i += 100) {
       const batch = emails.slice(i, i + 100);
       const { data } = await supabase
         .from("lead")
-        .select("email")
+        .select("id_lead, telefone, email")
         .eq("id_empresa", empresaSelecionada)
         .in("email", batch);
-      if (data) emailDuplicados.push(...data.map(d => d.email!));
+      if (data) {
+        for (const d of data) {
+          if (!existentes.find(e => e.id_lead === d.id_lead)) {
+            existentes.push(d);
+          }
+        }
+      }
     }
 
-    setDuplicados({ telefone: telDuplicados, email: emailDuplicados });
+    setDuplicadosInfo(existentes);
     setVerificado(true);
   };
 
-  const leadsUnicos = verificado
-    ? rows.filter(r => {
-        const tel = formatarTelefone(r.telefone);
-        const email = r.email?.trim().toLowerCase();
-        const isDupTel = tel && duplicados.telefone.includes(tel);
-        const isDupEmail = email && duplicados.email.includes(email);
-        return !isDupTel && !isDupEmail;
-      })
-    : rows;
+  const categorizarLeads = () => {
+    const novos: LeadRow[] = [];
+    const paraAtualizar: { row: LeadRow; id_lead: string }[] = [];
 
-  const qtdDuplicados = rows.length - leadsUnicos.length;
+    for (const r of rows) {
+      const tel = formatarTelefone(r.telefone);
+      const email = r.email?.trim().toLowerCase();
+
+      const match = duplicadosInfo.find(d =>
+        (tel && d.telefone === tel) || (email && d.email === email)
+      );
+
+      if (match) {
+        paraAtualizar.push({ row: r, id_lead: match.id_lead });
+      } else {
+        novos.push(r);
+      }
+    }
+    return { novos, paraAtualizar };
+  };
+
+  const { novos: leadsNovos, paraAtualizar: leadsMerge } = verificado
+    ? categorizarLeads()
+    : { novos: rows, paraAtualizar: [] };
 
   const importarMutation = useMutation({
     mutationFn: async () => {
       if (!empresaSelecionada || empresaSelecionada === "todas") {
         throw new Error("Selecione uma empresa específica para importar");
       }
-      if (leadsUnicos.length === 0) throw new Error("Nenhum lead novo para importar (todos já existem na base)");
+      if (rows.length === 0) throw new Error("Nenhum lead para importar");
 
-      const leadsToInsert = leadsUnicos.map(r => ({
-        id_empresa: empresaSelecionada,
-        nome_lead: limparNome(r.nome) || null,
-        telefone: formatarTelefone(r.telefone) || null,
-        email: r.email || null,
-        origem_tipo: "MANUAL" as const,
-      }));
+      const allLeadIds: string[] = [];
 
-      const { data: insertedLeads, error: leadsError } = await supabase
-        .from("lead")
-        .insert(leadsToInsert)
-        .select("id_lead");
+      // 1. Update existing leads (merge)
+      for (const { row, id_lead } of leadsMerge) {
+        const updates: Record<string, string | null> = {};
+        const nome = limparNome(row.nome);
+        const tel = formatarTelefone(row.telefone);
+        const email = row.email?.trim();
+        if (nome) updates.nome_lead = nome;
+        if (tel) updates.telefone = tel;
+        if (email) updates.email = email;
 
-      if (leadsError) throw leadsError;
+        if (Object.keys(updates).length > 0) {
+          await supabase.from("lead").update(updates).eq("id_lead", id_lead);
+        }
+        allLeadIds.push(id_lead);
+      }
 
-      // 2. If dispatch, create disparo_whatsapp + links
-      if (isDisparo && insertedLeads && insertedLeads.length > 0) {
+      // 2. Insert new leads
+      if (leadsNovos.length > 0) {
+        const leadsToInsert = leadsNovos.map(r => ({
+          id_empresa: empresaSelecionada,
+          nome_lead: limparNome(r.nome) || null,
+          telefone: formatarTelefone(r.telefone) || null,
+          email: r.email || null,
+          origem_tipo: "MANUAL" as const,
+        }));
+
+        const { data: insertedLeads, error: leadsError } = await supabase
+          .from("lead")
+          .insert(leadsToInsert)
+          .select("id_lead");
+
+        if (leadsError) throw leadsError;
+        if (insertedLeads) allLeadIds.push(...insertedLeads.map(l => l.id_lead));
+      }
+
+      // 3. If dispatch, create disparo_whatsapp + links for ALL leads
+      if (isDisparo && allLeadIds.length > 0) {
         const { data: disparo, error: disparoError } = await supabase
           .from("disparo_whatsapp")
           .insert({
             nome: nomeDisparo || `Importação ${new Date().toLocaleDateString("pt-BR")}`,
             id_empresa: empresaSelecionada,
-            qtd_leads: insertedLeads.length,
+            qtd_leads: allLeadIds.length,
             preset_usado: "importação",
             enviado: true,
             data_envio: dataDisparo.toISOString(),
@@ -199,9 +235,9 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
 
         if (disparoError) throw disparoError;
 
-        const links = insertedLeads.map(l => ({
+        const links = allLeadIds.map(id => ({
           id_disparo: disparo.id,
-          id_lead: l.id_lead,
+          id_lead: id,
         }));
 
         const { error: linksError } = await supabase
@@ -211,15 +247,18 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
         if (linksError) throw linksError;
       }
 
-      return insertedLeads.length;
+      return { total: allLeadIds.length, novos: leadsNovos.length, atualizados: leadsMerge.length };
     },
-    onSuccess: (count) => {
-      toast.success(`${count} leads importados com sucesso!`);
+    onSuccess: (result) => {
+      const parts: string[] = [];
+      if (result.novos > 0) parts.push(`${result.novos} novos`);
+      if (result.atualizados > 0) parts.push(`${result.atualizados} atualizados`);
+      toast.success(`${result.total} leads processados (${parts.join(", ")})!`);
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-count"] });
       queryClient.invalidateQueries({ queryKey: ["historico-disparos"] });
       queryClient.invalidateQueries({ queryKey: ["disparos-por-lead"] });
-      resetState();
+      resetAll();
       onOpenChange(false);
     },
     onError: (err: any) => {
@@ -342,14 +381,17 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
             </div>
           )}
 
-          {verificado && qtdDuplicados > 0 && (
-            <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 p-3 rounded-md">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
-              {qtdDuplicados} lead(s) já existe(m) na base e será(ão) ignorado(s). Serão importados {leadsUnicos.length} leads novos.
+          {verificado && leadsMerge.length > 0 && (
+            <div className="flex items-center gap-2 text-sm p-3 rounded-md border bg-muted/30">
+              <RefreshCw className="h-4 w-4 shrink-0 text-primary" />
+              <span>
+                <strong>{leadsMerge.length}</strong> lead(s) já existe(m) e serão <strong>atualizados</strong> (merge).
+                {leadsNovos.length > 0 && <> + <strong>{leadsNovos.length}</strong> novos serão inseridos.</>}
+              </span>
             </div>
           )}
 
-          {verificado && qtdDuplicados === 0 && (
+          {verificado && leadsMerge.length === 0 && (
             <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 dark:bg-green-950/30 p-3 rounded-md">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               Nenhum duplicado encontrado. Todos os {rows.length} leads são novos.
@@ -370,14 +412,14 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
           </Button>
           <Button
             onClick={() => importarMutation.mutate()}
-            disabled={leadsUnicos.length === 0 || !verificado || !empresaSelecionada || empresaSelecionada === "todas" || importarMutation.isPending}
+            disabled={rows.length === 0 || !verificado || !empresaSelecionada || empresaSelecionada === "todas" || importarMutation.isPending}
           >
             {importarMutation.isPending ? (
               "Importando..."
             ) : (
               <>
                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                Importar {leadsUnicos.length} leads
+                Importar {rows.length} leads
               </>
             )}
           </Button>
