@@ -23,6 +23,7 @@ interface LeadCardMobileProps {
   lead: any;
   isExpanded: boolean;
   onToggleExpand: () => void;
+  disparoInfo?: { count: number; ultimo: string };
 }
 
 // Helper functions duplicated for component isolation
@@ -73,7 +74,7 @@ const getWhatsappLink = (lead: any): string => {
   return `https://chat.grupoblue.com.br/open/${slug}/${telefone}`;
 };
 
-export function LeadCardMobile({ lead, isExpanded, onToggleExpand }: LeadCardMobileProps) {
+export function LeadCardMobile({ lead, isExpanded, onToggleExpand, disparoInfo }: LeadCardMobileProps) {
   const prioridade = getPrioridade(lead);
   const PrioridadeIcon = prioridade.icon;
   const dias = getDiasNoStage(lead);
@@ -143,6 +144,12 @@ export function LeadCardMobile({ lead, isExpanded, onToggleExpand }: LeadCardMob
                 )}
                 {isCarrinhoAbandonado && (
                   <Badge variant="outline" className="text-xs h-5 bg-orange-100 text-orange-700 border-orange-300">🛒</Badge>
+                )}
+                {disparoInfo && (
+                  <Badge variant="outline" className="text-xs h-5 bg-sky-100 text-sky-700 border-sky-300" title={`Último: ${format(parseISO(disparoInfo.ultimo), "dd/MM/yy")}`}>
+                    <MessageCircle className="h-3 w-3 mr-0.5" />
+                    {disparoInfo.count}
+                  </Badge>
                 )}
               </div>
               <div className="flex items-center gap-2">
