@@ -1127,7 +1127,9 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          data_envio: string | null
           descricao: string | null
+          enviado: boolean
           filtros_aplicados: Json | null
           id: string
           id_empresa: string
@@ -1138,7 +1140,9 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          data_envio?: string | null
           descricao?: string | null
+          enviado?: boolean
           filtros_aplicados?: Json | null
           id?: string
           id_empresa: string
@@ -1149,7 +1153,9 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          data_envio?: string | null
           descricao?: string | null
+          enviado?: boolean
           filtros_aplicados?: Json | null
           id?: string
           id_empresa?: string

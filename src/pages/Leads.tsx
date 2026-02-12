@@ -221,33 +221,40 @@ const Leads = () => {
     refetchInterval: 2 * 60 * 1000, // Auto-refresh a cada 2 minutos
   });
 
-  // Query para contar disparos por lead
+  // Query para contar disparos ENVIADOS por lead
   const { data: disparosPorLead } = useQuery({
     queryKey: ["disparos-por-lead", empresaSelecionada],
     queryFn: async () => {
+      // Primeiro buscar IDs dos disparos que foram de fato enviados
+      const { data: disparosEnviados, error: errDisparos } = await supabase
+        .from("disparo_whatsapp")
+        .select("id, data_envio")
+        .eq("enviado", true);
+      if (errDisparos) throw errDisparos;
+      if (!disparosEnviados || disparosEnviados.length === 0) return {};
+
+      const idsEnviados = disparosEnviados.map(d => d.id);
+      const dataEnvioMap: Record<string, string> = {};
+      for (const d of disparosEnviados) {
+        dataEnvioMap[d.id] = d.data_envio || "";
+      }
+
       const { data, error } = await supabase
         .from("disparo_whatsapp_lead")
-        .select(`
-          id_lead,
-          created_at,
-          disparo_whatsapp:id_disparo (
-            nome,
-            id_empresa
-          )
-        `)
-        .order("created_at", { ascending: false });
-
+        .select("id_lead, id_disparo")
+        .in("id_disparo", idsEnviados);
       if (error) throw error;
 
-      // Agrupa por id_lead: { count, ultimo_disparo }
+      // Agrupa por id_lead: { count, ultimo (data_envio mais recente) }
       const map: Record<string, { count: number; ultimo: string }> = {};
       for (const row of data || []) {
+        const dataEnvio = dataEnvioMap[row.id_disparo] || "";
         if (!map[row.id_lead]) {
-          map[row.id_lead] = { count: 0, ultimo: row.created_at };
+          map[row.id_lead] = { count: 0, ultimo: dataEnvio };
         }
         map[row.id_lead].count++;
-        if (row.created_at > map[row.id_lead].ultimo) {
-          map[row.id_lead].ultimo = row.created_at;
+        if (dataEnvio > map[row.id_lead].ultimo) {
+          map[row.id_lead].ultimo = dataEnvio;
         }
       }
       return map;
