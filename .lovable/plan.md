@@ -1,77 +1,70 @@
 
 
-# Melhorar a coluna Prioridade em /leads
+# Corrigir Coleta Google Ads
 
-## Situacao Atual
+## Problema Identificado
 
-A coluna **Prioridade** usa a funcao `getPrioridade` que classifica leads em 4 niveis (URGENTE, QUENTE, MORNO, FRIO) baseada quase exclusivamente no `mautic_score` bruto e alguns flags booleanos simples. Enquanto isso, existe uma funcao `calcularScoreTemperatura` mais completa que combina multiplas fontes de dados, mas ela so aparece como um numero nos detalhes expandidos e nao influencia a prioridade exibida.
+A coleta Google Ads NAO estava parada desde 09/jan. As funcoes executam diariamente via cron (`net.http_post`) com sucesso. Dois problemas mascaram isso:
 
-## Proposta: Unificar as duas logicas
+1. **Cron jobs duplicados com erro**: Existem 3 cron jobs extras (IDs 21, 23, 25) que usam `extensions.http_post` -- funcao que nao existe neste ambiente. Esses jobs falham toda noite, gerando ruido nos logs.
+2. **Falta de registro em `cronjob_execucao`**: A funcao `coletar-metricas-google` nao registra execucoes na tabela `cronjob_execucao`, entao parece que nao roda desde 09/jan (quando foi executada manualmente e o codigo manual registrou).
 
-Fazer a coluna **Prioridade** usar o score composto (temperatura) como base, incorporando todos os dados disponiveis.
+## Plano de Correcao
 
-### Nova formula de temperatura (0-200 pontos)
+### Passo 1: Remover cron jobs duplicados com erro
 
-**Engajamento Mautic (max ~90 pts)**
-- `mautic_score * 0.4` (max ~40 pts para scores ate 100)
-- `page_hits * 5` (max 50 pts)
-- Bonus de recencia: se `mautic_last_active` < 3 dias = +15 pts, < 7 dias = +8 pts
-- Bonus por tags de intencao (ex: "clicou-whatsapp") = +20 pts
+Executar SQL para remover os 3 jobs que usam `extensions.http_post`:
+- Job 21: `invoke-importar-campanhas-google` (04:15 UTC)
+- Job 23: `invoke-coletar-metricas-google` (04:45 UTC)
+- Job 25: `invoke-coletar-criativos-google` (05:15 UTC)
 
-**Sinais comerciais (max ~100 pts)**
-- Levantou mao = +30
-- Tem reuniao = +50
-- E MQL = +20
+### Passo 2: Adicionar log de execucao nas 3 funcoes
 
-**Dados Tokeniza (max ~70 pts)**
-- Investidor = +40
-- Qtd investimentos * 10 (max 30)
-- Carrinho abandonado = +35
+Modificar as edge functions para registrar cada execucao na tabela `cronjob_execucao`, igual as outras funcoes fazem (ex: `coletar-metricas-meta`):
 
-**Atendimento Chatblue (max ~60 pts)**
-- Conversa ativa = +30
-- SLA violado = +25 (urgencia operacional)
-- Prioridade alta no Chatblue = +15
-- Historico de conversas * 10 (max 50)
-- Penalidade: tempo resposta > 24h = -20
+**Arquivos a modificar:**
+- `supabase/functions/coletar-metricas-google/index.ts` -- adicionar insert em `cronjob_execucao` no final
+- `supabase/functions/coletar-criativos-google/index.ts` -- adicionar insert em `cronjob_execucao` no final
+- `supabase/functions/importar-campanhas-google/index.ts` -- adicionar insert em `cronjob_execucao` no final
 
-**Qualificacao LinkedIn (max ~25 pts)**
-- Senioridade C-Level = +25, Senior = +15, Pleno = +8
+Para cada funcao, adicionar:
+- Captura de `startTime = Date.now()` no inicio
+- Insert em `cronjob_execucao` com nome, status, duracao e detalhes no final (sucesso e erro)
 
-**Cliente existente (Notion)**
-- Tem id_cliente_notion = +25
+### Passo 3: Recoleta historica de metricas perdidas
 
-**Penalidades**
-- Inatividade (>7 dias sem avancar stage, exceto Vendido/Perdido) = -2 por dia extra (max -30)
-- Mautic inativo > 30 dias = -15
-
-### Novos thresholds de Prioridade
-
-| Nivel | Score | Condicao especial |
-|-------|-------|-------------------|
-| URGENTE | >= 120 | OU carrinho abandonado OU lead parado >7d em negociacao OU SLA violado |
-| QUENTE | >= 70 | OU levantou mao OU tem reuniao |
-| MORNO | >= 30 | OU e MQL |
-| FRIO | < 30 | - |
-
-### Mudancas visuais na coluna
-
-Adicionar o score numerico ao lado do label para dar transparencia:
-- Exemplo: "QUENTE 85°" em vez de apenas "QUENTE"
+Embora o cron execute diariamente, ele so coleta metricas do dia atual (`hoje`). Para garantir que nao ha lacunas, disparar a funcao `coletar-metricas-google-historico` para o periodo de 10/jan a 12/fev.
 
 ## Detalhes tecnicos
 
-### Arquivos a modificar
+### SQL para remover cron jobs duplicados
 
-1. **`src/pages/Leads.tsx`**
-   - Refatorar `calcularScoreTemperatura` para incluir os novos campos (`mautic_last_active`, `mautic_tags`, `chatblue_sla_violado`, `chatblue_prioridade`, `linkedin_senioridade`)
-   - Refatorar `getPrioridade` para usar o score composto como criterio principal, mantendo as condicoes especiais (carrinho abandonado, SLA violado) como override para URGENTE
-   - Atualizar a celula da tabela para exibir o score ao lado do label
+```sql
+SELECT cron.unschedule(21);
+SELECT cron.unschedule(23);
+SELECT cron.unschedule(25);
+```
 
-2. **`src/components/leads/LeadCardMobile.tsx`**
-   - Replicar as mesmas mudancas nas funcoes duplicadas `calcularScoreTemperatura` e `getPrioridade`
-   - Atualizar o badge de prioridade no card mobile
+### Padrao de log para as edge functions
 
-### Consideracao importante
-As funcoes `calcularScoreTemperatura` e `getPrioridade` estao duplicadas entre `Leads.tsx` e `LeadCardMobile.tsx`. Idealmente, extrair para um arquivo utilitario compartilhado (ex: `src/lib/lead-scoring.ts`) para evitar divergencia futura.
+```typescript
+const startTime = Date.now();
+// ... logica existente ...
+
+// No final (sucesso):
+await supabase.from('cronjob_execucao').insert({
+  nome_cronjob: 'coletar-metricas-google',
+  status: erros.length > 0 ? 'parcial' : 'sucesso',
+  duracao_ms: Date.now() - startTime,
+  detalhes_execucao: { resultados }
+});
+
+// No catch (erro):
+await supabase.from('cronjob_execucao').insert({
+  nome_cronjob: 'coletar-metricas-google',
+  status: 'erro',
+  mensagem_erro: error.message,
+  duracao_ms: Date.now() - startTime
+});
+```
 
