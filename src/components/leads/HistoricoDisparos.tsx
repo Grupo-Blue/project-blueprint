@@ -1,21 +1,25 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { History, Download, Eye, Users } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { History, Download, Eye, Users, CheckCircle2, Clock, CalendarIcon } from "lucide-react";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
-import { calcularScoreTemperatura, getPrioridade } from "@/lib/lead-scoring";
+import { cn } from "@/lib/utils";
 
 export function HistoricoDisparos() {
   const { empresaSelecionada } = useEmpresa();
+  const queryClient = useQueryClient();
   const [detalheDisparoId, setDetalheDisparoId] = useState<string | null>(null);
+  const [datePickerOpen, setDatePickerOpen] = useState<string | null>(null);
 
   const { data: disparos, isLoading } = useQuery({
     queryKey: ["historico-disparos", empresaSelecionada],
@@ -53,6 +57,41 @@ export function HistoricoDisparos() {
       return (data || []) as any[];
     },
     enabled: !!detalheDisparoId,
+  });
+
+  // Mutation para marcar como enviado
+  const marcarEnviado = useMutation({
+    mutationFn: async ({ id, data_envio }: { id: string; data_envio: string }) => {
+      const { error } = await supabase
+        .from("disparo_whatsapp")
+        .update({ enviado: true, data_envio })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["historico-disparos"] });
+      queryClient.invalidateQueries({ queryKey: ["disparos-por-lead"] });
+      toast.success("Disparo marcado como enviado!");
+      setDatePickerOpen(null);
+    },
+    onError: () => toast.error("Erro ao atualizar disparo"),
+  });
+
+  // Mutation para desmarcar
+  const desmarcarEnviado = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("disparo_whatsapp")
+        .update({ enviado: false, data_envio: null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["historico-disparos"] });
+      queryClient.invalidateQueries({ queryKey: ["disparos-por-lead"] });
+      toast.success("Disparo desmarcado");
+    },
+    onError: () => toast.error("Erro ao atualizar disparo"),
   });
 
   const formatarTelefone = (tel: string | null): string => {
@@ -135,7 +174,8 @@ export function HistoricoDisparos() {
                 <TableHead>Nome</TableHead>
                 <TableHead>Preset</TableHead>
                 <TableHead className="text-center">Leads</TableHead>
-                <TableHead>Data</TableHead>
+                <TableHead>Exportado</TableHead>
+                <TableHead>Enviado</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -152,7 +192,64 @@ export function HistoricoDisparos() {
                     <Badge variant="secondary">{d.qtd_leads}</Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {format(parseISO(d.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    {format(parseISO(d.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
+                  </TableCell>
+                  <TableCell>
+                    {d.enviado ? (
+                      <div className="flex items-center gap-1.5">
+                        <Badge className="bg-green-600 text-white text-xs gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Enviado
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {d.data_envio && format(parseISO(d.data_envio), "dd/MM/yy")}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-1.5 text-xs text-muted-foreground hover:text-destructive"
+                          onClick={() => desmarcarEnviado.mutate(d.id)}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    ) : (
+                      <Popover open={datePickerOpen === d.id} onOpenChange={(open) => setDatePickerOpen(open ? d.id : null)}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                            <Clock className="h-3 w-3" />
+                            Marcar enviado
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <div className="p-3 border-b">
+                            <p className="text-sm font-medium">Quando foi enviado?</p>
+                            <p className="text-xs text-muted-foreground">Selecione a data do disparo</p>
+                          </div>
+                          <Calendar
+                            mode="single"
+                            selected={undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                marcarEnviado.mutate({ id: d.id, data_envio: date.toISOString() });
+                              }
+                            }}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                          <div className="p-2 border-t">
+                            <Button
+                              size="sm"
+                              className="w-full text-xs"
+                              onClick={() => marcarEnviado.mutate({ id: d.id, data_envio: new Date().toISOString() })}
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Enviado hoje
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
