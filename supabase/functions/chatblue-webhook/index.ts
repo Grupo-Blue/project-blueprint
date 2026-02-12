@@ -437,6 +437,17 @@ serve(async (req) => {
 
       if (eventType === 'ticket.created') {
         updateData.chatwoot_conversas_total = (lead.chatwoot_conversas_total || 0) + 1;
+        
+        // V3: Calcular tempo_primeira_resposta_seg se ainda não foi calculado
+        if (!lead.tempo_primeira_resposta_seg && lead.data_criacao) {
+          const dataCriacaoLead = new Date(lead.data_criacao).getTime();
+          const agora = Date.now();
+          const diffSeg = Math.round((agora - dataCriacaoLead) / 1000);
+          if (diffSeg > 0 && diffSeg < 86400 * 30) { // Máximo 30 dias
+            updateData.tempo_primeira_resposta_seg = diffSeg;
+            console.log(`[V3] Tempo primeira resposta calculado: ${diffSeg}s para lead ${lead.id_lead}`);
+          }
+        }
       }
     }
 

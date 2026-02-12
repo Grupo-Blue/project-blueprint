@@ -449,6 +449,32 @@ Deno.serve(async (req) => {
       console.log(`[Transição] Lead ${dealId} tem reunião em ${agora}`);
     }
 
+    // Capturar owner do deal
+    let ownerName: string | null = null;
+    let ownerId: string | null = null;
+    if (dealData.user_id) {
+      ownerId = String(dealData.user_id);
+      try {
+        const ownerUrl = `https://${domain}.pipedrive.com/api/v1/users/${dealData.user_id}?api_token=${apiToken}`;
+        const ownerResponse = await fetch(ownerUrl);
+        if (ownerResponse.ok) {
+          const ownerData = await ownerResponse.json();
+          if (ownerData.success && ownerData.data) {
+            ownerName = ownerData.data.name;
+            console.log(`[Owner] ${ownerName} (ID: ${ownerId})`);
+          }
+        }
+      } catch (ownerError) {
+        console.error("[Owner] Erro ao buscar owner:", ownerError);
+      }
+    }
+
+    // Capturar motivo de perda
+    const motivoPerda = dealPerdido ? (dealData.lost_reason || null) : null;
+    if (motivoPerda) {
+      console.log(`[Perda] Motivo: ${motivoPerda}`);
+    }
+
     const leadData = {
       id_empresa: idEmpresa,
       id_lead_externo: String(dealId),
@@ -485,6 +511,10 @@ Deno.serve(async (req) => {
       data_mql: dataMql,
       data_levantou_mao: dataLevantouMao,
       data_reuniao: dataReuniao,
+      // V3: Owner e motivo de perda
+      proprietario_nome: ownerName,
+      proprietario_id: ownerId,
+      motivo_perda: motivoPerda,
     };
 
     console.log("Dados do lead a serem salvos:", JSON.stringify(leadData, null, 2));

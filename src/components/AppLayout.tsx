@@ -200,6 +200,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           </Button>
         </Link>
       )}
+      <Link to="/dashboard-comercial" onClick={() => setMobileMenuOpen(false)}>
+        <Button 
+          variant={location.pathname === "/dashboard-comercial" ? "secondary" : "ghost"} 
+          size="sm"
+          className="w-full justify-start hover:bg-accent transition-all"
+        >
+          <TrendingUp className="mr-2 h-4 w-4" />
+          Dash Comercial
+        </Button>
+      </Link>
       <Link to="/dashboard-trafego" onClick={() => setMobileMenuOpen(false)}>
         <Button 
           variant={location.pathname === "/dashboard-trafego" ? "secondary" : "ghost"} 

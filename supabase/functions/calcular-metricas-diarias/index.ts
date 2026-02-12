@@ -10,6 +10,14 @@ interface Empresa {
   nome: string;
 }
 
+// Classificar lead como NB ou Renovação baseado no cliente_status
+function classificarTipoNegocio(clienteStatus: string | null): 'new_business' | 'renovacao' {
+  if (clienteStatus && ['cliente', 'ex_cliente'].includes(clienteStatus.toLowerCase())) {
+    return 'renovacao';
+  }
+  return 'new_business';
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -27,7 +35,6 @@ Deno.serve(async (req) => {
     const datasParaCalcular: string[] = [];
     
     if (body.batch_days && typeof body.batch_days === 'number') {
-      // Modo batch: calcular últimos N dias
       for (let i = 1; i <= body.batch_days; i++) {
         const data = new Date();
         data.setDate(data.getDate() - i);
@@ -44,7 +51,6 @@ Deno.serve(async (req) => {
       datasParaCalcular.push(body.data);
     }
 
-    // Buscar todas as empresas uma vez
     const { data: empresas, error: errorEmpresas } = await supabase
       .from('empresa')
       .select('id_empresa, nome');
@@ -60,16 +66,15 @@ Deno.serve(async (req) => {
     let totalRegistros = 0;
     const resultadosPorDia: Record<string, { empresas: number; leads: number; vendas: number }> = {};
 
-    // Processar cada dia
     for (const dataCalculo of datasParaCalcular) {
       console.log(`\n📅 Processando: ${dataCalculo}`);
       resultadosPorDia[dataCalculo] = { empresas: 0, leads: 0, vendas: 0 };
 
       for (const empresa of empresas as Empresa[]) {
-        // Buscar leads criados nesta data
+        // Buscar leads criados nesta data COM cliente_status para classificação
         const { data: leadsCriados, error: errorLeads } = await supabase
           .from('lead')
-          .select('id_lead, is_mql, levantou_mao, tem_reuniao, reuniao_realizada, venda_realizada, valor_venda, lead_pago, id_criativo')
+          .select('id_lead, is_mql, levantou_mao, tem_reuniao, reuniao_realizada, venda_realizada, valor_venda, lead_pago, id_criativo, cliente_status')
           .eq('id_empresa', empresa.id_empresa)
           .gte('data_criacao', `${dataCalculo}T00:00:00`)
           .lt('data_criacao', `${dataCalculo}T23:59:59.999`);
@@ -79,10 +84,10 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Buscar vendas realizadas nesta data
+        // Buscar vendas realizadas nesta data COM cliente_status
         const { data: vendasRealizadas, error: errorVendas } = await supabase
           .from('lead')
-          .select('id_lead, valor_venda')
+          .select('id_lead, valor_venda, cliente_status')
           .eq('id_empresa', empresa.id_empresa)
           .eq('venda_realizada', true)
           .gte('data_venda', `${dataCalculo}T00:00:00`)
@@ -92,7 +97,7 @@ Deno.serve(async (req) => {
           console.error(`Erro ao buscar vendas: ${errorVendas.message}`);
         }
 
-        // Buscar verba investida nas campanhas da empresa
+        // Buscar verba investida
         const { data: contasAnuncio } = await supabase
           .from('conta_anuncio')
           .select('id_conta')
@@ -123,34 +128,30 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Calcular métricas dos leads
         const leads = leadsCriados || [];
-        const leadsTotal = leads.length;
-        const leadsPagos = leads.filter(l => l.lead_pago === true).length;
-        const mqls = leads.filter(l => l.is_mql === true).length;
-        const levantadas = leads.filter(l => l.levantou_mao === true).length;
-        const reunioes = leads.filter(l => l.tem_reuniao === true || l.reuniao_realizada === true).length;
         
-        // Vendas e valor das vendas do dia
-        const vendas = vendasRealizadas?.length || 0;
-        const valorVendas = vendasRealizadas?.reduce((sum, v) => sum + (Number(v.valor_venda) || 0), 0) || 0;
+        // Separar leads por tipo de negócio
+        const leadsNB = leads.filter(l => classificarTipoNegocio(l.cliente_status) === 'new_business');
+        const leadsRenov = leads.filter(l => classificarTipoNegocio(l.cliente_status) === 'renovacao');
+        
+        const vendasNB = (vendasRealizadas || []).filter(v => classificarTipoNegocio(v.cliente_status) === 'new_business');
+        const vendasRenov = (vendasRealizadas || []).filter(v => classificarTipoNegocio(v.cliente_status) === 'renovacao');
 
-        // Calcular CPL (apenas leads pagos)
-        const cpl = leadsPagos > 0 ? verbaInvestida / leadsPagos : null;
-        
-        // Calcular CAC
-        const cac = vendas > 0 ? verbaInvestida / vendas : null;
-        
-        // Calcular ticket médio
-        const ticketMedio = vendas > 0 ? valorVendas / vendas : null;
+        // Função helper para calcular métricas de um grupo de leads
+        const calcularMetricas = (leadsGrupo: any[], vendasGrupo: any[], verba: number) => {
+          const leadsTotal = leadsGrupo.length;
+          const leadsPagos = leadsGrupo.filter(l => l.lead_pago === true).length;
+          const mqls = leadsGrupo.filter(l => l.is_mql === true).length;
+          const levantadas = leadsGrupo.filter(l => l.levantou_mao === true).length;
+          const reunioes = leadsGrupo.filter(l => l.tem_reuniao === true || l.reuniao_realizada === true).length;
+          const vendas = vendasGrupo.length;
+          const valorVendas = vendasGrupo.reduce((sum, v) => sum + (Number(v.valor_venda) || 0), 0);
+          const cpl = leadsPagos > 0 ? verba / leadsPagos : null;
+          const cac = vendas > 0 ? verba / vendas : null;
+          const ticketMedio = vendas > 0 ? valorVendas / vendas : null;
 
-        // Upsert métricas da empresa (não duplica devido ao onConflict)
-        const { error: errorUpsert } = await supabase
-          .from('empresa_metricas_dia')
-          .upsert({
-            id_empresa: empresa.id_empresa,
-            data: dataCalculo,
-            verba_investida: verbaInvestida,
+          return {
+            verba_investida: verba,
             leads_total: leadsTotal,
             leads_pagos: leadsPagos,
             mqls,
@@ -162,24 +163,38 @@ Deno.serve(async (req) => {
             cac,
             ticket_medio: ticketMedio,
             updated_at: new Date().toISOString()
-          }, { 
-            onConflict: 'id_empresa,data' 
-          });
+          };
+        };
+
+        // Calcular 3 registros: total, new_business, renovacao
+        const metricasTotal = calcularMetricas(leads, vendasRealizadas || [], verbaInvestida);
+        const metricasNB = calcularMetricas(leadsNB, vendasNB, verbaInvestida); // verba vai toda pra NB por enquanto
+        const metricasRenov = calcularMetricas(leadsRenov, vendasRenov, 0); // renovação não tem verba de ads
+
+        const registros = [
+          { id_empresa: empresa.id_empresa, data: dataCalculo, tipo_negocio: 'total', ...metricasTotal },
+          { id_empresa: empresa.id_empresa, data: dataCalculo, tipo_negocio: 'new_business', ...metricasNB },
+          { id_empresa: empresa.id_empresa, data: dataCalculo, tipo_negocio: 'renovacao', ...metricasRenov },
+        ];
+
+        const { error: errorUpsert } = await supabase
+          .from('empresa_metricas_dia')
+          .upsert(registros, { onConflict: 'id_empresa,data,tipo_negocio' });
 
         if (errorUpsert) {
           console.error(`Erro ao salvar métricas: ${errorUpsert.message}`);
         } else {
-          totalRegistros++;
+          totalRegistros += 3;
           resultadosPorDia[dataCalculo].empresas++;
-          resultadosPorDia[dataCalculo].leads += leadsTotal;
-          resultadosPorDia[dataCalculo].vendas += vendas;
+          resultadosPorDia[dataCalculo].leads += leads.length;
+          resultadosPorDia[dataCalculo].vendas += (vendasRealizadas?.length || 0);
         }
       }
       
       console.log(`  ✓ ${resultadosPorDia[dataCalculo].empresas} empresas, ${resultadosPorDia[dataCalculo].leads} leads, ${resultadosPorDia[dataCalculo].vendas} vendas`);
     }
 
-    // Registrar execução no histórico de cronjobs
+    // Registrar execução
     const duracao = Date.now() - startTime;
     await supabase.from('cronjob_execucao').insert({
       nome_cronjob: 'calcular-metricas-diarias',
@@ -192,8 +207,7 @@ Deno.serve(async (req) => {
       }
     });
 
-    console.log(`\n✅ Cálculo concluído em ${duracao}ms`);
-    console.log(`   Dias: ${datasParaCalcular.length}, Registros: ${totalRegistros}`);
+    console.log(`\n✅ Cálculo concluído em ${duracao}ms (${totalRegistros} registros)`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -210,7 +224,6 @@ Deno.serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('❌ Erro:', errorMessage);
 
-    // Registrar erro
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);

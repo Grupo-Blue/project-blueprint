@@ -55,6 +55,24 @@ serve(async (req) => {
       console.log(`\n📊 Processando empresa ${idEmpresa}, pipeline ${pipelineId}`);
 
       try {
+        // Buscar users da organização para mapear owner
+        const usersMap: Record<number, string> = {};
+        try {
+          const usersUrl = `https://${domain}.pipedrive.com/api/v1/users?api_token=${apiToken}`;
+          const usersResponse = await fetch(usersUrl);
+          if (usersResponse.ok) {
+            const usersData = await usersResponse.json();
+            if (usersData.success && usersData.data) {
+              for (const user of usersData.data) {
+                usersMap[user.id] = user.name;
+              }
+              console.log(`  ↳ ${Object.keys(usersMap).length} users carregados`);
+            }
+          }
+        } catch (userError) {
+          console.error("  ⚠️ Erro ao buscar users:", userError);
+        }
+
         // Buscar stages da pipeline
         const stagesMap: Record<number, string> = {};
         const stageIds: number[] = [];
@@ -148,6 +166,13 @@ serve(async (req) => {
             stageAtual = stagesMap[deal.stage_id];
           }
           
+          // Capturar owner do deal
+          const ownerName = deal.user_id ? (usersMap[deal.user_id] || null) : null;
+          const ownerId = deal.user_id ? String(deal.user_id) : null;
+
+          // Capturar motivo de perda
+          const motivoPerda = dealPerdido ? (deal.lost_reason || null) : null;
+
           leadsToUpsert.push({
             id_empresa: idEmpresa,
             id_lead_externo: String(deal.id),
@@ -166,6 +191,9 @@ serve(async (req) => {
             venda_realizada: vendaRealizada,
             data_venda: vendaRealizada ? (deal.won_time || deal.update_time) : null,
             valor_venda: valorDeal,
+            proprietario_nome: ownerName,
+            proprietario_id: ownerId,
+            motivo_perda: motivoPerda,
           });
         }
 
