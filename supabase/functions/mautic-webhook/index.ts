@@ -176,8 +176,8 @@ serve(async (req) => {
     const latestUtm = utmtags.length > 0 ? utmtags[0] : null;
 
     if (!email && !telefone) {
-      console.warn('[Mautic Webhook] Contato sem email nem telefone válido');
-      return new Response(JSON.stringify({ success: false, message: 'Contato sem identificador' }), {
+      console.log('[Mautic Webhook] ⚠️ Contato anônimo ignorado (sem email/telefone)', { mauticId: mauticContactId, eventType });
+      return new Response(JSON.stringify({ success: true, ignored: true, reason: 'contato_anonimo', mautic_contact_id: mauticContactId }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
