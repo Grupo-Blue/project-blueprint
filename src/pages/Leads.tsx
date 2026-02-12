@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ExportarListaModal } from "@/components/leads/ExportarListaModal";
+import { ImportarLeadsModal } from "@/components/leads/ImportarLeadsModal";
 import { HistoricoDisparos } from "@/components/leads/HistoricoDisparos";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronRight, Mail, Globe, Target, Wallet, ShoppingCart, MapPin, History, AlertTriangle, Snowflake, Timer, X, Check, Download, ListFilter, Send } from "lucide-react";
+import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronRight, Mail, Globe, Target, Wallet, ShoppingCart, MapPin, History, AlertTriangle, Snowflake, Timer, X, Check, Download, ListFilter, Send, Upload } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, differenceInDays, startOfMonth, endOfMonth, parseISO } from "date-fns";
@@ -111,6 +112,7 @@ const Leads = () => {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   // Ler filtro de alerta da URL
   useEffect(() => {
@@ -494,6 +496,10 @@ const Leads = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button onClick={() => setImportModalOpen(true)} variant="outline">
+            <Upload className="h-4 w-4 mr-2" />
+            Importar Leads
+          </Button>
           <Button onClick={() => setExportModalOpen(true)} variant="outline">
             <Send className="h-4 w-4 mr-2" />
             Exportar Lista
@@ -1223,6 +1229,12 @@ const Leads = () => {
         open={exportModalOpen}
         onOpenChange={setExportModalOpen}
         leads={leads || []}
+      />
+
+      {/* Modal de Importação */}
+      <ImportarLeadsModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
       />
     </div>
   );
