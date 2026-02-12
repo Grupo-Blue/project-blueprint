@@ -338,7 +338,7 @@ serve(async (req) => {
         telefone: telefone || null,
         nome_lead: nome,
         origem_tipo: 'ORGANICO',
-        origem_canal: 'MAUTIC',
+        origem_canal: 'OUTRO',
         ...Object.fromEntries(
           Object.entries(dadosMautic).filter(([, v]) => v !== undefined)
         ),
