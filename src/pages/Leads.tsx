@@ -191,10 +191,10 @@ const Leads = () => {
     refetchInterval: 2 * 60 * 1000, // Auto-refresh a cada 2 minutos
   });
 
-  const { data: leads, isLoading } = useQuery({
-    queryKey: ["leads"],
+  const { data: leads, isLoading, isError: leadsError } = useQuery({
+    queryKey: ["leads", empresaSelecionada],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("lead")
         .select(`
           *,
@@ -215,12 +215,19 @@ const Leads = () => {
         `)
         .or("merged.is.null,merged.eq.false")
         .not("nome_lead", "like", "%(cópia)%")
-        .order("data_criacao", { ascending: false });
+        .order("data_criacao", { ascending: false })
+        .limit(1000);
 
+      if (empresaSelecionada && empresaSelecionada !== "todas") {
+        query = query.eq("id_empresa", empresaSelecionada);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
-    refetchInterval: 2 * 60 * 1000, // Auto-refresh a cada 2 minutos
+    retry: 2,
+    refetchInterval: 2 * 60 * 1000,
   });
 
   // Query para contar disparos ENVIADOS por lead
@@ -477,6 +484,18 @@ const Leads = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Carregando leads...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (leadsError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center space-y-4">
+          <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+          <p className="text-muted-foreground">Erro ao carregar leads. Tente recarregar a página.</p>
+          <Button onClick={() => window.location.reload()} variant="outline">Recarregar</Button>
         </div>
       </div>
     );
