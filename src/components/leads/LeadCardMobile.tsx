@@ -13,13 +13,11 @@ import {
   AlertTriangle,
   MapPin,
   Tag,
-  Flame,
-  Zap,
-  Snowflake,
   MessageCircle
 } from "lucide-react";
-import { format, parseISO, differenceInDays } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { getDiasNoStage, calcularScoreTemperatura, getPrioridade } from "@/lib/lead-scoring";
 
 interface LeadCardMobileProps {
   lead: any;
@@ -38,54 +36,7 @@ const getCanal = (source: string | null) => {
   return { icon: '🔗', label: 'Orgânico', color: 'text-muted-foreground' };
 };
 
-const getDiasNoStage = (lead: any): number => {
-  const ultimaData = lead.data_reuniao || lead.data_levantou_mao || lead.data_mql || lead.data_criacao;
-  if (!ultimaData) return 0;
-  return differenceInDays(new Date(), parseISO(ultimaData));
-};
-
-const calcularScoreTemperatura = (lead: any): number => {
-  let score = 0;
-  score += (lead.mautic_score || 0) * 0.4;
-  score += Math.min((lead.mautic_page_hits || 0) * 5, 50);
-  if (lead.levantou_mao) score += 30;
-  if (lead.tem_reuniao) score += 50;
-  if (lead.is_mql) score += 20;
-  if (lead.tokeniza_investidor) score += 40;
-  score += Math.min((lead.tokeniza_qtd_investimentos || 0) * 10, 30);
-  if (lead.id_cliente_notion) score += 25;
-  if (lead.tokeniza_carrinho_abandonado) score += 35;
-  if (lead.chatwoot_status_atendimento === 'open') score += 30;
-  if (lead.chatwoot_status_atendimento === 'resolved') score += 15;
-  score += Math.min((lead.chatwoot_conversas_total || 0) * 10, 50);
-  if (lead.chatwoot_tempo_resposta_medio && lead.chatwoot_tempo_resposta_medio > 86400) {
-    score -= 20;
-  }
-  const dias = getDiasNoStage(lead);
-  if (dias > 7 && !['Vendido', 'Perdido'].includes(lead.stage_atual || '')) {
-    score -= Math.min((dias - 7) * 2, 30);
-  }
-  return Math.max(0, Math.round(score));
-};
-
-const getPrioridade = (lead: any) => {
-  const dias = getDiasNoStage(lead);
-  const score = lead.mautic_score || 0;
-  const isCarrinhoAbandonado = lead.tokeniza_carrinho_abandonado && !lead.tokeniza_investidor;
-  const stagesNegociacao = ['Negociação', 'Aguardando pagamento'];
-  const isEmNegociacao = stagesNegociacao.includes(lead.stage_atual);
-  
-  if (isCarrinhoAbandonado || (dias > 7 && isEmNegociacao)) {
-    return { nivel: 1, label: 'URGENTE', icon: Flame, color: 'text-red-600', bgColor: 'bg-red-100' };
-  }
-  if (score >= 50 || lead.levantou_mao || lead.tem_reuniao) {
-    return { nivel: 2, label: 'QUENTE', icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100' };
-  }
-  if ((score >= 20 && score < 50) || lead.is_mql) {
-    return { nivel: 3, label: 'MORNO', icon: Activity, color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
-  }
-  return { nivel: 4, label: 'FRIO', icon: Snowflake, color: 'text-slate-400', bgColor: 'bg-slate-100' };
-};
+// getDiasNoStage, calcularScoreTemperatura e getPrioridade importados de @/lib/lead-scoring
 
 const getStatusPrincipal = (lead: any) => {
   if (lead.venda_realizada) return { label: 'Vendido', color: 'bg-green-600 text-white', icon: '💰' };
@@ -129,7 +80,7 @@ export function LeadCardMobile({ lead, isExpanded, onToggleExpand }: LeadCardMob
   const canal = getCanal(lead.utm_source);
   const statusPrincipal = getStatusPrincipal(lead);
   const isCarrinhoAbandonado = lead.tokeniza_carrinho_abandonado && !lead.tokeniza_investidor;
-  const scoreTemp = calcularScoreTemperatura(lead);
+  const scoreTemp = prioridade.score;
   const utmQuality = getUtmQuality(lead);
 
   return (
@@ -155,6 +106,7 @@ export function LeadCardMobile({ lead, isExpanded, onToggleExpand }: LeadCardMob
               )}>
                 <PrioridadeIcon className="h-3 w-3" />
                 {prioridade.label}
+                <span className="font-mono text-[10px] opacity-80">{prioridade.score}°</span>
               </div>
             </div>
 

@@ -18,6 +18,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { usePeriodo } from "@/contexts/PeriodoContext";
 import { useEmpresa } from "@/contexts/EmpresaContext";
+import { getDiasNoStage, calcularScoreTemperatura, getPrioridade } from "@/lib/lead-scoring";
 import { ImportarUsuariosTokeniza } from "@/components/ImportarUsuariosTokeniza";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -72,80 +73,7 @@ const getWhatsappLink = (lead: any): string => {
   return `https://chat.grupoblue.com.br/open/${slug}/${telefone}`;
 };
 
-// Helper para calcular dias no stage
-const getDiasNoStage = (lead: any): number => {
-  const ultimaData = lead.data_reuniao || lead.data_levantou_mao || lead.data_mql || lead.data_criacao;
-  if (!ultimaData) return 0;
-  return differenceInDays(new Date(), parseISO(ultimaData));
-};
-
-// Helper para calcular score de temperatura composto
-const calcularScoreTemperatura = (lead: any): number => {
-  let score = 0;
-  
-  // Base: Score Mautic (40% do valor)
-  score += (lead.mautic_score || 0) * 0.4;
-  
-  // Engajamento: Page hits (+5 cada, max 50)
-  score += Math.min((lead.mautic_page_hits || 0) * 5, 50);
-  
-  // Sinais de interesse (bônus fixos)
-  if (lead.levantou_mao) score += 30;
-  if (lead.tem_reuniao) score += 50;
-  if (lead.is_mql) score += 20;
-  
-  // Histórico Tokeniza
-  if (lead.tokeniza_investidor) score += 40;
-  score += Math.min((lead.tokeniza_qtd_investimentos || 0) * 10, 30);
-  
-  // Cliente existente Notion
-  if (lead.id_cliente_notion) score += 25;
-  
-  // Carrinho abandonado = interesse demonstrado
-  if (lead.tokeniza_carrinho_abandonado) score += 35;
-  
-  // Chatwoot: Engajamento de atendimento
-  if (lead.chatwoot_status_atendimento === 'open') score += 30; // Conversa ativa
-  if (lead.chatwoot_status_atendimento === 'resolved') score += 15; // Já foi atendido
-  score += Math.min((lead.chatwoot_conversas_total || 0) * 10, 50); // Histórico conversas
-  
-  // Penalidade: tempo de resposta alto no atendimento
-  if (lead.chatwoot_tempo_resposta_medio && lead.chatwoot_tempo_resposta_medio > 86400) {
-    score -= 20; // >24h sem resposta
-  }
-  
-  // Penalidade por inatividade
-  const dias = getDiasNoStage(lead);
-  if (dias > 7 && !['Vendido', 'Perdido'].includes(lead.stage_atual || '')) {
-    score -= Math.min((dias - 7) * 2, 30);
-  }
-  
-  return Math.max(0, Math.round(score));
-};
-
-// Helper para calcular prioridade
-const getPrioridade = (lead: any) => {
-  const dias = getDiasNoStage(lead);
-  const score = lead.mautic_score || 0;
-  const isCarrinhoAbandonado = lead.tokeniza_carrinho_abandonado && !lead.tokeniza_investidor;
-  const stagesNegociacao = ['Negociação', 'Aguardando pagamento'];
-  const isEmNegociacao = stagesNegociacao.includes(lead.stage_atual);
-  
-  // URGENTE: Carrinho abandonado OU lead parado +7 dias em negociação
-  if (isCarrinhoAbandonado || (dias > 7 && isEmNegociacao)) {
-    return { nivel: 1, label: 'URGENTE', icon: Flame, color: 'text-red-600', bgColor: 'bg-red-100', borderColor: 'border-red-500' };
-  }
-  // QUENTE: Score ≥ 50 OU levantou mão OU tem reunião
-  if (score >= 50 || lead.levantou_mao || lead.tem_reuniao) {
-    return { nivel: 2, label: 'QUENTE', icon: Zap, color: 'text-orange-600', bgColor: 'bg-orange-100', borderColor: 'border-orange-500' };
-  }
-  // MORNO: Score 20-49 OU MQL
-  if ((score >= 20 && score < 50) || lead.is_mql) {
-    return { nivel: 3, label: 'MORNO', icon: Activity, color: 'text-yellow-600', bgColor: 'bg-yellow-100', borderColor: 'border-yellow-500' };
-  }
-  // FRIO: Score < 20 ou sem interação
-  return { nivel: 4, label: 'FRIO', icon: Snowflake, color: 'text-slate-400', bgColor: 'bg-slate-100', borderColor: 'border-slate-300' };
-};
+// getDiasNoStage, calcularScoreTemperatura e getPrioridade importados de @/lib/lead-scoring
 
 // Helper para status principal simplificado
 const getStatusPrincipal = (lead: any) => {
@@ -869,7 +797,7 @@ const Leads = () => {
                     const canal = getCanal(lead.utm_source);
                     const statusPrincipal = getStatusPrincipal(lead);
                     const isCarrinhoAbandonado = lead.tokeniza_carrinho_abandonado && !lead.tokeniza_investidor;
-                    const scoreTemp = calcularScoreTemperatura(lead);
+                    const scoreTemp = prioridade.score;
 
                     return (
                       <Collapsible key={lead.id_lead} asChild open={expandedRows.has(lead.id_lead)}>
