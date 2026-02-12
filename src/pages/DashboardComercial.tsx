@@ -1,6 +1,9 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Button } from "@/components/ui/button";
+import { Target } from "lucide-react";
 import { CockpitKPIs } from "@/components/dashboard/CockpitKPIs";
 import { MetaVsRealizado } from "@/components/dashboard/MetaVsRealizado";
 import { ReceitaAcumulada } from "@/components/dashboard/ReceitaAcumulada";
@@ -35,11 +38,19 @@ const DashboardComercial = () => {
           <h1 className="text-2xl font-bold tracking-tight">Dashboard Comercial</h1>
           <p className="text-sm text-muted-foreground">Visão consolidada de vendas, metas e performance</p>
         </div>
-        <ToggleGroup type="single" value={tipoNegocio} onValueChange={(v) => v && setTipoNegocio(v)} className="bg-muted rounded-lg p-0.5">
-          <ToggleGroupItem value="total" className="text-xs px-3 h-8 data-[state=on]:bg-background data-[state=on]:shadow-sm">Total</ToggleGroupItem>
-          <ToggleGroupItem value="new_business" className="text-xs px-3 h-8 data-[state=on]:bg-background data-[state=on]:shadow-sm">New Business</ToggleGroupItem>
-          <ToggleGroupItem value="renovacao" className="text-xs px-3 h-8 data-[state=on]:bg-background data-[state=on]:shadow-sm">Renovação</ToggleGroupItem>
-        </ToggleGroup>
+        <div className="flex items-center gap-2">
+          <Link to="/metas-comerciais">
+            <Button variant="outline" size="sm">
+              <Target className="h-4 w-4 mr-1" />
+              Metas
+            </Button>
+          </Link>
+          <ToggleGroup type="single" value={tipoNegocio} onValueChange={(v) => v && setTipoNegocio(v)} className="bg-muted rounded-lg p-0.5">
+            <ToggleGroupItem value="total" className="text-xs px-3 h-8 data-[state=on]:bg-background data-[state=on]:shadow-sm">Total</ToggleGroupItem>
+            <ToggleGroupItem value="new_business" className="text-xs px-3 h-8 data-[state=on]:bg-background data-[state=on]:shadow-sm">New Business</ToggleGroupItem>
+            <ToggleGroupItem value="renovacao" className="text-xs px-3 h-8 data-[state=on]:bg-background data-[state=on]:shadow-sm">Renovação</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
       </div>
 
       <AlertasCriticos />
