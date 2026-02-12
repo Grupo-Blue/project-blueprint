@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -146,6 +147,7 @@ const Leads = () => {
   const { tipoFiltro, getDataReferencia } = usePeriodo();
   const { empresaSelecionada, empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
   const isMobile = useIsMobile();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Hook de realtime para novos leads
   useLeadsRealtime();
@@ -158,10 +160,32 @@ const Leads = () => {
   const [investidorFilter, setInvestidorFilter] = useState<string>("all");
   const [origemFilter, setOrigemFilter] = useState<string>("all");
   const [parados7DiasFilter, setParados7DiasFilter] = useState(false);
+  const [alertaLeadIds, setAlertaLeadIds] = useState<string[] | null>(null);
+  const [alertaTipo, setAlertaTipo] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortColumn, setSortColumn] = useState<string | null>("data_entrada");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  // Ler filtro de alerta da URL
+  useEffect(() => {
+    const alertaParam = searchParams.get("alerta");
+    const idsParam = searchParams.get("ids");
+    if (alertaParam && idsParam) {
+      setAlertaTipo(alertaParam);
+      setAlertaLeadIds(idsParam.split(","));
+      // Limpar outros filtros
+      setStatusFilter("all");
+      setStageFilter([]);
+      setScoreMinimo("");
+      setClienteStatusFilter("all");
+      setInvestidorFilter("all");
+      setOrigemFilter("all");
+      setParados7DiasFilter(false);
+      setSearchTerm("");
+      setCurrentPage(1);
+    }
+  }, [searchParams]);
 
   const ITEMS_PER_PAGE = 15;
 
@@ -266,6 +290,14 @@ const Leads = () => {
 
   // Filtrar leads (sem filtro de período - mostra todos os leads independente do mês)
   const filteredLeads = leads?.filter((lead) => {
+    // Se há filtro de alerta ativo, filtrar exclusivamente por IDs
+    if (alertaLeadIds && alertaLeadIds.length > 0) {
+      const matchesEmpresa =
+        !empresaSelecionada || empresaSelecionada === "todas" ||
+        lead.id_empresa === empresaSelecionada;
+      return alertaLeadIds.includes(lead.id_lead) && matchesEmpresa;
+    }
+
     const matchesSearch =
       !searchTerm ||
       lead.nome_lead?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -477,6 +509,34 @@ const Leads = () => {
         </div>
         <ImportarUsuariosTokeniza />
       </div>
+
+      {/* Banner de alerta ativo */}
+      {alertaTipo && alertaLeadIds && (
+        <div className="flex items-center gap-3 p-3 rounded-lg border bg-accent/50">
+          <AlertTriangle className="h-5 w-5 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">
+              Exibindo {alertaLeadIds.length} lead(s) do alerta: {
+                alertaTipo === "sla" ? "Sem primeira resposta" :
+                alertaTipo === "orfao" ? "Sem proprietário" :
+                alertaTipo === "levantada" ? "Levantou mão sem reunião" : alertaTipo
+              }
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setAlertaTipo(null);
+              setAlertaLeadIds(null);
+              setSearchParams({});
+            }}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Limpar filtro
+          </Button>
+        </div>
+      )}
 
       {/* Quick Wins Cards - Ações Prioritárias */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
