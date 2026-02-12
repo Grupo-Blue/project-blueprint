@@ -102,15 +102,72 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
     reader.readAsText(file, "UTF-8");
   };
 
+  const [duplicados, setDuplicados] = useState<{ telefone: string[]; email: string[] }>({ telefone: [], email: [] });
+  const [verificado, setVerificado] = useState(false);
+
+  const resetStateOriginal = resetState;
+  // Override resetState to also clear duplicados
+  const resetAll = () => {
+    resetStateOriginal();
+    setDuplicados({ telefone: [], email: [] });
+    setVerificado(false);
+  };
+
+  const verificarDuplicados = async () => {
+    if (!empresaSelecionada || empresaSelecionada === "todas") return;
+
+    const telefones = rows.map(r => formatarTelefone(r.telefone)).filter(Boolean);
+    const emails = rows.map(r => r.email?.trim().toLowerCase()).filter(Boolean) as string[];
+
+    const telDuplicados: string[] = [];
+    const emailDuplicados: string[] = [];
+
+    // Check phones in batches of 100
+    for (let i = 0; i < telefones.length; i += 100) {
+      const batch = telefones.slice(i, i + 100);
+      const { data } = await supabase
+        .from("lead")
+        .select("telefone")
+        .eq("id_empresa", empresaSelecionada)
+        .in("telefone", batch);
+      if (data) telDuplicados.push(...data.map(d => d.telefone!));
+    }
+
+    // Check emails in batches of 100
+    for (let i = 0; i < emails.length; i += 100) {
+      const batch = emails.slice(i, i + 100);
+      const { data } = await supabase
+        .from("lead")
+        .select("email")
+        .eq("id_empresa", empresaSelecionada)
+        .in("email", batch);
+      if (data) emailDuplicados.push(...data.map(d => d.email!));
+    }
+
+    setDuplicados({ telefone: telDuplicados, email: emailDuplicados });
+    setVerificado(true);
+  };
+
+  const leadsUnicos = verificado
+    ? rows.filter(r => {
+        const tel = formatarTelefone(r.telefone);
+        const email = r.email?.trim().toLowerCase();
+        const isDupTel = tel && duplicados.telefone.includes(tel);
+        const isDupEmail = email && duplicados.email.includes(email);
+        return !isDupTel && !isDupEmail;
+      })
+    : rows;
+
+  const qtdDuplicados = rows.length - leadsUnicos.length;
+
   const importarMutation = useMutation({
     mutationFn: async () => {
       if (!empresaSelecionada || empresaSelecionada === "todas") {
         throw new Error("Selecione uma empresa específica para importar");
       }
-      if (rows.length === 0) throw new Error("Nenhum lead para importar");
+      if (leadsUnicos.length === 0) throw new Error("Nenhum lead novo para importar (todos já existem na base)");
 
-      // 1. Insert leads
-      const leadsToInsert = rows.map(r => ({
+      const leadsToInsert = leadsUnicos.map(r => ({
         id_empresa: empresaSelecionada,
         nome_lead: limparNome(r.nome) || null,
         telefone: formatarTelefone(r.telefone) || null,
@@ -171,7 +228,7 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
   });
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) resetState(); onOpenChange(v); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) resetAll(); onOpenChange(v); }}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -274,44 +331,33 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
           )}
 
           {/* Preview table */}
-          {rows.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <span className="text-sm font-medium">Pré-visualização ({rows.length} leads)</span>
-              </div>
-              <div className="max-h-48 overflow-y-auto border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Telefone</TableHead>
-                      <TableHead>Email</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.slice(0, 10).map((r, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-sm">{limparNome(r.nome) || "—"}</TableCell>
-                        <TableCell className="text-sm font-mono">{formatarTelefone(r.telefone) || "—"}</TableCell>
-                        <TableCell className="text-sm">{r.email || "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                    {rows.length > 10 && (
-                      <TableRow>
-                        <TableCell colSpan={3} className="text-center text-xs text-muted-foreground">
-                          ... e mais {rows.length - 10} leads
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+          {/* Duplicate check results */}
+          {rows.length > 0 && !verificado && (
+            <div className="flex items-center gap-2 p-3 rounded-md border bg-muted/30">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+              <span className="text-sm flex-1">Verifique duplicados antes de importar.</span>
+              <Button size="sm" variant="outline" onClick={verificarDuplicados}>
+                Verificar duplicados
+              </Button>
+            </div>
+          )}
+
+          {verificado && qtdDuplicados > 0 && (
+            <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 p-3 rounded-md">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              {qtdDuplicados} lead(s) já existe(m) na base e será(ão) ignorado(s). Serão importados {leadsUnicos.length} leads novos.
+            </div>
+          )}
+
+          {verificado && qtdDuplicados === 0 && (
+            <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 dark:bg-green-950/30 p-3 rounded-md">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Nenhum duplicado encontrado. Todos os {rows.length} leads são novos.
             </div>
           )}
 
           {!empresaSelecionada || empresaSelecionada === "todas" ? (
-            <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 p-3 rounded-md">
+            <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/30 p-3 rounded-md">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               Selecione uma empresa específica para importar leads.
             </div>
@@ -319,19 +365,19 @@ export function ImportarLeadsModal({ open, onOpenChange }: ImportarLeadsModalPro
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => { resetState(); onOpenChange(false); }}>
+          <Button variant="outline" onClick={() => { resetAll(); onOpenChange(false); }}>
             Cancelar
           </Button>
           <Button
             onClick={() => importarMutation.mutate()}
-            disabled={rows.length === 0 || !empresaSelecionada || empresaSelecionada === "todas" || importarMutation.isPending}
+            disabled={leadsUnicos.length === 0 || !verificado || !empresaSelecionada || empresaSelecionada === "todas" || importarMutation.isPending}
           >
             {importarMutation.isPending ? (
               "Importando..."
             ) : (
               <>
                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                Importar {rows.length} leads
+                Importar {leadsUnicos.length} leads
               </>
             )}
           </Button>
