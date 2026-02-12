@@ -152,3 +152,6 @@ verify_jwt = false
 
 [functions.verificar-coleta-concorrentes]
 verify_jwt = false
+
+[functions.mautic-webhook]
+verify_jwt = false
