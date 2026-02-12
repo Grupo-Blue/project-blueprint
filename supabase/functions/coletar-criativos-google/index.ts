@@ -35,6 +35,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
   try {
     console.log("Iniciando coleta de criativos Google Ads...");
 
@@ -451,6 +452,17 @@ serve(async (req) => {
 
     console.log("Coleta de criativos Google Ads concluída");
 
+    const erros = resultados.filter((r: any) => r.status === "error");
+    const sucessos = resultados.filter((r: any) => r.status === "success");
+
+    // Registrar execução no cronjob_execucao
+    await supabase.from('cronjob_execucao').insert({
+      nome_cronjob: 'coletar-criativos-google',
+      status: erros.length > 0 && sucessos.length === 0 ? 'erro' : erros.length > 0 ? 'parcial' : 'sucesso',
+      duracao_ms: Date.now() - startTime,
+      detalhes_execucao: { sucessos: sucessos.length, erros: erros.length, resultados },
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -461,6 +473,15 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Erro geral:", error);
+    try {
+      const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await supabase.from('cronjob_execucao').insert({
+        nome_cronjob: 'coletar-criativos-google',
+        status: 'erro',
+        mensagem_erro: error instanceof Error ? error.message : String(error),
+        duracao_ms: Date.now() - startTime,
+      });
+    } catch (_) { /* ignore logging error */ }
     return new Response(
       JSON.stringify({
         success: false,
