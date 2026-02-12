@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
-import { AlertTriangle, Clock, UserX, PhoneOff } from "lucide-react";
+import { AlertTriangle, Clock, UserX, PhoneOff, ArrowRight } from "lucide-react";
 
 interface Alerta {
   tipo: string;
@@ -9,12 +10,14 @@ interface Alerta {
   detalhes: string;
   icon: any;
   cor: string;
+  leadIds: string[];
 }
 
 export const AlertasCriticos = () => {
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [loading, setLoading] = useState(true);
   const { empresaSelecionada } = useEmpresa();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchAlertas();
@@ -33,7 +36,7 @@ export const AlertasCriticos = () => {
         .is("proprietario_nome", null)
         .eq("merged", false)
         .gte("data_criacao", new Date(agora - 7 * 24 * 60 * 60 * 1000).toISOString())
-        .limit(5);
+        .limit(50);
 
       if (empresaSelecionada && empresaSelecionada !== "todas") {
         querySemDono = querySemDono.eq("id_empresa", empresaSelecionada);
@@ -48,7 +51,7 @@ export const AlertasCriticos = () => {
         .is("tempo_primeira_resposta_seg", null)
         .eq("merged", false)
         .gte("data_criacao", `${hoje}T00:00:00`)
-        .limit(5);
+        .limit(50);
 
       if (empresaSelecionada && empresaSelecionada !== "todas") {
         querySemResposta = querySemResposta.eq("id_empresa", empresaSelecionada);
@@ -65,13 +68,13 @@ export const AlertasCriticos = () => {
         .eq("reuniao_realizada", false)
         .eq("merged", false)
         .gte("data_criacao", new Date(agora - 7 * 24 * 60 * 60 * 1000).toISOString())
-        .limit(5);
+        .limit(50);
 
       if (empresaSelecionada && empresaSelecionada !== "todas") {
         queryLevantadaSemReuniao = queryLevantadaSemReuniao.eq("id_empresa", empresaSelecionada);
       }
 
-      const { count: countLevantada } = await queryLevantadaSemReuniao;
+      const { data: levantadaSemReuniao, count: countLevantada } = await queryLevantadaSemReuniao;
 
       const novosAlertas: Alerta[] = [];
 
@@ -82,6 +85,7 @@ export const AlertasCriticos = () => {
           detalhes: (semResposta || []).map(l => l.nome_lead).join(", "),
           icon: Clock,
           cor: "text-red-500 bg-red-500/10 border-red-500/20",
+          leadIds: (semResposta || []).map(l => l.id_lead),
         });
       }
 
@@ -92,6 +96,7 @@ export const AlertasCriticos = () => {
           detalhes: (semDono || []).map(l => l.nome_lead).join(", "),
           icon: UserX,
           cor: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+          leadIds: (semDono || []).map(l => l.id_lead),
         });
       }
 
@@ -99,9 +104,10 @@ export const AlertasCriticos = () => {
         novosAlertas.push({
           tipo: "levantada",
           mensagem: `${countLevantada} lead(s) levantaram a mão sem reunião agendada`,
-          detalhes: "",
+          detalhes: (levantadaSemReuniao || []).map(l => l.nome_lead).join(", "),
           icon: PhoneOff,
           cor: "text-yellow-500 bg-yellow-500/10 border-yellow-500/20",
+          leadIds: (levantadaSemReuniao || []).map(l => l.id_lead),
         });
       }
 
@@ -113,6 +119,14 @@ export const AlertasCriticos = () => {
     }
   };
 
+  const handleAlertaClick = (alerta: Alerta) => {
+    if (alerta.leadIds.length === 0) return;
+    const params = new URLSearchParams();
+    params.set("alerta", alerta.tipo);
+    params.set("ids", alerta.leadIds.join(","));
+    navigate(`/leads?${params.toString()}`);
+  };
+
   if (loading || alertas.length === 0) return null;
 
   return (
@@ -120,14 +134,19 @@ export const AlertasCriticos = () => {
       {alertas.map((alerta, i) => {
         const Icon = alerta.icon;
         return (
-          <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${alerta.cor}`}>
-            <Icon className="h-5 w-5 mt-0.5 shrink-0" />
-            <div className="min-w-0">
+          <div
+            key={i}
+            onClick={() => handleAlertaClick(alerta)}
+            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity ${alerta.cor}`}
+          >
+            <Icon className="h-5 w-5 shrink-0" />
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">{alerta.mensagem}</p>
               {alerta.detalhes && (
                 <p className="text-xs text-muted-foreground truncate mt-0.5">{alerta.detalhes}</p>
               )}
             </div>
+            <ArrowRight className="h-4 w-4 shrink-0 opacity-50" />
           </div>
         );
       })}
