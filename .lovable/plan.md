@@ -1,70 +1,53 @@
 
 
-# Corrigir Coleta Google Ads
+# Corrigir Coleta GA4 - Parada desde Dezembro
 
 ## Problema Identificado
 
-A coleta Google Ads NAO estava parada desde 09/jan. As funcoes executam diariamente via cron (`net.http_post`) com sucesso. Dois problemas mascaram isso:
+A funcao `coletar-metricas-ga4` **nunca teve um cron job agendado**. Diferente do Google Ads (que tinha crons funcionando), o GA4 so foi executado manualmente em 11/dez/2025. Desde entao, ninguem mais disparou a funcao.
 
-1. **Cron jobs duplicados com erro**: Existem 3 cron jobs extras (IDs 21, 23, 25) que usam `extensions.http_post` -- funcao que nao existe neste ambiente. Esses jobs falham toda noite, gerando ruido nos logs.
-2. **Falta de registro em `cronjob_execucao`**: A funcao `coletar-metricas-google` nao registra execucoes na tabela `cronjob_execucao`, entao parece que nao roda desde 09/jan (quando foi executada manualmente e o codigo manual registrou).
+- Ultima coleta: 10/dez/2025 (dados na tabela `landingpage_metricas`)
+- Ultima execucao registrada: 11/dez/2025 (manual)
+- Cron jobs GA4: **zero** (confirmado via `cron.job`)
+- Integracoes ativas: 4 (1 Blue Consult + 3 Tokeniza)
+- A funcao ja possui logging em `cronjob_execucao` (nao precisa modificar)
 
 ## Plano de Correcao
 
-### Passo 1: Remover cron jobs duplicados com erro
+### Passo 1: Criar cron job para coleta diaria
 
-Executar SQL para remover os 3 jobs que usam `extensions.http_post`:
-- Job 21: `invoke-importar-campanhas-google` (04:15 UTC)
-- Job 23: `invoke-coletar-metricas-google` (04:45 UTC)
-- Job 25: `invoke-coletar-criativos-google` (05:15 UTC)
+Agendar execucao diaria da funcao `coletar-metricas-ga4` via `pg_cron` + `net.http_post`, seguindo o mesmo padrao das outras funcoes.
 
-### Passo 2: Adicionar log de execucao nas 3 funcoes
-
-Modificar as edge functions para registrar cada execucao na tabela `cronjob_execucao`, igual as outras funcoes fazem (ex: `coletar-metricas-meta`):
-
-**Arquivos a modificar:**
-- `supabase/functions/coletar-metricas-google/index.ts` -- adicionar insert em `cronjob_execucao` no final
-- `supabase/functions/coletar-criativos-google/index.ts` -- adicionar insert em `cronjob_execucao` no final
-- `supabase/functions/importar-campanhas-google/index.ts` -- adicionar insert em `cronjob_execucao` no final
-
-Para cada funcao, adicionar:
-- Captura de `startTime = Date.now()` no inicio
-- Insert em `cronjob_execucao` com nome, status, duracao e detalhes no final (sucesso e erro)
-
-### Passo 3: Recoleta historica de metricas perdidas
-
-Embora o cron execute diariamente, ele so coleta metricas do dia atual (`hoje`). Para garantir que nao ha lacunas, disparar a funcao `coletar-metricas-google-historico` para o periodo de 10/jan a 12/fev.
-
-## Detalhes tecnicos
-
-### SQL para remover cron jobs duplicados
+Horario sugerido: **06:30 UTC** (03:30 BRT) - fora do horario das outras coletas para evitar concorrencia.
 
 ```sql
-SELECT cron.unschedule(21);
-SELECT cron.unschedule(23);
-SELECT cron.unschedule(25);
+SELECT cron.schedule(
+  'invoke-coletar-metricas-ga4',
+  '30 6 * * *',
+  $$
+  SELECT net.http_post(
+    url := 'https://unsznbmmqhihwctguvvr.supabase.co/functions/v1/coletar-metricas-ga4',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer <anon_key>"}'::jsonb,
+    body := '{"dias": 7}'::jsonb
+  ) AS request_id;
+  $$
+);
 ```
 
-### Padrao de log para as edge functions
+### Passo 2: Backfill de dados perdidos (Dez 11 a Fev 12)
 
-```typescript
-const startTime = Date.now();
-// ... logica existente ...
+Disparar a funcao manualmente com `dias: 65` para recuperar os ~2 meses de dados perdidos para todas as 4 integracoes ativas.
 
-// No final (sucesso):
-await supabase.from('cronjob_execucao').insert({
-  nome_cronjob: 'coletar-metricas-google',
-  status: erros.length > 0 ? 'parcial' : 'sucesso',
-  duracao_ms: Date.now() - startTime,
-  detalhes_execucao: { resultados }
-});
+### Passo 3 (opcional): Criar cron para enriquecer-leads-ga4
 
-// No catch (erro):
-await supabase.from('cronjob_execucao').insert({
-  nome_cronjob: 'coletar-metricas-google',
-  status: 'erro',
-  mensagem_erro: error.message,
-  duracao_ms: Date.now() - startTime
-});
-```
+A funcao `enriquecer-leads-ga4` tambem nao tem cron. Pode ser agendada para rodar apos a coleta (ex: 07:00 UTC) para manter os leads atualizados com dados GA4.
+
+## Nenhuma alteracao de codigo necessaria
+
+A funcao `coletar-metricas-ga4` ja possui:
+- Logging em `cronjob_execucao` (sucesso e erro)
+- Captura de `startTime` e duracao
+- Suporte ao parametro `dias` para backfill
+
+Apenas precisa do agendamento via SQL e da execucao manual para backfill.
 
