@@ -14,8 +14,8 @@ const TAGS_LEVANTOU_MAO = [
   'agendou-reuniao',
 ];
 
-// Limites para MQL automático
-const MQL_SCORE_MINIMO = 50;
+// Limite padrão para MQL (usado como fallback se não houver threshold do segmento)
+const MQL_SCORE_MINIMO_PADRAO = 50;
 const MQL_PAGE_HITS_MINIMO = 10;
 
 // Normalizar telefone para E.164 brasileiro
@@ -171,6 +171,25 @@ serve(async (req) => {
       ? (contact.tags as Array<{ tag?: string } | string>).map(t => typeof t === 'string' ? t : (t?.tag || '')).filter(Boolean)
       : [];
 
+    // Segmentos do contato Mautic
+    const contactSegments: Array<{ id: number; name?: string }> = [];
+    if (contact.segments && typeof contact.segments === 'object') {
+      // Mautic envia segments como objeto { "1": { id: 1, name: "..." }, ... } ou array
+      if (Array.isArray(contact.segments)) {
+        for (const seg of contact.segments) {
+          if (seg && typeof seg.id === 'number') contactSegments.push(seg);
+        }
+      } else {
+        for (const key of Object.keys(contact.segments as Record<string, unknown>)) {
+          const seg = (contact.segments as Record<string, unknown>)[key] as Record<string, unknown> | null;
+          if (seg && (typeof seg.id === 'number' || typeof seg.id === 'string')) {
+            contactSegments.push({ id: Number(seg.id), name: seg.name as string | undefined });
+          }
+        }
+      }
+    }
+    console.log(`[Mautic Webhook] Segmentos do contato: ${JSON.stringify(contactSegments.map(s => ({ id: s.id, name: s.name })))}`);
+
     // UTMs
     const utmtags = Array.isArray(contact.utmtags) ? (contact.utmtags as Array<Record<string, unknown>>) : [];
     const latestUtm = utmtags.length > 0 ? utmtags[0] : null;
@@ -227,13 +246,41 @@ serve(async (req) => {
       if (data) leadExistente = data;
     }
 
-    // 7. Determinar empresa (buscar integração Mautic ativa para saber a empresa)
+    // 7. Determinar empresa via mapeamento de segmentos Mautic
     let idEmpresa: string | null = null;
+    let thresholdScore = MQL_SCORE_MINIMO_PADRAO;
 
+    // Se lead já existe, manter empresa original
     if (leadExistente) {
       idEmpresa = leadExistente.id_empresa as string;
-    } else {
-      // Buscar empresa que tem integração Mautic ativa
+    }
+
+    // Buscar mapeamentos de segmento → empresa
+    const { data: mapeamentos } = await supabase
+      .from('mautic_segmento_empresa')
+      .select('id_empresa, segmento_mautic_id, segmento_mautic_nome, threshold_score')
+      .eq('ativo', true);
+
+    // Tentar mapear empresa pelo segmento do contato
+    let segmentoEncontrado: string | null = null;
+    if (mapeamentos && contactSegments.length > 0) {
+      for (const seg of contactSegments) {
+        const mapeamento = mapeamentos.find(m => m.segmento_mautic_id === seg.id);
+        if (mapeamento) {
+          segmentoEncontrado = mapeamento.segmento_mautic_nome;
+          thresholdScore = mapeamento.threshold_score ?? MQL_SCORE_MINIMO_PADRAO;
+          // Só define empresa se o lead não existia (não sobrescreve empresa de lead existente)
+          if (!idEmpresa) {
+            idEmpresa = mapeamento.id_empresa;
+          }
+          console.log(`[Mautic Webhook] Segmento "${segmentoEncontrado}" → Empresa: ${mapeamento.id_empresa}, Threshold: ${thresholdScore}`);
+          break; // Primeiro mapeamento encontrado ganha
+        }
+      }
+    }
+
+    // Fallback: buscar empresa com integração Mautic ativa
+    if (!idEmpresa) {
       const { data: integracoes } = await supabase
         .from('integracao')
         .select('id_empresa')
@@ -243,11 +290,12 @@ serve(async (req) => {
 
       if (integracoes && integracoes.length > 0) {
         idEmpresa = integracoes[0].id_empresa;
+        console.log(`[Mautic Webhook] Fallback: usando empresa da integração Mautic: ${idEmpresa}`);
       }
     }
 
     if (!idEmpresa) {
-      console.error('[Mautic Webhook] Nenhuma empresa com integração Mautic ativa');
+      console.error('[Mautic Webhook] Nenhuma empresa encontrada (sem segmento mapeado nem integração ativa)');
       return new Response(JSON.stringify({ success: false, message: 'Nenhuma empresa Mautic configurada' }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -285,8 +333,8 @@ serve(async (req) => {
     }
     dadosMautic.mautic_page_hits = pageHitsNovo;
 
-    // Verificar MQL
-    const deveSerMql = score >= MQL_SCORE_MINIMO || pageHitsNovo >= MQL_PAGE_HITS_MINIMO;
+    // Verificar MQL (usa threshold do segmento da empresa ou padrão)
+    const deveSerMql = score >= thresholdScore || pageHitsNovo >= MQL_PAGE_HITS_MINIMO;
     if (deveSerMql && !eraIsMql) {
       dadosMautic.is_mql = true;
       dadosMautic.data_mql = new Date().toISOString();
