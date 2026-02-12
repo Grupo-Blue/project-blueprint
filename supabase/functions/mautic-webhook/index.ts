@@ -96,7 +96,11 @@ serve(async (req) => {
     const headerSecret = req.headers.get('X-Webhook-Secret') || req.headers.get('x-webhook-secret');
     const receivedSecret = querySecret || headerSecret;
 
-    console.log(`[Mautic Webhook] Secret recebido via: ${querySecret ? 'query_param' : headerSecret ? 'header' : 'nenhum'}`);
+    // Debug: logar URL completa e headers para diagnosticar
+    console.log(`[Mautic Webhook] URL completa: ${req.url}`);
+    console.log(`[Mautic Webhook] Query secret: ${querySecret || 'null'}`);
+    console.log(`[Mautic Webhook] Header secret: ${headerSecret || 'null'}`);
+    console.log(`[Mautic Webhook] Headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
 
     if (!webhookSecret || receivedSecret !== webhookSecret) {
       console.error('[Mautic Webhook] Secret inválido');
