@@ -3690,6 +3690,44 @@ export type Database = {
         }
         Relationships: []
       }
+      mautic_segmento_empresa: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          id: string
+          id_empresa: string
+          segmento_mautic_id: number
+          segmento_mautic_nome: string
+          threshold_score: number | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          id?: string
+          id_empresa: string
+          segmento_mautic_id: number
+          segmento_mautic_nome: string
+          threshold_score?: number | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          id?: string
+          id_empresa?: string
+          segmento_mautic_id?: number
+          segmento_mautic_nome?: string
+          threshold_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mautic_segmento_empresa_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       merge_ignorado: {
         Row: {
           created_at: string | null
