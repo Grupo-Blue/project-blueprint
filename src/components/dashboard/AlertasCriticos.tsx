@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { AlertTriangle, Clock, UserX, PhoneOff, ArrowRight } from "lucide-react";
+import { aplicarFiltroComercial } from "@/lib/empresa-constants";
 
 interface Alerta {
   tipo: string;
@@ -38,9 +39,7 @@ export const AlertasCriticos = () => {
         .gte("data_criacao", new Date(agora - 7 * 24 * 60 * 60 * 1000).toISOString())
         .limit(50);
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        querySemDono = querySemDono.eq("id_empresa", empresaSelecionada);
-      }
+      querySemDono = aplicarFiltroComercial(querySemDono, empresaSelecionada);
 
       const { data: semDono, count: countSemDono } = await querySemDono;
 
@@ -53,9 +52,7 @@ export const AlertasCriticos = () => {
         .gte("data_criacao", `${hoje}T00:00:00`)
         .limit(50);
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        querySemResposta = querySemResposta.eq("id_empresa", empresaSelecionada);
-      }
+      querySemResposta = aplicarFiltroComercial(querySemResposta, empresaSelecionada);
 
       const { data: semResposta, count: countSemResposta } = await querySemResposta;
 
@@ -70,9 +67,7 @@ export const AlertasCriticos = () => {
         .gte("data_criacao", new Date(agora - 7 * 24 * 60 * 60 * 1000).toISOString())
         .limit(50);
 
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        queryLevantadaSemReuniao = queryLevantadaSemReuniao.eq("id_empresa", empresaSelecionada);
-      }
+      queryLevantadaSemReuniao = aplicarFiltroComercial(queryLevantadaSemReuniao, empresaSelecionada);
 
       const { data: levantadaSemReuniao, count: countLevantada } = await queryLevantadaSemReuniao;
 
