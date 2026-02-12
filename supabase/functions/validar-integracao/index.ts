@@ -318,7 +318,9 @@ async function validarGA4(config: any) {
 }
 
 async function validarChatblue(config: any) {
-  const { api_url, api_token } = config;
+  const api_url = config.api_url;
+  // Priorizar secret do ambiente
+  const api_token = Deno.env.get('CHATBLUE_API_TOKEN') || config.api_token;
   if (!api_url || !api_token) {
     return { success: false, error: "URL da API e API Token são obrigatórios" };
   }

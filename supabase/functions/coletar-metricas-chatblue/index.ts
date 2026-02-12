@@ -36,7 +36,8 @@ serve(async (req) => {
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
       const apiUrl = config.api_url;
-      const apiToken = config.api_token;
+      // Priorizar secret do ambiente, fallback para config_json
+      const apiToken = Deno.env.get('CHATBLUE_API_TOKEN') || config.api_token;
 
       if (!apiUrl || !apiToken) {
         resultados.push({ integracao: integracao.id_integracao, error: 'api_url ou api_token não configurado' });

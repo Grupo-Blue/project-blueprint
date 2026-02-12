@@ -91,8 +91,8 @@ serve(async (req) => {
     if (integracoes && integracoes.length > 0) {
       const config = integracoes[0].config_json as any;
 
-      // Verificar webhook_secret se configurado
-      const webhookSecret = config.webhook_secret;
+      // Verificar webhook_secret via env (prioritário) ou config_json (fallback)
+      const webhookSecret = Deno.env.get('CHATBLUE_WEBHOOK_SECRET') || config.webhook_secret;
       if (webhookSecret) {
         const receivedSecret = req.headers.get('x-webhook-secret');
         if (receivedSecret !== webhookSecret) {
