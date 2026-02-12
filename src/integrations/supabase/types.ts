@@ -1123,6 +1123,86 @@ export type Database = {
           },
         ]
       }
+      disparo_whatsapp: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          filtros_aplicados: Json | null
+          id: string
+          id_empresa: string
+          nome: string
+          preset_usado: string | null
+          qtd_leads: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          filtros_aplicados?: Json | null
+          id?: string
+          id_empresa: string
+          nome: string
+          preset_usado?: string | null
+          qtd_leads?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          filtros_aplicados?: Json | null
+          id?: string
+          id_empresa?: string
+          nome?: string
+          preset_usado?: string | null
+          qtd_leads?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disparo_whatsapp_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      disparo_whatsapp_lead: {
+        Row: {
+          created_at: string
+          id: string
+          id_disparo: string
+          id_lead: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          id_disparo: string
+          id_lead: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          id_disparo?: string
+          id_lead?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disparo_whatsapp_lead_id_disparo_fkey"
+            columns: ["id_disparo"]
+            isOneToOne: false
+            referencedRelation: "disparo_whatsapp"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disparo_whatsapp_lead_id_lead_fkey"
+            columns: ["id_lead"]
+            isOneToOne: false
+            referencedRelation: "lead"
+            referencedColumns: ["id_lead"]
+          },
+        ]
+      }
       empresa: {
         Row: {
           cac_maximo: number
