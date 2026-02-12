@@ -45,8 +45,12 @@ function extrairContato(body: Record<string, unknown>): { contact: Record<string
     const eventData = body[eventType];
     if (eventData && Array.isArray(eventData) && eventData.length > 0) {
       const entry = eventData[0];
+      // page_on_hit tem contato em hit.lead ao invés de contact
       if (entry?.contact) {
         return { contact: entry.contact, eventType };
+      }
+      if (entry?.hit?.lead) {
+        return { contact: entry.hit.lead, eventType };
       }
     }
     // Formato alternativo: objeto direto (não array)
@@ -54,6 +58,9 @@ function extrairContato(body: Record<string, unknown>): { contact: Record<string
       const entry = eventData as Record<string, unknown>;
       if (entry?.contact) {
         return { contact: entry.contact as Record<string, unknown>, eventType };
+      }
+      if ((entry as any)?.hit?.lead) {
+        return { contact: (entry as any).hit.lead as Record<string, unknown>, eventType };
       }
     }
   }
@@ -161,7 +168,7 @@ serve(async (req) => {
 
     // Tags
     const tagsArray = Array.isArray(contact.tags)
-      ? (contact.tags as Array<{ tag: string }>).map(t => t.tag)
+      ? (contact.tags as Array<{ tag?: string } | string>).map(t => typeof t === 'string' ? t : (t?.tag || '')).filter(Boolean)
       : [];
 
     // UTMs
@@ -287,8 +294,8 @@ serve(async (req) => {
     }
 
     // Verificar levantou_mao via tags
-    const temTagLevantouMao = tagsArray.some(tag =>
-      TAGS_LEVANTOU_MAO.some(tl => tag.toLowerCase().includes(tl))
+    const temTagLevantouMao = tagsArray.length > 0 && tagsArray.some(tag =>
+      tag && TAGS_LEVANTOU_MAO.some(tl => tag.toLowerCase().includes(tl))
     );
     if (temTagLevantouMao && !eraLevantouMao) {
       dadosMautic.levantou_mao = true;
