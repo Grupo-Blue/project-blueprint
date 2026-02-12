@@ -13,9 +13,19 @@ import { RenovacaoKPIs } from "@/components/dashboard/RenovacaoKPIs";
 import { MotivosNaoRenovacao } from "@/components/dashboard/MotivosNaoRenovacao";
 import { LeadsPorCanal } from "@/components/dashboard/LeadsPorCanal";
 import { CACPorCanal } from "@/components/dashboard/CACPorCanal";
+import { MetaSazonal } from "@/components/dashboard/MetaSazonal";
+import { ProjecaoReceita } from "@/components/dashboard/ProjecaoReceita";
+import { ROIProfitability } from "@/components/dashboard/ROIProfitability";
+import { SLACompliance } from "@/components/dashboard/SLACompliance";
+import { LeadsOrfaos } from "@/components/dashboard/LeadsOrfaos";
+import { TempoCiclo } from "@/components/dashboard/TempoCiclo";
+import { PacingOrcamento } from "@/components/dashboard/PacingOrcamento";
+import { ComparativoAnual } from "@/components/dashboard/ComparativoAnual";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 
 const DashboardComercial = () => {
   const [tipoNegocio, setTipoNegocio] = useState("total");
+  const { empresaSelecionada } = useEmpresa();
 
   return (
     <div className="space-y-4">
@@ -72,21 +82,28 @@ const DashboardComercial = () => {
         </TabsContent>
 
         <TabsContent value="financeiro" className="space-y-4">
-          <div className="p-8 border border-dashed rounded-lg text-center text-muted-foreground">
-            <p className="text-sm">Meta Sazonal, Projeção de Receita — Sprint 3</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <MetaSazonal tipoNegocio={tipoNegocio} />
+            <ProjecaoReceita tipoNegocio={tipoNegocio} />
           </div>
+          <ROIProfitability empresaId={empresaSelecionada !== "todas" ? empresaSelecionada : undefined} />
+          {empresaSelecionada && empresaSelecionada !== "todas" && (
+            <PacingOrcamento empresaId={empresaSelecionada} />
+          )}
         </TabsContent>
 
         <TabsContent value="operacional" className="space-y-4">
-          <div className="p-8 border border-dashed rounded-lg text-center text-muted-foreground">
-            <p className="text-sm">SLA Compliance, Atividades CRM, Leads Órfãos — Sprint 3</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <SLACompliance />
+            <LeadsOrfaos />
           </div>
+          {empresaSelecionada && empresaSelecionada !== "todas" && (
+            <TempoCiclo empresaId={empresaSelecionada} />
+          )}
         </TabsContent>
 
         <TabsContent value="historico" className="space-y-4">
-          <div className="p-8 border border-dashed rounded-lg text-center text-muted-foreground">
-            <p className="text-sm">Comparativo Anual (2023-2026) — Sprint 3</p>
-          </div>
+          <ComparativoAnual />
         </TabsContent>
       </Tabs>
     </div>
