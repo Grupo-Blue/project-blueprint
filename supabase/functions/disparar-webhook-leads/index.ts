@@ -356,10 +356,21 @@ serve(async (req) => {
         }
 
         try {
+          const customHeaders = destino.headers || {};
           const headers: Record<string, string> = {
             'Content-Type': 'application/json',
-            ...(destino.headers || {})
+            ...customHeaders
           };
+
+          // Injetar secret do webhook se o destino tiver header x-webhook-secret com placeholder
+          if (headers['x-webhook-secret'] === '{{SGT_WEBHOOK_SECRET}}') {
+            const webhookSecret = Deno.env.get('SGT_WEBHOOK_SECRET');
+            if (webhookSecret) {
+              headers['x-webhook-secret'] = webhookSecret;
+            } else {
+              console.warn('[Webhook] SGT_WEBHOOK_SECRET não configurado, enviando sem autenticação');
+            }
+          }
 
           console.log(`[Webhook] Enviando lead ${lead.id_lead} (score: ${scoreTemperatura}, ${prioridade}) para ${destino.nome}`);
 
