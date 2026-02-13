@@ -3334,6 +3334,7 @@ export type Database = {
           proprietario_id: string | null
           proprietario_nome: string | null
           reuniao_realizada: boolean
+          score_temperatura: number
           stage_atual: string | null
           stape_client_id: string | null
           stape_eventos: Json | null
@@ -3462,6 +3463,7 @@ export type Database = {
           proprietario_id?: string | null
           proprietario_nome?: string | null
           reuniao_realizada?: boolean
+          score_temperatura?: number
           stage_atual?: string | null
           stape_client_id?: string | null
           stape_eventos?: Json | null
@@ -3590,6 +3592,7 @@ export type Database = {
           proprietario_id?: string | null
           proprietario_nome?: string | null
           reuniao_realizada?: boolean
+          score_temperatura?: number
           stage_atual?: string | null
           stape_client_id?: string | null
           stape_eventos?: Json | null
@@ -4994,6 +4997,7 @@ export type Database = {
           id: string
           id_empresa: string | null
           nome: string
+          score_minimo_crm: number
           updated_at: string | null
           url: string
         }
@@ -5005,6 +5009,7 @@ export type Database = {
           id?: string
           id_empresa?: string | null
           nome: string
+          score_minimo_crm?: number
           updated_at?: string | null
           url: string
         }
@@ -5016,6 +5021,7 @@ export type Database = {
           id?: string
           id_empresa?: string | null
           nome?: string
+          score_minimo_crm?: number
           updated_at?: string | null
           url?: string
         }

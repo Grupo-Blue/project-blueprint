@@ -12,6 +12,8 @@ interface SDRPayload {
   evento: 'LEAD_NOVO' | 'ATUALIZACAO' | 'CARRINHO_ABANDONADO' | 'MQL' | 'SCORE_ATUALIZADO' | 'CLIQUE_OFERTA' | 'FUNIL_ATUALIZADO';
   empresa: 'TOKENIZA' | 'BLUE';
   timestamp: string;
+  score_temperatura: number;
+  prioridade: 'URGENTE' | 'QUENTE' | 'MORNO' | 'FRIO';
   dados_lead: {
     nome: string;
     email: string;
@@ -34,6 +36,14 @@ interface SDRPayload {
     data_reuniao?: string;
     data_venda?: string;
     valor_venda?: number;
+  };
+  dados_linkedin?: {
+    url?: string;
+    cargo?: string;
+    empresa?: string;
+    setor?: string;
+    senioridade?: string;
+    conexoes?: number;
   };
   dados_tokeniza?: {
     valor_investido: number;
@@ -86,7 +96,13 @@ interface SDRPayload {
 
 // IDs das empresas
 const TOKENIZA_ID = '61b5ffeb-fbbc-47c1-8ced-152bb647ed20';
-const BLUE_ID = '95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db';
+
+function getPrioridade(score: number): 'URGENTE' | 'QUENTE' | 'MORNO' | 'FRIO' {
+  if (score >= 120) return 'URGENTE';
+  if (score >= 70) return 'QUENTE';
+  if (score >= 30) return 'MORNO';
+  return 'FRIO';
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -119,12 +135,14 @@ serve(async (req) => {
       .eq('merged', false);
 
     if (body.lead_ids && body.lead_ids.length > 0) {
-      // Disparo imediato de leads específicos
+      // Disparo imediato de leads específicos (manual ou via monitorar-enriquecimento)
       query = query.in('id_lead', body.lead_ids);
     } else {
-      // Buscar leads atualizados nos últimos 15 minutos OU sem webhook enviado
+      // Modo cron: só buscar leads QUENTES (score >= 70)
       const quinzeMinutosAtras = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-      query = query.or(`webhook_enviado_em.is.null,updated_at.gte.${quinzeMinutosAtras}`);
+      query = query
+        .gte('score_temperatura', 70)
+        .or(`webhook_enviado_em.is.null,updated_at.gte.${quinzeMinutosAtras}`);
     }
 
     const { data: leadsRaw, error: leadsError } = await query.limit(100);
@@ -178,6 +196,9 @@ serve(async (req) => {
     let webhooksErros = 0;
 
     for (const lead of leads) {
+      const scoreTemperatura = lead.score_temperatura || 0;
+      const prioridade = getPrioridade(scoreTemperatura);
+
       // Determinar empresa no formato SDR IA
       const empresaSDR: 'TOKENIZA' | 'BLUE' = lead.id_empresa === TOKENIZA_ID ? 'TOKENIZA' : 'BLUE';
       
@@ -185,13 +206,11 @@ serve(async (req) => {
       let evento: SDRPayload['evento'] = 'ATUALIZACAO';
       
       if (body.evento) {
-        // Evento fornecido explicitamente
         const eventoUpper = body.evento.toUpperCase();
         if (['LEAD_NOVO', 'ATUALIZACAO', 'CARRINHO_ABANDONADO', 'MQL', 'SCORE_ATUALIZADO', 'CLIQUE_OFERTA', 'FUNIL_ATUALIZADO'].includes(eventoUpper)) {
           evento = eventoUpper as SDRPayload['evento'];
         }
       } else if (!lead.webhook_enviado_em) {
-        // Primeiro envio = Lead Novo
         evento = 'LEAD_NOVO';
       } else if (lead.tokeniza_carrinho_abandonado) {
         evento = 'CARRINHO_ABANDONADO';
@@ -199,12 +218,14 @@ serve(async (req) => {
         evento = 'MQL';
       }
       
-      // Montar payload no formato SDR IA
+      // Montar payload completo no formato SDR IA
       const payload: SDRPayload = {
         lead_id: lead.id_lead,
         evento,
         empresa: empresaSDR,
         timestamp: new Date().toISOString(),
+        score_temperatura: scoreTemperatura,
+        prioridade,
         dados_lead: {
           nome: lead.nome_lead || 'Não informado',
           email: lead.email || 'nao-informado@placeholder.com',
@@ -229,6 +250,18 @@ serve(async (req) => {
           valor_venda: lead.valor_venda || undefined
         }
       };
+
+      // Adicionar dados LinkedIn se existirem
+      if (lead.linkedin_url || lead.linkedin_cargo || lead.linkedin_senioridade) {
+        payload.dados_linkedin = {
+          url: lead.linkedin_url || undefined,
+          cargo: lead.linkedin_cargo || undefined,
+          empresa: lead.linkedin_empresa || undefined,
+          setor: lead.linkedin_setor || undefined,
+          senioridade: lead.linkedin_senioridade || undefined,
+          conexoes: lead.linkedin_conexoes || undefined
+        };
+      }
 
       // Adicionar dados Mautic se existirem
       if (lead.id_mautic_contact || lead.mautic_score || lead.mautic_page_hits) {
@@ -269,7 +302,6 @@ serve(async (req) => {
 
       // Adicionar dados específicos da Tokeniza
       if (empresaSDR === 'TOKENIZA') {
-        // Calcular quantidade de projetos do array
         const projetosArray = Array.isArray(lead.tokeniza_projetos) ? lead.tokeniza_projetos : [];
         const qtdProjetos = projetosArray.length;
         
@@ -283,7 +315,6 @@ serve(async (req) => {
           valor_carrinho: lead.tokeniza_valor_carrinho || undefined
         };
 
-        // Adicionar metadata para carrinho abandonado
         if (lead.tokeniza_carrinho_abandonado && lead.tokeniza_valor_carrinho) {
           payload.event_metadata = {
             valor_simulado: lead.tokeniza_valor_carrinho,
@@ -315,16 +346,23 @@ serve(async (req) => {
           continue;
         }
 
+        // Respeitar score_minimo_crm do destino (apenas no modo cron, sem lead_ids)
+        if (!body.lead_ids?.length) {
+          const scoreMinimo = destino.score_minimo_crm ?? 70;
+          if (scoreTemperatura < scoreMinimo) {
+            console.log(`[Webhook] Lead ${lead.id_lead} score ${scoreTemperatura} < mínimo ${scoreMinimo} do destino ${destino.nome}, pulando`);
+            continue;
+          }
+        }
+
         try {
-          // Preparar headers
           const headers: Record<string, string> = {
             'Content-Type': 'application/json',
             ...(destino.headers || {})
           };
 
-          console.log(`[Webhook] Enviando lead ${lead.id_lead} para ${destino.nome}:`, JSON.stringify(payload).substring(0, 500));
+          console.log(`[Webhook] Enviando lead ${lead.id_lead} (score: ${scoreTemperatura}, ${prioridade}) para ${destino.nome}`);
 
-          // Enviar webhook
           const response = await fetch(destino.url, {
             method: 'POST',
             headers,
@@ -334,7 +372,6 @@ serve(async (req) => {
           const statusCode = response.status;
           const resposta = await response.text();
 
-          // Registrar log
           await supabase.from('lead_webhook_log').insert({
             id_lead: lead.id_lead,
             id_webhook_destino: destino.id,
@@ -356,7 +393,6 @@ serve(async (req) => {
           webhooksErros++;
           console.error(`[Webhook] Erro ao enviar para ${destino.nome}:`, sendError);
 
-          // Registrar erro no log
           await supabase.from('lead_webhook_log').insert({
             id_lead: lead.id_lead,
             id_webhook_destino: destino.id,
