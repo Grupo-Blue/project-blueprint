@@ -6,6 +6,100 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Tags que indicam intenção de compra/contato (replicado de lead-scoring.ts)
+const TAGS_INTENCAO = [
+  "clicou-whatsapp",
+  "clicou-agendar",
+  "pediu-contato",
+  "formulario-contato",
+  "solicitou-demo",
+];
+
+function differenceInDays(dateA: Date, dateB: Date): number {
+  const diffMs = dateA.getTime() - dateB.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+function calcularScoreTemperatura(lead: Record<string, unknown>): number {
+  let score = 0;
+
+  // === Engajamento Mautic (max ~90 pts) ===
+  score += ((lead.mautic_score as number) || 0) * 0.4;
+  score += Math.min(((lead.mautic_page_hits as number) || 0) * 5, 50);
+
+  // Bônus de recência Mautic
+  if (lead.mautic_last_active) {
+    const diasInativo = differenceInDays(new Date(), new Date(lead.mautic_last_active as string));
+    if (diasInativo <= 3) score += 15;
+    else if (diasInativo <= 7) score += 8;
+    else if (diasInativo > 30) score -= 15;
+  }
+
+  // Bônus por tags de intenção
+  if (lead.mautic_tags) {
+    const tags: string[] = Array.isArray(lead.mautic_tags)
+      ? lead.mautic_tags
+      : typeof lead.mautic_tags === "string"
+        ? (lead.mautic_tags as string).split(",").map((t: string) => t.trim().toLowerCase())
+        : [];
+    const temTagIntencao = tags.some((tag) =>
+      TAGS_INTENCAO.some((ti) => tag.toLowerCase().includes(ti))
+    );
+    if (temTagIntencao) score += 20;
+  }
+
+  // === Sinais comerciais (max ~100 pts) ===
+  if (lead.levantou_mao) score += 30;
+  if (lead.tem_reuniao) score += 50;
+  if (lead.is_mql) score += 20;
+
+  // === Dados Tokeniza (max ~70 pts) ===
+  if (lead.tokeniza_investidor) score += 40;
+  score += Math.min(((lead.tokeniza_qtd_investimentos as number) || 0) * 10, 30);
+  if (lead.tokeniza_carrinho_abandonado) score += 35;
+
+  // === Atendimento Chatblue (max ~60 pts) ===
+  if (lead.chatblue_sla_violado) score += 25;
+  if (lead.chatblue_prioridade === "alta" || lead.chatblue_prioridade === "urgente") score += 15;
+  if (lead.chatwoot_status_atendimento === "open") score += 30;
+  else if (lead.chatwoot_status_atendimento === "resolved") score += 15;
+  score += Math.min(((lead.chatwoot_conversas_total as number) || 0) * 10, 50);
+  if (lead.chatwoot_tempo_resposta_medio && (lead.chatwoot_tempo_resposta_medio as number) > 86400) {
+    score -= 20;
+  }
+
+  // === Qualificação LinkedIn (max ~25 pts) ===
+  const senioridade = ((lead.linkedin_senioridade as string) || "").toLowerCase();
+  if (senioridade.includes("c-level") || senioridade.includes("diretor") || senioridade.includes("ceo") || senioridade.includes("cfo") || senioridade.includes("cto")) {
+    score += 25;
+  } else if (senioridade.includes("sênior") || senioridade.includes("senior") || senioridade.includes("gerente") || senioridade.includes("head")) {
+    score += 15;
+  } else if (senioridade.includes("pleno") || senioridade.includes("analista")) {
+    score += 8;
+  }
+
+  // === Cliente existente (Notion) ===
+  if (lead.id_cliente_notion) score += 25;
+
+  // === Penalidades ===
+  const ultimaData = (lead.data_reuniao || lead.data_levantou_mao || lead.data_mql || lead.data_criacao) as string | null;
+  if (ultimaData) {
+    const dias = differenceInDays(new Date(), new Date(ultimaData));
+    if (dias > 7 && !["Vendido", "Perdido"].includes((lead.stage_atual as string) || "")) {
+      score -= Math.min((dias - 7) * 2, 30);
+    }
+  }
+
+  return Math.max(0, Math.round(score));
+}
+
+function getPrioridade(score: number): string {
+  if (score >= 120) return "URGENTE";
+  if (score >= 70) return "QUENTE";
+  if (score >= 30) return "MORNO";
+  return "FRIO";
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -24,7 +118,7 @@ serve(async (req) => {
     
     const { data: leads, error: leadsError } = await supabase
       .from('lead')
-      .select('id_lead, email, id_empresa, is_mql, mautic_score, mautic_page_hits, mautic_last_active, mautic_tags, tokeniza_investidor, tokeniza_valor_investido, tokeniza_qtd_investimentos, tokeniza_carrinho_abandonado, updated_at, webhook_enviado_em')
+      .select('id_lead, email, id_empresa, is_mql, levantou_mao, tem_reuniao, stage_atual, mautic_score, mautic_page_hits, mautic_last_active, mautic_tags, mautic_first_visit, mautic_segments, cidade_mautic, estado_mautic, id_mautic_contact, tokeniza_investidor, tokeniza_valor_investido, tokeniza_qtd_investimentos, tokeniza_carrinho_abandonado, chatblue_sla_violado, chatblue_prioridade, chatwoot_status_atendimento, chatwoot_conversas_total, chatwoot_tempo_resposta_medio, linkedin_senioridade, id_cliente_notion, data_criacao, data_mql, data_levantou_mao, data_reuniao, score_temperatura, updated_at, webhook_enviado_em')
       .or(`updated_at.gte.${tenMinutesAgo},webhook_enviado_em.is.null`)
       .not('email', 'is', null)
       .eq('merged', false)
@@ -39,6 +133,8 @@ serve(async (req) => {
     let leadsAtualizados = 0;
     let leadsMauticMudou = 0;
     let leadsTokenizaMudou = 0;
+    let leadsScoreCruzouThreshold = 0;
+    let leadsScoreAtualizado = 0;
 
     for (const lead of leads || []) {
       if (!lead.email) continue;
@@ -55,7 +151,6 @@ serve(async (req) => {
         if (mauticResponse.data?.success && mauticResponse.data?.data) {
           const novoMautic = mauticResponse.data.data;
           
-          // Comparar valores
           if (
             lead.mautic_score !== novoMautic.score ||
             lead.mautic_page_hits !== novoMautic.pageHits ||
@@ -64,7 +159,6 @@ serve(async (req) => {
             mauticMudou = true;
             leadsMauticMudou++;
             
-            // Atualizar lead com novos dados Mautic
             await supabase.from('lead').update({
               mautic_score: novoMautic.score,
               mautic_page_hits: novoMautic.pageHits,
@@ -75,7 +169,6 @@ serve(async (req) => {
               cidade_mautic: novoMautic.cidade,
               estado_mautic: novoMautic.estado,
               id_mautic_contact: novoMautic.mauticId,
-              // Atualizar MQL se atingir critérios
               is_mql: novoMautic.score >= 50 || novoMautic.pageHits >= 10 || lead.is_mql
             }).eq('id_lead', lead.id_lead);
 
@@ -95,7 +188,6 @@ serve(async (req) => {
         if (tokenizaResponse.data?.enriched && tokenizaResponse.data?.data) {
           const novoTokeniza = tokenizaResponse.data.data;
           
-          // Comparar valores
           if (
             lead.tokeniza_investidor !== novoTokeniza.investidor ||
             lead.tokeniza_valor_investido !== novoTokeniza.valor_investido ||
@@ -114,6 +206,65 @@ serve(async (req) => {
       if (mauticMudou || tokenizaMudou) {
         leadsAtualizados++;
       }
+
+      // === Calcular score de temperatura ===
+      // Re-fetch lead with latest data after enrichment
+      const { data: leadAtualizado } = await supabase
+        .from('lead')
+        .select('*')
+        .eq('id_lead', lead.id_lead)
+        .single();
+
+      if (!leadAtualizado) continue;
+
+      const scoreAnterior = lead.score_temperatura || 0;
+      const scoreNovo = calcularScoreTemperatura(leadAtualizado);
+      const prioridade = getPrioridade(scoreNovo);
+
+      // Persistir score se mudou
+      if (scoreNovo !== scoreAnterior) {
+        await supabase.from('lead').update({
+          score_temperatura: scoreNovo
+        }).eq('id_lead', lead.id_lead);
+
+        console.log(`[Score] Lead ${lead.id_lead}: ${scoreAnterior} -> ${scoreNovo} (${prioridade})`);
+      }
+
+      // === Verificar se deve disparar webhook para CRM ===
+      const DEFAULT_THRESHOLD = 70;
+
+      // Caso 1: Lead cruzou o threshold (era frio/morno, agora quente)
+      if (scoreAnterior < DEFAULT_THRESHOLD && scoreNovo >= DEFAULT_THRESHOLD) {
+        leadsScoreCruzouThreshold++;
+        console.log(`[CRM] Lead ${lead.id_lead} cruzou threshold! Score: ${scoreNovo} - Disparando MQL`);
+        
+        try {
+          await supabase.functions.invoke('disparar-webhook-leads', {
+            body: {
+              lead_ids: [lead.id_lead],
+              evento: 'MQL'
+            }
+          });
+        } catch (webhookError) {
+          console.error(`[CRM] Erro ao disparar webhook MQL para lead ${lead.id_lead}:`, webhookError);
+        }
+      }
+      // Caso 2: Lead já estava quente e score mudou significativamente (>15 pts)
+      else if (scoreAnterior >= DEFAULT_THRESHOLD && scoreNovo >= DEFAULT_THRESHOLD && Math.abs(scoreNovo - scoreAnterior) > 15) {
+        leadsScoreAtualizado++;
+        console.log(`[CRM] Lead ${lead.id_lead} score atualizado significativamente: ${scoreAnterior} -> ${scoreNovo}`);
+        
+        try {
+          await supabase.functions.invoke('disparar-webhook-leads', {
+            body: {
+              lead_ids: [lead.id_lead],
+              evento: 'SCORE_ATUALIZADO'
+            }
+          });
+        } catch (webhookError) {
+          console.error(`[CRM] Erro ao disparar webhook SCORE_ATUALIZADO para lead ${lead.id_lead}:`, webhookError);
+        }
+      }
     }
 
     const duracao = Date.now() - startTime;
@@ -127,11 +278,13 @@ serve(async (req) => {
         leads_verificados: leads?.length || 0,
         leads_atualizados: leadsAtualizados,
         mautic_mudancas: leadsMauticMudou,
-        tokeniza_mudancas: leadsTokenizaMudou
+        tokeniza_mudancas: leadsTokenizaMudou,
+        leads_cruzaram_threshold: leadsScoreCruzouThreshold,
+        leads_score_atualizado: leadsScoreAtualizado
       }
     });
 
-    console.log(`[Monitorar Enriquecimento] Concluído em ${duracao}ms - ${leadsAtualizados} leads atualizados`);
+    console.log(`[Monitorar Enriquecimento] Concluído em ${duracao}ms - ${leadsAtualizados} atualizados, ${leadsScoreCruzouThreshold} cruzaram threshold`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -139,6 +292,8 @@ serve(async (req) => {
       leads_atualizados: leadsAtualizados,
       mautic_mudancas: leadsMauticMudou,
       tokeniza_mudancas: leadsTokenizaMudou,
+      leads_cruzaram_threshold: leadsScoreCruzouThreshold,
+      leads_score_atualizado: leadsScoreAtualizado,
       duracao_ms: duracao
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -148,7 +303,6 @@ serve(async (req) => {
     const duracao = Date.now() - startTime;
     console.error('[Monitorar Enriquecimento] Erro:', error);
 
-    // Criar cliente para registrar erro
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;

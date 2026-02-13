@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Plus, Trash2, Send, ChevronDown, ChevronUp, ExternalLink, History, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Send, ChevronDown, ChevronUp, ExternalLink, History, RefreshCw, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -23,6 +24,7 @@ interface WebhookDestino {
   ativo: boolean;
   headers: Record<string, string>;
   eventos: string[];
+  score_minimo_crm: number;
   created_at: string;
 }
 
@@ -46,6 +48,7 @@ export function WebhookDestinosManager() {
     url: '',
     id_empresa: '',
     headers: '',
+    score_minimo_crm: 70,
     eventos: ['lead_criado', 'lead_atualizado', 'enriquecimento']
   });
 
@@ -104,14 +107,15 @@ export function WebhookDestinosManager() {
         url: newDestino.url,
         id_empresa: newDestino.id_empresa || null,
         headers: parsedHeaders,
-        eventos: newDestino.eventos
+        eventos: newDestino.eventos,
+        score_minimo_crm: newDestino.score_minimo_crm
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhook-destinos'] });
       setIsAddDialogOpen(false);
-      setNewDestino({ nome: '', url: '', id_empresa: '', headers: '', eventos: ['lead_criado', 'lead_atualizado', 'enriquecimento'] });
+      setNewDestino({ nome: '', url: '', id_empresa: '', headers: '', score_minimo_crm: 70, eventos: ['lead_criado', 'lead_atualizado', 'enriquecimento'] });
       toast.success('Destino de webhook adicionado!');
     },
     onError: (error) => {
@@ -322,6 +326,31 @@ export function WebhookDestinosManager() {
                     className="text-sm"
                   />
                 </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1">
+                    <Label htmlFor="score_minimo" className="text-xs sm:text-sm">Score mínimo para envio</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[250px]">
+                          <p className="text-xs">Escala 0-200. MORNO ≥ 30, QUENTE ≥ 70, URGENTE ≥ 120. Leads abaixo desse score não serão enviados ao CRM.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <Input
+                    id="score_minimo"
+                    type="number"
+                    min={0}
+                    max={200}
+                    value={newDestino.score_minimo_crm}
+                    onChange={(e) => setNewDestino({ ...newDestino, score_minimo_crm: parseInt(e.target.value) || 70 })}
+                    placeholder="70"
+                    className="text-sm"
+                  />
+                </div>
               </div>
               <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="w-full sm:w-auto">
@@ -375,7 +404,7 @@ export function WebhookDestinosManager() {
                           {destino.url}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          Empresa: {getEmpresaNome(destino.id_empresa)}
+                          Empresa: {getEmpresaNome(destino.id_empresa)} · Score mínimo: {destino.score_minimo_crm ?? 70}
                         </div>
                       </div>
                     </div>
