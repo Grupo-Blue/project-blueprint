@@ -1,65 +1,143 @@
 
 
-# Corrigir tela travada em "Carregando..."
+# Disparo de Leads Aquecidos para o CRM (com dados completos)
 
-## Problema identificado
+## Visao geral do fluxo
 
-No arquivo `src/components/AppLayout.tsx`, a funcao `checkAuth` (linhas 93-124) faz uma consulta ao banco para buscar o perfil do usuario. Se essa consulta falhar por timeout ou qualquer outro erro, o codigo nunca chega ao `setLoading(false)` na linha 123, deixando a tela presa no spinner "Carregando..." para sempre.
+O lead entra no sistema (via Pipedrive, CSV ou Mautic) e o SGT vai enriquecendo ele em segundo plano a cada 10 minutos. Quando o lead atinge score >= 70 (QUENTE), o sistema dispara automaticamente um webhook para o CRM com TODOS os dados enriquecidos. O CRM recebe um pacote completo para iniciar cadencias de SDR sem precisar buscar nada a mais.
 
-Os logs confirmam que o banco esta sofrendo timeouts (`canceling statement due to statement timeout`), o que causa exatamente esse comportamento.
-
-## Solucao
-
-Adicionar um bloco `try/catch/finally` na funcao `checkAuth` para garantir que `setLoading(false)` seja sempre executado, mesmo em caso de erro.
-
-## Detalhes tecnicos
-
-### Arquivo: `src/components/AppLayout.tsx`
-
-Envolver o conteudo de `checkAuth` em um `try/catch`:
-
-```typescript
-const checkAuth = async () => {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      navigate("/auth");
-      return;
-    }
-
-    setUser(session.user);
-
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", session.user.id)
-      .single();
-
-    if (profileData && !profileData.aprovado) {
-      await supabase.auth.signOut();
-      toast({
-        title: "Acesso pendente",
-        description: "Seu cadastro ainda não foi aprovado pelo administrador",
-        variant: "destructive",
-      });
-      navigate("/auth");
-      return;
-    }
-
-    setProfile(profileData);
-  } catch (error) {
-    console.error("Erro ao verificar autenticação:", error);
-    toast({
-      title: "Erro de conexão",
-      description: "Não foi possível carregar seus dados. Tente novamente.",
-      variant: "destructive",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+```text
+Lead entra no SGT (frio, score ~10)
+        |
+  Cron roda a cada 10min
+        |
+  Enriquece com Mautic (score, tags, paginas visitadas)
+  Enriquece com Tokeniza (investimentos, carrinho)
+  Enriquece com LinkedIn (cargo, senioridade)
+  Enriquece com Chatwoot (conversas, atendimento)
+        |
+  Calcula score de temperatura
+  Persiste score na tabela lead
+        |
+  Score >= 70?
+   |          |
+  Nao        Sim
+   |          |
+  Aguarda    Monta payload completo com TODOS os dados
+  proximo    Envia webhook ao CRM
+  ciclo      Evento: MQL (primeiro envio) ou SCORE_ATUALIZADO
 ```
 
-A mudanca principal e mover `setLoading(false)` para um bloco `finally`, garantindo que sempre sera executado independente de sucesso ou falha. Em caso de erro, o usuario vera um toast com a mensagem de erro e o dashboard carregara (mesmo que sem dados de perfil), em vez de ficar preso eternamente no spinner.
+## O que o CRM vai receber (payload completo)
 
+O CRM recebe um JSON unico com tudo que precisa para classificar e abordar o lead:
+
+```text
+{
+  lead_id, evento, empresa, timestamp,
+  score_temperatura: 85,
+  prioridade: "QUENTE",
+
+  dados_lead: {
+    nome, email, telefone,
+    pipedrive_deal_id, url_pipedrive, organizacao,
+    utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+    origem_tipo, lead_pago,
+    score, stage,
+    data_criacao, data_mql, data_levantou_mao, data_reuniao, data_venda,
+    valor_venda
+  },
+
+  dados_linkedin: {           <-- NOVO
+    url, cargo, empresa,
+    setor, senioridade,
+    conexoes
+  },
+
+  dados_mautic: {
+    contact_id, score, page_hits,
+    last_active, first_visit,
+    tags, segments,
+    cidade, estado
+  },
+
+  dados_tokeniza: {
+    valor_investido, qtd_investimentos, qtd_projetos,
+    projetos[], ultimo_investimento_em,
+    carrinho_abandonado, valor_carrinho
+  },
+
+  dados_blue: {
+    qtd_compras_ir, ticket_medio,
+    score_mautic, cliente_status
+  },
+
+  dados_chatwoot: {
+    contact_id, conversas_total, mensagens_total,
+    ultima_conversa, status_atendimento,
+    tempo_resposta_medio, agente_atual, inbox
+  },
+
+  dados_notion: {
+    cliente_id, cliente_status
+  },
+
+  event_metadata: {           <-- contexto do evento
+    oferta_id, valor_simulado, pagina_visitada
+  }
+}
+```
+
+## Mudancas necessarias
+
+### 1. Migration SQL (nova)
+
+Adicionar coluna `score_temperatura` (INTEGER, default 0) na tabela `lead` para persistir o score calculado no backend. Adicionar coluna `score_minimo_crm` (INTEGER, default 70) na tabela `webhook_destino` para threshold configuravel por destino.
+
+### 2. Edge Function: `monitorar-enriquecimento-leads/index.ts`
+
+Mudancas na funcao que roda a cada 10 minutos:
+
+- Apos enriquecer com Mautic e Tokeniza, calcular o score de temperatura usando a mesma logica de `src/lib/lead-scoring.ts` (replicada no backend)
+- Persistir o score na coluna `score_temperatura`
+- Comparar com o score anterior: se cruzou o threshold de 70 (era < 70, agora >= 70), invocar `disparar-webhook-leads` com o lead_id e evento `MQL`
+- Se ja estava acima de 70 e o score mudou mais de 15 pontos, invocar com evento `SCORE_ATUALIZADO`
+- Registrar no log do cronjob quantos leads cruzaram o threshold
+
+### 3. Edge Function: `disparar-webhook-leads/index.ts`
+
+Mudancas no payload e filtragem:
+
+**Adicionar ao payload:**
+- Campo `score_temperatura` (numero) no nivel raiz
+- Campo `prioridade` (string: URGENTE/QUENTE/MORNO/FRIO) no nivel raiz
+- Objeto `dados_linkedin` com os campos: `url` (linkedin_url), `cargo` (linkedin_cargo), `empresa` (linkedin_empresa), `setor` (linkedin_setor), `senioridade` (linkedin_senioridade), `conexoes` (linkedin_conexoes)
+
+**Modificar filtragem no modo cron (sem lead_ids):**
+- Adicionar `.gte('score_temperatura', 70)` na query para so buscar leads quentes
+- Respeitar o `score_minimo_crm` de cada destino ao filtrar envios
+- Manter comportamento atual quando `lead_ids` sao fornecidos (disparo manual forcado)
+
+### 4. Interface: `src/components/WebhookDestinosManager.tsx`
+
+Adicionar campo "Score minimo para envio ao CRM" na configuracao de cada destino de webhook. Input numerico com default 70 e tooltip explicando a escala (0-200, QUENTE a partir de 70, URGENTE a partir de 120).
+
+### 5. Logica de score no backend
+
+Replicar a funcao `calcularScoreTemperatura` dentro da edge function `monitorar-enriquecimento-leads`. Os fatores sao:
+
+- Engajamento Mautic: score * 0.4 + page_hits * 5 + bonus recencia (ate 90 pts)
+- Tags de intencao (clicou-whatsapp, pediu-contato, etc): +20 pts
+- Sinais comerciais: levantou_mao (+30), reuniao (+50), MQL (+20)
+- Dados Tokeniza: investidor (+40), investimentos (+10 cada, max 30), carrinho abandonado (+35)
+- Atendimento Chatwoot: SLA violado (+25), conversas ativas (+30)
+- LinkedIn: C-Level/Diretor (+25), Senior/Gerente (+15), Pleno (+8)
+- Cliente Notion existente: +25 pts
+- Penalidade: inatividade no stage > 7 dias (-2 pts/dia, max -30)
+
+## Resultado esperado
+
+- Leads frios/mornos ficam "cozinhando" no SGT sem incomodar o CRM
+- Quando um lead esquenta (score >= 70), o CRM recebe um pacote completo com TODOS os dados enriquecidos
+- O SDR do CRM sabe exatamente: quem e o lead, de onde veio, o que fez, quanto investiu, qual o cargo, e por que ele foi enviado naquele momento
+- O threshold e configuravel por destino de webhook na interface
