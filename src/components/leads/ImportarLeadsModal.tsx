@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { toast } from "sonner";
+import { dispararWebhooksCRMLote } from "@/lib/webhookService";
+
 
 interface LeadRow {
   nome: string;
