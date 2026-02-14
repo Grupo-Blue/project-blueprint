@@ -179,7 +179,7 @@ const RelatorioCreativos = () => {
             valor_vendas: lCr.valor,
             isSemConversao: mCr.verba > 0 && totalLeads === 0,
           };
-        }).filter(c => c.impressoes > 0 || c.verba_investida > 0);
+        });
 
         // Marcar estrela (melhor CPL com leads > 0)
         const comLeads = criativos.filter(c => c.leads > 0);
@@ -189,8 +189,12 @@ const RelatorioCreativos = () => {
           if (idx >= 0) criativos[idx].isEstrela = true;
         }
 
-        // Ordenar criativos por CPL (menor = melhor)
+        // Ordenar criativos: com dados primeiro, depois por CPL (menor = melhor)
         criativos.sort((a, b) => {
+          const aTemDados = a.impressoes > 0 || a.verba_investida > 0 || a.leads > 0;
+          const bTemDados = b.impressoes > 0 || b.verba_investida > 0 || b.leads > 0;
+          if (aTemDados && !bTemDados) return -1;
+          if (!aTemDados && bTemDados) return 1;
           if (a.leads > 0 && b.leads === 0) return -1;
           if (a.leads === 0 && b.leads > 0) return 1;
           return a.cpl - b.cpl;
