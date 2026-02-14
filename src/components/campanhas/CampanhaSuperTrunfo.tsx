@@ -161,7 +161,7 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
   );
 
   const CriativosDetalhe = () => (
-    <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+    <div className="space-y-2 max-h-[60vh] overflow-y-auto overflow-x-hidden">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-sm">Ranking de Criativos</h3>
         <Badge variant="outline" className="text-xs">{campanha.criativos.length} criativos</Badge>

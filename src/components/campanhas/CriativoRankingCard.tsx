@@ -98,7 +98,7 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
           )}
         </DialogContent>
       </Dialog>
-      <div className="flex-1 min-w-0 space-y-2">
+      <div className="flex-1 min-w-0 space-y-2 overflow-hidden">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium truncate">
             {criativo.descricao || criativo.id_criativo.slice(0, 12)}
