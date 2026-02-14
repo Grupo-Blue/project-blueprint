@@ -49,15 +49,22 @@ interface CampanhaSuperTrunfoProps {
 const PlataformaIcon = ({ plataforma }: { plataforma: string }) => {
   if (plataforma === 'META') {
     return (
-      <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-        M
+      <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center">
+        <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="currentColor">
+          <path d="M12 2.04c-5.5 0-10 4.49-10 10.02 0 5 3.66 9.15 8.44 9.9v-7H7.9v-2.9h2.54V9.85c0-2.52 1.49-3.93 3.78-3.93 1.09 0 2.23.2 2.23.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.88h2.78l-.45 2.9h-2.33v7a10 10 0 0 0 8.44-9.9c0-5.53-4.5-10.02-10-10.02Z" />
+        </svg>
       </div>
     );
   }
   if (plataforma === 'GOOGLE') {
     return (
-      <div className="w-7 h-7 rounded-md bg-gradient-to-br from-blue-500 via-red-500 to-yellow-400 flex items-center justify-center text-white text-xs font-bold">
-        G
+      <div className="w-7 h-7 rounded-md bg-white border border-border flex items-center justify-center">
+        <svg viewBox="0 0 24 24" className="w-4 h-4">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1Z" fill="#4285F4" />
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23Z" fill="#34A853" />
+          <path d="M5.84 14.09a6.07 6.07 0 0 1 0-4.17V7.07H2.18a10.02 10.02 0 0 0 0 9.86l3.66-2.84Z" fill="#FBBC05" />
+          <path d="M12 4.75c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.09 14.97 0 12 0 7.7 0 3.99 2.47 2.18 6.07l3.66 2.84c.87-2.6 3.3-4.16 6.16-4.16Z" fill="#EA4335" />
+        </svg>
       </div>
     );
   }
