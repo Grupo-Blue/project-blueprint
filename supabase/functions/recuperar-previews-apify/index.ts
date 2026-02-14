@@ -216,18 +216,28 @@ Deno.serve(async (req) => {
 
           if (bestMatch) {
             const urlPreview = bestMatch.snapshot?.images?.[0] || null;
-            const urlMidia =
+            const videoUrl =
               bestMatch.snapshot?.videos?.[0]?.video_hd_url ||
               bestMatch.snapshot?.videos?.[0]?.video_sd_url ||
+              null;
+            const urlMidia =
+              videoUrl ||
               bestMatch.snapshot?.images?.[0] ||
               null;
 
+            const updateFields: Record<string, any> = {
+              url_preview: urlPreview,
+              url_midia: urlMidia || urlPreview,
+            };
+
+            // Store actual video URL separately for proper playback
+            if (videoUrl) {
+              updateFields.url_video = videoUrl;
+            }
+
             const { error: updateError } = await supabase
               .from("criativo")
-              .update({
-                url_preview: urlPreview,
-                url_midia: urlMidia || urlPreview,
-              })
+              .update(updateFields)
               .eq("id_criativo", criativo.id_criativo);
 
             if (!updateError) {

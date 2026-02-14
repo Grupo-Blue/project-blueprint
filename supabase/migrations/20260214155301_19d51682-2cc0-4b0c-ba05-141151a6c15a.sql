@@ -1,0 +1,1 @@
+ALTER TABLE public.criativo ADD COLUMN url_video TEXT;
