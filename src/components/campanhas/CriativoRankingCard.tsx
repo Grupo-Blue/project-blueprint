@@ -49,7 +49,7 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
   ];
 
   return (
-    <div className="flex gap-3 p-3 rounded-lg border bg-card hover:shadow-md transition-shadow">
+    <div className="flex gap-3 p-3 rounded-lg border bg-card hover:shadow-md transition-shadow overflow-hidden">
       {/* Posição */}
       <div className="flex flex-col items-center justify-start pt-1">
         <span className={`text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center ${
@@ -121,7 +121,7 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
         </div>
 
         {/* Métricas inline */}
-        <div className="grid grid-cols-4 gap-2 text-xs">
+        <div className="grid grid-cols-4 gap-1 text-xs">
           <div>
             <span className="text-muted-foreground">Leads</span>
             <p className="font-semibold">{criativo.leads}</p>
