@@ -53,6 +53,8 @@ import { CriativoItemMobile } from "@/components/dashboard/CriativoItemMobile";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AtualizacaoProgressoFloat } from "@/components/AtualizacaoProgressoFloat";
 import { useAtualizarDadosEmpresa } from "@/hooks/useAtualizarDadosEmpresa";
+import { PostsOrganicosRanking } from "@/components/dashboard/PostsOrganicosRanking";
+import { AudienciaDemografica } from "@/components/dashboard/AudienciaDemografica";
 
 interface CampanhaMetrica {
   id_campanha: string;
@@ -1848,6 +1850,10 @@ export default function DashboardTrafego() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Conteúdo Orgânico */}
+      <PostsOrganicosRanking />
+      <AudienciaDemografica />
 
       <Dialog open={campanhaFluxoOpen} onOpenChange={setCampanhaFluxoOpen}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
