@@ -158,3 +158,6 @@ verify_jwt = false
 
 [functions.chat-ia-assistente]
 verify_jwt = false
+
+[functions.coletar-conteudo-metricool]
+verify_jwt = false

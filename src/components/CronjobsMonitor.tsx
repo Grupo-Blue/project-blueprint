@@ -143,6 +143,13 @@ const CRONJOBS: CronjobConfig[] = [
     functionName: "recoletar-criativos-historicos",
     schedule: "Manual",
     description: "Recoleta TODOS os criativos históricos (ativos, pausados, arquivados) do Meta Ads"
+  },
+  {
+    name: "coletar-conteudo-metricool",
+    displayName: "Coletar Conteúdo Metricool",
+    functionName: "coletar-conteudo-metricool",
+    schedule: "05:00",
+    description: "Coleta posts orgânicos, demographics da audiência e dados de concorrentes do Metricool"
   }
 ];
 

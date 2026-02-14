@@ -4622,6 +4622,97 @@ export type Database = {
           },
         ]
       }
+      social_audiencia_demografica: {
+        Row: {
+          created_at: string | null
+          data_coleta: string
+          id: string
+          id_empresa: string | null
+          label: string
+          percentual: number | null
+          rede_social: string
+          tipo: string
+          valor: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          data_coleta: string
+          id?: string
+          id_empresa?: string | null
+          label: string
+          percentual?: number | null
+          rede_social: string
+          tipo: string
+          valor?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          data_coleta?: string
+          id?: string
+          id_empresa?: string | null
+          label?: string
+          percentual?: number | null
+          rede_social?: string
+          tipo?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_audiencia_demografica_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      social_concorrentes_metricool: {
+        Row: {
+          created_at: string | null
+          data: string
+          engajamento_medio: number | null
+          id: string
+          id_empresa: string | null
+          nome_concorrente: string
+          posts_total: number | null
+          rede_social: string
+          seguidores: number | null
+          username_concorrente: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          data: string
+          engajamento_medio?: number | null
+          id?: string
+          id_empresa?: string | null
+          nome_concorrente: string
+          posts_total?: number | null
+          rede_social: string
+          seguidores?: number | null
+          username_concorrente?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          data?: string
+          engajamento_medio?: number | null
+          id?: string
+          id_empresa?: string | null
+          nome_concorrente?: string
+          posts_total?: number | null
+          rede_social?: string
+          seguidores?: number | null
+          username_concorrente?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_concorrentes_metricool_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       social_metricas_dia: {
         Row: {
           alcance: number
@@ -4671,6 +4762,86 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "social_metricas_dia_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      social_posts: {
+        Row: {
+          alcance: number | null
+          cliques_link: number | null
+          comentarios: number | null
+          compartilhamentos: number | null
+          created_at: string | null
+          data_publicacao: string | null
+          engajamento_total: number | null
+          id: string
+          id_empresa: string | null
+          impressoes: number | null
+          likes: number | null
+          post_id_externo: string
+          rede_social: string
+          salvos: number | null
+          taxa_engajamento: number | null
+          texto: string | null
+          tipo: string | null
+          updated_at: string | null
+          url_midia: string | null
+          url_post: string | null
+          visitas_perfil: number | null
+        }
+        Insert: {
+          alcance?: number | null
+          cliques_link?: number | null
+          comentarios?: number | null
+          compartilhamentos?: number | null
+          created_at?: string | null
+          data_publicacao?: string | null
+          engajamento_total?: number | null
+          id?: string
+          id_empresa?: string | null
+          impressoes?: number | null
+          likes?: number | null
+          post_id_externo: string
+          rede_social: string
+          salvos?: number | null
+          taxa_engajamento?: number | null
+          texto?: string | null
+          tipo?: string | null
+          updated_at?: string | null
+          url_midia?: string | null
+          url_post?: string | null
+          visitas_perfil?: number | null
+        }
+        Update: {
+          alcance?: number | null
+          cliques_link?: number | null
+          comentarios?: number | null
+          compartilhamentos?: number | null
+          created_at?: string | null
+          data_publicacao?: string | null
+          engajamento_total?: number | null
+          id?: string
+          id_empresa?: string | null
+          impressoes?: number | null
+          likes?: number | null
+          post_id_externo?: string
+          rede_social?: string
+          salvos?: number | null
+          taxa_engajamento?: number | null
+          texto?: string | null
+          tipo?: string | null
+          updated_at?: string | null
+          url_midia?: string | null
+          url_post?: string | null
+          visitas_perfil?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_posts_id_empresa_fkey"
             columns: ["id_empresa"]
             isOneToOne: false
             referencedRelation: "empresa"
