@@ -60,6 +60,17 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
       <div className="w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
         {criativo.url_midia ? (
           <img src={criativo.url_midia} alt="" className="w-full h-full object-cover" />
+        ) : criativo.url_preview ? (
+          <a
+            href={criativo.url_preview}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="flex flex-col items-center justify-center text-primary hover:text-primary/80 transition-colors"
+          >
+            {getTipoIcon(criativo.tipo)}
+            <span className="text-[8px] mt-0.5 font-medium">Preview</span>
+          </a>
         ) : (
           getTipoIcon(criativo.tipo)
         )}

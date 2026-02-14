@@ -295,6 +295,53 @@ serve(async (req) => {
               }
             }
 
+            // === FASE 4: Buscar métricas por anúncio (insights) ===
+            if (ads.length > 0) {
+              try {
+                const adIds = ads.map((a: any) => a.id).join(",");
+                const insightsUrl = `https://graph.facebook.com/v22.0/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,actions,reach,frequency&level=ad&date_preset=today&filtering=[{"field":"ad.id","operator":"IN","value":["${adIds.replace(/,/g, '","')}"]}]&access_token=${accessToken}`;
+                
+                const insightsResponse = await fetch(insightsUrl);
+                if (insightsResponse.ok) {
+                  const insightsData = await insightsResponse.json();
+                  
+                  for (const insight of insightsData.data || []) {
+                    // Encontrar o criativo no banco pelo id_anuncio_externo
+                    const { data: criativoDB } = await supabase
+                      .from("criativo")
+                      .select("id_criativo")
+                      .eq("id_anuncio_externo", insight.ad_id)
+                      .maybeSingle();
+                    
+                    if (!criativoDB) continue;
+                    
+                    const adLeads = insight.actions?.find((a: any) => a.action_type === "lead")?.value || 0;
+                    const adSpend = parseFloat(insight.spend || "0");
+                    const adClicks = parseInt(insight.clicks || "0");
+                    
+                    const metricasCriativo = {
+                      id_criativo: criativoDB.id_criativo,
+                      data: hoje,
+                      impressoes: parseInt(insight.impressions || "0"),
+                      cliques: adClicks,
+                      verba_investida: adSpend,
+                      leads: parseInt(adLeads),
+                      alcance: parseInt(insight.reach || "0"),
+                      frequencia: parseFloat(insight.frequency || "0"),
+                      cpc_medio: adClicks > 0 ? adSpend / adClicks : 0,
+                    };
+                    
+                    await supabase
+                      .from("criativo_metricas_dia")
+                      .upsert(metricasCriativo, { onConflict: "id_criativo,data" });
+                  }
+                  console.log(`  📊 Métricas de ${insightsData.data?.length || 0} ads salvas`);
+                }
+              } catch (insErr: any) {
+                console.error(`  ⚠️ Erro ao buscar insights dos ads:`, insErr.message);
+              }
+            }
+
             resultados.push({
               integracao: integracao.id_integracao,
               campanha: campanha.nome,

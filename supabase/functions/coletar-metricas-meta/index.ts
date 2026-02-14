@@ -156,13 +156,28 @@ serve(async (req) => {
 
           const leads = metrica.actions?.find((a: any) => a.action_type === "lead")?.value || 0;
 
+          // Extrair métricas avançadas
+          const videoViews = metrica.video_play_actions?.find((a: any) => a.action_type === "video_view")?.value || 0;
+          const videoAvgWatch = metrica.video_avg_time_watched_actions?.find((a: any) => a.action_type === "video_view")?.value || 0;
+          const inlineLinkClicks = parseInt(metrica.inline_link_clicks || "0");
+          const reach = parseInt(metrica.reach || "0");
+          const frequency = parseFloat(metrica.frequency || "0");
+          const spend = parseFloat(metrica.spend || "0");
+          const clicks = parseInt(metrica.clicks || "0");
+
           const metricasDia = {
             id_campanha: campanha.id_campanha,
             data: hoje,
             impressoes: parseInt(metrica.impressions || "0"),
-            cliques: parseInt(metrica.clicks || "0"),
-            verba_investida: parseFloat(metrica.spend || "0"),
+            cliques: clicks,
+            verba_investida: spend,
             leads: parseInt(leads),
+            alcance: reach,
+            frequencia: frequency,
+            cpc_medio: clicks > 0 ? spend / clicks : 0,
+            video_views: parseInt(videoViews),
+            video_avg_watch_time: parseFloat(videoAvgWatch),
+            inline_link_clicks: inlineLinkClicks,
           };
 
           // Inserir ou atualizar métricas do dia

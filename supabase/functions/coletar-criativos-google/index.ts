@@ -403,7 +403,7 @@ serve(async (req) => {
               const investimento = parseFloat(metrics?.costMicros || "0") / 1000000;
               const leads = parseInt(metrics?.conversions || "0");
 
-              // Salvar métricas diárias do criativo
+              // Salvar métricas diárias do criativo (com campos avançados)
               const metricasData = {
                 id_criativo: criativoSalvo.id_criativo,
                 data: hoje,
@@ -411,6 +411,9 @@ serve(async (req) => {
                 cliques,
                 verba_investida: investimento,
                 leads,
+                cpc_medio: cliques > 0 ? investimento / cliques : 0,
+                conversoes: leads,
+                valor_conversao: 0,
               };
 
               const { error: metricasError } = await supabase
