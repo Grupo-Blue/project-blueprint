@@ -227,8 +227,7 @@ export default function Empresas() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="space-y-8">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-4xl font-bold text-foreground">Gestão de Empresas</h1>
@@ -620,6 +619,5 @@ export default function Empresas() {
           </DialogContent>
         </Dialog>
       </div>
-    </div>
   );
 }
