@@ -327,37 +327,35 @@ const Criativos = () => {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Gestão de Criativos</h1>
-              <p className="text-sm text-muted-foreground">
-                Alertas de campanhas com menos de 2 criativos ativos
-              </p>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button disabled={syncingCreatives}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  {syncingCreatives ? "Atualizando..." : "Atualizar"}
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleRefresh}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Recarregar Dados
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSyncCreatives}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Sincronizar com APIs
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold">Gestão de Criativos</h1>
+          <p className="text-sm text-muted-foreground">
+            Alertas de campanhas com menos de 2 criativos ativos
+          </p>
         </div>
-
-      <main className="container mx-auto px-4 py-8">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button disabled={syncingCreatives}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {syncingCreatives ? "Atualizando..." : "Atualizar"}
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleRefresh}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Recarregar Dados
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSyncCreatives}>
+              <Download className="mr-2 h-4 w-4" />
+              Sincronizar com APIs
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
         {/* Resumo */}
         <div className="grid gap-4 md:grid-cols-4 mb-8">
           <Card>
@@ -559,7 +557,7 @@ const Criativos = () => {
             </div>
           )}
         </div>
-      </main>
+      </div>
 
       {/* Modal de edição de URL esperada */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
@@ -689,6 +687,7 @@ const Criativos = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
   );
 };
 

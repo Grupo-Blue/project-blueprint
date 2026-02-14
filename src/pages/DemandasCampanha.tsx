@@ -167,8 +167,8 @@ export default function DemandasCampanha() {
 
   if (isLoading || loadingEmpresas) {
     return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="p-8">
+        <div className="space-y-4">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-muted rounded w-1/3"></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -253,8 +253,8 @@ export default function DemandasCampanha() {
   );
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
         <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Demandas de Campanhas</h1>

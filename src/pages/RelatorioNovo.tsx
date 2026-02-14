@@ -110,7 +110,7 @@ export default function RelatorioNovo() {
   // Loading state
   if (loadingEmpresas) {
     return (
-      <div className="min-h-screen bg-background p-8 flex items-center justify-center">
+      <div className="p-8 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
@@ -122,8 +122,8 @@ export default function RelatorioNovo() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="space-y-6">
+      <div>
         <Button variant="ghost" onClick={() => navigate("/relatorios")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Voltar
