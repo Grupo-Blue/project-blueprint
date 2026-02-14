@@ -268,7 +268,7 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
     <>
       {cardContent}
       <Dialog open={abrirDialog} onOpenChange={setAbrirDialog}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl w-[95vw] max-h-[85vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <PlataformaIcon plataforma={campanha.plataforma} />
