@@ -81,6 +81,14 @@ function calcularScoreTemperatura(lead: Record<string, unknown>): number {
   // === Cliente existente (Notion) ===
   if (lead.id_cliente_notion) score += 25;
 
+  // === Dados Metricool Ads (max ~15 pts) ===
+  if (lead.metricool_roas_campanha && (lead.metricool_roas_campanha as number) > 3) {
+    score += 10;
+  }
+  if (lead.metricool_ctr_campanha && (lead.metricool_ctr_campanha as number) > 2) {
+    score += 5;
+  }
+
   // === Penalidades ===
   const ultimaData = (lead.data_reuniao || lead.data_levantou_mao || lead.data_mql || lead.data_criacao) as string | null;
   if (ultimaData) {
@@ -118,7 +126,7 @@ serve(async (req) => {
     
     const { data: leads, error: leadsError } = await supabase
       .from('lead')
-      .select('id_lead, email, id_empresa, is_mql, levantou_mao, tem_reuniao, stage_atual, mautic_score, mautic_page_hits, mautic_last_active, mautic_tags, mautic_first_visit, mautic_segments, cidade_mautic, estado_mautic, id_mautic_contact, tokeniza_investidor, tokeniza_valor_investido, tokeniza_qtd_investimentos, tokeniza_carrinho_abandonado, chatblue_sla_violado, chatblue_prioridade, chatwoot_status_atendimento, chatwoot_conversas_total, chatwoot_tempo_resposta_medio, linkedin_senioridade, id_cliente_notion, data_criacao, data_mql, data_levantou_mao, data_reuniao, score_temperatura, updated_at, webhook_enviado_em')
+      .select('id_lead, email, id_empresa, is_mql, levantou_mao, tem_reuniao, stage_atual, mautic_score, mautic_page_hits, mautic_last_active, mautic_tags, mautic_first_visit, mautic_segments, cidade_mautic, estado_mautic, id_mautic_contact, tokeniza_investidor, tokeniza_valor_investido, tokeniza_qtd_investimentos, tokeniza_carrinho_abandonado, chatblue_sla_violado, chatblue_prioridade, chatwoot_status_atendimento, chatwoot_conversas_total, chatwoot_tempo_resposta_medio, linkedin_senioridade, id_cliente_notion, data_criacao, data_mql, data_levantou_mao, data_reuniao, score_temperatura, updated_at, webhook_enviado_em, id_campanha_vinculada, metricool_roas_campanha, metricool_cpc_campanha, metricool_ctr_campanha, metricool_conversao_valor, metricool_fonte, utm_source, utm_medium')
       .or(`updated_at.gte.${tenMinutesAgo},webhook_enviado_em.is.null`)
       .not('email', 'is', null)
       .eq('merged', false)
@@ -133,6 +141,7 @@ serve(async (req) => {
     let leadsAtualizados = 0;
     let leadsMauticMudou = 0;
     let leadsTokenizaMudou = 0;
+    let leadsMetricoolMudou = 0;
     let leadsScoreCruzouThreshold = 0;
     let leadsScoreAtualizado = 0;
 
@@ -141,6 +150,7 @@ serve(async (req) => {
 
       let mauticMudou = false;
       let tokenizaMudou = false;
+      let metricoolMudou = false;
 
       // Verificar mudanças no Mautic
       try {
@@ -203,7 +213,95 @@ serve(async (req) => {
         console.error(`[Tokeniza] Erro ao verificar lead ${lead.id_lead}:`, tokenizaError);
       }
 
-      if (mauticMudou || tokenizaMudou) {
+      // === Enriquecer com dados Metricool Ads ===
+      if (lead.id_campanha_vinculada) {
+        try {
+          // Buscar métricas Metricool da campanha vinculada (últimos 30 dias)
+          const { data: metricasCampanha } = await supabase
+            .from('campanha_metricas_dia')
+            .select('verba_investida, cliques, impressoes, conversoes, valor_conversao, fonte_conversoes')
+            .eq('id_campanha', lead.id_campanha_vinculada)
+            .not('fonte_conversoes', 'is', null)
+            .order('data', { ascending: false })
+            .limit(30);
+
+          if (metricasCampanha && metricasCampanha.length > 0) {
+            // Agregar métricas
+            let totalSpent = 0, totalClicks = 0, totalImpressions = 0, totalConversions = 0, totalConversionValue = 0;
+            let fonte = '';
+            for (const m of metricasCampanha) {
+              totalSpent += m.verba_investida || 0;
+              totalClicks += m.cliques || 0;
+              totalImpressions += m.impressoes || 0;
+              totalConversions += m.conversoes || 0;
+              totalConversionValue += m.valor_conversao || 0;
+              if (!fonte && m.fonte_conversoes) {
+                fonte = m.fonte_conversoes.includes('GOOGLE') ? 'GOOGLE' : 'META';
+              }
+            }
+
+            const roas = totalSpent > 0 ? totalConversionValue / totalSpent : 0;
+            const cpc = totalClicks > 0 ? totalSpent / totalClicks : 0;
+            const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+
+            // Verificar se mudou
+            const roasAnterior = (lead.metricool_roas_campanha as number) || 0;
+            const cpcAnterior = (lead.metricool_cpc_campanha as number) || 0;
+
+            if (Math.abs(roas - roasAnterior) > 0.1 || Math.abs(cpc - cpcAnterior) > 0.5) {
+              await supabase.from('lead').update({
+                metricool_roas_campanha: Math.round(roas * 100) / 100,
+                metricool_cpc_campanha: Math.round(cpc * 100) / 100,
+                metricool_ctr_campanha: Math.round(ctr * 100) / 100,
+                metricool_conversao_valor: Math.round(totalConversionValue * 100) / 100,
+                metricool_fonte: fonte || null,
+              }).eq('id_lead', lead.id_lead);
+
+              metricoolMudou = true;
+              leadsMetricoolMudou++;
+              console.log(`[Metricool] Lead ${lead.id_lead} enriquecido - ROAS: ${roas.toFixed(2)}, CPC: ${cpc.toFixed(2)}, fonte: ${fonte}`);
+            }
+          }
+        } catch (metricoolError) {
+          console.error(`[Metricool] Erro ao enriquecer lead ${lead.id_lead}:`, metricoolError);
+        }
+      }
+
+      // === Vincular lead a post orgânico ===
+      if (!lead.id_post_organico_vinculado && lead.utm_source && lead.utm_medium === 'organic') {
+        try {
+          const rede = (lead.utm_source as string).toLowerCase();
+          if (['instagram', 'facebook', 'linkedin', 'tiktok', 'youtube', 'twitter'].includes(rede)) {
+            const dataCriacao = lead.data_criacao as string;
+            if (dataCriacao) {
+              const dataLead = new Date(dataCriacao);
+              const dataInicio = new Date(dataLead);
+              dataInicio.setDate(dataInicio.getDate() - 3); // 3 dias antes
+
+              const { data: postsProximos } = await supabase
+                .from('social_posts')
+                .select('id')
+                .eq('id_empresa', lead.id_empresa)
+                .eq('rede', rede)
+                .gte('data_publicacao', dataInicio.toISOString())
+                .lte('data_publicacao', dataCriacao)
+                .order('data_publicacao', { ascending: false })
+                .limit(1);
+
+              if (postsProximos && postsProximos.length > 0) {
+                await supabase.from('lead').update({
+                  id_post_organico_vinculado: postsProximos[0].id,
+                }).eq('id_lead', lead.id_lead);
+                console.log(`[Orgânico] Lead ${lead.id_lead} vinculado ao post ${postsProximos[0].id}`);
+              }
+            }
+          }
+        } catch (orgError) {
+          console.error(`[Orgânico] Erro ao vincular lead ${lead.id_lead}:`, orgError);
+        }
+      }
+
+      if (mauticMudou || tokenizaMudou || metricoolMudou) {
         leadsAtualizados++;
       }
 
@@ -279,12 +377,13 @@ serve(async (req) => {
         leads_atualizados: leadsAtualizados,
         mautic_mudancas: leadsMauticMudou,
         tokeniza_mudancas: leadsTokenizaMudou,
+        metricool_mudancas: leadsMetricoolMudou,
         leads_cruzaram_threshold: leadsScoreCruzouThreshold,
         leads_score_atualizado: leadsScoreAtualizado
       }
     });
 
-    console.log(`[Monitorar Enriquecimento] Concluído em ${duracao}ms - ${leadsAtualizados} atualizados, ${leadsScoreCruzouThreshold} cruzaram threshold`);
+    console.log(`[Monitorar Enriquecimento] Concluído em ${duracao}ms - ${leadsAtualizados} atualizados, ${leadsMetricoolMudou} metricool, ${leadsScoreCruzouThreshold} cruzaram threshold`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -292,6 +391,7 @@ serve(async (req) => {
       leads_atualizados: leadsAtualizados,
       mautic_mudancas: leadsMauticMudou,
       tokeniza_mudancas: leadsTokenizaMudou,
+      metricool_mudancas: leadsMetricoolMudou,
       leads_cruzaram_threshold: leadsScoreCruzouThreshold,
       leads_score_atualizado: leadsScoreAtualizado,
       duracao_ms: duracao

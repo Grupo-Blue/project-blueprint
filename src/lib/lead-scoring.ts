@@ -77,6 +77,14 @@ export const calcularScoreTemperatura = (lead: any): number => {
   // === Cliente existente (Notion) ===
   if (lead.id_cliente_notion) score += 25;
 
+  // === Dados Metricool Ads (max ~15 pts) ===
+  if (lead.metricool_roas_campanha && lead.metricool_roas_campanha > 3) {
+    score += 10; // Campanha com ROAS alto = lead mais qualificado
+  }
+  if (lead.metricool_ctr_campanha && lead.metricool_ctr_campanha > 2) {
+    score += 5; // CTR alto = anúncio relevante
+  }
+
   // === Penalidades ===
   const dias = getDiasNoStage(lead);
   if (dias > 7 && !["Vendido", "Perdido"].includes(lead.stage_atual || "")) {

@@ -3399,6 +3399,7 @@ export type Database = {
           id_lead: string
           id_lead_externo: string | null
           id_mautic_contact: string | null
+          id_post_organico_vinculado: string | null
           irpf_aliquota_efetiva: number | null
           irpf_ano_mais_recente: number | null
           irpf_complexidade_declaracao: string | null
@@ -3440,6 +3441,11 @@ export type Database = {
           merged_at: string | null
           merged_by: string | null
           merged_into_lead_id: string | null
+          metricool_conversao_valor: number | null
+          metricool_cpc_campanha: number | null
+          metricool_ctr_campanha: number | null
+          metricool_fonte: string | null
+          metricool_roas_campanha: number | null
           motivo_perda: string | null
           nome_lead: string | null
           organizacao: string | null
@@ -3529,6 +3535,7 @@ export type Database = {
           id_lead?: string
           id_lead_externo?: string | null
           id_mautic_contact?: string | null
+          id_post_organico_vinculado?: string | null
           irpf_aliquota_efetiva?: number | null
           irpf_ano_mais_recente?: number | null
           irpf_complexidade_declaracao?: string | null
@@ -3570,6 +3577,11 @@ export type Database = {
           merged_at?: string | null
           merged_by?: string | null
           merged_into_lead_id?: string | null
+          metricool_conversao_valor?: number | null
+          metricool_cpc_campanha?: number | null
+          metricool_ctr_campanha?: number | null
+          metricool_fonte?: string | null
+          metricool_roas_campanha?: number | null
           motivo_perda?: string | null
           nome_lead?: string | null
           organizacao?: string | null
@@ -3659,6 +3671,7 @@ export type Database = {
           id_lead?: string
           id_lead_externo?: string | null
           id_mautic_contact?: string | null
+          id_post_organico_vinculado?: string | null
           irpf_aliquota_efetiva?: number | null
           irpf_ano_mais_recente?: number | null
           irpf_complexidade_declaracao?: string | null
@@ -3700,6 +3713,11 @@ export type Database = {
           merged_at?: string | null
           merged_by?: string | null
           merged_into_lead_id?: string | null
+          metricool_conversao_valor?: number | null
+          metricool_cpc_campanha?: number | null
+          metricool_ctr_campanha?: number | null
+          metricool_fonte?: string | null
+          metricool_roas_campanha?: number | null
           motivo_perda?: string | null
           nome_lead?: string | null
           organizacao?: string | null
@@ -3783,6 +3801,13 @@ export type Database = {
             columns: ["id_irpf_declaracao"]
             isOneToOne: false
             referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_id_post_organico_vinculado_fkey"
+            columns: ["id_post_organico_vinculado"]
+            isOneToOne: false
+            referencedRelation: "social_posts"
             referencedColumns: ["id"]
           },
           {

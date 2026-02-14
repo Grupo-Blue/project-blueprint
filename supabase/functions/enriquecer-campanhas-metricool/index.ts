@@ -274,7 +274,7 @@ async function fetchTimelineMetrics(
       
       if (resp.ok) {
         const data = await resp.json();
-        console.log(`    ✅ ${metrica.nome}: ${data?.length || 0} registros`);
+        console.log(`    ✅ ${metrica.nome}: ${data?.length || 0} registros, raw sample: ${JSON.stringify(data?.slice(0, 3))}`);
         
         for (const item of (data || [])) {
           let dataStr: string | null = null;
@@ -439,10 +439,72 @@ serve(async (req) => {
           
           if (metricasGoogle.size > 0) {
             console.log(`  📊 ${metricasGoogle.size} dias de métricas agregadas Google`);
-            // Salvar como métricas agregadas na empresa
+            // Log valores para debug
             for (const [data, metricas] of metricasGoogle) {
-              if (metricas.conversions > 0 || metricas.conversionValue > 0) {
-                resultadoEmpresa.google.metricas_atualizadas++;
+              console.log(`    📋 Google ${data}: spent=${metricas.spent}, clicks=${metricas.clicks}, impressions=${metricas.impressions}, conversions=${metricas.conversions}, convValue=${metricas.conversionValue}`);
+            }
+            // Buscar campanhas Google para associar métricas agregadas
+            const { data: contasGoogleAgg } = await supabase
+              .from('conta_anuncio')
+              .select('id_conta')
+              .eq('id_empresa', empresaId)
+              .eq('plataforma', 'GOOGLE');
+
+            console.log(`    🔍 Contas Google: ${contasGoogleAgg?.length || 0}`);
+
+            if (contasGoogleAgg && contasGoogleAgg.length > 0) {
+              const { data: campanhasGoogleAgg } = await supabase
+                .from('campanha')
+                .select('id_campanha, nome')
+                .in('id_conta', contasGoogleAgg.map(c => c.id_conta))
+                .eq('ativa', true)
+                .limit(1);
+
+              console.log(`    🔍 Campanhas Google ativas: ${campanhasGoogleAgg?.length || 0} ${campanhasGoogleAgg?.[0]?.nome || ''}`);
+
+              if (campanhasGoogleAgg && campanhasGoogleAgg.length > 0) {
+                const campanhaRefGoogle = campanhasGoogleAgg[0];
+                for (const [data, metricas] of metricasGoogle) {
+                  if (metricas.spent > 0 || metricas.clicks > 0 || metricas.conversions > 0) {
+                    const { data: existenteG } = await supabase
+                      .from('campanha_metricas_dia')
+                      .select('conversoes, fonte_conversoes')
+                      .eq('id_campanha', campanhaRefGoogle.id_campanha)
+                      .eq('data', data)
+                      .single();
+
+                    console.log(`    🔍 Existente Google: ${JSON.stringify(existenteG)}`);
+
+                    const deveAtualizarG = !existenteG ||
+                      !existenteG.conversoes ||
+                      existenteG.conversoes === 0 ||
+                      existenteG.fonte_conversoes === null ||
+                      existenteG.fonte_conversoes?.startsWith('METRICOOL');
+
+                    if (deveAtualizarG) {
+                      const conversoes = metricas.conversions || metricas.results || 0;
+                      const { error } = await supabase
+                        .from('campanha_metricas_dia')
+                        .upsert({
+                          id_campanha: campanhaRefGoogle.id_campanha,
+                          data,
+                          impressoes: metricas.impressions || 0,
+                          cliques: metricas.clicks || 0,
+                          verba_investida: metricas.spent || 0,
+                          conversoes,
+                          valor_conversao: metricas.conversionValue || 0,
+                          fonte_conversoes: 'METRICOOL_GOOGLE_AGREGADO',
+                        }, { onConflict: 'id_campanha,data' });
+
+                      if (error) {
+                        console.error(`    ❌ Erro upsert Google: ${error.message}`);
+                      } else {
+                        resultadoEmpresa.google.metricas_atualizadas++;
+                        console.log(`    ✅ Google agregado salvo: ${data}`);
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -545,7 +607,8 @@ serve(async (req) => {
                 
                 for (const [data, metricas] of metricasMeta) {
                   const conversoes = metricas.conversions || metricas.results || 0;
-                  if (conversoes > 0 || metricas.conversionValue > 0) {
+                  // Salvar mesmo sem conversões - spent/clicks/impressions são valiosos
+                  if (conversoes > 0 || metricas.conversionValue > 0 || metricas.spent > 0 || metricas.clicks > 0) {
                     // Verificar se já existe com dados da API direta
                     const { data: existente } = await supabase
                       .from('campanha_metricas_dia')
