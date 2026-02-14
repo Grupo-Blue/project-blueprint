@@ -53,10 +53,17 @@ const navItems: NavItem[] = [
 interface LiquidSidebarProps {
   profile: any;
   onLogout: () => void;
+  onCollapseChange?: (collapsed: boolean) => void;
 }
 
-export const LiquidSidebar = ({ profile, onLogout }: LiquidSidebarProps) => {
+export const LiquidSidebar = ({ profile, onLogout, onCollapseChange }: LiquidSidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
+
+  const toggleCollapse = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    onCollapseChange?.(next);
+  };
   const location = useLocation();
   const isMobile = useIsMobile();
 
@@ -173,7 +180,7 @@ export const LiquidSidebar = ({ profile, onLogout }: LiquidSidebarProps) => {
     >
       <SidebarContent />
       <button
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={toggleCollapse}
         className="absolute -right-3 top-20 h-6 w-6 rounded-full bg-card border shadow-sm flex items-center justify-center hover:bg-accent transition-colors z-50"
       >
         {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}

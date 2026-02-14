@@ -111,7 +111,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   return (
     <div className="min-h-screen liquid-bg">
       {/* Sidebar */}
-      <LiquidSidebar profile={profile} onLogout={handleLogout} />
+      <LiquidSidebar profile={profile} onLogout={handleLogout} onCollapseChange={(c) => setSidebarCollapsed(c)} />
 
       {/* Main content area */}
       <div
