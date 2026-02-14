@@ -24,6 +24,12 @@ interface CriativoDetalhes {
   urlPreview?: string;
   urlMidia?: string;
   tipo?: string;
+  alcance?: number;
+  frequencia?: number;
+  cpcMedio?: number;
+  videoViews?: number;
+  conversoes?: number;
+  valorConversao?: number;
 }
 
 interface CriativoDetalhesModalProps {
@@ -146,6 +152,30 @@ export function CriativoDetalhesModal({
               <span className="text-sm text-muted-foreground">Verba Investida</span>
               <p className="font-medium">{formatCurrency(criativo.verba)}</p>
             </div>
+            {(criativo.alcance ?? 0) > 0 && (
+              <div>
+                <span className="text-sm text-muted-foreground">Alcance</span>
+                <p className="font-medium">{criativo.alcance?.toLocaleString()}</p>
+              </div>
+            )}
+            {(criativo.frequencia ?? 0) > 0 && (
+              <div>
+                <span className="text-sm text-muted-foreground">Frequência</span>
+                <p className="font-medium">{criativo.frequencia?.toFixed(2)}x</p>
+              </div>
+            )}
+            {(criativo.cpcMedio ?? 0) > 0 && (
+              <div>
+                <span className="text-sm text-muted-foreground">CPC Médio</span>
+                <p className="font-medium">{formatCurrency(criativo.cpcMedio!)}</p>
+              </div>
+            )}
+            {(criativo.valorConversao ?? 0) > 0 && (
+              <div>
+                <span className="text-sm text-muted-foreground">ROAS</span>
+                <p className="font-medium text-green-600">{(criativo.valorConversao! / criativo.verba).toFixed(2)}x</p>
+              </div>
+            )}
           </div>
 
           {/* Botões de ação */}

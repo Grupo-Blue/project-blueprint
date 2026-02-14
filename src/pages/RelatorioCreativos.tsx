@@ -111,16 +111,18 @@ const RelatorioCreativos = () => {
       }
 
       // Agregar métricas por campanha
-      const metricasPorCamp: Record<string, { impressoes: number; cliques: number; verba: number; leads: number; conversoes: number; valor_conv: number }> = {};
+      const metricasPorCamp: Record<string, { impressoes: number; cliques: number; verba: number; leads: number; conversoes: number; valor_conv: number; alcance: number; frequencia: number; cpc_medio: number }> = {};
       (metricasCamp || []).forEach(m => {
-        if (!metricasPorCamp[m.id_campanha]) metricasPorCamp[m.id_campanha] = { impressoes: 0, cliques: 0, verba: 0, leads: 0, conversoes: 0, valor_conv: 0 };
+        if (!metricasPorCamp[m.id_campanha]) metricasPorCamp[m.id_campanha] = { impressoes: 0, cliques: 0, verba: 0, leads: 0, conversoes: 0, valor_conv: 0, alcance: 0, frequencia: 0, cpc_medio: 0 };
         const c = metricasPorCamp[m.id_campanha];
         c.impressoes += m.impressoes || 0;
         c.cliques += m.cliques || 0;
         c.verba += m.verba_investida || 0;
         c.leads += m.leads || 0;
-        c.conversoes += m.conversoes || 0;
-        c.valor_conv += m.valor_conversao || 0;
+        c.conversoes += (m as any).conversoes || 0;
+        c.valor_conv += (m as any).valor_conversao || 0;
+        c.alcance += (m as any).alcance || 0;
+        if ((m as any).cpc_medio > 0) c.cpc_medio = (m as any).cpc_medio;
       });
 
       // Agregar métricas por criativo

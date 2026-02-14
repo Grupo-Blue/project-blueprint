@@ -523,43 +523,64 @@ export type Database = {
       }
       campanha_metricas_dia: {
         Row: {
+          alcance: number | null
           cliques: number
           conversoes: number | null
+          cpc_medio: number | null
           created_at: string
           data: string
           fonte_conversoes: string | null
+          frequencia: number | null
           id_campanha: string
           id_metricas_dia: string
           impressoes: number
+          inline_link_clicks: number | null
           leads: number
+          parcela_impressao: number | null
           valor_conversao: number | null
           verba_investida: number
+          video_avg_watch_time: number | null
+          video_views: number | null
         }
         Insert: {
+          alcance?: number | null
           cliques?: number
           conversoes?: number | null
+          cpc_medio?: number | null
           created_at?: string
           data: string
           fonte_conversoes?: string | null
+          frequencia?: number | null
           id_campanha: string
           id_metricas_dia?: string
           impressoes?: number
+          inline_link_clicks?: number | null
           leads?: number
+          parcela_impressao?: number | null
           valor_conversao?: number | null
           verba_investida?: number
+          video_avg_watch_time?: number | null
+          video_views?: number | null
         }
         Update: {
+          alcance?: number | null
           cliques?: number
           conversoes?: number | null
+          cpc_medio?: number | null
           created_at?: string
           data?: string
           fonte_conversoes?: string | null
+          frequencia?: number | null
           id_campanha?: string
           id_metricas_dia?: string
           impressoes?: number
+          inline_link_clicks?: number | null
           leads?: number
+          parcela_impressao?: number | null
           valor_conversao?: number | null
           verba_investida?: number
+          video_avg_watch_time?: number | null
+          video_views?: number | null
         }
         Relationships: [
           {
@@ -963,34 +984,52 @@ export type Database = {
       }
       criativo_metricas_dia: {
         Row: {
+          alcance: number | null
           cliques: number
+          conversoes: number | null
+          cpc_medio: number | null
           created_at: string
           data: string
+          frequencia: number | null
           id_criativo: string
           id_metricas_dia: string
           impressoes: number
           leads: number
+          valor_conversao: number | null
           verba_investida: number
+          video_views: number | null
         }
         Insert: {
+          alcance?: number | null
           cliques?: number
+          conversoes?: number | null
+          cpc_medio?: number | null
           created_at?: string
           data: string
+          frequencia?: number | null
           id_criativo: string
           id_metricas_dia?: string
           impressoes?: number
           leads?: number
+          valor_conversao?: number | null
           verba_investida?: number
+          video_views?: number | null
         }
         Update: {
+          alcance?: number | null
           cliques?: number
+          conversoes?: number | null
+          cpc_medio?: number | null
           created_at?: string
           data?: string
+          frequencia?: number | null
           id_criativo?: string
           id_metricas_dia?: string
           impressoes?: number
           leads?: number
+          valor_conversao?: number | null
           verba_investida?: number
+          video_views?: number | null
         }
         Relationships: [
           {

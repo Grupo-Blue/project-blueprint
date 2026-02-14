@@ -208,18 +208,44 @@ serve(async (req) => {
         
         console.log(`Encontrados ${results.length} resultados de métricas para customer ${customerId}`);
 
-        // Processar resultados
+        // Agregar resultados por campanha (Google retorna rows por device/network)
+        const agregado: Record<string, {
+          impressoes: number; cliques: number; verba: number; leads: number;
+          cpc_total: number; cpc_count: number; impression_share_total: number; impression_share_count: number;
+        }> = {};
+
         for (const result of results) {
-          const campanha = campanhas.find(c => c.id_campanha_externo === String(result.campaign.id));
+          const campId = String(result.campaign.id);
+          if (!agregado[campId]) {
+            agregado[campId] = { impressoes: 0, cliques: 0, verba: 0, leads: 0, cpc_total: 0, cpc_count: 0, impression_share_total: 0, impression_share_count: 0 };
+          }
+          const a = agregado[campId];
+          a.impressoes += parseInt(result.metrics.impressions || "0");
+          a.cliques += parseInt(result.metrics.clicks || "0");
+          a.verba += parseFloat(result.metrics.costMicros || "0") / 1000000;
+          a.leads += parseInt(result.metrics.conversions || "0");
+          
+          const avgCpc = parseFloat(result.metrics.averageCpc || "0") / 1000000;
+          if (avgCpc > 0) { a.cpc_total += avgCpc; a.cpc_count++; }
+          
+          const impShare = parseFloat(result.metrics.searchImpressionShare || "0");
+          if (impShare > 0) { a.impression_share_total += impShare; a.impression_share_count++; }
+        }
+
+        // Salvar métricas agregadas
+        for (const [campExtId, a] of Object.entries(agregado)) {
+          const campanha = campanhas.find(c => c.id_campanha_externo === campExtId);
           if (!campanha) continue;
 
           const metricasDia = {
             id_campanha: campanha.id_campanha,
             data: hoje,
-            impressoes: parseInt(result.metrics.impressions || "0"),
-            cliques: parseInt(result.metrics.clicks || "0"),
-            verba_investida: parseFloat(result.metrics.costMicros || "0") / 1000000,
-            leads: parseInt(result.metrics.conversions || "0"),
+            impressoes: a.impressoes,
+            cliques: a.cliques,
+            verba_investida: a.verba,
+            leads: a.leads,
+            cpc_medio: a.cpc_count > 0 ? a.cpc_total / a.cpc_count : (a.cliques > 0 ? a.verba / a.cliques : 0),
+            parcela_impressao: a.impression_share_count > 0 ? a.impression_share_total / a.impression_share_count : null,
           };
 
           const { error: upsertError } = await supabase
