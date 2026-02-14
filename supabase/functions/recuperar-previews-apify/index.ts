@@ -204,11 +204,23 @@ Deno.serve(async (req) => {
         // 4. Match and update
         for (const criativo of group.criativos) {
           const descricao = criativo.descricao || "";
+          const anuncioExterno = criativo.id_anuncio_externo || criativo.id_criativo_externo || "";
 
           let bestMatch: ApifyAdResult | null = null;
           let bestScore = 0;
+          let matchMethod = "none";
 
           for (const ad of results) {
+            // Priority 1: Match by ad ID (adArchiveID or adid)
+            const adId = ad.adArchiveID || ad.adid || "";
+            if (anuncioExterno && adId && anuncioExterno === adId) {
+              bestMatch = ad;
+              bestScore = 1;
+              matchMethod = "id_exact";
+              break;
+            }
+
+            // Priority 2: Match by text similarity (threshold 0.2)
             const adText = [
               ad.snapshot?.body_text,
               ad.snapshot?.caption,
@@ -220,10 +232,15 @@ Deno.serve(async (req) => {
             if (!adText && !descricao) continue;
 
             const score = calculateSimilarity(descricao, adText);
-            if (score > bestScore && score > 0.3) {
+            if (score > bestScore && score > 0.2) {
               bestScore = score;
               bestMatch = ad;
+              matchMethod = "text_similarity";
             }
+          }
+
+          if (bestMatch) {
+            console.log(`✅ Match for ${criativo.id_criativo}: method=${matchMethod}, score=${bestScore.toFixed(2)}`);
           }
 
           if (bestMatch) {
