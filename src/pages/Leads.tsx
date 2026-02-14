@@ -293,12 +293,15 @@ const Leads = () => {
       return alertaLeadIds.includes(lead.id_lead) && matchesEmpresa;
     }
 
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
       !searchTerm ||
-      lead.nome_lead?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.organizacao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.stage_atual?.toLowerCase().includes(searchTerm.toLowerCase());
+      lead.nome_lead?.toLowerCase().includes(searchLower) ||
+      lead.organizacao?.toLowerCase().includes(searchLower) ||
+      lead.email?.toLowerCase().includes(searchLower) ||
+      lead.telefone?.toLowerCase().includes(searchLower) ||
+      lead.telefone?.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, '')) ||
+      lead.stage_atual?.toLowerCase().includes(searchLower);
 
     const matchesStatus =
       statusFilter === "all" ||
@@ -692,7 +695,7 @@ const Leads = () => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nome, email..."
+                  placeholder="Buscar por nome, email, telefone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
