@@ -7,7 +7,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScoreResult, TipoFunil } from "@/lib/campanha-scoring";
 import { formatCurrency } from "@/lib/utils";
-import { AlertTriangle, ChevronDown, Layers } from "lucide-react";
+import { AlertTriangle, ChevronDown, Layers, Target, Link2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,6 +24,8 @@ export interface CampanhaCard {
   leads: number;
   mqls: number;
   vendas: number;
+  vendas_diretas: number;
+  vendas_campanha: number;
   valor_vendas: number;
   verba_investida: number;
   ctr: number;
@@ -100,7 +103,31 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
           </div>
           <div>
             <p className="text-[11px] text-muted-foreground">Vendas</p>
-            <p className="text-lg font-bold">{campanha.vendas}</p>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center justify-center gap-1">
+                    <p className="text-lg font-bold">{campanha.vendas}</p>
+                    {campanha.vendas > 0 && (
+                      campanha.vendas_diretas > 0 && campanha.vendas_campanha > 0 ? (
+                        <Link2 className="h-3 w-3 text-muted-foreground" />
+                      ) : campanha.vendas_diretas > 0 ? (
+                        <Target className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <Link2 className="h-3 w-3 text-amber-500" />
+                      )
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">
+                    {campanha.vendas_diretas > 0 && <span className="flex items-center gap-1"><Target className="h-3 w-3" /> {campanha.vendas_diretas} via criativo</span>}
+                    {campanha.vendas_campanha > 0 && <span className="flex items-center gap-1"><Link2 className="h-3 w-3" /> {campanha.vendas_campanha} via campanha</span>}
+                    {campanha.vendas === 0 && 'Sem vendas atribuídas'}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       )}
