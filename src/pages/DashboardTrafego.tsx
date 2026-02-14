@@ -1224,20 +1224,18 @@ export default function DashboardTrafego() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-muted rounded w-1/3"></div>
-            <div className="h-64 bg-muted rounded"></div>
-          </div>
+      <div className="p-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-1/3"></div>
+          <div className="h-64 bg-muted rounded"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-8">
-      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-8">
+    <>
+    <div className="space-y-4 sm:space-y-8">
         <div className="flex flex-col gap-3 sm:gap-4">
           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3 sm:gap-4">
             <div>
@@ -1294,7 +1292,6 @@ export default function DashboardTrafego() {
                 </span>
               )}
             </div>
-          </div>
         </div>
 
         {/* Floating de progresso da atualização */}
@@ -1866,5 +1863,6 @@ export default function DashboardTrafego() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }

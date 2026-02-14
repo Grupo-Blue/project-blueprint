@@ -14,7 +14,7 @@ export default function AnaliseLandingPages() {
 
   if (!empresaSelecionada || empresaSelecionada === "todas") {
     return (
-      <div className="container mx-auto p-8">
+      <div className="p-8">
         <Card className="p-8 text-center">
           <CardHeader>
             <CardTitle className="flex items-center justify-center gap-2">
@@ -31,7 +31,7 @@ export default function AnaliseLandingPages() {
   }
 
   return (
-    <div className="container mx-auto p-8">
+    <div className="space-y-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Análise de Landing Pages</h1>
         <p className="text-muted-foreground">

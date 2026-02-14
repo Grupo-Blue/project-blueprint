@@ -592,8 +592,8 @@ export default function RelatorioEditor() {
   const mesNome = relatorio?.mes ? MESES[relatorio.mes - 1] : "";
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="space-y-6">
+      <div>
         {/* Header com ações */}
         <div className="flex flex-wrap justify-between items-center gap-4">
           <Button variant="ghost" onClick={() => navigate("/relatorios")}>

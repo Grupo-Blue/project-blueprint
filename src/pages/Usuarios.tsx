@@ -337,22 +337,20 @@ const Usuarios = () => {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Gestão de Usuários</h1>
-              <p className="text-sm text-muted-foreground">
-                Gerenciar perfis, permissões e acesso às empresas
-              </p>
-            </div>
-            <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["usuarios"] })}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Atualizar
-            </Button>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold">Gestão de Usuários</h1>
+          <p className="text-sm text-muted-foreground">
+            Gerenciar perfis, permissões e acesso às empresas
+          </p>
         </div>
-
-      <main className="container mx-auto px-4 py-8">
+        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["usuarios"] })}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Atualizar
+        </Button>
+      </div>
         {/* Resumo */}
         <div className="grid gap-4 md:grid-cols-4 mb-8">
           <Card>
@@ -481,7 +479,7 @@ const Usuarios = () => {
             </Card>
           ))}
         </div>
-      </main>
+      </div>
 
       {/* Dialog de Edição */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -613,6 +611,7 @@ const Usuarios = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
   );
 };
 
