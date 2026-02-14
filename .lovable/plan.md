@@ -1,93 +1,114 @@
 
 
-# Automacao Completa da Integracao Apify
+# Enriquecimento Completo de Dados de Anuncios
 
-## Objetivo
-Tornar todas as 4 funcionalidades Apify totalmente automaticas, executando 2x ao dia (07:00 e 13:00 BRT = 10:00 e 16:00 UTC), sem necessidade de interacao manual.
+## Diagnostico Atual
 
----
+### Cobertura de Previews (271 criativos ativos)
+| Tipo | Total | Com Midia | Com Preview | Lacuna |
+|---|---|---|---|---|
+| VIDEO | 142 | 100 (70%) | 80 (56%) | 42 sem midia |
+| IMAGEM | 92 | 68 (74%) | 62 (67%) | 24 sem midia |
+| CARROSSEL | 15 | 10 (67%) | 15 (100%) | 5 sem midia |
+| OUTRO | 22 | 0 (0%) | 0 (0%) | 22 sem nada |
 
-## 1. Correcoes no Banco de Dados
+### Metricas Descartadas
+As edge functions ja buscam da API dados avancados, mas nao salvam no banco:
+- **Meta Ads** (`coletar-metricas-meta`): busca `reach`, `frequency`, `video_play_actions`, `video_avg_time_watched_actions`, `website_ctr`, `inline_link_clicks` -- mas salva apenas impressoes/cliques/verba/leads
+- **Google Ads** (`coletar-metricas-google`): busca `average_cpc`, `search_impression_share`, `segments.device`, `segments.ad_network_type` -- mas salva apenas impressoes/cliques/verba/leads
 
-As edge functions usam `upsert` com `onConflict`, mas faltam as constraints UNIQUE necessarias:
-
-| Tabela | Constraint necessaria |
-|---|---|
-| `concorrente_anuncio` | UNIQUE em `ad_id_externo` |
-| `tendencia_mercado` | UNIQUE em `url` |
-
-Sem essas constraints, os upserts falham silenciosamente ou geram duplicatas.
-
----
-
-## 2. Cronjobs a Criar (pg_cron + pg_net)
-
-Serao criados **8 cronjobs** (4 funcoes x 2 horarios):
-
-| Funcao | 07:00 BRT (10:00 UTC) | 13:00 BRT (16:00 UTC) |
-|---|---|---|
-| `recuperar-previews-apify` | Sim | Sim |
-| `enriquecer-lead-linkedin` | Sim | Sim |
-| `monitorar-concorrentes-apify` | Sim | Sim |
-| `coletar-tendencias-cripto` | Sim | Sim |
-
-Cada cronjob usa `net.http_post` para invocar a edge function correspondente com os headers de autorizacao.
-
-**Nota sobre concorrentes:** A funcao `monitorar-concorrentes-apify` inicia os actors do Apify de forma assincrona. A funcao `verificar-coleta-concorrentes` precisa ser chamada depois para coletar os resultados. Para resolver isso de forma automatica, sera adicionada logica dentro da propria funcao `monitorar-concorrentes-apify` para, apos iniciar os runs, aguardar e verificar os resultados automaticamente (polling interno), eliminando a necessidade de chamar `verificar-coleta-concorrentes` separadamente no cron.
+### Schema Limitado
+- `campanha_metricas_dia`: apenas `impressoes`, `cliques`, `verba_investida`, `leads`, `conversoes`, `valor_conversao`
+- `criativo_metricas_dia`: apenas `impressoes`, `cliques`, `verba_investida`, `leads`
+- Faltam: alcance, frequencia, CPC medio, ROAS, tempo de video, parcela de impressao
 
 ---
 
-## 3. Ajuste na Edge Function `monitorar-concorrentes-apify`
+## Plano de Implementacao
 
-Atualmente essa funcao apenas **inicia** os actors e retorna os `run_id`s, exigindo uma segunda chamada manual a `verificar-coleta-concorrentes`.
+### Fase 1: Expandir Schema do Banco
 
-**Alteracao:** Adicionar um parametro opcional `auto_verify: true` (default no cron). Quando ativo, a funcao:
-1. Inicia todos os actors
-2. Aguarda ate 8 minutos fazendo polling de status
-3. Quando cada run termina, coleta os resultados e insere no banco
-4. Registra log final na `cronjob_execucao`
+**Tabela `campanha_metricas_dia`** -- adicionar colunas:
+- `alcance` (integer) -- reach do Meta
+- `frequencia` (numeric) -- frequency do Meta
+- `cpc_medio` (numeric) -- average CPC de ambas plataformas
+- `parcela_impressao` (numeric) -- search_impression_share do Google
+- `video_views` (integer) -- video plays do Meta
+- `video_avg_watch_time` (numeric) -- tempo medio de visualizacao
+- `inline_link_clicks` (integer) -- cliques no link (diferente de cliques gerais)
 
-Isso torna o fluxo de concorrentes totalmente self-contained.
+**Tabela `criativo_metricas_dia`** -- adicionar colunas:
+- `alcance` (integer)
+- `frequencia` (numeric)
+- `cpc_medio` (numeric)
+- `video_views` (integer)
+- `conversoes` (integer)
+- `valor_conversao` (numeric)
 
----
+### Fase 2: Atualizar Edge Functions de Coleta
 
-## 4. Sequencia de Implementacao
+**`coletar-metricas-meta`**: Salvar os campos extras que ja vem da API (reach, frequency, video_play_actions, etc.) nas novas colunas.
 
-1. Criar migration com as constraints UNIQUE
-2. Atualizar `monitorar-concorrentes-apify` com logica de auto-verify
-3. Criar os 8 cronjobs via SQL (insert direto, nao migration)
+**`coletar-metricas-google`**: Salvar average_cpc e search_impression_share. Agregar metricas por device/network ao inves de descartar.
+
+**`coletar-criativos-meta`**: Ja busca `preview_shareable_link` e salva como `url_preview`. Adicionar busca do campo `ad_preview` do Meta para obter thumbnail renderizavel (iframe HTML do anuncio) quando `url_midia` estiver vazio.
+
+**`coletar-criativos-google`**: Adicionar busca de asset URLs para responsive search ads e responsive display ads que atualmente ficam sem preview.
+
+### Fase 3: Melhorar Exibicao de Previews no Frontend
+
+**`CriativoRankingCard.tsx`**: 
+- Quando `url_midia` nao existe mas `url_preview` existe (link fb.me), exibir botao "Ver Preview" ao inves de icone vazio
+- Adicionar fallback para thumbnail via `url_preview` quando possivel
+
+**`CampanhaSuperTrunfo.tsx` (dialog)**:
+- Mostrar metricas extras quando disponiveis: alcance, frequencia, CPC medio
+- Destacar ROAS quando `valor_conversao > 0`
+
+**`CriativoDetalhesModal.tsx`**:
+- Exibir alcance e frequencia do criativo
+- Mostrar ROAS e valor de conversao quando disponiveis
+
+### Fase 4: Enriquecer Metricas de Criativos do Meta
+
+Atualmente, `coletar-criativos-meta` coleta criativos mas **nao busca metricas por criativo** (so salva o criativo em si). As metricas por criativo precisam de uma chamada separada `ad_id/insights`.
+
+Criar logica dentro de `coletar-criativos-meta` para, apos coletar os ads, buscar metricas por ad (`ad_id/insights?fields=impressions,clicks,spend,actions,reach,frequency`) e salvar em `criativo_metricas_dia`. Isso preenchera os cards que hoje mostram 0 em tudo.
 
 ---
 
 ## Secao Tecnica
 
-### Migration SQL (constraints)
+### Migration SQL
 ```sql
--- Constraint UNIQUE para upserts de concorrentes
-ALTER TABLE public.concorrente_anuncio 
-  ADD CONSTRAINT concorrente_anuncio_ad_id_externo_key UNIQUE (ad_id_externo);
+-- Expandir campanha_metricas_dia
+ALTER TABLE public.campanha_metricas_dia
+  ADD COLUMN IF NOT EXISTS alcance integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS frequencia numeric DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cpc_medio numeric DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS parcela_impressao numeric,
+  ADD COLUMN IF NOT EXISTS video_views integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS video_avg_watch_time numeric DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS inline_link_clicks integer DEFAULT 0;
 
--- Constraint UNIQUE para upserts de tendencias
-ALTER TABLE public.tendencia_mercado 
-  ADD CONSTRAINT tendencia_mercado_url_key UNIQUE (url);
+-- Expandir criativo_metricas_dia
+ALTER TABLE public.criativo_metricas_dia
+  ADD COLUMN IF NOT EXISTS alcance integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS frequencia numeric DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cpc_medio numeric DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS video_views integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS conversoes integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS valor_conversao numeric DEFAULT 0;
 ```
 
-### Cronjobs SQL (exemplo de 1 dos 8)
-```sql
-SELECT cron.schedule(
-  'recuperar-previews-apify-manha',
-  '0 10 * * *',
-  $$
-  SELECT net.http_post(
-    url:='https://unsznbmmqhihwctguvvr.supabase.co/functions/v1/recuperar-previews-apify',
-    headers:='{"Content-Type":"application/json","Authorization":"Bearer <anon_key>"}'::jsonb,
-    body:='{}'::jsonb
-  ) as request_id;
-  $$
-);
-```
+### Alteracoes em Edge Functions
+- `coletar-metricas-meta`: mapear campos da resposta API para novas colunas no upsert
+- `coletar-metricas-google`: agregar metricas por campaign (somando devices) e salvar cpc_medio e parcela_impressao
+- `coletar-criativos-meta`: adicionar chamada `insights` por batch de ad IDs para preencher `criativo_metricas_dia`
+- `coletar-criativos-google`: ja salva metricas por criativo, apenas adicionar as novas colunas
 
-### Alteracao em `monitorar-concorrentes-apify`
-- Adicionar funcao interna `waitAndCollectResults(runs, supabase, token)` que faz polling dos runs e insere resultados (reutilizando logica de `verificar-coleta-concorrentes`)
-- Chamar automaticamente quando invocado sem parametro `skip_verify`
+### Alteracoes no Frontend
+- `CriativoRankingCard`: exibir alcance/frequencia quando > 0, melhorar fallback visual de preview
+- `CampanhaSuperTrunfo`: adicionar ROAS e alcance no dialog de detalhes
+- `RelatorioCreativos.tsx`: consumir novas colunas na query de metricas
 
