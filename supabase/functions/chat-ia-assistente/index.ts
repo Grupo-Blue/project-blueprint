@@ -389,14 +389,14 @@ async function executeTool(name: string, args: Record<string, any>, userId?: str
 
       let query = supabaseAdmin
         .from("lead")
-        .select("nome_lead, email, telefone, utm_source, utm_medium, utm_campaign, canal, venda, valor_venda, data_criacao, etapa_funil")
+        .select("nome_lead, email, telefone, utm_source, utm_medium, utm_campaign, origem_canal, venda_realizada, valor_venda, data_criacao, stage_atual, proprietario_nome, score_temperatura")
         .eq("id_empresa", id_empresa)
         .gte("data_criacao", dataInicio.toISOString().split("T")[0])
         .order("data_criacao", { ascending: false })
         .limit(limite);
 
-      if (args.com_venda === true) query = query.eq("venda", true);
-      if (args.com_venda === false) query = query.eq("venda", false);
+      if (args.com_venda === true) query = query.eq("venda_realizada", true);
+      if (args.com_venda === false) query = query.eq("venda_realizada", false);
 
       const { data, error } = await query;
       if (error) return { error: error.message };
