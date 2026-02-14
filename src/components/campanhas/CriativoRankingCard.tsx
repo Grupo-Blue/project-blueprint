@@ -41,10 +41,13 @@ const getTipoIcon = (tipo: string) => {
 };
 
 function getPreviewLink(criativo: CriativoRankingData): string | null {
+  if (criativo.url_preview) {
+    return criativo.url_preview;
+  }
   if (criativo.id_anuncio_externo) {
     return `https://www.facebook.com/ads/library/?id=${criativo.id_anuncio_externo}`;
   }
-  return criativo.url_preview || null;
+  return null;
 }
 
 export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardProps) {
