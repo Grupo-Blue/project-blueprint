@@ -103,21 +103,37 @@ serve(async (req) => {
       return res.data;
     });
 
-    // === FASE 3: Criativos Meta (todas as campanhas de uma vez) ===
+    // === FASE 3: Criativos Meta (em loop até processar todas) ===
     await executarFase("criativos_meta", async () => {
-      const res = await chamarFuncao(supabaseUrl, anonKey, "coletar-criativos-meta", {
-        max_campanhas: 100, // Processar todas de uma vez
-      }, 120000); // 2min timeout
+      const BATCH_SIZE = 5;
+      let offset = 0;
+      let totalProcessadas = 0;
+      let pendentes = 999;
 
-      if (!res.ok) {
-        console.error(`❌ Criativos Meta: erro`, res.data);
-        throw new Error(res.data?.error || "Erro na coleta de criativos Meta");
+      while (pendentes > 0 && tempoRestante() > 30000) {
+        const res = await chamarFuncao(supabaseUrl, anonKey, "coletar-criativos-meta", {
+          max_campanhas: BATCH_SIZE,
+          offset: offset,
+        }, 55000);
+
+        if (!res.ok) {
+          console.error(`❌ Criativos Meta batch offset=${offset}: erro`, res.data);
+          throw new Error(res.data?.error || "Erro na coleta de criativos Meta");
+        }
+
+        const processadas = res.data?.resultados?.length || 0;
+        pendentes = res.data?.campanhas_pendentes || 0;
+        totalProcessadas += processadas;
+        offset += BATCH_SIZE;
+
+        console.log(`📎 Criativos Meta batch: +${processadas} (total: ${totalProcessadas}, pendentes: ${pendentes})`);
+
+        // Se não processou nenhuma neste batch, acabou
+        if (processadas === 0) break;
       }
 
-      const processadas = res.data?.resultados?.length || 0;
-      const pendentes = res.data?.campanhas_pendentes || 0;
-      console.log(`📎 Criativos Meta: ${processadas} campanhas processadas, ${pendentes} pendentes`);
-      return res.data;
+      console.log(`📎 Criativos Meta finalizado: ${totalProcessadas} campanhas processadas`);
+      return { total_processadas: totalProcessadas };
     });
 
     // === FASE 4: Criativos Google ===
