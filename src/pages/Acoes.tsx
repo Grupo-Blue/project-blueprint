@@ -423,7 +423,7 @@ const Acoes = () => {
       </div>
 
       <Tabs defaultValue="acoes" className="space-y-6">
-        <TabsList className="grid w-full max-w-xl grid-cols-3">
+        <TabsList className="glass-card p-1 h-auto grid w-full max-w-xl grid-cols-3">
           <TabsTrigger value="acoes" className="gap-2">
             <ListChecks className="h-4 w-4" />
             Ações A/B/C

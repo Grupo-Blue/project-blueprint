@@ -275,76 +275,66 @@ const Alertas = () => {
 
       {/* Resumo Geral */}
       <div className="grid gap-4 md:grid-cols-5">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Alertas</CardTitle>
+        <div className="glass-card p-5 glow-cyan">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-muted-foreground">Total de Alertas</span>
             <AlertTriangle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalAlertasMetricas + totalAlertasUTM + totalDuplicados}</div>
-            <p className="text-xs text-muted-foreground">Alertas ativos</p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="text-2xl font-bold">{totalAlertasMetricas + totalAlertasUTM + totalDuplicados}</div>
+          <p className="text-xs text-muted-foreground">Alertas ativos</p>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alertas CPL/CAC</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalAlertasMetricas}</div>
-            <p className="text-xs text-muted-foreground">Métricas acima da meta</p>
-          </CardContent>
-        </Card>
+        <div className="glass-card p-5 glow-amber">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-muted-foreground">Alertas CPL/CAC</span>
+            <AlertTriangle className="h-4 w-4 text-liquid-amber" />
+          </div>
+          <div className="text-2xl font-bold">{totalAlertasMetricas}</div>
+          <p className="text-xs text-muted-foreground">Métricas acima da meta</p>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alertas UTM</CardTitle>
-            <Link2 className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalAlertasUTM}</div>
-            <p className="text-xs text-muted-foreground">Discrepâncias detectadas</p>
-          </CardContent>
-        </Card>
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-muted-foreground">Alertas UTM</span>
+            <Link2 className="h-4 w-4 text-liquid-cyan" />
+          </div>
+          <div className="text-2xl font-bold">{totalAlertasUTM}</div>
+          <p className="text-xs text-muted-foreground">Discrepâncias detectadas</p>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Leads Duplicados</CardTitle>
-            <Users className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalDuplicados}</div>
-            <p className="text-xs text-muted-foreground">Emails para merge</p>
-          </CardContent>
-        </Card>
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-muted-foreground">Leads Duplicados</span>
+            <Users className="h-4 w-4 text-liquid-purple" />
+          </div>
+          <div className="text-2xl font-bold">{totalDuplicados}</div>
+          <p className="text-xs text-muted-foreground">Emails para merge</p>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Status</CardTitle>
+        <div className="glass-card p-5 glow-mint">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-muted-foreground">Status</span>
             {totalAlertasMetricas + totalAlertasUTM + totalDuplicados === 0 ? (
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CheckCircle2 className="h-4 w-4 text-liquid-mint" />
             ) : (
               <AlertTriangle className="h-4 w-4 text-destructive" />
             )}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {totalAlertasMetricas + totalAlertasUTM + totalDuplicados === 0 ? "OK" : "Atenção"}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {totalAlertasMetricas + totalAlertasUTM + totalDuplicados === 0 
-                ? "Tudo em ordem" 
-                : "Requer ação"}
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="text-2xl font-bold">
+            {totalAlertasMetricas + totalAlertasUTM + totalDuplicados === 0 ? "OK" : "Atenção"}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {totalAlertasMetricas + totalAlertasUTM + totalDuplicados === 0 
+              ? "Tudo em ordem" 
+              : "Requer ação"}
+          </p>
+        </div>
       </div>
 
       {/* Tabs de Alertas */}
       <Tabs defaultValue="utm" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="utm" className="gap-2">
+        <TabsList className="glass-card p-1 h-auto">
+          <TabsTrigger value="utm" className="gap-2 rounded-2xl data-[state=active]:bg-background/80">
             <Link2 className="h-4 w-4" />
             UTM ({totalAlertasUTM})
           </TabsTrigger>

@@ -557,97 +557,97 @@ const Leads = () => {
 
       {/* Quick Wins Cards - Ações Prioritárias */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className={cn(
-          "border-l-4 cursor-pointer hover:shadow-md transition-shadow",
-          quickWins.carrinhosParaRecuperar.length > 0 ? "border-l-orange-500 bg-orange-50/50" : "border-l-slate-200"
+        <div className={cn(
+          "glass-card p-0 border-l-4 cursor-pointer",
+          quickWins.carrinhosParaRecuperar.length > 0 ? "border-l-orange-500" : "border-l-muted"
         )} onClick={() => setInvestidorFilter("carrinho")}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4 text-orange-600" />
+          <div className="p-4 pb-2">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-liquid-amber" />
               Carrinhos para Recuperar
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{quickWins.carrinhosParaRecuperar.length}</div>
+            </p>
+          </div>
+          <div className="px-4 pb-4">
+            <div className="text-2xl font-bold text-liquid-amber">{quickWins.carrinhosParaRecuperar.length}</div>
             <p className="text-xs text-muted-foreground">
               {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(valorCarrinhos)}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className={cn(
-          "border-l-4 cursor-pointer hover:shadow-md transition-shadow",
-          parados7DiasFilter ? "border-l-red-600 bg-red-100 ring-2 ring-red-500" : quickWins.leadsParados7Dias.length > 0 ? "border-l-red-500 bg-red-50/50" : "border-l-slate-200"
+        <div className={cn(
+          "glass-card p-0 border-l-4 cursor-pointer",
+          parados7DiasFilter ? "border-l-destructive ring-2 ring-destructive" : quickWins.leadsParados7Dias.length > 0 ? "border-l-destructive" : "border-l-muted"
         )} onClick={() => setParados7DiasFilter(!parados7DiasFilter)}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
+          <div className="p-4 pb-2">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
               Parados +7 dias
               {parados7DiasFilter && <Badge variant="secondary" className="ml-auto text-xs">Filtrado</Badge>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{quickWins.leadsParados7Dias.length}</div>
+            </p>
+          </div>
+          <div className="px-4 pb-4">
+            <div className="text-2xl font-bold text-destructive">{quickWins.leadsParados7Dias.length}</div>
             <p className="text-xs text-muted-foreground">
               {parados7DiasFilter ? "Clique para remover filtro" : "Leads para ligar"}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className={cn(
-          "border-l-4 cursor-pointer hover:shadow-md transition-shadow",
-          quickWins.reunioesAgendadas.length > 0 ? "border-l-purple-500 bg-purple-50/50" : "border-l-slate-200"
+        <div className={cn(
+          "glass-card p-0 border-l-4 cursor-pointer",
+          quickWins.reunioesAgendadas.length > 0 ? "border-l-liquid-purple" : "border-l-muted"
         )} onClick={() => setStatusFilter("reuniao")}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-purple-600" />
+          <div className="p-4 pb-2">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-liquid-purple" />
               Reuniões Agendadas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{quickWins.reunioesAgendadas.length}</div>
+            </p>
+          </div>
+          <div className="px-4 pb-4">
+            <div className="text-2xl font-bold text-liquid-purple">{quickWins.reunioesAgendadas.length}</div>
             <p className="text-xs text-muted-foreground">Pendentes</p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className={cn(
-          "border-l-4 cursor-pointer hover:shadow-md transition-shadow",
-          quickWins.emNegociacao.length > 0 ? "border-l-emerald-500 bg-emerald-50/50" : "border-l-slate-200"
+        <div className={cn(
+          "glass-card p-0 border-l-4 cursor-pointer",
+          quickWins.emNegociacao.length > 0 ? "border-l-liquid-mint" : "border-l-muted"
         )}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-emerald-600" />
+          <div className="p-4 pb-2">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-liquid-mint" />
               Em Negociação
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{quickWins.emNegociacao.length}</div>
+            </p>
+          </div>
+          <div className="px-4 pb-4">
+            <div className="text-2xl font-bold text-liquid-mint">{quickWins.emNegociacao.length}</div>
             <p className="text-xs text-muted-foreground">
               {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(valorNegociacao)}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Stats Cards - Métricas Gerais */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-        <Card className="p-3">
+        <div className="glass-card p-3">
           <div className="text-xs text-muted-foreground">Total</div>
           <div className="text-xl font-bold">{stats.total}</div>
-        </Card>
-        <Card className="p-3">
+        </div>
+        <div className="glass-card p-3">
           <div className="text-xs text-muted-foreground">MQLs</div>
-          <div className="text-xl font-bold text-blue-600">{stats.mqls}</div>
-        </Card>
-        <Card className="p-3">
+          <div className="text-xl font-bold text-liquid-cyan">{stats.mqls}</div>
+        </div>
+        <div className="glass-card p-3">
           <div className="text-xs text-muted-foreground">Reuniões</div>
-          <div className="text-xl font-bold text-purple-600">{stats.reunioes}</div>
-        </Card>
-        <Card className="p-3">
+          <div className="text-xl font-bold text-liquid-purple">{stats.reunioes}</div>
+        </div>
+        <div className="glass-card p-3">
           <div className="text-xs text-muted-foreground">Vendas</div>
-          <div className="text-xl font-bold text-green-600">{stats.vendas}</div>
-        </Card>
-        <Card className="p-3">
+          <div className="text-xl font-bold text-liquid-mint">{stats.vendas}</div>
+        </div>
+        <div className="glass-card p-3">
           <div className="flex items-center justify-between">
             <div className="text-xs text-muted-foreground">Valor Total</div>
             <Button 
@@ -663,11 +663,11 @@ const Leads = () => {
           <div className="text-lg font-bold">
             {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(stats.valorTotal)}
           </div>
-        </Card>
-        <Card className="p-3">
+        </div>
+        <div className="glass-card p-3">
           <div className="text-xs text-muted-foreground">Investidores</div>
-          <div className="text-xl font-bold text-amber-600">{stats.investidores}</div>
-        </Card>
+          <div className="text-xl font-bold text-liquid-amber">{stats.investidores}</div>
+        </div>
       </div>
 
       {/* Filters - Mobile vs Desktop */}
