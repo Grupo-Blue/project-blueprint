@@ -155,3 +155,6 @@ verify_jwt = false
 
 [functions.mautic-webhook]
 verify_jwt = false
+
+[functions.chat-ia-assistente]
+verify_jwt = false

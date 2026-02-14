@@ -57,6 +57,7 @@ import sgtLogo from "@/assets/sgt-logo.png";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DataStatusIndicator } from "@/components/DataStatusIndicator";
+import { ChatIAFlutuante } from "@/components/ChatIAFlutuante";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -619,6 +620,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           </div>
         </nav>
       )}
+      <ChatIAFlutuante />
     </div>
   );
 };
