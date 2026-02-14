@@ -44,10 +44,6 @@ function getAdLibraryUrl(criativo: CriativoDetalhes): string | null {
   if (criativo.idAnuncioExterno) {
     return `https://www.facebook.com/ads/library/?id=${criativo.idAnuncioExterno}`;
   }
-  // If urlPreview is already an Ad Library link, use it
-  if (criativo.urlPreview?.includes('facebook.com/ads/library')) {
-    return criativo.urlPreview;
-  }
   return criativo.urlPreview || null;
 }
 
