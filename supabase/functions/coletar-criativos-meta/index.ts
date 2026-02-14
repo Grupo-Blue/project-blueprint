@@ -101,7 +101,8 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const integracaoIdFiltro = body.integracao_id;
     const campanhaIdFiltro = body.campanha_id;
-    const maxCampanhasPorExecucao = body.max_campanhas || 5; // Processar no máximo 5 campanhas por vez
+    const maxCampanhasPorExecucao = body.max_campanhas || 5;
+    const offsetCampanhas = body.offset || 0; // Pular N campanhas já processadas
 
     let query = supabase
       .from("integracao")
@@ -121,6 +122,7 @@ serve(async (req) => {
     const resultados: any[] = [];
     const hoje = new Date().toISOString().split("T")[0];
     let campanhasProcessadas = 0;
+    let totalCampanhasVistas = 0;
     let campanhasPendentes: any[] = [];
 
     for (const integracao of integracoes || []) {
@@ -178,6 +180,13 @@ serve(async (req) => {
 
         // Processar em batches
         for (const campanha of campanhas) {
+          totalCampanhasVistas++;
+          
+          // Pular campanhas já processadas em execuções anteriores
+          if (totalCampanhasVistas <= offsetCampanhas) {
+            continue;
+          }
+          
           if (campanhasProcessadas >= maxCampanhasPorExecucao) {
             campanhasPendentes.push({ campanha: campanha.nome, integracao: integracao.id_integracao });
             continue;
