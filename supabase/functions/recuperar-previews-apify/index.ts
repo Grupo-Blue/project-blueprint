@@ -178,11 +178,23 @@ Deno.serve(async (req) => {
       try {
         console.log(`Processing ${group.criativos.length} criativos for ${group.empresaNome}`);
 
+        // Build a clean Facebook Ads Library URL
+        const searchQuery = group.empresaNome.trim();
+        const adsLibraryUrl = new URL("https://www.facebook.com/ads/library/");
+        adsLibraryUrl.searchParams.set("active_status", "active");
+        adsLibraryUrl.searchParams.set("ad_type", "all");
+        adsLibraryUrl.searchParams.set("country", "BR");
+        adsLibraryUrl.searchParams.set("q", searchQuery);
+        adsLibraryUrl.searchParams.set("search_type", "keyword_unordered");
+        const finalUrl = adsLibraryUrl.toString();
+
+        console.log(`🔗 URL: ${finalUrl}`);
+
         const results: ApifyAdResult[] = await runApifyActorAndWait(
           "curious_coder~facebook-ads-library-scraper",
           {
-            urls: [`https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(group.empresaNome)}&search_type=keyword_unordered`],
-            maxItems: 100,
+            urls: [{ url: finalUrl }],
+            limitPerSource: 100,
           },
           APIFY_API_TOKEN
         );
