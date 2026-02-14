@@ -26,7 +26,6 @@ interface ApifyAdResult {
 }
 
 async function runApifyActorAndWait(actorId: string, input: object, token: string): Promise<any[]> {
-  // Start the actor run
   const runResponse = await fetch(
     `${APIFY_BASE_URL}/acts/${actorId}/runs?token=${token}`,
     {
@@ -48,7 +47,6 @@ async function runApifyActorAndWait(actorId: string, input: object, token: strin
     throw new Error("No run ID returned from Apify");
   }
 
-  // Poll for completion (max 5 minutes)
   const maxWait = 5 * 60 * 1000;
   const pollInterval = 10000;
   const startTime = Date.now();
@@ -63,7 +61,6 @@ async function runApifyActorAndWait(actorId: string, input: object, token: strin
     const status = statusData.data?.status;
 
     if (status === "SUCCEEDED") {
-      // Fetch results from the default dataset
       const datasetId = statusData.data?.defaultDatasetId;
       const itemsResponse = await fetch(
         `${APIFY_BASE_URL}/datasets/${datasetId}/items?token=${token}`
@@ -87,12 +84,38 @@ function normalizeText(text: string): string {
     .trim();
 }
 
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, "") + u.pathname.replace(/\/$/, "").toLowerCase();
+  } catch {
+    return url.toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+  }
+}
+
 function calculateSimilarity(a: string, b: string): number {
   const wordsA = new Set(normalizeText(a).split(" "));
   const wordsB = new Set(normalizeText(b).split(" "));
   const intersection = new Set([...wordsA].filter((x) => wordsB.has(x)));
   const union = new Set([...wordsA, ...wordsB]);
   return union.size > 0 ? intersection.size / union.size : 0;
+}
+
+function buildAdsLibraryUrl(pageIdFacebook: string | null, empresaNome: string): string {
+  const adsLibraryUrl = new URL("https://www.facebook.com/ads/library/");
+  adsLibraryUrl.searchParams.set("active_status", "all");
+  adsLibraryUrl.searchParams.set("ad_type", "all");
+  adsLibraryUrl.searchParams.set("country", "BR");
+
+  if (pageIdFacebook) {
+    adsLibraryUrl.searchParams.set("view_all_page_id", pageIdFacebook);
+    adsLibraryUrl.searchParams.set("search_type", "page");
+  } else {
+    adsLibraryUrl.searchParams.set("q", empresaNome.trim());
+    adsLibraryUrl.searchParams.set("search_type", "keyword_unordered");
+  }
+
+  return adsLibraryUrl.toString();
 }
 
 Deno.serve(async (req) => {
@@ -112,13 +135,15 @@ Deno.serve(async (req) => {
 
     const { id_empresa, limit = 50 } = await req.json().catch(() => ({}));
 
-    // 1. Find criativos without preview
+    // 1. Find criativos without preview - include id_anuncio_externo and url_final
     let query = supabase
       .from("criativo")
       .select(`
         id_criativo,
         id_criativo_externo,
+        id_anuncio_externo,
         descricao,
+        url_final,
         id_campanha,
         campanha:campanha!inner(
           id_campanha,
@@ -127,20 +152,19 @@ Deno.serve(async (req) => {
           conta_anuncio:conta_anuncio!inner(
             id_empresa,
             plataforma,
+            page_id_facebook,
             empresa:empresa!inner(nome)
           )
         )
       `)
       .is("url_preview", null)
       .eq("ativo", true)
+      .eq("campanha.conta_anuncio.plataforma", "META")
       .limit(limit);
 
     if (id_empresa) {
       query = query.eq("campanha.conta_anuncio.id_empresa", id_empresa);
     }
-
-    // Filter only META platform
-    query = query.eq("campanha.conta_anuncio.plataforma", "META");
 
     const { data: criativos, error: criativosError } = await query;
 
@@ -155,8 +179,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2. Group by empresa to batch Apify calls
-    const empresaGroups: Record<string, { empresaNome: string; criativos: any[] }> = {};
+    // 2. Group by empresa
+    const empresaGroups: Record<string, { empresaNome: string; pageIdFacebook: string | null; criativos: any[] }> = {};
     for (const criativo of criativos) {
       const conta = (criativo as any).campanha?.conta_anuncio;
       if (!conta) continue;
@@ -164,6 +188,7 @@ Deno.serve(async (req) => {
       if (!empresaGroups[empresaId]) {
         empresaGroups[empresaId] = {
           empresaNome: conta.empresa?.nome || "",
+          pageIdFacebook: conta.page_id_facebook || null,
           criativos: [],
         };
       }
@@ -172,47 +197,51 @@ Deno.serve(async (req) => {
 
     let totalUpdated = 0;
     const errors: string[] = [];
+    const diagnostics: any[] = [];
 
     // 3. For each empresa, call Apify
     for (const [empresaId, group] of Object.entries(empresaGroups)) {
       try {
-        console.log(`Processing ${group.criativos.length} criativos for ${group.empresaNome}`);
+        const searchMethod = group.pageIdFacebook ? `page_id=${group.pageIdFacebook}` : `query=${group.empresaNome}`;
+        console.log(`🔍 Processing ${group.criativos.length} criativos for ${group.empresaNome} (${searchMethod})`);
 
-        // Build a clean Facebook Ads Library URL
-        const searchQuery = group.empresaNome.trim();
-        const adsLibraryUrl = new URL("https://www.facebook.com/ads/library/");
-        adsLibraryUrl.searchParams.set("active_status", "active");
-        adsLibraryUrl.searchParams.set("ad_type", "all");
-        adsLibraryUrl.searchParams.set("country", "BR");
-        adsLibraryUrl.searchParams.set("q", searchQuery);
-        adsLibraryUrl.searchParams.set("search_type", "keyword_unordered");
-        const finalUrl = adsLibraryUrl.toString();
-
+        const finalUrl = buildAdsLibraryUrl(group.pageIdFacebook, group.empresaNome);
         console.log(`🔗 URL: ${finalUrl}`);
 
         const results: ApifyAdResult[] = await runApifyActorAndWait(
           "curious_coder~facebook-ads-library-scraper",
           {
             urls: [{ url: finalUrl }],
-            limitPerSource: 100,
+            limitPerSource: 200,
           },
           APIFY_API_TOKEN
         );
 
-        console.log(`Apify returned ${results.length} ads for ${group.empresaNome}`);
+        console.log(`📦 Apify returned ${results.length} ads for ${group.empresaNome}`);
 
-        // 4. Match and update
+        // Diagnostic: log sample Apify ad
+        if (results.length > 0) {
+          const sample = results[0];
+          console.log(`📊 Sample Apify ad: adArchiveID=${sample.adArchiveID}, adid=${sample.adid}, pageID=${sample.pageID}, pageName=${sample.pageName}, link_url=${sample.snapshot?.link_url}, text=${sample.snapshot?.body_text?.substring(0, 80)}`);
+        }
+
+        // 4. Match with cascade logic
         for (const criativo of group.criativos) {
+          const anuncioExterno = criativo.id_anuncio_externo || "";
+          const urlFinal = criativo.url_final || "";
           const descricao = criativo.descricao || "";
-          const anuncioExterno = criativo.id_anuncio_externo || criativo.id_criativo_externo || "";
+
+          // Diagnostic: log criativo fields
+          console.log(`📊 Criativo ${criativo.id_criativo}: anuncio_ext=${anuncioExterno || "NULL"}, criativo_ext=${criativo.id_criativo_externo}, url_final=${urlFinal || "NULL"}, desc=${descricao?.substring(0, 50)}`);
 
           let bestMatch: ApifyAdResult | null = null;
           let bestScore = 0;
           let matchMethod = "none";
 
           for (const ad of results) {
-            // Priority 1: Match by ad ID (adArchiveID or adid)
             const adId = ad.adArchiveID || ad.adid || "";
+
+            // Priority 1: Match by ad ID (id_anuncio_externo vs adArchiveID/adid)
             if (anuncioExterno && adId && anuncioExterno === adId) {
               bestMatch = ad;
               bestScore = 1;
@@ -220,7 +249,20 @@ Deno.serve(async (req) => {
               break;
             }
 
-            // Priority 2: Match by text similarity (threshold 0.2)
+            // Priority 2: Match by landing page URL
+            if (urlFinal && ad.snapshot?.link_url) {
+              const normalizedFinal = normalizeUrl(urlFinal);
+              const normalizedAdLink = normalizeUrl(ad.snapshot.link_url);
+              if (normalizedFinal && normalizedAdLink && 
+                  (normalizedFinal.includes(normalizedAdLink) || normalizedAdLink.includes(normalizedFinal))) {
+                bestMatch = ad;
+                bestScore = 0.9;
+                matchMethod = "url_match";
+                break;
+              }
+            }
+
+            // Priority 3: Text similarity (threshold 0.2)
             const adText = [
               ad.snapshot?.body_text,
               ad.snapshot?.caption,
@@ -229,7 +271,7 @@ Deno.serve(async (req) => {
               .filter(Boolean)
               .join(" ");
 
-            if (!adText && !descricao) continue;
+            if (!adText || !descricao) continue;
 
             const score = calculateSimilarity(descricao, adText);
             if (score > bestScore && score > 0.2) {
@@ -241,25 +283,19 @@ Deno.serve(async (req) => {
 
           if (bestMatch) {
             console.log(`✅ Match for ${criativo.id_criativo}: method=${matchMethod}, score=${bestScore.toFixed(2)}`);
-          }
 
-          if (bestMatch) {
             const urlPreview = bestMatch.snapshot?.images?.[0] || null;
             const videoUrl =
               bestMatch.snapshot?.videos?.[0]?.video_hd_url ||
               bestMatch.snapshot?.videos?.[0]?.video_sd_url ||
               null;
-            const urlMidia =
-              videoUrl ||
-              bestMatch.snapshot?.images?.[0] ||
-              null;
+            const urlMidia = videoUrl || bestMatch.snapshot?.images?.[0] || null;
 
             const updateFields: Record<string, any> = {
               url_preview: urlPreview,
               url_midia: urlMidia || urlPreview,
             };
 
-            // Store actual video URL separately for proper playback
             if (videoUrl) {
               updateFields.url_video = videoUrl;
             }
@@ -271,9 +307,16 @@ Deno.serve(async (req) => {
 
             if (!updateError) {
               totalUpdated++;
+              diagnostics.push({
+                id_criativo: criativo.id_criativo,
+                match_method: matchMethod,
+                score: bestScore,
+              });
             } else {
               errors.push(`Update error for ${criativo.id_criativo}: ${updateError.message}`);
             }
+          } else {
+            console.log(`❌ No match for ${criativo.id_criativo} (desc=${descricao?.substring(0, 30)})`);
           }
         }
       } catch (err) {
@@ -290,6 +333,7 @@ Deno.serve(async (req) => {
       detalhes_execucao: {
         total_criativos: criativos.length,
         total_updated: totalUpdated,
+        diagnostics,
         errors,
       },
     });
@@ -299,6 +343,7 @@ Deno.serve(async (req) => {
         success: true,
         total_criativos: criativos.length,
         updated: totalUpdated,
+        diagnostics,
         errors: errors.length > 0 ? errors : undefined,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
