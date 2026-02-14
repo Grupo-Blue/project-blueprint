@@ -41,10 +41,14 @@ interface CriativoDetalhesModalProps {
 }
 
 function getAdLibraryUrl(criativo: CriativoDetalhes): string | null {
+  // Prefer fb.me/adspreview link stored in urlPreview
+  if (criativo.urlPreview) {
+    return criativo.urlPreview;
+  }
   if (criativo.idAnuncioExterno) {
     return `https://www.facebook.com/ads/library/?id=${criativo.idAnuncioExterno}`;
   }
-  return criativo.urlPreview || null;
+  return null;
 }
 
 export function CriativoDetalhesModal({ 
