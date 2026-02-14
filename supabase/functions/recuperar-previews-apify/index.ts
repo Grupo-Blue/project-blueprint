@@ -181,9 +181,7 @@ Deno.serve(async (req) => {
         const results: ApifyAdResult[] = await runApifyActorAndWait(
           "curious_coder~facebook-ads-library-scraper",
           {
-            searchQuery: group.empresaNome,
-            adType: "ALL",
-            country: "BR",
+            urls: [`https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(group.empresaNome)}&search_type=keyword_unordered`],
             maxItems: 100,
           },
           APIFY_API_TOKEN
