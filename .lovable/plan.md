@@ -1,143 +1,116 @@
 
 
-# Disparo de Leads Aquecidos para o CRM (com dados completos)
+# Análise Profunda de Campanhas -- "Super Trunfo"
 
-## Visao geral do fluxo
+## Visao Geral
 
-O lead entra no sistema (via Pipedrive, CSV ou Mautic) e o SGT vai enriquecendo ele em segundo plano a cada 10 minutos. Quando o lead atinge score >= 70 (QUENTE), o sistema dispara automaticamente um webhook para o CRM com TODOS os dados enriquecidos. O CRM recebe um pacote completo para iniciar cadencias de SDR sem precisar buscar nada a mais.
+Substituir a pagina `/relatorio-criativos` por uma interface de analise de campanhas ativas no estilo "carta de Super Trunfo". Cada campanha sera um card rico e visual com uma nota de saude, logo da plataforma (Meta/Google) e metricas-chave que mudam conforme o tipo de campanha (topo ou fundo de funil). Ao clicar, expande para mostrar os criativos em ranking com thumbnails, alertas e mini funil.
 
-```text
-Lead entra no SGT (frio, score ~10)
-        |
-  Cron roda a cada 10min
-        |
-  Enriquece com Mautic (score, tags, paginas visitadas)
-  Enriquece com Tokeniza (investimentos, carrinho)
-  Enriquece com LinkedIn (cargo, senioridade)
-  Enriquece com Chatwoot (conversas, atendimento)
-        |
-  Calcula score de temperatura
-  Persiste score na tabela lead
-        |
-  Score >= 70?
-   |          |
-  Nao        Sim
-   |          |
-  Aguarda    Monta payload completo com TODOS os dados
-  proximo    Envia webhook ao CRM
-  ciclo      Evento: MQL (primeiro envio) ou SCORE_ATUALIZADO
-```
+---
 
-## O que o CRM vai receber (payload completo)
+## Estrutura da Pagina
 
-O CRM recebe um JSON unico com tudo que precisa para classificar e abordar o lead:
+### 1. Cabecalho e Filtros
+- Titulo: "Analise de Campanhas"
+- Filtros: Periodo (7d, 30d, mes atual, mes anterior), Plataforma (Todas, Meta, Google), Ordenacao (Nota, CPL, ROAS, Leads, Verba)
+- Botao de comparacao lado a lado (selecionar 2-3 campanhas)
 
-```text
-{
-  lead_id, evento, empresa, timestamp,
-  score_temperatura: 85,
-  prioridade: "QUENTE",
+### 2. Card "Super Trunfo" de Campanha
 
-  dados_lead: {
-    nome, email, telefone,
-    pipedrive_deal_id, url_pipedrive, organizacao,
-    utm_source, utm_medium, utm_campaign, utm_content, utm_term,
-    origem_tipo, lead_pago,
-    score, stage,
-    data_criacao, data_mql, data_levantou_mao, data_reuniao, data_venda,
-    valor_venda
-  },
+Cada campanha ativa aparece como um card com visual distinto:
 
-  dados_linkedin: {           <-- NOVO
-    url, cargo, empresa,
-    setor, senioridade,
-    conexoes
-  },
+**Topo do Card:**
+- Logo da plataforma (icone Meta azul ou Google colorido) no canto esquerdo
+- Nome da campanha
+- Badge de tipo: "Topo de Funil" ou "Fundo de Funil" (configuravel por campanha via um toggle/select dentro do card)
+- Nota de saude no canto direito (A/B/C/D/F com cor) -- calculada automaticamente
 
-  dados_mautic: {
-    contact_id, score, page_hits,
-    last_active, first_visit,
-    tags, segments,
-    cidade, estado
-  },
+**Corpo do Card (muda conforme o tipo):**
 
-  dados_tokeniza: {
-    valor_investido, qtd_investimentos, qtd_projetos,
-    projetos[], ultimo_investimento_em,
-    carrinho_abandonado, valor_carrinho
-  },
+Topo de Funil:
+- Impressoes | CTR | Cliques
+- Verba investida
+- Nota
 
-  dados_blue: {
-    qtd_compras_ir, ticket_medio,
-    score_mautic, cliente_status
-  },
+Fundo de Funil:
+- Leads | MQLs | Vendas
+- Verba investida
+- Nota
 
-  dados_chatwoot: {
-    contact_id, conversas_total, mensagens_total,
-    ultima_conversa, status_atendimento,
-    tempo_resposta_medio, agente_atual, inbox
-  },
+**Calculo da Nota:**
+- Fundo: Baseada em CPL (vs media), taxa de conversao Lead-to-Sale, ROAS
+- Topo: Baseada em CTR (vs benchmark), CPC efetivo, custo por 1000 impressoes
+- Escala: A (top 20%), B (acima da media), C (na media), D (abaixo), F (critico)
 
-  dados_notion: {
-    cliente_id, cliente_status
-  },
+**Rodape do Card:**
+- Quantidade de criativos ativos / total
+- Icone de alerta se houver criativos com problema (fadiga, sem leads, etc.)
 
-  event_metadata: {           <-- contexto do evento
-    oferta_id, valor_simulado, pagina_visitada
-  }
-}
-```
+### 3. Detalhe Expandido (ao clicar no card)
 
-## Mudancas necessarias
+Abre um painel/dialog com:
 
-### 1. Migration SQL (nova)
+**Ranking de Criativos** (ordenados pelo melhor ao pior por CPL ou ROAS):
+- Card visual de cada criativo com:
+  - Thumbnail (imagem/video) a esquerda
+  - Metricas ao lado (leads, CPL, CTR, vendas)
+  - Mini funil visual: Impressoes -> Cliques -> Leads -> Vendas (barras proporcionais)
+  - Badge de posicao no ranking (#1, #2, #3...)
+  - Alertas visuais:
+    - "Fadiga" (queda de CTR > 30% vs semana anterior)
+    - "Sem conversao" (verba > 0, leads = 0)
+    - "Estrela" (melhor ROAS/CPL da campanha)
 
-Adicionar coluna `score_temperatura` (INTEGER, default 0) na tabela `lead` para persistir o score calculado no backend. Adicionar coluna `score_minimo_crm` (INTEGER, default 70) na tabela `webhook_destino` para threshold configuravel por destino.
+### 4. Comparacao Lado a Lado
 
-### 2. Edge Function: `monitorar-enriquecimento-leads/index.ts`
+- Botao "Comparar" permite selecionar 2-3 campanhas
+- Modal/painel com cards lado a lado mostrando as mesmas metricas para comparacao direta
+- Destaque visual em verde/vermelho para a metrica vencedora de cada linha
 
-Mudancas na funcao que roda a cada 10 minutos:
+---
 
-- Apos enriquecer com Mautic e Tokeniza, calcular o score de temperatura usando a mesma logica de `src/lib/lead-scoring.ts` (replicada no backend)
-- Persistir o score na coluna `score_temperatura`
-- Comparar com o score anterior: se cruzou o threshold de 70 (era < 70, agora >= 70), invocar `disparar-webhook-leads` com o lead_id e evento `MQL`
-- Se ja estava acima de 70 e o score mudou mais de 15 pontos, invocar com evento `SCORE_ATUALIZADO`
-- Registrar no log do cronjob quantos leads cruzaram o threshold
+## Detalhes Tecnicos
 
-### 3. Edge Function: `disparar-webhook-leads/index.ts`
+### Arquivos a criar/modificar:
 
-Mudancas no payload e filtragem:
+1. **`src/pages/RelatorioCreativos.tsx`** -- Reescrever completamente como a nova pagina "Analise de Campanhas"
 
-**Adicionar ao payload:**
-- Campo `score_temperatura` (numero) no nivel raiz
-- Campo `prioridade` (string: URGENTE/QUENTE/MORNO/FRIO) no nivel raiz
-- Objeto `dados_linkedin` com os campos: `url` (linkedin_url), `cargo` (linkedin_cargo), `empresa` (linkedin_empresa), `setor` (linkedin_setor), `senioridade` (linkedin_senioridade), `conexoes` (linkedin_conexoes)
+2. **`src/components/campanhas/CampanhaSuperTrunfo.tsx`** (novo) -- Componente do card Super Trunfo individual
 
-**Modificar filtragem no modo cron (sem lead_ids):**
-- Adicionar `.gte('score_temperatura', 70)` na query para so buscar leads quentes
-- Respeitar o `score_minimo_crm` de cada destino ao filtrar envios
-- Manter comportamento atual quando `lead_ids` sao fornecidos (disparo manual forcado)
+3. **`src/components/campanhas/CriativoRankingCard.tsx`** (novo) -- Card de criativo com thumbnail, metricas e mini funil
 
-### 4. Interface: `src/components/WebhookDestinosManager.tsx`
+4. **`src/components/campanhas/ComparativoCampanhas.tsx`** (novo) -- Modal de comparacao lado a lado
 
-Adicionar campo "Score minimo para envio ao CRM" na configuracao de cada destino de webhook. Input numerico com default 70 e tooltip explicando a escala (0-200, QUENTE a partir de 70, URGENTE a partir de 120).
+5. **`src/components/campanhas/NotaSaudeCampanha.tsx`** (novo) -- Componente visual da nota A-F com calculo
 
-### 5. Logica de score no backend
+6. **`src/lib/campanha-scoring.ts`** (novo) -- Logica de calculo da nota de saude, separada por tipo (topo/fundo)
 
-Replicar a funcao `calcularScoreTemperatura` dentro da edge function `monitorar-enriquecimento-leads`. Os fatores sao:
+### Fonte de dados:
+- Reutilizar a query existente que busca `criativo` + `criativo_metricas_dia` + `lead` (mesma logica da pagina atual)
+- Agrupar resultados por `campanha` ao inves de listar criativos individuais
+- O tipo de campanha (topo/fundo) sera armazenado via campo `tipo_funil` na tabela `campanha` (nova coluna)
 
-- Engajamento Mautic: score * 0.4 + page_hits * 5 + bonus recencia (ate 90 pts)
-- Tags de intencao (clicou-whatsapp, pediu-contato, etc): +20 pts
-- Sinais comerciais: levantou_mao (+30), reuniao (+50), MQL (+20)
-- Dados Tokeniza: investidor (+40), investimentos (+10 cada, max 30), carrinho abandonado (+35)
-- Atendimento Chatwoot: SLA violado (+25), conversas ativas (+30)
-- LinkedIn: C-Level/Diretor (+25), Senior/Gerente (+15), Pleno (+8)
-- Cliente Notion existente: +25 pts
-- Penalidade: inatividade no stage > 7 dias (-2 pts/dia, max -30)
+### Migracao de banco:
+- Adicionar coluna `tipo_funil` (TEXT, default 'fundo') na tabela `campanha` com valores: 'topo', 'fundo'
+- Isso permite persistir a configuracao por campanha
 
-## Resultado esperado
+### Responsividade:
+- Desktop: Grid de 2-3 cards por linha
+- Mobile: Cards em coluna unica, detalhe expandido inline (collapsible ao inves de dialog)
 
-- Leads frios/mornos ficam "cozinhando" no SGT sem incomodar o CRM
-- Quando um lead esquenta (score >= 70), o CRM recebe um pacote completo com TODOS os dados enriquecidos
-- O SDR do CRM sabe exatamente: quem e o lead, de onde veio, o que fez, quanto investiu, qual o cargo, e por que ele foi enviado naquele momento
-- O threshold e configuravel por destino de webhook na interface
+### Navegacao:
+- Manter a rota `/relatorio-criativos` (apenas renomear o titulo no menu lateral para "Analise Campanhas")
+
+---
+
+## Sequencia de Implementacao
+
+1. Criar migracao (campo `tipo_funil` na tabela `campanha`)
+2. Criar `campanha-scoring.ts` com logica de calculo de nota
+3. Criar componente `NotaSaudeCampanha`
+4. Criar componente `CriativoRankingCard` com thumbnail + mini funil + alertas
+5. Criar componente `CampanhaSuperTrunfo`
+6. Criar componente `ComparativoCampanhas`
+7. Reescrever `RelatorioCreativos.tsx` integrando tudo
+8. Atualizar nome no menu lateral
+
