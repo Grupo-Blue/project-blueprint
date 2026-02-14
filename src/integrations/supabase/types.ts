@@ -481,6 +481,7 @@ export type Database = {
           id_conta: string
           nome: string
           objetivo: string | null
+          tipo_funil: string
           updated_at: string
           url_esperada: string | null
         }
@@ -493,6 +494,7 @@ export type Database = {
           id_conta: string
           nome: string
           objetivo?: string | null
+          tipo_funil?: string
           updated_at?: string
           url_esperada?: string | null
         }
@@ -505,6 +507,7 @@ export type Database = {
           id_conta?: string
           nome?: string
           objetivo?: string | null
+          tipo_funil?: string
           updated_at?: string
           url_esperada?: string | null
         }

@@ -267,7 +267,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           className="w-full justify-start hover:bg-accent transition-all"
         >
           <Image className="mr-2 h-4 w-4" />
-          Performance Criativos
+          Análise Campanhas
         </Button>
       </Link>
       <Link to="/analise-landing-pages" onClick={() => setMobileMenuOpen(false)}>
