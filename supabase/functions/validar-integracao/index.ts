@@ -264,7 +264,7 @@ async function validarMetricool(config: any) {
   }
 
   // Use the same base URL and pattern as sincronizar-metricool
-  const url = `https://app.metricool.com/api/${user_id}/blog/${blog_id}/stats/timeline?startDate=2025-01-01&endDate=2025-01-02&metric=igFollowers`;
+  const url = `https://app.metricool.com/api/stats/timeline/igFollowers?blogId=${blog_id}&userId=${user_id}&start=20250101&end=20250102`;
   const response = await fetch(url, {
     headers: { "X-Mc-Auth": user_token },
   });
