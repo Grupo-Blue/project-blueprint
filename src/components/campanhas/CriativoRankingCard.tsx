@@ -1,6 +1,8 @@
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Star, TrendingDown, Image, Video, FileText } from "lucide-react";
+import { AlertTriangle, Star, TrendingDown, Image, Video, FileText, ExternalLink } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useState } from "react";
 
 export interface CriativoRankingData {
   id_criativo: string;
@@ -36,6 +38,7 @@ const getTipoIcon = (tipo: string) => {
 };
 
 export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardProps) {
+  const [imagemExpandida, setImagemExpandida] = useState(false);
   const maxFunil = Math.max(criativo.impressoes, 1);
 
   const etapasFunil = [
@@ -56,27 +59,45 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
         </span>
       </div>
 
-      {/* Thumbnail */}
-      <div className="w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
-        {criativo.url_midia ? (
-          <img src={criativo.url_midia} alt="" className="w-full h-full object-cover" />
-        ) : criativo.url_preview ? (
+      {/* Thumbnail + Preview link */}
+      <div className="flex flex-col items-center gap-1">
+        <div 
+          className={`w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center ${criativo.url_midia ? 'cursor-pointer hover:ring-2 ring-primary/50 transition-all' : ''}`}
+          onClick={(e) => {
+            if (criativo.url_midia) {
+              e.stopPropagation();
+              setImagemExpandida(true);
+            }
+          }}
+        >
+          {criativo.url_midia ? (
+            <img src={criativo.url_midia} alt="" className="w-full h-full object-cover" />
+          ) : (
+            getTipoIcon(criativo.tipo)
+          )}
+        </div>
+        {(criativo.url_preview) && (
           <a
             href={criativo.url_preview}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex flex-col items-center justify-center text-primary hover:text-primary/80 transition-colors"
+            className="text-muted-foreground hover:text-primary transition-colors"
+            title="Ver preview"
           >
-            {getTipoIcon(criativo.tipo)}
-            <span className="text-[8px] mt-0.5 font-medium">Preview</span>
+            <ExternalLink className="h-3.5 w-3.5" />
           </a>
-        ) : (
-          getTipoIcon(criativo.tipo)
         )}
       </div>
 
-      {/* Info + Métricas */}
+      {/* Image expand dialog */}
+      <Dialog open={imagemExpandida} onOpenChange={setImagemExpandida}>
+        <DialogContent className="max-w-2xl p-2" onClick={(e) => e.stopPropagation()}>
+          {criativo.url_midia && (
+            <img src={criativo.url_midia} alt={criativo.descricao || ''} className="w-full h-auto rounded-lg" />
+          )}
+        </DialogContent>
+      </Dialog>
       <div className="flex-1 min-w-0 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-medium truncate">
