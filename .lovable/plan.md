@@ -1,77 +1,251 @@
 
 
-# Adicionar 13 Novas Tools ao Chat IA Assistente
+# Redesign "Liquid" do SGT -- UI Premium e Fluida
 
 ## Visao Geral
 
-Expandir a edge function `chat-ia-assistente` de 6 para 19 ferramentas, adicionando 9 de leitura e 4 de escrita. Isso dara ao assistente acesso completo ao sistema, permitindo consultar alertas, concorrentes, hipoteses, landing pages, metricas sociais, funil de conversao, e tambem **criar registros** como demandas de campanha, alertas, hipoteses e aprendizados.
+Transformar a interface do SGT de um layout tradicional com header horizontal + navegacao inline para um design moderno com estetica "liquid": glassmorphism, gradientes organicos, formas arredondadas, sombras coloridas e animacoes suaves. O layout passara a usar uma sidebar vertical minimal + Bento Grid no conteudo principal.
 
 ---
 
-## Novas Ferramentas de Leitura (9)
+## O Que Muda (Antes vs Depois)
 
-1. **`comparar_periodos`** -- Compara metricas de dois periodos (ex: este mes vs mes passado). Consulta `empresa_metricas_dia` para ambos os intervalos e calcula variacao percentual de leads, vendas, CPL, verba.
+**Antes:** Header horizontal com navegacao inline, cards com cantos de 8px, fundo branco plano, sombras cinzas, layout em grid simples.
 
-2. **`buscar_alertas`** -- Consulta `alerta_automatico` filtrando por empresa, severidade (INFO/WARNING/CRITICAL), resolvido ou nao. Retorna alertas pendentes com titulo, descricao e metadados.
-
-3. **`buscar_concorrentes`** -- Consulta `concorrente_anuncio` para ver anuncios de concorrentes detectados. Pode filtrar por concorrente_nome, plataforma e status (ATIVO/INATIVO).
-
-4. **`buscar_hipoteses`** -- Consulta `hipotese_teste` com filtros de empresa e resultado (CONFIRMADA/REFUTADA/INCONCLUSIVA). Retorna tipo, descricao, criterio de sucesso e resultado.
-
-5. **`buscar_aprendizados`** -- Consulta `aprendizado_semana` filtrando por empresa e tipo. Retorna descricao e metricas de suporte.
-
-6. **`buscar_metricas_instagram`** -- Consulta `social_metricas_dia` para uma rede social especifica (INSTAGRAM, FACEBOOK, LINKEDIN, etc). Retorna seguidores, alcance, impressoes, engajamento.
-
-7. **`buscar_landing_pages`** -- Consulta `landingpage_metricas` para performance de LPs (sessoes, conversoes, bounce rate) e `landingpage_analise` para insights IA existentes.
-
-8. **`funil_conversao`** -- Calcula funil completo da empresa: Leads Total -> Leads Pagos -> Levantadas -> MQLs -> Reunioes -> Vendas, com taxas de conversao entre cada etapa. Dados de `empresa_metricas_dia`.
-
-9. **`listar_empresas`** -- Lista todas as empresas no sistema com nome, CPL maximo, CAC maximo e meta de verba. Util quando nenhuma empresa esta selecionada.
-
-## Novas Ferramentas de Escrita (4)
-
-10. **`criar_demanda_campanha`** -- Insere em `demanda_campanha` com titulo, descricao, plataforma (META/GOOGLE), prioridade, verba_diaria, verba_total, data_inicio, UTMs sugeridos. Requer `id_empresa` e usa o `user_id` autenticado como `id_criador`. Status inicial: PENDENTE.
-
-11. **`criar_alerta`** -- Insere em `alerta_automatico` com tipo, severidade, titulo, descricao e metadados. Permite que a IA crie alertas manuais para a equipe acompanhar.
-
-12. **`criar_hipotese`** -- Insere em `hipotese_teste` com tipo, descricao e criterio_sucesso. Requer `id_empresa` e `id_semana`. Permite registrar testes sugeridos pela IA.
-
-13. **`criar_aprendizado`** -- Insere em `aprendizado_semana` com tipo, descricao e metricas_suporte. Permite registrar insights identificados pela IA.
+**Depois:** Sidebar flutuante semi-transparente a esquerda, background com gradientes mesh animados, cards glassmorphism com cantos de 20-32px, sombras coloridas difusas (glows), tipografia Inter com numeros bold, Bento Grid responsivo.
 
 ---
 
-## Detalhes Tecnicos
+## 1. Design System Liquid (Fundacao)
 
-### Arquivo modificado
+### Paleta de Cores (CSS Variables)
 
-**`supabase/functions/chat-ia-assistente/index.ts`** -- Unico arquivo a ser alterado:
+Novas variaveis CSS para os acentos liquid:
 
-- Adicionar 13 novas entradas no array `toolDeclarations` com `name`, `description` e `parameters`
-- Adicionar 13 novos `case` no `switch` da funcao `executeTool`
-- Para as tools de escrita, o `user_id` do usuario autenticado sera passado para a funcao `executeTool` para registrar quem criou o registro
-- Atualizar o `SYSTEM_PROMPT` para informar a IA sobre suas novas capacidades de escrita e instrui-la a sempre confirmar antes de criar registros
+- `--liquid-cyan`: Electric Blue/Cyan (traffego/dados)
+- `--liquid-amber`: Sunset Orange/Gold (conversao/dinheiro)
+- `--liquid-mint`: Soft Mint Green (sucesso)
+- `--liquid-glass`: rgba branco com opacidade para glassmorphism
+- `--liquid-glow-*`: sombras coloridas difusas
 
-### Mudancas no System Prompt
+### Classes Utilitarias
 
-Adicionar instrucoes sobre:
-- Capacidade de criar demandas, alertas, hipoteses e aprendizados
-- **Sempre pedir confirmacao** antes de executar tools de escrita ("Posso registrar essa demanda?")
-- Quando criar demandas, sugerir UTMs, verba e segmentacao baseados nos dados historicos
+Novas classes Tailwind customizadas:
 
-### Fluxo de escrita (seguranca)
+- `.glass-card`: backdrop-blur + bg semi-transparente + borda sutil + border-radius 20-24px
+- `.glass-card-lg`: versao com blur maior e radius 28-32px para widgets destaque
+- `.glow-cyan`, `.glow-amber`, `.glow-mint`: sombras coloridas (box-shadow com cor)
+- `.liquid-bg`: background mesh gradient animado com blobs
+- `.bento-grid`: CSS Grid com areas nomeadas para layout masonry
 
-A edge function ja usa `SUPABASE_SERVICE_ROLE_KEY` para queries, entao as insercoes funcionarao sem problemas de RLS. O `user_id` autenticado sera extraido do token JWT e usado como `id_criador` nas demandas.
+### Animacoes
 
-### Aumento de MAX_ITERATIONS
-
-Sera aumentado de 5 para 8, pois com mais ferramentas a IA pode precisar de mais rodadas de tool calling para consultas complexas.
+- `@keyframes mesh-flow`: gradiente de fundo que se move lentamente (60s cycle)
+- `@keyframes blob-float`: blobs de cor que flutuam suavemente
+- `@keyframes fade-up`: entrada suave dos cards (translate Y + opacity)
+- `@keyframes ring-fill`: preenchimento circular para ROAS progress ring
+- Transicoes suaves em hover nos cards (scale 1.02, glow aumenta)
 
 ---
 
-## Sequencia de Implementacao
+## 2. Layout -- Sidebar Vertical + Bento Grid
 
-1. Adicionar as 13 declaracoes de ferramentas ao array `toolDeclarations`
-2. Implementar os 13 novos cases no `executeTool` (passando `user_id` para writes)
-3. Atualizar o system prompt com instrucoes sobre escrita
-4. Aumentar `MAX_ITERATIONS` para 8
-5. Deploy da edge function
+### Sidebar (Novo Componente)
+
+Substituir a navegacao horizontal no header por uma sidebar vertical flutuante:
+
+- Largura: 72px colapsada (somente icones) / 240px expandida
+- Fundo: glassmorphism (backdrop-blur + semi-transparente)
+- Icones: arredondados, preenchidos quando ativos (filled icons)
+- Agrupamento: Dashboards, Operacional, Analise, Admin
+- Logo SGT no topo
+- Avatar + logout no rodape
+- Toggle de expand/collapse com animacao suave
+- Mobile: drawer lateral (mantendo bottom nav para acesso rapido)
+
+### Header Simplificado
+
+O header atual sera simplificado para conter apenas:
+
+- Saudacao: "Bem-vindo, {nome}" com data/hora
+- Filtros globais (empresa + periodo) com estilo pill/rounded
+- Indicador de status dos dados
+
+### Bento Grid (Dashboard)
+
+O conteudo principal usara um grid estilo Bento:
+
+- Desktop: grid com 4 colunas, widgets ocupando 1x1, 2x1, 2x2 etc.
+- Tablet: 2 colunas
+- Mobile: 1 coluna (stack vertical)
+- Gap entre cards: 16-20px
+- Cards com tamanhos variados conforme importancia
+
+---
+
+## 3. Componentes Redesenhados
+
+### KPI Cards (Topo do Dashboard)
+
+Cards grandes com glassmorphism para as metricas principais:
+
+- Investimento Total: glow amber, icone DollarSign
+- CPA: glow cyan, icone Target
+- ROAS: glow mint, com progress ring SVG animado (circular)
+- Leads: glow cyan, icone Users
+
+Cada card tera:
+- border-radius: 24px
+- Backdrop blur
+- Numero grande (font-size 2.5rem, font-weight 800)
+- Variacao percentual com seta animada
+- Micro-sparkline no fundo (opcional)
+
+### Grafico "Traffic Flow" (Spline Area Chart)
+
+Widget grande (2x2 no bento grid) com:
+
+- Recharts AreaChart com `type="natural"` para curvas suaves (ondas)
+- Gradiente fill (cyan -> transparente)
+- Linha suave com stroke-width 3
+- Fundo glassmorphism
+- Animacao de entrada: linha desenhando da esquerda para direita
+
+### Lead Quality Heatmap
+
+Widget com circulos/bolhas organicas:
+
+- 3 categorias: Hot (amber), Warm (cyan), Cold (muted)
+- Tamanho dos circulos proporcional ao volume
+- Layout organico (nao grid rigido)
+- Hover mostra detalhes com tooltip glassmorphism
+
+### Funil de Conversao Fluido
+
+Em vez de triangulo rigido, um "rio" vertical:
+
+- Path SVG curvo de cima para baixo
+- Impressoes -> Cliques -> Leads -> Vendas
+- Largura diminui suavemente
+- Gradiente do cyan (topo) ao amber (fundo/conversao)
+- Numeros e taxas ao lado de cada etapa
+- Animacao de "fluxo" sutil
+
+---
+
+## 4. Arquivos a Criar/Modificar
+
+### Novos Arquivos
+
+1. **`src/index.css`** -- Adicionar variaveis CSS liquid, classes utilitarias (.glass-card, .liquid-bg, .bento-grid), keyframes de animacao
+2. **`src/components/layout/LiquidSidebar.tsx`** -- Nova sidebar vertical glassmorphism com icones, grupos, toggle collapse
+3. **`src/components/dashboard/LiquidKPICard.tsx`** -- Card KPI redesenhado com glassmorphism, glow, progress ring
+4. **`src/components/dashboard/TrafficFlowChart.tsx`** -- Spline area chart com visual de ondas
+5. **`src/components/dashboard/LeadQualityBubbles.tsx`** -- Heatmap com bolhas organicas
+6. **`src/components/dashboard/LiquidFunnel.tsx`** -- Funil SVG fluido estilo rio
+7. **`src/components/ui/GlassCard.tsx`** -- Wrapper card glassmorphism reutilizavel
+
+### Arquivos Modificados
+
+1. **`src/components/AppLayout.tsx`** -- Substituir header horizontal + nav inline por LiquidSidebar + header simplificado + background liquid
+2. **`src/pages/Dashboard.tsx`** -- Reorganizar widgets em Bento Grid, usar novos componentes liquid
+3. **`src/pages/DashboardComercial.tsx`** -- Aplicar glassmorphism nos cards e tabs
+4. **`src/components/dashboard/CockpitKPIs.tsx`** -- Usar LiquidKPICard com glows e progress rings
+5. **`tailwind.config.ts`** -- Adicionar cores liquid, border-radius maiores, keyframes de animacao
+6. **`src/components/ui/card.tsx`** -- Atualizar border-radius padrao para 20px
+
+---
+
+## 5. Detalhes Tecnicos
+
+### Glassmorphism (CSS)
+
+```text
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 24px;
+}
+
+.dark .glass-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+```
+
+### Mesh Gradient Background
+
+Fundo animado com pseudo-elementos posicionados como blobs:
+
+```text
+.liquid-bg {
+  position: relative;
+  background: linear-gradient(135deg, #f0f4ff 0%, #f8f9fe 50%, #fef9f0 100%);
+}
+
+.liquid-bg::before,
+.liquid-bg::after {
+  content: '';
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.3;
+  animation: blob-float 20s infinite alternate;
+}
+```
+
+### Progress Ring SVG (ROAS)
+
+Circulo SVG com stroke-dasharray animado para mostrar percentual de ROAS vs meta:
+
+```text
+<svg viewBox="0 0 120 120">
+  <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="8"/>
+  <circle cx="60" cy="60" r="54" fill="none" stroke="url(#gradient)" 
+    stroke-width="8" stroke-linecap="round"
+    stroke-dasharray="339.29" stroke-dashoffset={offset}
+    style="transition: stroke-dashoffset 1.5s ease-out"/>
+</svg>
+```
+
+### Bento Grid Layout
+
+```text
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+/* Widgets com spans diferentes */
+.bento-2x1 { grid-column: span 2; }
+.bento-2x2 { grid-column: span 2; grid-row: span 2; }
+.bento-4x1 { grid-column: span 4; }
+```
+
+---
+
+## 6. Sequencia de Implementacao
+
+1. **Fundacao**: Atualizar `index.css` e `tailwind.config.ts` com variaveis liquid, classes utilitarias, keyframes
+2. **GlassCard**: Criar componente base reutilizavel
+3. **LiquidSidebar**: Criar sidebar e integrar no AppLayout (substituindo nav horizontal)
+4. **LiquidKPICards**: Criar cards com glassmorphism e progress ring
+5. **TrafficFlowChart**: Criar area chart com visual de ondas
+6. **LeadQualityBubbles + LiquidFunnel**: Criar visualizacoes organicas
+7. **Dashboard**: Reorganizar pagina principal com Bento Grid e novos componentes
+8. **DashboardComercial**: Aplicar estetica liquid nos tabs e cockpit
+9. **Polimento**: Animacoes de entrada, hover effects, responsividade mobile
+
+---
+
+## 7. Compatibilidade
+
+- Todas as paginas existentes continuam funcionando -- apenas o visual muda
+- Os dados e queries permanecem identicos
+- O ChatIAFlutuante mantem sua posicao (canto inferior direito)
+- Mobile: sidebar vira drawer, bottom nav permanece, cards empilham verticalmente
+- Dark mode: glassmorphism adaptado com backgrounds escuros semi-transparentes
+
