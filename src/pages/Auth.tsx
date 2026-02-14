@@ -280,8 +280,8 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-accent/20 p-4">
-      <Card className="w-full max-w-md shadow-lg">
+    <div className="min-h-screen flex items-center justify-center liquid-bg p-4">
+      <Card className="w-full max-w-md glass-card-lg shadow-lg">
         <CardHeader className="space-y-1">
           {(mode === "forgot-password" || mode === "reset-password") && (
             <button

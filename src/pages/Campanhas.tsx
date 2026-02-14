@@ -128,13 +128,11 @@ export default function Campanhas() {
   // Loading state
   if (loadingEmpresas || isLoading) {
     return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="space-y-4">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-muted rounded w-1/4"></div>
             <div className="h-64 bg-muted rounded"></div>
           </div>
-        </div>
       </div>
     );
   }
@@ -145,8 +143,7 @@ export default function Campanhas() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="space-y-8">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
             <div>
@@ -299,8 +296,6 @@ export default function Campanhas() {
             </div>
           </Card>
         )}
-      </div>
-
       <Dialog open={campanhaFluxoOpen} onOpenChange={setCampanhaFluxoOpen}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

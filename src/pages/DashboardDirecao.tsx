@@ -313,8 +313,7 @@ export default function DashboardDirecao() {
 
   if (isLoading || loadingEmpresas) {
     return (
-      <div className="min-h-screen bg-background p-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="space-y-4">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-muted rounded w-1/3"></div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -323,7 +322,6 @@ export default function DashboardDirecao() {
               ))}
             </div>
           </div>
-        </div>
       </div>
     );
   }
@@ -333,8 +331,7 @@ export default function DashboardDirecao() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-3 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-4 md:space-y-8">
+    <div className="space-y-4 md:space-y-8">
         <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2 md:gap-4">
           <div>
             <h1 className="text-2xl md:text-4xl font-bold text-foreground">Dashboard Direção</h1>
@@ -466,30 +463,22 @@ export default function DashboardDirecao() {
                     <p className="font-semibold text-sm md:text-base truncate">{metrica.nome}</p>
                     <div className="flex flex-wrap gap-2 md:gap-4 text-xs md:text-sm text-muted-foreground">
                       <span>Verba: R$ {(metrica.verba_investida / 1000).toFixed(1)}k</span>
-                      <span>Leads: <span className="text-primary font-medium">{metrica.leads_pagos}</span>/{metrica.leads_total}</span>
+                      <span>Leads: {metrica.leads_total}</span>
                       <span>Vendas: {metrica.vendas}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 md:gap-4 shrink-0">
-                    <div className="text-left md:text-right">
-                      <p className="text-xs md:text-sm font-medium">
-                        CPL: R$ {metrica.cpl?.toFixed(0) || "N/A"}
-                      </p>
-                      {metrica.cpl && metrica.cpl > metrica.cpl_maximo ? (
-                        <Badge variant="destructive" className="text-[10px] md:text-xs">Acima</Badge>
-                      ) : (
-                        <Badge variant="default" className="text-[10px] md:text-xs">OK</Badge>
-                      )}
+                  <div className="flex flex-wrap gap-2 md:gap-4 items-center">
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs text-muted-foreground">CPL</span>
+                      <span className={`font-medium ${metrica.cpl && metrica.cpl > metrica.cpl_maximo ? 'text-destructive' : ''}`}>
+                        R$ {metrica.cpl?.toFixed(0) || '-'}
+                      </span>
                     </div>
-                    <div className="text-left md:text-right">
-                      <p className="text-xs md:text-sm font-medium">
-                        CAC: R$ {metrica.cac?.toFixed(0) || "N/A"}
-                      </p>
-                      {metrica.cac && metrica.cac > metrica.cac_maximo ? (
-                        <Badge variant="destructive" className="text-[10px] md:text-xs">Acima</Badge>
-                      ) : (
-                        <Badge variant="default" className="text-[10px] md:text-xs">OK</Badge>
-                      )}
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs text-muted-foreground">CAC</span>
+                      <span className={`font-medium ${metrica.cac && metrica.cac > metrica.cac_maximo ? 'text-destructive' : ''}`}>
+                        R$ {metrica.cac?.toFixed(0) || '-'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -498,189 +487,6 @@ export default function DashboardDirecao() {
           </CardContent>
         </Card>
 
-        {/* Aprovações Categoria C - Seção Completa */}
-        <Card className={acoesAprovacao?.length ? "border-l-4 border-l-yellow-500" : ""}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              Aprovações Categoria C
-              {acoesAprovacao?.length ? (
-                <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-300 ml-2">
-                  {acoesAprovacao.length} pendente{acoesAprovacao.length > 1 ? "s" : ""}
-                </Badge>
-              ) : null}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {acoesAprovacao?.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <CheckCircle2 className="h-12 w-12 text-green-500 mb-3" />
-                <p className="text-lg font-medium">Nenhuma ação pendente</p>
-                <p className="text-sm text-muted-foreground">
-                  Todas as ações Categoria C foram processadas
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {acoesAprovacao?.map((acao: any) => (
-                  <div key={acao.id_acao} className="p-4 border rounded-lg bg-muted/30">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="font-semibold">{acao.tipo_acao}</p>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                          <span className="flex items-center gap-1">
-                            <Building2 className="h-3 w-3" />
-                            {acao.empresa?.nome || "N/A"}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {format(new Date(acao.data_criacao), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                          </span>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-300">
-                        Pendente
-                      </Badge>
-                    </div>
-                    
-                    <div className="text-sm mb-2">
-                      <span className="text-muted-foreground">Solicitado por: </span>
-                      <span>{acao.usuario?.nome || "N/A"}</span>
-                    </div>
-                    
-                    <p className="text-sm mb-3 line-clamp-2">{acao.descricao}</p>
-                    
-                    {acao.impacto_esperado && (
-                      <p className="text-xs text-muted-foreground mb-3">
-                        <strong>Impacto:</strong> {acao.impacto_esperado}
-                      </p>
-                    )}
-                    
-                    <div className="flex gap-2 pt-3 border-t">
-                      <Button
-                        onClick={() => handleOpenDialog(acao, "aprovar")}
-                        size="sm"
-                        className="flex-1"
-                      >
-                        <CheckCircle2 className="mr-1 h-4 w-4" />
-                        Aprovar
-                      </Button>
-                      <Button
-                        onClick={() => handleOpenDialog(acao, "reprovar")}
-                        size="sm"
-                        variant="destructive"
-                        className="flex-1"
-                      >
-                        <XCircle className="mr-1 h-4 w-4" />
-                        Reprovar
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-          {/* Últimos Aprendizados */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5" />
-                Últimos Aprendizados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {ultimosAprendizados?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhum aprendizado registrado
-                  </p>
-                ) : (
-                  <>
-                    {ultimosAprendizados?.map((aprendizado: any) => (
-                      <div
-                        key={aprendizado.id_aprendizado}
-                        className="p-3 border rounded-lg"
-                      >
-                        <p className="text-sm line-clamp-2">{aprendizado.descricao}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {aprendizado.empresa?.nome} • Semana{" "}
-                          {aprendizado.semana?.numero_semana}/{aprendizado.semana?.ano}
-                        </p>
-                      </div>
-                    ))}
-                    <Link to="/aprendizados">
-                      <Button variant="outline" className="w-full mt-2">
-                        Ver todos os aprendizados
-                      </Button>
-                    </Link>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Demandas de Campanhas */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ClipboardList className="h-5 w-5" />
-              Demandas de Campanhas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              <div className="flex items-center gap-3 p-3 bg-yellow-500/10 rounded-lg">
-                <Clock className="h-5 w-5 text-yellow-600" />
-                <div>
-                  <p className="text-2xl font-bold">
-                    {demandasCampanha?.filter(d => d.status === 'PENDENTE').length || 0}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Pendentes</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-lg">
-                <Play className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="text-2xl font-bold">
-                    {demandasCampanha?.filter(d => d.status === 'EM_EXECUCAO').length || 0}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Em Execução</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-green-500/10 rounded-lg">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="text-2xl font-bold">
-                    {demandasCampanha?.filter(d => d.status === 'EXECUTADA').length || 0}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Executadas</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-purple-500/10 rounded-lg">
-                <ShieldCheck className="h-5 w-5 text-purple-600" />
-                <div>
-                  <p className="text-2xl font-bold">
-                    {demandasCampanha?.filter(d => d.status === 'VERIFICADA').length || 0}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Verificadas</p>
-                </div>
-              </div>
-            </div>
-            <Link to="/demandas-campanhas">
-              <Button variant="outline" className="w-full">
-                Ver todas as demandas
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Dialog de Aprovação/Reprovação */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
