@@ -80,7 +80,8 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
   const isMobile = useIsMobile();
 
   const formatNum = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n.toString();
-
+  const [abrirDialog, setAbrirDialog] = useState(false);
+  
   const MetricasCard = () => (
     <>
       {campanha.tipo_funil === 'topo' ? (
@@ -180,12 +181,13 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
       className={`overflow-hidden cursor-pointer hover:shadow-lg transition-all border-2 ${
         selecionadaComparar ? 'border-primary shadow-lg' : 'border-transparent'
       }`}
-      onClick={() => {
+      onClick={(e) => {
         if (comparando && onToggleComparar) {
           onToggleComparar(campanha.id_campanha);
-        } else {
-          setAberto(true);
+        } else if (!isMobile) {
+          setAbrirDialog(true);
         }
+        // On mobile, CollapsibleTrigger handles the toggle
       }}
     >
       {/* Header stripe */}
@@ -265,7 +267,7 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
   return (
     <>
       {cardContent}
-      <Dialog open={aberto} onOpenChange={setAberto}>
+      <Dialog open={abrirDialog} onOpenChange={setAbrirDialog}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
