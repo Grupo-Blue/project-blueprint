@@ -47,7 +47,7 @@ const RelatorioCreativos = () => {
       // 1. Buscar campanhas ativas da empresa
       const { data: campanhasData } = await supabase
         .from("campanha")
-        .select("id_campanha, nome, ativa, tipo_funil, conta_anuncio:id_conta(id_empresa, plataforma)")
+        .select("id_campanha, nome, ativa, tipo_funil, conta_anuncio:id_conta(id_empresa, plataforma, id_externo)")
         .eq("ativa", true);
 
       const campanhasDaEmpresa = (campanhasData || []).filter(
@@ -65,10 +65,10 @@ const RelatorioCreativos = () => {
         .gte("data", format(dataInicio, "yyyy-MM-dd"))
         .lte("data", format(dataFim, "yyyy-MM-dd"));
 
-      // 3. Criativos
+      // 3. Criativos (incluindo dados da conta para links permanentes)
       const { data: criativosData } = await supabase
         .from("criativo")
-        .select("id_criativo, descricao, tipo, url_midia, url_preview, id_campanha, ativo, id_anuncio_externo")
+        .select("id_criativo, descricao, tipo, url_midia, url_preview, id_campanha, ativo, id_anuncio_externo, url_video")
         .in("id_campanha", campIds);
 
       const criatIds = (criativosData || []).map(c => c.id_criativo);
@@ -155,9 +155,16 @@ const RelatorioCreativos = () => {
         if (l.venda_realizada) { leadsPorCampanha[cId].vendas += 1; leadsPorCampanha[cId].valor += l.valor_venda || 0; }
       });
 
+      // Mapear conta_id_externo por campanha
+      const contaIdExternoPorCamp: Record<string, string | null> = {};
+      campanhasDaEmpresa.forEach(c => {
+        contaIdExternoPorCamp[c.id_campanha] = c.conta_anuncio?.id_externo || null;
+      });
+
       return campanhasDaEmpresa.map(camp => {
         const mc = metricasPorCamp[camp.id_campanha] || { impressoes: 0, cliques: 0, verba: 0, leads: 0, conversoes: 0, valor_conv: 0 };
         const criativosCamp = (criativosData || []).filter(c => c.id_campanha === camp.id_campanha);
+        const contaIdExterno = contaIdExternoPorCamp[camp.id_campanha] || null;
 
         // Construir dados dos criativos
         const criativos: CriativoRankingData[] = criativosCamp.map(cr => {
@@ -180,6 +187,8 @@ const RelatorioCreativos = () => {
             roas: mCr.verba > 0 ? lCr.valor / mCr.verba : 0,
             valor_vendas: lCr.valor,
             isSemConversao: mCr.verba > 0 && totalLeads === 0,
+            id_anuncio_externo: cr.id_anuncio_externo,
+            conta_id_externo: contaIdExterno,
           };
         });
 

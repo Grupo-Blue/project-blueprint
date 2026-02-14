@@ -32,6 +32,7 @@ interface CriativoDetalhes {
   conversoes?: number;
   valorConversao?: number;
   idAnuncioExterno?: string;
+  contaIdExterno?: string;
 }
 
 interface CriativoDetalhesModalProps {
@@ -41,10 +42,12 @@ interface CriativoDetalhesModalProps {
 }
 
 function getAdLibraryUrl(criativo: CriativoDetalhes): string | null {
-  // Prefer fb.me/adspreview link stored in urlPreview
-  if (criativo.urlPreview) {
-    return criativo.urlPreview;
+  // Prioridade 1: Ads Manager (permanente, requer login)
+  if (criativo.idAnuncioExterno && criativo.contaIdExterno) {
+    const cleanAccountId = criativo.contaIdExterno.replace(/^act_/, "");
+    return `https://www.facebook.com/ads/manager/creation/adpreview/?act=${cleanAccountId}&adId=${criativo.idAnuncioExterno}`;
   }
+  // Prioridade 2: Ad Library (público, permanente)
   if (criativo.idAnuncioExterno) {
     return `https://www.facebook.com/ads/library/?id=${criativo.idAnuncioExterno}`;
   }

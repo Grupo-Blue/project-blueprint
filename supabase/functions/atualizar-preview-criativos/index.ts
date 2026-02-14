@@ -15,7 +15,7 @@ serve(async (req) => {
   const nomeCronjob = "atualizar-preview-criativos";
 
   try {
-    console.log("🔄 Iniciando atualização de URLs de preview dos criativos...");
+    console.log("🔄 Iniciando atualização de URLs de preview dos criativos (links permanentes)...");
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -23,9 +23,11 @@ serve(async (req) => {
     );
 
     const body = await req.json().catch(() => ({}));
-    const maxCriativos = body.max_criativos || 50;
+    const maxCriativos = body.max_criativos || 200;
     const apenasAtivos = body.apenas_ativos !== false;
+    const forcarAtualizacao = body.forcar === true;
 
+    // Buscar criativos Meta que precisam de atualização
     let query = supabase
       .from("criativo")
       .select(`
@@ -35,6 +37,8 @@ serve(async (req) => {
         id_campanha,
         descricao,
         tipo,
+        url_preview,
+        url_midia,
         campanha:id_campanha!inner (
           id_campanha_externo,
           nome,
@@ -46,10 +50,14 @@ serve(async (req) => {
           )
         )
       `)
-      .is("url_preview", null)
       .eq("campanha.conta_anuncio.plataforma", "META")
       .order("created_at", { ascending: false })
       .limit(maxCriativos);
+
+    if (!forcarAtualizacao) {
+      // Buscar apenas criativos sem url_preview ou com fb.me (links temporários)
+      query = query.or("url_preview.is.null,url_preview.like.%fb.me%");
+    }
 
     if (apenasAtivos) {
       query = query.eq("ativo", true);
@@ -61,20 +69,20 @@ serve(async (req) => {
       throw new Error(`Erro ao buscar criativos: ${criativosError.message}`);
     }
 
-    console.log(`📊 ${criativos?.length || 0} criativos sem url_preview encontrados`);
+    console.log(`📊 ${criativos?.length || 0} criativos para processar`);
 
     if (!criativos || criativos.length === 0) {
       return new Response(
         JSON.stringify({
           success: true,
-          message: "Nenhum criativo sem url_preview encontrado",
+          message: "Nenhum criativo para atualizar",
           atualizados: 0,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Agrupar criativos por empresa
+    // Agrupar criativos por empresa para buscar tokens
     const criativosPorEmpresa: Record<string, any[]> = {};
     for (const criativo of criativos) {
       const idEmpresa = (criativo.campanha as any)?.conta_anuncio?.id_empresa;
@@ -87,10 +95,13 @@ serve(async (req) => {
 
     const estatisticas = {
       total_processados: 0,
-      atualizados: 0,
+      atualizados_ads_manager: 0,
+      atualizados_ad_library: 0,
+      buscou_ad_id: 0,
       erros: 0,
       sem_token: 0,
       videos_resolvidos: 0,
+      sem_id: 0,
     };
 
     for (const [idEmpresa, criativosEmpresa] of Object.entries(criativosPorEmpresa)) {
@@ -104,17 +115,10 @@ serve(async (req) => {
         (i: any) => i.id_empresa === idEmpresa
       );
 
-      if (!integracao) {
-        console.log(`⚠️ Sem integração Meta ativa para empresa ${idEmpresa}`);
-        estatisticas.sem_token += criativosEmpresa.length;
-        continue;
-      }
+      const accessToken = integracao ? (integracao.config_json as any)?.access_token : null;
 
-      const accessToken = (integracao.config_json as any)?.access_token;
       if (!accessToken) {
-        console.log(`⚠️ Token não encontrado para empresa ${idEmpresa}`);
-        estatisticas.sem_token += criativosEmpresa.length;
-        continue;
+        console.log(`⚠️ Sem token Meta para empresa ${idEmpresa}, usando apenas links permanentes locais`);
       }
 
       const BATCH_SIZE = 10;
@@ -123,8 +127,7 @@ serve(async (req) => {
       for (let i = 0; i < criativosEmpresa.length; i += BATCH_SIZE) {
         const batch = criativosEmpresa.slice(i, i + BATCH_SIZE);
 
-        if (i > 0) {
-          console.log(`⏱️ Rate limit: aguardando ${RATE_LIMIT_DELAY / 1000}s...`);
+        if (i > 0 && accessToken) {
           await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAY));
         }
 
@@ -135,17 +138,17 @@ serve(async (req) => {
             const creativeId = criativo.id_criativo_externo;
             const accountId = (criativo.campanha as any)?.conta_anuncio?.id_externo;
 
-            // Se não tiver id_anuncio_externo, tentar buscar via creative
-            if (!adId && creativeId && accountId) {
+            // Se não tiver id_anuncio_externo, tentar buscar via Graph API
+            if (!adId && creativeId && accountId && accessToken) {
               console.log(`🔍 Buscando anúncio para creative ${creativeId}...`);
-              const searchUrl = `https://graph.facebook.com/v22.0/${accountId}/ads?fields=id,creative{id}&filtering=[{"field":"creative.id","operator":"EQUAL","value":"${creativeId}"}]&limit=1&access_token=${accessToken}`;
-              
               try {
+                const searchUrl = `https://graph.facebook.com/v22.0/${accountId}/ads?fields=id,creative{id}&filtering=[{"field":"creative.id","operator":"EQUAL","value":"${creativeId}"}]&limit=1&access_token=${accessToken}`;
                 const searchResp = await fetch(searchUrl);
                 if (searchResp.ok) {
                   const searchData = await searchResp.json();
                   if (searchData.data && searchData.data.length > 0) {
                     adId = searchData.data[0].id;
+                    estatisticas.buscou_ad_id++;
                     console.log(`✅ Encontrado ad ${adId} para creative ${creativeId}`);
                     await supabase
                       .from("criativo")
@@ -154,87 +157,56 @@ serve(async (req) => {
                   }
                 }
               } catch (searchErr) {
-                console.log(`⚠️ Erro ao buscar anúncio por creative: ${searchErr}`);
+                console.log(`⚠️ Erro ao buscar anúncio: ${searchErr}`);
               }
             }
 
-            // If no adId, try fetching thumbnail directly from creative ID
-            if (!adId && creativeId) {
-              try {
-                const creativeUrl = `https://graph.facebook.com/v22.0/${creativeId}?fields=thumbnail_url,video_id&access_token=${accessToken}`;
-                const creativeResp = await fetch(creativeUrl);
-                if (creativeResp.ok) {
-                  const creativeData = await creativeResp.json();
-                  const cThumb = creativeData.thumbnail_url;
-                  const cVideoId = creativeData.video_id;
-                  const cUpdate: Record<string, any> = {
-                    url_preview: `https://www.facebook.com/ads/library/?id=${creativeId}`,
-                    updated_at: new Date().toISOString(),
-                  };
-                  if (cThumb) cUpdate.url_midia = cThumb;
-                  if (cVideoId && (criativo.tipo === "VIDEO" || criativo.tipo === "video")) {
-                    try {
-                      const vResp = await fetch(`https://graph.facebook.com/v22.0/${cVideoId}?fields=source&access_token=${accessToken}`);
-                      if (vResp.ok) { const vd = await vResp.json(); if (vd.source) { cUpdate.url_video = vd.source; estatisticas.videos_resolvidos++; } }
-                    } catch {}
-                  }
-                  const { error: ue } = await supabase.from("criativo").update(cUpdate).eq("id_criativo", criativo.id_criativo);
-                  if (!ue) { estatisticas.atualizados++; console.log(`✅ Via creative: ${criativo.descricao?.substring(0, 40) || creativeId}`); }
-                  else { estatisticas.erros++; }
-                } else {
-                  console.log(`⚠️ Creative ${creativeId}: ${creativeResp.status}`);
-                }
-              } catch (e) { console.log(`⚠️ Erro creative: ${e}`); }
-              return;
-            }
-
-            if (!adId) {
-              console.log(`⚠️ Criativo ${criativo.id_criativo} sem IDs externos`);
-              return;
-            }
-
-            // Fetch ad data with creative details (thumbnail + video_id)
-            const adUrl = `https://graph.facebook.com/v22.0/${adId}?fields=preview_shareable_link,creative{thumbnail_url,video_id}&access_token=${accessToken}`;
-            const response = await fetch(adUrl);
-
-            if (!response.ok) {
-              console.log(`❌ Erro ao buscar ad ${adId}: ${response.status}`);
-              estatisticas.erros++;
-              return;
-            }
-
-            const adData = await response.json();
-            const previewUrl = adData.preview_shareable_link;
-            const thumbnailUrl = adData.creative?.thumbnail_url;
-            const videoId = adData.creative?.video_id;
-
+            // Gerar link permanente
             const updateFields: Record<string, any> = {
-              // Use preview_shareable_link (fb.me/adspreview format)
-              url_preview: previewUrl || `https://www.facebook.com/ads/library/?id=${adId}`,
               updated_at: new Date().toISOString(),
             };
 
-            // Use thumbnail as higher-quality url_midia if available
-            if (thumbnailUrl) {
-              updateFields.url_midia = thumbnailUrl;
+            if (adId && accountId) {
+              // Formato Ads Manager (permanente, requer login)
+              const cleanAccountId = accountId.replace(/^act_/, "");
+              updateFields.url_preview = `https://www.facebook.com/ads/manager/creation/adpreview/?act=${cleanAccountId}&adId=${adId}`;
+              estatisticas.atualizados_ads_manager++;
+            } else if (adId) {
+              // Fallback: Ad Library (público, permanente)
+              updateFields.url_preview = `https://www.facebook.com/ads/library/?id=${adId}`;
+              estatisticas.atualizados_ad_library++;
+            } else {
+              console.log(`⚠️ Criativo ${criativo.id_criativo} sem IDs para gerar link`);
+              estatisticas.sem_id++;
+              return;
             }
 
-            // For VIDEO creatives, fetch the actual video source URL
-            if (videoId && (criativo.tipo === "VIDEO" || criativo.tipo === "video")) {
+            // Buscar thumbnail/video se não tem url_midia e tem token
+            if (!criativo.url_midia && accessToken && adId) {
               try {
-                const videoUrl = `https://graph.facebook.com/v22.0/${videoId}?fields=source&access_token=${accessToken}`;
-                const videoResp = await fetch(videoUrl);
-                if (videoResp.ok) {
-                  const videoData = await videoResp.json();
-                  if (videoData.source) {
-                    updateFields.url_video = videoData.source;
-                    estatisticas.videos_resolvidos++;
-                    console.log(`🎬 Video source obtido para ad ${adId}`);
+                const adUrl = `https://graph.facebook.com/v22.0/${adId}?fields=creative{thumbnail_url,video_id}&access_token=${accessToken}`;
+                const response = await fetch(adUrl);
+                if (response.ok) {
+                  const adData = await response.json();
+                  const thumbnailUrl = adData.creative?.thumbnail_url;
+                  const videoId = adData.creative?.video_id;
+
+                  if (thumbnailUrl) updateFields.url_midia = thumbnailUrl;
+
+                  if (videoId && (criativo.tipo === "VIDEO" || criativo.tipo === "video")) {
+                    try {
+                      const videoResp = await fetch(`https://graph.facebook.com/v22.0/${videoId}?fields=source&access_token=${accessToken}`);
+                      if (videoResp.ok) {
+                        const vd = await videoResp.json();
+                        if (vd.source) {
+                          updateFields.url_video = vd.source;
+                          estatisticas.videos_resolvidos++;
+                        }
+                      }
+                    } catch {}
                   }
                 }
-              } catch (videoErr) {
-                console.log(`⚠️ Erro ao buscar video source para ${videoId}: ${videoErr}`);
-              }
+              } catch {}
             }
 
             const { error: updateError } = await supabase
@@ -246,8 +218,7 @@ serve(async (req) => {
               console.log(`❌ Erro ao atualizar criativo ${criativo.id_criativo}: ${updateError.message}`);
               estatisticas.erros++;
             } else {
-              estatisticas.atualizados++;
-              console.log(`✅ Atualizado: ${criativo.descricao?.substring(0, 40) || adId}...`);
+              console.log(`✅ ${criativo.descricao?.substring(0, 40) || adId} → ${adId && accountId ? 'AdsManager' : 'AdLibrary'}`);
             }
           } catch (err) {
             console.error(`❌ Erro ao processar criativo:`, err);
@@ -260,6 +231,7 @@ serve(async (req) => {
     }
 
     const duracao = Date.now() - startTime;
+    const totalAtualizados = estatisticas.atualizados_ads_manager + estatisticas.atualizados_ad_library;
 
     await supabase.from("cronjob_execucao").insert({
       nome_cronjob: nomeCronjob,
@@ -270,17 +242,19 @@ serve(async (req) => {
 
     console.log(`\n📊 ===== RESUMO =====`);
     console.log(`   Processados: ${estatisticas.total_processados}`);
-    console.log(`   Atualizados: ${estatisticas.atualizados}`);
+    console.log(`   Ads Manager: ${estatisticas.atualizados_ads_manager}`);
+    console.log(`   Ad Library: ${estatisticas.atualizados_ad_library}`);
+    console.log(`   Ad IDs recuperados: ${estatisticas.buscou_ad_id}`);
     console.log(`   Vídeos resolvidos: ${estatisticas.videos_resolvidos}`);
+    console.log(`   Sem IDs: ${estatisticas.sem_id}`);
     console.log(`   Erros: ${estatisticas.erros}`);
-    console.log(`   Sem token: ${estatisticas.sem_token}`);
     console.log(`   Duração: ${(duracao / 1000).toFixed(1)}s`);
     console.log(`====================`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Atualização concluída: ${estatisticas.atualizados} criativos atualizados`,
+        message: `Atualização concluída: ${totalAtualizados} criativos com links permanentes`,
         estatisticas,
         duracao_segundos: (duracao / 1000).toFixed(1),
       }),

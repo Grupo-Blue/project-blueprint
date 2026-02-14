@@ -24,7 +24,7 @@ export interface CriativoRankingData {
   isSemConversao?: boolean;
   isEstrela?: boolean;
   id_anuncio_externo?: string | null;
-
+  conta_id_externo?: string | null;
 }
 
 interface CriativoRankingCardProps {
@@ -41,9 +41,12 @@ const getTipoIcon = (tipo: string) => {
 };
 
 function getPreviewLink(criativo: CriativoRankingData): string | null {
-  if (criativo.url_preview) {
-    return criativo.url_preview;
+  // Prioridade 1: Ads Manager (permanente, requer login)
+  if (criativo.id_anuncio_externo && criativo.conta_id_externo) {
+    const cleanAccountId = criativo.conta_id_externo.replace(/^act_/, "");
+    return `https://www.facebook.com/ads/manager/creation/adpreview/?act=${cleanAccountId}&adId=${criativo.id_anuncio_externo}`;
   }
+  // Prioridade 2: Ad Library (público, permanente)
   if (criativo.id_anuncio_externo) {
     return `https://www.facebook.com/ads/library/?id=${criativo.id_anuncio_externo}`;
   }
