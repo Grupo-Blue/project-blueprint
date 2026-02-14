@@ -44,14 +44,7 @@ function getPreviewLink(criativo: CriativoRankingData): string | null {
   if (criativo.id_anuncio_externo) {
     return `https://www.facebook.com/ads/library/?id=${criativo.id_anuncio_externo}`;
   }
-  if (criativo.url_preview?.includes('facebook.com/ads/library')) {
-    return criativo.url_preview;
-  }
-  // Don't use fb.me links as they require login
-  if (criativo.url_preview && !criativo.url_preview.includes('fb.me')) {
-    return criativo.url_preview;
-  }
-  return null;
+  return criativo.url_preview || null;
 }
 
 export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardProps) {
