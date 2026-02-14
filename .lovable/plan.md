@@ -1,115 +1,80 @@
 
 
-# Enriquecer Leads com Dados de Ads do Metricool
+# Corrigir Coleta de Dados de Ads do Metricool
 
-## Diagnostico
+## Problema Raiz
 
-O sistema `enriquecer-campanhas-metricool` existe mas **nao esta populando dados de Ads** (0 registros com `fonte_conversoes` preenchido). Antes de enriquecer leads, precisamos garantir que os dados de Ads estejam chegando.
+Analisei a documentacao oficial (Swagger) do Metricool e encontrei o problema: a funcao `enriquecer-campanhas-metricool` esta usando **URLs que nao existem na API**.
 
-## Fase 1 -- Diagnosticar e corrigir coleta de Ads
+URLs que estamos tentando (ERRADAS):
+- `/ads/google/campaigns` -- NAO EXISTE
+- `/ads/facebook/campaigns` -- NAO EXISTE
+- `/ads/campaigns?network=google` -- NAO EXISTE
 
-### 1.1 Executar a funcao e capturar logs detalhados
+URLs corretas (da documentacao oficial):
+- `/stats/adwords/campaigns` -- Google Ads (retorna `AdCampaign[]`)
+- `/stats/facebookads/campaigns` -- Facebook/Meta Ads (retorna `AdCampaign[]`)
+- `/stats/tiktokads/campaigns` -- TikTok Ads (retorna `AdCampaign[]`)
 
-Disparar `enriquecer-campanhas-metricool` manualmente e analisar os logs para entender:
-- Os endpoints de Ads estao retornando dados ou 404/vazio?
-- Se retornam dados, o matching de campanhas esta falhando?
+## Endpoints de Ads Disponiveis na API
 
-### 1.2 Adicionar fallback robusto
+Com base no Swagger oficial (`app.metricool.com/api/swagger.json`):
 
-Se os endpoints especificos de Ads (`/ads/google/campaigns`) nao funcionam no plano atual do Metricool, usar as metricas timeline que ja funcionam:
-- `googleAdsConversions`, `googleAdsConversionValue`, `googleAdsSpent`
-- `facebookAdsConversions`, `facebookAdsConversionValue`, `facebookAdsSpent`
+| Endpoint | Descricao | Parametros |
+|---|---|---|
+| `/stats/facebookads/campaigns` | Lista campanhas Facebook Ads com metricas | `start`, `end`, `sortcolumn` (name, impressions, reach, conversions, clicks, cpm, cpc, ctr, spent) |
+| `/stats/adwords/campaigns` | Lista campanhas Google Ads com metricas | `start`, `end`, `sortcolumn` (impressions, cpm, cpc, ctr, cost) |
+| `/stats/tiktokads/campaigns` | Lista campanhas TikTok Ads com metricas | `start`, `end`, `sortcolumn` |
+| `/stats/adwords/keywords` | Keywords do Google Ads | `start`, `end`, `sortcolumn`, `CAMPAIGN` (filtro) |
+| `/stats/aggregations/fbAdsPerformance` | Metricas agregadas Facebook Ads | `start`, `end`, `campaignid` (opcional) |
+| `/stats/aggregations/adwordsPerformance` | Metricas agregadas Google Ads | `start`, `end`, `campaignid` (opcional) |
+| `/stats/facebookads/metricvalue` | Valor de metrica especifica FB Ads | `metric`, `start`, `end`, `idCampaign` |
 
-Estes endpoints timeline ja estao implementados como fallback na funcao, mas talvez nao estejam sendo salvos corretamente.
+Todos usam `blogId` e `userId` como query params + `X-Mc-Auth` no header.
 
-## Fase 2 -- Enriquecer Leads com dados cruzados
+## Plano de Correcao
 
-### 2.1 Novas colunas na tabela `lead`
+### 1. Corrigir URLs na funcao `enriquecer-campanhas-metricool`
 
-Adicionar campos para dados vindos do cruzamento com Metricool:
-
-```text
-metricool_conversao_valor    NUMERIC    -- valor de conversao reportado pelo Metricool para a campanha do lead
-metricool_roas_campanha      NUMERIC    -- ROAS da campanha que gerou o lead (via Metricool)
-metricool_cpc_campanha       NUMERIC    -- CPC da campanha que gerou o lead
-metricool_ctr_campanha       NUMERIC    -- CTR da campanha que gerou o lead
-metricool_fonte              TEXT       -- 'GOOGLE' ou 'META' (confirmado pelo Metricool)
-```
-
-### 2.2 Logica de enriquecimento
-
-Quando um lead tem `id_campanha_vinculada`, buscar os dados de Ads do Metricool para aquela campanha e preencher as colunas acima. Isso da ao comercial uma visao de "quanto custou trazer esse lead" mais fidedigna.
-
-### 2.3 Integrar no score de temperatura
-
-Adicionar no `lead-scoring.ts`:
-- Leads de campanhas com ROAS alto (> 3x): bonus de +10 pontos (campanha performando bem = lead mais qualificado)
-- Leads com CPC muito alto (> 2x media): flag de alerta para otimizacao
-
-## Fase 3 -- Cruzar organico com leads
-
-### 3.1 Vincular leads a posts organicos
-
-Se o lead tem `utm_source=instagram` e `utm_medium=organic`, tentar cruzar com `social_posts` pela data de criacao do lead para identificar qual post organico gerou o lead.
-
-### 3.2 Nova coluna
+Substituir os endpoints errados pelos corretos:
 
 ```text
-id_post_organico_vinculado   UUID REFERENCES social_posts(id)
+ANTES (errado):
+  /ads/google/campaigns?blogId=...
+  /ads/facebook/campaigns?blogId=...
+  /ads/campaigns?network=google&blogId=...
+
+DEPOIS (correto):
+  /stats/adwords/campaigns?blogId=...&userId=...&start=...&end=...
+  /stats/facebookads/campaigns?blogId=...&userId=...&start=...&end=...
+  /stats/tiktokads/campaigns?blogId=...&userId=...&start=...&end=...
 ```
 
-## Fase 4 -- Usar demografia para qualificacao
+### 2. Adicionar endpoint de agregacoes como complemento
 
-### 4.1 Contexto demografico
+Usar `/stats/aggregations/fbAdsPerformance` e `/stats/aggregations/adwordsPerformance` para obter totais agregados por periodo, que podem servir como validacao e fallback.
 
-Quando `social_audiencia_demografica` tiver dados, usar para contextualizar leads:
-- Se a audiencia e 70% masculina 25-34 e o lead se encaixa nesse perfil, bonus no score
-- Se o lead esta fora do perfil principal, pode indicar lead de menor qualidade
+### 3. Processar resposta corretamente
 
----
+O modelo `AdCampaign` do Metricool retorna os dados diretamente no array (nao aninhados em `stats` ou `daily`). Campos chave:
+- `name`, `impressions`, `reach`, `conversions`, `clicks`, `cpm`, `cpc`, `ctr`, `spent`/`cost`
 
-## Detalhes tecnicos
+### 4. Adicionar TikTok Ads
 
-### Arquivos a modificar
+Endpoint disponivel mas nao implementado. Aproveitar para incluir.
 
-- `supabase/functions/enriquecer-campanhas-metricool/index.ts` -- corrigir salvamento de metricas timeline e adicionar logs de diagnostico
-- Nova migration SQL -- adicionar colunas `metricool_*` na tabela `lead` e `id_post_organico_vinculado`
-- `src/lib/lead-scoring.ts` -- adicionar bonus/penalidade baseado em ROAS/CPC do Metricool
-- `supabase/functions/monitorar-enriquecimento-leads/index.ts` -- adicionar etapa de enriquecimento Metricool no loop de leads
+## Arquivo a Modificar
 
-### Novo fluxo de dados
+- `supabase/functions/enriquecer-campanhas-metricool/index.ts`
+  - Funcao `fetchAdsPlatformData`: trocar URLs dos endpoints
+  - Funcao `fetchAdsCreativeData`: trocar URLs dos endpoints
+  - Adicionar chamada ao endpoint de agregacoes como complemento
+  - Adicionar suporte a TikTok Ads
 
-```text
-Metricool API
-    |
-    v
-enriquecer-campanhas-metricool
-    |
-    v
-campanha_metricas_dia (com fonte_conversoes = METRICOOL_*)
-    |
-    v
-monitorar-enriquecimento-leads (loop existente)
-    |
-    +--> Para cada lead com id_campanha_vinculada:
-    |      Buscar metricas Metricool da campanha
-    |      Preencher metricool_roas, metricool_cpc, etc.
-    |      Recalcular score_temperatura
-    |
-    v
-lead (enriquecido com dados de Ads)
-```
+## Resultado Esperado
 
-### Ordem de implementacao
-
-1. Disparar `enriquecer-campanhas-metricool` e analisar logs (diagnostico)
-2. Corrigir funcao se necessario
-3. Criar migration com novas colunas
-4. Atualizar `monitorar-enriquecimento-leads` com etapa Metricool
-5. Atualizar `lead-scoring.ts` com bonus ROAS/CPC
-6. Testar fluxo completo
-
-### RLS
-
-As novas colunas na tabela `lead` herdam as politicas RLS ja existentes -- nenhuma alteracao necessaria.
+Apos a correcao, ao disparar `enriquecer-campanhas-metricool`:
+- Os endpoints corretos serao chamados
+- Dados reais de campanhas de Ads (impressoes, cliques, conversoes, CPC, CTR, ROAS, verba) serao salvos em `campanha_metricas_dia`
+- Os leads vinculados a essas campanhas poderao ser enriquecidos com `metricool_roas_campanha`, `metricool_cpc_campanha`, etc.
 
