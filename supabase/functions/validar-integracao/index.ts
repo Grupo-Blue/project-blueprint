@@ -263,12 +263,15 @@ async function validarMetricool(config: any) {
     return { success: false, error: "Todos os campos são obrigatórios" };
   }
 
-  const response = await fetch(`https://app.metricool.com/api/v2/${user_id}/blog/${blog_id}`, {
-    headers: { Authorization: `Bearer ${user_token}` },
+  // Use the same base URL and pattern as sincronizar-metricool
+  const url = `https://app.metricool.com/api/${user_id}/blog/${blog_id}/stats/timeline?startDate=2025-01-01&endDate=2025-01-02&metric=igFollowers`;
+  const response = await fetch(url, {
+    headers: { "X-Mc-Auth": user_token },
   });
 
   if (!response.ok) {
-    return { success: false, error: "Credenciais do Metricool inválidas" };
+    const errText = await response.text().catch(() => "");
+    return { success: false, error: `Credenciais do Metricool inválidas (${response.status}): ${errText}` };
   }
 
   return { success: true, message: "Credenciais do Metricool válidas" };
