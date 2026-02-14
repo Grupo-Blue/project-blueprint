@@ -637,6 +637,73 @@ export type Database = {
           },
         ]
       }
+      chat_conversa: {
+        Row: {
+          created_at: string
+          id: string
+          id_empresa: string | null
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          id_empresa?: string | null
+          titulo?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          id_empresa?: string | null
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_conversa_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      chat_mensagem: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          id_conversa: string
+          role: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          id_conversa: string
+          role: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          id_conversa?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_mensagem_id_conversa_fkey"
+            columns: ["id_conversa"]
+            isOneToOne: false
+            referencedRelation: "chat_conversa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cliente_notion: {
         Row: {
           anos_fiscais: Json | null
