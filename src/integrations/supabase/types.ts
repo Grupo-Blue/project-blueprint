@@ -893,6 +893,7 @@ export type Database = {
           id_empresa: string
           id_externo: string
           nome: string
+          page_id_facebook: string | null
           plataforma: Database["public"]["Enums"]["plataforma_midia"]
           updated_at: string
         }
@@ -903,6 +904,7 @@ export type Database = {
           id_empresa: string
           id_externo: string
           nome: string
+          page_id_facebook?: string | null
           plataforma: Database["public"]["Enums"]["plataforma_midia"]
           updated_at?: string
         }
@@ -913,6 +915,7 @@ export type Database = {
           id_empresa?: string
           id_externo?: string
           nome?: string
+          page_id_facebook?: string | null
           plataforma?: Database["public"]["Enums"]["plataforma_midia"]
           updated_at?: string
         }

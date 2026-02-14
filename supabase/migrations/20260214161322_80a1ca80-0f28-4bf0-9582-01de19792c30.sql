@@ -1,0 +1,1 @@
+ALTER TABLE public.conta_anuncio ADD COLUMN page_id_facebook TEXT;
