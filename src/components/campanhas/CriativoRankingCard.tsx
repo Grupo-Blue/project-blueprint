@@ -50,7 +50,7 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
 
   return (
     <>
-      <div className="flex gap-3 p-3 rounded-lg border bg-card hover:shadow-md transition-shadow overflow-hidden">
+      <div className="flex gap-2 p-2.5 rounded-lg border bg-card hover:shadow-md transition-shadow overflow-hidden w-full max-w-full box-border">
         {/* Posição */}
         <div className="flex flex-col items-center justify-start pt-1 flex-shrink-0">
           <span className={`text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center ${
