@@ -85,7 +85,7 @@ const RelatorioCreativos = () => {
         metricasCri = data || [];
       }
 
-      // 5. Leads vinculados
+      // 5. Leads vinculados via criativo
       let leadsData: any[] = [];
       if (criatIds.length > 0) {
         const { data } = await supabase
@@ -95,6 +95,19 @@ const RelatorioCreativos = () => {
           .gte("data_criacao", format(dataInicio, "yyyy-MM-dd"))
           .lte("data_criacao", format(dataFim, "yyyy-MM-dd"));
         leadsData = data || [];
+      }
+
+      // 5b. Leads vinculados via id_campanha_vinculada (sem criativo)
+      let leadsCampanhaData: any[] = [];
+      if (campIds.length > 0) {
+        const { data } = await supabase
+          .from("lead")
+          .select("id_campanha_vinculada, id_criativo, is_mql, venda_realizada, valor_venda")
+          .in("id_campanha_vinculada", campIds)
+          .is("id_criativo", null)
+          .gte("data_criacao", format(dataInicio, "yyyy-MM-dd"))
+          .lte("data_criacao", format(dataFim, "yyyy-MM-dd"));
+        leadsCampanhaData = data || [];
       }
 
       // Agregar métricas por campanha
@@ -127,6 +140,17 @@ const RelatorioCreativos = () => {
         leadsPorCri[l.id_criativo].total += 1;
         if (l.is_mql) leadsPorCri[l.id_criativo].mqls += 1;
         if (l.venda_realizada) { leadsPorCri[l.id_criativo].vendas += 1; leadsPorCri[l.id_criativo].valor += l.valor_venda || 0; }
+      });
+
+      // Agregar leads vinculados por campanha (sem criativo)
+      const leadsPorCampanha: Record<string, { total: number; mqls: number; vendas: number; valor: number }> = {};
+      leadsCampanhaData.forEach(l => {
+        const cId = l.id_campanha_vinculada;
+        if (!cId) return;
+        if (!leadsPorCampanha[cId]) leadsPorCampanha[cId] = { total: 0, mqls: 0, vendas: 0, valor: 0 };
+        leadsPorCampanha[cId].total += 1;
+        if (l.is_mql) leadsPorCampanha[cId].mqls += 1;
+        if (l.venda_realizada) { leadsPorCampanha[cId].vendas += 1; leadsPorCampanha[cId].valor += l.valor_venda || 0; }
       });
 
       return campanhasDaEmpresa.map(camp => {
@@ -172,11 +196,17 @@ const RelatorioCreativos = () => {
           return a.cpl - b.cpl;
         });
 
-        // Totalizar leads/mqls/vendas via criativos
-        const totalLeads = criativos.reduce((s, c) => s + c.leads, 0) || mc.leads;
-        const totalMqls = criativos.reduce((s, c) => s + (leadsPorCri[c.id_criativo]?.mqls || 0), 0);
-        const totalVendas = criativos.reduce((s, c) => s + c.vendas, 0);
-        const totalValorVendas = criativos.reduce((s, c) => s + c.valor_vendas, 0);
+        // Totalizar leads/mqls/vendas via criativos (atribuição direta)
+        const vendasDiretas = criativos.reduce((s, c) => s + c.vendas, 0);
+        const valorDireto = criativos.reduce((s, c) => s + c.valor_vendas, 0);
+        
+        // Leads vinculados por campanha (sem criativo identificado)
+        const lCamp = leadsPorCampanha[camp.id_campanha] || { total: 0, mqls: 0, vendas: 0, valor: 0 };
+        
+        const totalLeads = (criativos.reduce((s, c) => s + c.leads, 0) + lCamp.total) || mc.leads;
+        const totalMqls = criativos.reduce((s, c) => s + (leadsPorCri[c.id_criativo]?.mqls || 0), 0) + lCamp.mqls;
+        const totalVendas = vendasDiretas + lCamp.vendas;
+        const totalValorVendas = valorDireto + lCamp.valor;
 
         return {
           id_campanha: camp.id_campanha,
@@ -189,6 +219,8 @@ const RelatorioCreativos = () => {
           leads: totalLeads,
           mqls: totalMqls,
           vendas: totalVendas,
+          vendas_diretas: vendasDiretas,
+          vendas_campanha: lCamp.vendas,
           valor_vendas: totalValorVendas,
           verba_investida: mc.verba,
           ctr: mc.impressoes > 0 ? (mc.cliques / mc.impressoes) * 100 : 0,

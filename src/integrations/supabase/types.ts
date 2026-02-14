@@ -3279,6 +3279,7 @@ export type Database = {
           ga4_landing_page: string | null
           ga4_sessoes: number | null
           ga4_tempo_site_segundos: number | null
+          id_campanha_vinculada: string | null
           id_cliente_notion: string | null
           id_criativo: string | null
           id_empresa: string
@@ -3408,6 +3409,7 @@ export type Database = {
           ga4_landing_page?: string | null
           ga4_sessoes?: number | null
           ga4_tempo_site_segundos?: number | null
+          id_campanha_vinculada?: string | null
           id_cliente_notion?: string | null
           id_criativo?: string | null
           id_empresa: string
@@ -3537,6 +3539,7 @@ export type Database = {
           ga4_landing_page?: string | null
           ga4_sessoes?: number | null
           ga4_tempo_site_segundos?: number | null
+          id_campanha_vinculada?: string | null
           id_cliente_notion?: string | null
           id_criativo?: string | null
           id_empresa?: string
@@ -3635,6 +3638,13 @@ export type Database = {
           webhook_enviado_em?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_id_campanha_vinculada_fkey"
+            columns: ["id_campanha_vinculada"]
+            isOneToOne: false
+            referencedRelation: "campanha"
+            referencedColumns: ["id_campanha"]
+          },
           {
             foreignKeyName: "lead_id_cliente_notion_fkey"
             columns: ["id_cliente_notion"]
