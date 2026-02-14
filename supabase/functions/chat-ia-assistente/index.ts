@@ -453,8 +453,7 @@ serve(async (req) => {
       })),
     ];
 
-    // Use gemini-2.5-pro (stable) — gemini-3-pro-preview when available
-    const model = "gemini-2.5-pro";
+    const model = "gemini-3-pro-preview";
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
     // First call - may need tool calling
