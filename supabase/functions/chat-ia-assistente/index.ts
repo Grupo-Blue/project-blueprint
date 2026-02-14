@@ -389,7 +389,7 @@ async function executeTool(name: string, args: Record<string, any>, userId?: str
 
       let query = supabaseAdmin
         .from("lead")
-        .select("nome, email, telefone, utm_source, utm_medium, utm_campaign, canal, venda, valor_venda, data_criacao, etapa_funil")
+        .select("nome_lead, email, telefone, utm_source, utm_medium, utm_campaign, canal, venda, valor_venda, data_criacao, etapa_funil")
         .eq("id_empresa", id_empresa)
         .gte("data_criacao", dataInicio.toISOString().split("T")[0])
         .order("data_criacao", { ascending: false })
