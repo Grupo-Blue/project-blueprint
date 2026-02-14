@@ -1,9 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Users, DollarSign, TrendingUp, Target, Calendar } from "lucide-react";
+import { BarChart3, Users, DollarSign, Target } from "lucide-react";
 import { startOfMonth, endOfMonth, format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { AlertaIntegracao } from "@/components/AlertaIntegracao";
 import { ValidacaoUTM } from "@/components/ValidacaoUTM";
 import { usePeriodo } from "@/contexts/PeriodoContext";
@@ -22,54 +20,89 @@ import { TempoCiclo } from "@/components/dashboard/TempoCiclo";
 import { MetricasMultiRede } from "@/components/dashboard/MetricasMultiRede";
 import { StapeHealthWidget } from "@/components/dashboard/StapeHealthWidget";
 import { ServerSideComparison } from "@/components/dashboard/ServerSideComparison";
+import { LiquidKPICard } from "@/components/dashboard/LiquidKPICard";
+import { TrafficFlowChart } from "@/components/dashboard/TrafficFlowChart";
+import { LeadQualityBubbles } from "@/components/dashboard/LeadQualityBubbles";
+import { LiquidFunnel } from "@/components/dashboard/LiquidFunnel";
 
 const Dashboard = () => {
-  const { getDataReferencia, tipoFiltro, labelPeriodo } = usePeriodo();
+  const { getDataReferencia, labelPeriodo } = usePeriodo();
   const { empresaSelecionada, empresasPermitidas, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
-  
-  // Usar data do filtro selecionado
+
   const dataReferencia = getDataReferencia();
   const inicioMes = startOfMonth(dataReferencia);
   const fimMes = endOfMonth(dataReferencia);
 
-  // Buscar campanhas ativas
   const { data: campanhas } = useQuery({
     queryKey: ["campanhas-ativas"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("campanha")
-        .select("id_campanha")
-        .eq("ativa", true);
+      const { data, error } = await supabase.from("campanha").select("id_campanha").eq("ativa", true);
       if (error) throw error;
       return data;
     },
-    refetchInterval: 5 * 60 * 1000, // Auto-refresh a cada 5 minutos
+    refetchInterval: 5 * 60 * 1000,
   });
 
-  // ID da empresa para queries (null se "todas")
   const empresaIdQuery = empresaSelecionada && empresaSelecionada !== "todas" ? empresaSelecionada : null;
 
-  // Buscar métricas diárias do período
   const { data: metricasDiarias } = useQuery({
     queryKey: ["metricas-dashboard-diarias", inicioMes.toISOString(), fimMes.toISOString(), empresaIdQuery],
     queryFn: async () => {
       if (!empresaIdQuery) return null;
-      
       const { data, error } = await supabase
         .from("empresa_metricas_dia")
         .select("*")
         .eq("id_empresa", empresaIdQuery)
         .gte("data", format(inicioMes, "yyyy-MM-dd"))
         .lte("data", format(fimMes, "yyyy-MM-dd"));
-      
       if (error) throw error;
       return data;
     },
     enabled: !!empresaIdQuery,
-    refetchInterval: 5 * 60 * 1000, // Auto-refresh a cada 5 minutos
+    refetchInterval: 5 * 60 * 1000,
   });
 
-  // Estatísticas calculadas das métricas diárias
+  // Buscar métricas de campanhas para o chart
+  const { data: metricasCampanhas } = useQuery({
+    queryKey: ["metricas-campanhas-chart", inicioMes.toISOString(), fimMes.toISOString(), empresaIdQuery],
+    queryFn: async () => {
+      let query = supabase
+        .from("campanha_metricas_dia")
+        .select("data, impressoes, cliques, leads")
+        .gte("data", format(inicioMes, "yyyy-MM-dd"))
+        .lte("data", format(fimMes, "yyyy-MM-dd"))
+        .order("data");
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Aggregate by day
+      const byDay: Record<string, { impressoes: number; cliques: number; leads: number }> = {};
+      (data || []).forEach(d => {
+        if (!byDay[d.data]) byDay[d.data] = { impressoes: 0, cliques: 0, leads: 0 };
+        byDay[d.data].impressoes += d.impressoes || 0;
+        byDay[d.data].cliques += d.cliques || 0;
+        byDay[d.data].leads += d.leads || 0;
+      });
+
+      return Object.entries(byDay).map(([date, metrics]) => ({
+        label: format(new Date(date + "T12:00:00"), "dd/MM"),
+        ...metrics,
+      }));
+    },
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  if (loadingEmpresas) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!hasAccess) return <SemAcessoEmpresas />;
+
   const totaisMetricas = metricasDiarias?.reduce(
     (acc, m) => ({
       verba: acc.verba + Number(m.verba_investida || 0),
@@ -79,194 +112,107 @@ const Dashboard = () => {
     { verba: 0, leads: 0, vendas: 0 }
   ) || { verba: 0, leads: 0, vendas: 0 };
 
-  // Loading state
-  if (loadingEmpresas) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  // Sem acesso
-  if (!hasAccess) {
-    return <SemAcessoEmpresas />;
-  }
-
-  // Calcular estatísticas a partir das métricas diárias agregadas
   const totalCampanhas = campanhas?.length || 0;
   const totalLeads = totaisMetricas.leads;
   const totalVendas = totaisMetricas.vendas;
   const taxaConversao = totalLeads > 0 ? (totalVendas / totalLeads) * 100 : 0;
   const cplMedio = totaisMetricas.leads > 0 ? totaisMetricas.verba / totaisMetricas.leads : 0;
 
+  const formatCurrency = (v: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v);
+
   return (
     <>
       <AlertaIntegracao />
-      
-      <div className="mb-6 md:mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-2">Bem-vindo ao SGT!</h2>
-            <p className="text-sm md:text-base text-muted-foreground">
-              Sistema de Governança de Tráfego Pago
-            </p>
-          </div>
+
+      <div className="mb-6">
+        <h2 className="text-2xl md:text-3xl font-extrabold mb-1 text-foreground">Bem-vindo ao SGT!</h2>
+        <p className="text-sm text-muted-foreground">Sistema de Governança de Tráfego Pago • {labelPeriodo}</p>
+      </div>
+
+      {/* KPI Cards - Bento Grid Top */}
+      <div className="bento-grid mb-6">
+        <LiquidKPICard
+          label="Campanhas"
+          value={totalCampanhas.toString()}
+          icon={BarChart3}
+          glow="cyan"
+          delay={0}
+        />
+        <LiquidKPICard
+          label="Leads"
+          value={totalLeads.toString()}
+          icon={Users}
+          glow="cyan"
+          delay={100}
+        />
+        <LiquidKPICard
+          label="CPL Médio"
+          value={cplMedio > 0 ? formatCurrency(cplMedio) : "R$ 0"}
+          icon={DollarSign}
+          glow="amber"
+          delay={200}
+        />
+        <LiquidKPICard
+          label="Conversão"
+          value={`${taxaConversao.toFixed(1)}%`}
+          icon={Target}
+          glow="mint"
+          delay={300}
+          progressRing={{ value: taxaConversao, max: 100 }}
+        />
+      </div>
+
+      {/* Main Content Bento Grid */}
+      <div className="bento-grid mb-6">
+        {/* Traffic Flow Chart - 2x2 */}
+        <div className="bento-2x2">
+          <TrafficFlowChart data={metricasCampanhas || []} />
         </div>
+
+        {/* Lead Quality Bubbles */}
+        <LeadQualityBubbles />
+
+        {/* Liquid Funnel */}
+        <LiquidFunnel />
       </div>
 
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-6 md:mb-8">
-        <Card className="p-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Campanhas</CardTitle>
-            <BarChart3 className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-lg md:text-2xl font-bold">{totalCampanhas}</div>
-            <p className="text-[10px] md:text-xs text-muted-foreground truncate">
-              {totalCampanhas === 0 ? "Nenhuma" : "Ativas"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="p-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Leads</CardTitle>
-            <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-lg md:text-2xl font-bold">{totalLeads}</div>
-            <p className="text-[10px] md:text-xs text-muted-foreground truncate">
-              {labelPeriodo}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="p-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">CPL Médio</CardTitle>
-            <DollarSign className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-lg md:text-2xl font-bold">
-              {cplMedio > 0 
-                ? new Intl.NumberFormat("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                    maximumFractionDigits: 0,
-                  }).format(cplMedio)
-                : "R$ 0"}
-            </div>
-            <p className="text-[10px] md:text-xs text-muted-foreground truncate">
-              {labelPeriodo}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="p-0">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-1 md:pb-2">
-            <CardTitle className="text-xs md:text-sm font-medium">Conversão</CardTitle>
-            <Target className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 md:p-4 pt-0">
-            <div className="text-lg md:text-2xl font-bold">{taxaConversao.toFixed(1)}%</div>
-            <p className="text-[10px] md:text-xs text-muted-foreground truncate">
-              {totalVendas}/{totalLeads}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* NOVA SEÇÃO: KPIs Históricos */}
+      {/* Existing widgets - now with glass styling */}
       {empresaIdQuery && (
-        <div className="mb-6 md:mb-8">
+        <div className="space-y-5">
           <KPIsHistoricos empresaId={empresaIdQuery} />
-        </div>
-      )}
-
-      {/* FASE 3: Pacing de Orçamento */}
-      {empresaIdQuery && (
-        <div className="mb-6 md:mb-8">
           <PacingOrcamento empresaId={empresaIdQuery} />
         </div>
       )}
 
-      {/* NOVA SEÇÃO: Distribuição por Empresa (visível quando há múltiplas empresas) */}
       {empresasPermitidas.length > 1 && (
-        <div className="mb-6 md:mb-8">
+        <div className="mt-5">
           <DistribuicaoEmpresa />
         </div>
       )}
 
-      {/* NOVA SEÇÃO: Coorte de Qualidade */}
       {empresaIdQuery && (
-        <div className="mb-6 md:mb-8">
+        <div className="space-y-5 mt-5">
           <CoorteQualidade empresaId={empresaIdQuery} />
-        </div>
-      )}
-
-      {/* NOVA SEÇÃO: Tracking Score */}
-      <div className="mb-6 md:mb-8">
-        <TrackingScore empresaId={empresaIdQuery || undefined} />
-      </div>
-
-      {/* Stape Health - Monitoramento Server-Side */}
-      {empresaIdQuery && (
-        <div className="mb-6 md:mb-8">
-          <StapeHealthWidget empresaId={empresaIdQuery} />
-        </div>
-      )}
-
-      {/* Comparativo Server-Side vs Client-Side */}
-      {empresaIdQuery && (
-        <div className="mb-6 md:mb-8">
+          <div className="bento-grid">
+            <div className="bento-2x1"><TrackingScore empresaId={empresaIdQuery} /></div>
+            <div className="bento-2x1"><StapeHealthWidget empresaId={empresaIdQuery} /></div>
+          </div>
           <ServerSideComparison empresaId={empresaIdQuery} />
-        </div>
-      )}
-
-      {/* FASE 2: Alertas de Anomalias */}
-      {empresaIdQuery && (
-        <div className="mb-6 md:mb-8">
           <AlertasAnomalias empresaId={empresaIdQuery} />
-        </div>
-      )}
-
-      {/* FASE 2: ROI e Lucratividade */}
-      {empresaIdQuery && (
-        <div className="mb-6 md:mb-8">
           <ROIProfitability empresaId={empresaIdQuery} />
-        </div>
-      )}
-
-      {/* FASE 3: Tempo de Ciclo de Vendas */}
-      {empresaIdQuery && (
-        <div className="mb-6 md:mb-8">
           <TempoCiclo empresaId={empresaIdQuery} />
-        </div>
-      )}
-
-      {/* FASE 2: Fadiga de Criativos */}
-      {empresaIdQuery && (
-        <div className="mb-6 md:mb-8">
           <CriativosFadiga empresaId={empresaIdQuery} />
-        </div>
-      )}
-
-      {/* Métricas Multi-Rede (Redes Sociais) */}
-      {empresaIdQuery && (
-        <div className="mb-6 md:mb-8">
           <MetricasMultiRede empresaId={empresaIdQuery} dataReferencia={dataReferencia} />
+          <InteligenciaIA empresaId={empresaIdQuery} />
         </div>
       )}
 
-      {/* IA Intelligence */}
-      <div className="mb-6 md:mb-8">
-        {empresaIdQuery && <InteligenciaIA empresaId={empresaIdQuery} />}
+      <div className="mt-5">
+        <ValidacaoUTM />
       </div>
-
-      {/* ValidacaoUTM detalhado */}
-      <ValidacaoUTM />
     </>
   );
 };
+
 export default Dashboard;
