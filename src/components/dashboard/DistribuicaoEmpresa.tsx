@@ -58,13 +58,11 @@ export function DistribuicaoEmpresa() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center h-40">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="glass-card p-6">
+        <div className="flex items-center justify-center h-40">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
     );
   }
 
@@ -143,19 +141,19 @@ export function DistribuicaoEmpresa() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <div className="glass-card p-5">
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold flex items-center gap-2">
           🥧 Distribuição Gasto vs Resultado
-        </CardTitle>
-        <CardDescription>
+        </h3>
+        <div className="mt-1">
           <MetricaComInfo 
             label="Comparação % do gasto vs % das vendas por empresa (últimos 6 meses)"
             info="Mostra como o investimento em mídia está distribuído entre empresas comparado com a distribuição de vendas. Alertas são gerados quando uma empresa consome mais % do orçamento do que gera em vendas."
           />
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </div>
+      </div>
+      <div>
         {alertas.length > 0 && (
           <Alert variant="destructive" className="mb-4">
             <AlertTriangle className="h-4 w-4" />
@@ -233,7 +231,7 @@ export function DistribuicaoEmpresa() {
             </p>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
