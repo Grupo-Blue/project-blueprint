@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: "default" | "lg";
   glow?: "cyan" | "amber" | "mint" | "none";
+  style?: React.CSSProperties;
 }
 
 const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
