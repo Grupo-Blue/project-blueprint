@@ -44,7 +44,7 @@ const toolDeclarations = [
   },
   {
     name: "buscar_leads",
-    description: "Busca leads com filtros. Pode filtrar por período, se converteu em venda, canal de origem, etc.",
+    description: "Busca leads com filtros. Pode filtrar por período, venda, canal, telefone, email ou nome.",
     parameters: {
       type: "object",
       properties: {
@@ -52,6 +52,9 @@ const toolDeclarations = [
         dias: { type: "number", description: "Últimos N dias (padrão 30)" },
         com_venda: { type: "boolean", description: "Filtrar apenas leads que viraram venda" },
         limite: { type: "number", description: "Máximo de leads retornados (padrão 50)" },
+        telefone: { type: "string", description: "Filtrar por telefone (busca parcial)" },
+        email: { type: "string", description: "Filtrar por email (busca parcial)" },
+        nome: { type: "string", description: "Filtrar por nome do lead (busca parcial)" },
       },
       required: ["id_empresa"],
     },
@@ -382,18 +385,29 @@ async function executeTool(name: string, args: Record<string, any>, userId?: str
     }
 
     case "buscar_leads": {
-      const dias = args.dias || 30;
       const limite = args.limite || 50;
-      const dataInicio = new Date();
-      dataInicio.setDate(dataInicio.getDate() - dias);
 
       let query = supabaseAdmin
         .from("lead")
         .select("nome_lead, email, telefone, utm_source, utm_medium, utm_campaign, origem_canal, venda_realizada, valor_venda, data_criacao, stage_atual, proprietario_nome, score_temperatura")
         .eq("id_empresa", id_empresa)
-        .gte("data_criacao", dataInicio.toISOString().split("T")[0])
         .order("data_criacao", { ascending: false })
         .limit(limite);
+
+      // Se busca por telefone/email/nome, não limitar por data para encontrar leads antigos
+      if (args.telefone) {
+        query = query.ilike("telefone", `%${args.telefone}%`);
+      } else if (args.email) {
+        query = query.ilike("email", `%${args.email}%`);
+      } else if (args.nome) {
+        query = query.ilike("nome_lead", `%${args.nome}%`);
+      } else {
+        // Só aplica filtro de data quando não está buscando por campo específico
+        const dias = args.dias || 30;
+        const dataInicio = new Date();
+        dataInicio.setDate(dataInicio.getDate() - dias);
+        query = query.gte("data_criacao", dataInicio.toISOString().split("T")[0]);
+      }
 
       if (args.com_venda === true) query = query.eq("venda_realizada", true);
       if (args.com_venda === false) query = query.eq("venda_realizada", false);
