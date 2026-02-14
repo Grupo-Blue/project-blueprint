@@ -1,128 +1,77 @@
 
 
-# Chat IA Flutuante com Historico e Perguntas Sugeridas
+# Adicionar 13 Novas Tools ao Chat IA Assistente
 
 ## Visao Geral
 
-Botao flutuante no canto inferior direito que abre um chat com IA (google/gemini-3-pro-preview) usando sua propria chave API do Google. O chat persiste conversas no banco de dados, permitindo alternar entre chats antigos e criar novos. Botoes de perguntas sugeridas aparecem no inicio de cada conversa para facilitar o uso.
+Expandir a edge function `chat-ia-assistente` de 6 para 19 ferramentas, adicionando 9 de leitura e 4 de escrita. Isso dara ao assistente acesso completo ao sistema, permitindo consultar alertas, concorrentes, hipoteses, landing pages, metricas sociais, funil de conversao, e tambem **criar registros** como demandas de campanha, alertas, hipoteses e aprendizados.
 
 ---
 
-## Chave de API
+## Novas Ferramentas de Leitura (9)
 
-Voce precisara fornecer sua chave da API do Google Gemini. Ela sera armazenada de forma segura como um secret do backend (acessivel apenas pela edge function, nunca exposta no frontend). A edge function chamara a API do Google Gemini diretamente (nao pelo gateway Lovable AI).
+1. **`comparar_periodos`** -- Compara metricas de dois periodos (ex: este mes vs mes passado). Consulta `empresa_metricas_dia` para ambos os intervalos e calcula variacao percentual de leads, vendas, CPL, verba.
 
----
+2. **`buscar_alertas`** -- Consulta `alerta_automatico` filtrando por empresa, severidade (INFO/WARNING/CRITICAL), resolvido ou nao. Retorna alertas pendentes com titulo, descricao e metadados.
 
-## Estrutura do Chat
+3. **`buscar_concorrentes`** -- Consulta `concorrente_anuncio` para ver anuncios de concorrentes detectados. Pode filtrar por concorrente_nome, plataforma e status (ATIVO/INATIVO).
 
-### Painel Flutuante
-- Botao circular fixo no canto inferior direito (icone Sparkles/MessageCircle)
-- Ao clicar, abre painel de ~400x550px (desktop) ou tela cheia (mobile)
-- Cabecalho com: titulo do chat, botao "Novo Chat", botao para ver lista de chats
+4. **`buscar_hipoteses`** -- Consulta `hipotese_teste` com filtros de empresa e resultado (CONFIRMADA/REFUTADA/INCONCLUSIVA). Retorna tipo, descricao, criterio de sucesso e resultado.
 
-### Lista de Chats (sidebar/drawer)
-- Lista de conversas anteriores com titulo e data
-- Titulo gerado automaticamente a partir da primeira mensagem do usuario
-- Ao clicar, carrega as mensagens daquele chat
-- Opcao de excluir chat
+5. **`buscar_aprendizados`** -- Consulta `aprendizado_semana` filtrando por empresa e tipo. Retorna descricao e metricas de suporte.
 
-### Area de Conversa
-- Mensagens renderizadas com Markdown (react-markdown)
-- Streaming token por token
-- Indicador "pensando..." enquanto a IA consulta dados
+6. **`buscar_metricas_instagram`** -- Consulta `social_metricas_dia` para uma rede social especifica (INSTAGRAM, FACEBOOK, LINKEDIN, etc). Retorna seguidores, alcance, impressoes, engajamento.
 
-### Perguntas Sugeridas
-- Aparecem como botoes/chips no inicio de cada novo chat
-- Mudam conforme a empresa selecionada
-- Exemplos:
-  - "Como estao as campanhas ativas esse mes?"
-  - "Quais leads da {empresa} converteram em venda?"
-  - "Me sugira uma nova campanha de Google Ads"
-  - "Qual criativo esta com melhor CPL?"
-  - "Analise o funil de conversao do ultimo mes"
+7. **`buscar_landing_pages`** -- Consulta `landingpage_metricas` para performance de LPs (sessoes, conversoes, bounce rate) e `landingpage_analise` para insights IA existentes.
 
----
+8. **`funil_conversao`** -- Calcula funil completo da empresa: Leads Total -> Leads Pagos -> Levantadas -> MQLs -> Reunioes -> Vendas, com taxas de conversao entre cada etapa. Dados de `empresa_metricas_dia`.
 
-## Persistencia no Banco
+9. **`listar_empresas`** -- Lista todas as empresas no sistema com nome, CPL maximo, CAC maximo e meta de verba. Util quando nenhuma empresa esta selecionada.
 
-### Duas novas tabelas:
+## Novas Ferramentas de Escrita (4)
 
-**`chat_conversa`**
-- `id` (UUID, PK)
-- `user_id` (UUID, FK auth.users)
-- `titulo` (TEXT) -- gerado pela primeira mensagem
-- `id_empresa` (UUID, nullable) -- empresa no contexto quando criou
-- `created_at`, `updated_at`
+10. **`criar_demanda_campanha`** -- Insere em `demanda_campanha` com titulo, descricao, plataforma (META/GOOGLE), prioridade, verba_diaria, verba_total, data_inicio, UTMs sugeridos. Requer `id_empresa` e usa o `user_id` autenticado como `id_criador`. Status inicial: PENDENTE.
 
-**`chat_mensagem`**
-- `id` (UUID, PK)
-- `id_conversa` (UUID, FK chat_conversa)
-- `role` (TEXT: 'user' | 'assistant')
-- `content` (TEXT)
-- `created_at`
+11. **`criar_alerta`** -- Insere em `alerta_automatico` com tipo, severidade, titulo, descricao e metadados. Permite que a IA crie alertas manuais para a equipe acompanhar.
 
-RLS: Cada usuario so ve seus proprios chats (`user_id = auth.uid()`).
+12. **`criar_hipotese`** -- Insere em `hipotese_teste` com tipo, descricao e criterio_sucesso. Requer `id_empresa` e `id_semana`. Permite registrar testes sugeridos pela IA.
 
----
-
-## Edge Function: `chat-ia-assistente`
-
-### Fluxo
-1. Recebe: mensagens do chat + id_empresa + id_conversa
-2. Busca dados relevantes do banco usando Supabase client (service role)
-3. Chama a API do Google Gemini diretamente com a chave `GEMINI_API_KEY`
-4. Usa **tool calling** para que a IA decida quais dados consultar
-5. Retorna resposta em streaming (SSE)
-
-### Ferramentas disponiveis para a IA (tool calling)
-- `buscar_campanhas` -- campanhas ativas com metricas agregadas
-- `buscar_leads` -- leads com filtros (periodo, venda, canal, empresa)
-- `buscar_criativos` -- criativos com performance e ranking
-- `buscar_metricas_empresa` -- metricas consolidadas (leads, vendas, CPL, ROAS)
-- `buscar_demandas` -- demandas/tarefas de trafego existentes
-- `resumo_geral` -- visao consolidada rapida
-
-### System Prompt
-A IA sera instruida a:
-- Responder em portugues brasileiro
-- Ser proativa, sugerindo acoes concretas ("Posso criar essa demanda no sistema?")
-- Usar dados reais para fundamentar respostas
-- Formatar com Markdown (tabelas, listas, negrito)
+13. **`criar_aprendizado`** -- Insere em `aprendizado_semana` com tipo, descricao e metricas_suporte. Permite registrar insights identificados pela IA.
 
 ---
 
 ## Detalhes Tecnicos
 
-### Arquivos a criar
+### Arquivo modificado
 
-1. **Migracao SQL** -- tabelas `chat_conversa` e `chat_mensagem` com RLS
-2. **`supabase/functions/chat-ia-assistente/index.ts`** -- edge function com tool calling e streaming via API Gemini direta
-3. **`src/components/ChatIAFlutuante.tsx`** -- componente completo (botao + painel + lista de chats + conversa + sugestoes)
-4. **`src/components/AppLayout.tsx`** -- adicionar `<ChatIAFlutuante />` antes do fechamento do div principal
+**`supabase/functions/chat-ia-assistente/index.ts`** -- Unico arquivo a ser alterado:
 
-### Modificacoes
+- Adicionar 13 novas entradas no array `toolDeclarations` com `name`, `description` e `parameters`
+- Adicionar 13 novos `case` no `switch` da funcao `executeTool`
+- Para as tools de escrita, o `user_id` do usuario autenticado sera passado para a funcao `executeTool` para registrar quem criou o registro
+- Atualizar o `SYSTEM_PROMPT` para informar a IA sobre suas novas capacidades de escrita e instrui-la a sempre confirmar antes de criar registros
 
-- **`supabase/config.toml`** -- registrar `[functions.chat-ia-assistente]` com `verify_jwt = false` (validacao manual no codigo)
+### Mudancas no System Prompt
 
-### Chamada a API Gemini (direta, sem gateway)
+Adicionar instrucoes sobre:
+- Capacidade de criar demandas, alertas, hipoteses e aprendizados
+- **Sempre pedir confirmacao** antes de executar tools de escrita ("Posso registrar essa demanda?")
+- Quando criar demandas, sugerir UTMs, verba e segmentacao baseados nos dados historicos
 
-A edge function chamara diretamente:
-```text
-POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse
-```
-Usando a chave `GEMINI_API_KEY` armazenada nos secrets.
+### Fluxo de escrita (seguranca)
 
-Nota: O modelo `gemini-3-pro-preview` sera usado conforme disponibilidade na API do Google. Se ainda nao estiver disponivel na API direta, usaremos `gemini-2.5-pro` como fallback ate a liberacao.
+A edge function ja usa `SUPABASE_SERVICE_ROLE_KEY` para queries, entao as insercoes funcionarao sem problemas de RLS. O `user_id` autenticado sera extraido do token JWT e usado como `id_criador` nas demandas.
+
+### Aumento de MAX_ITERATIONS
+
+Sera aumentado de 5 para 8, pois com mais ferramentas a IA pode precisar de mais rodadas de tool calling para consultas complexas.
 
 ---
 
 ## Sequencia de Implementacao
 
-1. Solicitar a chave `GEMINI_API_KEY` ao usuario
-2. Criar migracao SQL (tabelas + RLS)
-3. Criar edge function `chat-ia-assistente` com tool calling e streaming
-4. Registrar no config.toml
-5. Criar componente `ChatIAFlutuante` com lista de chats, sugestoes e streaming
-6. Integrar no AppLayout
-
+1. Adicionar as 13 declaracoes de ferramentas ao array `toolDeclarations`
+2. Implementar os 13 novos cases no `executeTool` (passando `user_id` para writes)
+3. Atualizar o system prompt com instrucoes sobre escrita
+4. Aumentar `MAX_ITERATIONS` para 8
+5. Deploy da edge function
