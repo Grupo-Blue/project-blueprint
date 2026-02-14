@@ -268,31 +268,33 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
     <>
       {cardContent}
       <Dialog open={abrirDialog} onOpenChange={setAbrirDialog}>
-        <DialogContent className="max-w-2xl w-[95vw] max-h-[85vh] overflow-y-auto overflow-x-hidden">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <PlataformaIcon plataforma={campanha.plataforma} />
-              <span className="truncate">{campanha.nome}</span>
-              <NotaSaudeCampanha nota={campanha.score.nota} pontuacao={campanha.score.pontuacao} tamanho="sm" />
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-2xl w-[95vw] max-h-[85vh] overflow-y-auto overflow-x-hidden p-0">
+          <div className="p-6 space-y-4 min-w-0 w-full overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <PlataformaIcon plataforma={campanha.plataforma} />
+                <span className="truncate flex-1 min-w-0">{campanha.nome}</span>
+                <NotaSaudeCampanha nota={campanha.score.nota} pontuacao={campanha.score.pontuacao} tamanho="sm" />
+              </DialogTitle>
+            </DialogHeader>
 
-          {/* Score details */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {campanha.score.detalhes.map(d => (
-              <div key={d.metrica} className={`rounded-md p-2 text-center text-xs ${
-                d.status === 'bom' ? 'bg-green-500/10 text-green-700' :
-                d.status === 'medio' ? 'bg-yellow-500/10 text-yellow-700' :
-                'bg-red-500/10 text-red-700'
-              }`}>
-                <p className="font-semibold">{d.metrica}</p>
-                <p className="text-lg font-bold">{d.valor.toFixed(d.metrica === 'ROAS' ? 2 : 1)}</p>
-                <p className="text-[10px] opacity-70">bench: {d.benchmark.toFixed(1)}</p>
-              </div>
-            ))}
+            {/* Score details */}
+            <div className="grid grid-cols-3 gap-2">
+              {campanha.score.detalhes.map(d => (
+                <div key={d.metrica} className={`rounded-md p-2 text-center text-xs ${
+                  d.status === 'bom' ? 'bg-green-500/10 text-green-700' :
+                  d.status === 'medio' ? 'bg-yellow-500/10 text-yellow-700' :
+                  'bg-red-500/10 text-red-700'
+                }`}>
+                  <p className="font-semibold truncate">{d.metrica}</p>
+                  <p className="text-lg font-bold">{d.valor.toFixed(d.metrica === 'ROAS' ? 2 : 1)}</p>
+                  <p className="text-[10px] opacity-70">bench: {d.benchmark.toFixed(1)}</p>
+                </div>
+              ))}
+            </div>
+
+            <CriativosDetalhe />
           </div>
-
-          <CriativosDetalhe />
         </DialogContent>
       </Dialog>
     </>
