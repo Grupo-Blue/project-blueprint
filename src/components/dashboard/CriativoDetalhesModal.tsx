@@ -23,6 +23,7 @@ interface CriativoDetalhes {
   fatigado: boolean;
   urlPreview?: string;
   urlMidia?: string;
+  urlVideo?: string;
   tipo?: string;
   alcance?: number;
   frequencia?: number;
@@ -30,12 +31,24 @@ interface CriativoDetalhes {
   videoViews?: number;
   conversoes?: number;
   valorConversao?: number;
+  idAnuncioExterno?: string;
 }
 
 interface CriativoDetalhesModalProps {
   criativo: CriativoDetalhes | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+function getAdLibraryUrl(criativo: CriativoDetalhes): string | null {
+  if (criativo.idAnuncioExterno) {
+    return `https://www.facebook.com/ads/library/?id=${criativo.idAnuncioExterno}`;
+  }
+  // If urlPreview is already an Ad Library link, use it
+  if (criativo.urlPreview?.includes('facebook.com/ads/library')) {
+    return criativo.urlPreview;
+  }
+  return criativo.urlPreview || null;
 }
 
 export function CriativoDetalhesModal({ 
@@ -45,8 +58,11 @@ export function CriativoDetalhesModal({
 }: CriativoDetalhesModalProps) {
   if (!criativo) return null;
 
-  const TipoIcon = criativo.tipo === "VIDEO" ? Video : 
-                   criativo.tipo === "IMAGEM" ? Image : FileText;
+  const isVideo = criativo.tipo === "VIDEO" || criativo.tipo === "video";
+  const TipoIcon = isVideo ? Video : 
+                   criativo.tipo === "IMAGEM" || criativo.tipo === "IMAGE" ? Image : FileText;
+
+  const previewLink = getAdLibraryUrl(criativo);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -60,23 +76,27 @@ export function CriativoDetalhesModal({
 
         <div className="space-y-4">
           {/* Preview/Mídia */}
-          {criativo.urlPreview || criativo.urlMidia ? (
+          {isVideo && criativo.urlVideo ? (
+            <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+              <video
+                src={criativo.urlVideo}
+                poster={criativo.urlMidia || undefined}
+                controls
+                playsInline
+                muted
+                className="w-full h-full object-contain"
+              />
+            </div>
+          ) : criativo.urlMidia ? (
             <div className="relative aspect-video rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-              {criativo.urlMidia ? (
-                <img 
-                  src={criativo.urlMidia} 
-                  alt={criativo.descricao}
-                  className="object-contain max-h-full"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              ) : (
-                <div className="text-center text-muted-foreground p-4">
-                  <Image className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Preview disponível externamente</p>
-                </div>
-              )}
+              <img 
+                src={criativo.urlMidia} 
+                alt={criativo.descricao}
+                className="object-contain max-h-full"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
             </div>
           ) : (
             <div className="aspect-video rounded-lg bg-muted flex items-center justify-center">
@@ -178,16 +198,16 @@ export function CriativoDetalhesModal({
             )}
           </div>
 
-          {/* Botões de ação */}
-          {criativo.urlPreview && (
+          {/* Botão de ação */}
+          {previewLink && (
             <div className="pt-2">
               <Button 
                 variant="outline" 
                 className="w-full"
-                onClick={() => window.open(criativo.urlPreview, '_blank')}
+                onClick={() => window.open(previewLink, '_blank')}
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
-                Ver no Facebook
+                Ver na Biblioteca de Anúncios
               </Button>
             </div>
           )}

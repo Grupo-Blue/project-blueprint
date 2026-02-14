@@ -10,6 +10,7 @@ export interface CriativoRankingData {
   tipo: string;
   url_midia: string | null;
   url_preview: string | null;
+  url_video?: string | null;
   impressoes: number;
   cliques: number;
   leads: number;
@@ -22,6 +23,8 @@ export interface CriativoRankingData {
   isFadiga?: boolean;
   isSemConversao?: boolean;
   isEstrela?: boolean;
+  id_anuncio_externo?: string | null;
+
 }
 
 interface CriativoRankingCardProps {
@@ -37,9 +40,25 @@ const getTipoIcon = (tipo: string) => {
   }
 };
 
+function getPreviewLink(criativo: CriativoRankingData): string | null {
+  if (criativo.id_anuncio_externo) {
+    return `https://www.facebook.com/ads/library/?id=${criativo.id_anuncio_externo}`;
+  }
+  if (criativo.url_preview?.includes('facebook.com/ads/library')) {
+    return criativo.url_preview;
+  }
+  // Don't use fb.me links as they require login
+  if (criativo.url_preview && !criativo.url_preview.includes('fb.me')) {
+    return criativo.url_preview;
+  }
+  return null;
+}
+
 export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardProps) {
   const [imagemExpandida, setImagemExpandida] = useState(false);
   const maxFunil = Math.max(criativo.impressoes, 1);
+  const isVideo = criativo.tipo === 'VIDEO' || criativo.tipo === 'video';
+  const previewLink = getPreviewLink(criativo);
 
   const etapasFunil = [
     { label: 'Imp', valor: criativo.impressoes, cor: 'bg-blue-500' },
@@ -63,9 +82,9 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
         {/* Thumbnail + Preview link */}
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
           <div 
-            className={`w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center ${criativo.url_midia ? 'cursor-pointer hover:ring-2 ring-primary/50 transition-all' : ''}`}
+            className={`w-16 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center ${(criativo.url_midia || criativo.url_video) ? 'cursor-pointer hover:ring-2 ring-primary/50 transition-all' : ''}`}
             onClick={(e) => {
-              if (criativo.url_midia) {
+              if (criativo.url_midia || criativo.url_video) {
                 e.stopPropagation();
                 setImagemExpandida(true);
               }
@@ -73,18 +92,20 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
           >
             {criativo.url_midia ? (
               <img src={criativo.url_midia} alt="" className="w-full h-full object-cover" />
+            ) : isVideo && criativo.url_video ? (
+              <Video className="h-6 w-6 text-muted-foreground" />
             ) : (
               getTipoIcon(criativo.tipo)
             )}
           </div>
-          {(criativo.url_preview) && (
+          {previewLink && (
             <a
-              href={criativo.url_preview}
+              href={previewLink}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               className="text-muted-foreground hover:text-primary transition-colors"
-              title="Ver preview"
+              title="Ver na Biblioteca de Anúncios"
             >
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
@@ -154,12 +175,21 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
         </div>
       </div>
 
-      {/* Image expand dialog - outside flex container */}
+      {/* Media expand dialog */}
       <Dialog open={imagemExpandida} onOpenChange={setImagemExpandida}>
         <DialogContent className="max-w-2xl p-2" onClick={(e) => e.stopPropagation()}>
-          {criativo.url_midia && (
+          {isVideo && criativo.url_video ? (
+            <video
+              src={criativo.url_video}
+              poster={criativo.url_midia || undefined}
+              controls
+              playsInline
+              muted
+              className="w-full h-auto rounded-lg"
+            />
+          ) : criativo.url_midia ? (
             <img src={criativo.url_midia} alt={criativo.descricao || ''} className="w-full h-auto rounded-lg" />
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </>
