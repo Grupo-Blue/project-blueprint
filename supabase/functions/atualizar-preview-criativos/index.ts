@@ -35,17 +35,19 @@ serve(async (req) => {
         id_campanha,
         descricao,
         tipo,
-        campanha:id_campanha (
+        campanha:id_campanha!inner (
           id_campanha_externo,
           nome,
           id_conta,
-          conta_anuncio:id_conta (
+          conta_anuncio:id_conta!inner (
             id_empresa,
-            id_externo
+            id_externo,
+            plataforma
           )
         )
       `)
       .is("url_preview", null)
+      .eq("campanha.conta_anuncio.plataforma", "META")
       .order("created_at", { ascending: false })
       .limit(maxCriativos);
 
@@ -94,7 +96,7 @@ serve(async (req) => {
     for (const [idEmpresa, criativosEmpresa] of Object.entries(criativosPorEmpresa)) {
       const { data: integracoes } = await supabase
         .from("integracao")
-        .select("config_json")
+        .select("id_empresa, config_json")
         .eq("tipo", "META_ADS")
         .eq("ativo", true);
 
@@ -156,8 +158,38 @@ serve(async (req) => {
               }
             }
 
+            // If no adId, try fetching thumbnail directly from creative ID
+            if (!adId && creativeId) {
+              try {
+                const creativeUrl = `https://graph.facebook.com/v22.0/${creativeId}?fields=thumbnail_url,video_id&access_token=${accessToken}`;
+                const creativeResp = await fetch(creativeUrl);
+                if (creativeResp.ok) {
+                  const creativeData = await creativeResp.json();
+                  const cThumb = creativeData.thumbnail_url;
+                  const cVideoId = creativeData.video_id;
+                  const cUpdate: Record<string, any> = {
+                    url_preview: `https://www.facebook.com/ads/library/?id=${creativeId}`,
+                    updated_at: new Date().toISOString(),
+                  };
+                  if (cThumb) cUpdate.url_midia = cThumb;
+                  if (cVideoId && (criativo.tipo === "VIDEO" || criativo.tipo === "video")) {
+                    try {
+                      const vResp = await fetch(`https://graph.facebook.com/v22.0/${cVideoId}?fields=source&access_token=${accessToken}`);
+                      if (vResp.ok) { const vd = await vResp.json(); if (vd.source) { cUpdate.url_video = vd.source; estatisticas.videos_resolvidos++; } }
+                    } catch {}
+                  }
+                  const { error: ue } = await supabase.from("criativo").update(cUpdate).eq("id_criativo", criativo.id_criativo);
+                  if (!ue) { estatisticas.atualizados++; console.log(`✅ Via creative: ${criativo.descricao?.substring(0, 40) || creativeId}`); }
+                  else { estatisticas.erros++; }
+                } else {
+                  console.log(`⚠️ Creative ${creativeId}: ${creativeResp.status}`);
+                }
+              } catch (e) { console.log(`⚠️ Erro creative: ${e}`); }
+              return;
+            }
+
             if (!adId) {
-              console.log(`⚠️ Criativo ${criativo.id_criativo} não possui id_anuncio_externo`);
+              console.log(`⚠️ Criativo ${criativo.id_criativo} sem IDs externos`);
               return;
             }
 
@@ -176,12 +208,9 @@ serve(async (req) => {
             const thumbnailUrl = adData.creative?.thumbnail_url;
             const videoId = adData.creative?.video_id;
 
-            // Build public Ad Library link (works without login)
-            const adLibraryUrl = `https://www.facebook.com/ads/library/?id=${adId}`;
-
             const updateFields: Record<string, any> = {
-              // Prefer Ad Library URL (public), fallback to preview_shareable_link
-              url_preview: adLibraryUrl,
+              // Use preview_shareable_link (fb.me/adspreview format)
+              url_preview: previewUrl || `https://www.facebook.com/ads/library/?id=${adId}`,
               updated_at: new Date().toISOString(),
             };
 
