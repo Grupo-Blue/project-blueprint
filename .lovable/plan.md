@@ -1,100 +1,128 @@
 
 
-# Vincular Vendas a Campanhas e Criativos
+# Chat IA Flutuante com Historico e Perguntas Sugeridas
 
-## Diagnostico Atual
+## Visao Geral
 
-Os numeros revelam o problema:
+Botao flutuante no canto inferior direito que abre um chat com IA (google/gemini-3-pro-preview) usando sua propria chave API do Google. O chat persiste conversas no banco de dados, permitindo alternar entre chats antigos e criar novos. Botoes de perguntas sugeridas aparecem no inicio de cada conversa para facilitar o uso.
 
-| Metrica | Quantidade |
-|---|---|
-| Total de leads com venda | 11.998 |
-| Vinculados a criativo (id_criativo) | 21 (0,17%) |
-| Com utm_campaign (sem criativo) | 39 (0,33%) |
-| Sem vinculo algum | 11.938 (99,5%) |
+---
 
-A pagina de Analise de Campanhas calcula vendas e ROAS usando apenas leads que tem `id_criativo` preenchido. Com apenas 21 de 12 mil vendas visíveis, os cards mostram ROAS praticamente zero para todas as campanhas.
+## Chave de API
 
-## Causa Raiz
+Voce precisara fornecer sua chave da API do Google Gemini. Ela sera armazenada de forma segura como um secret do backend (acessivel apenas pela edge function, nunca exposta no frontend). A edge function chamara a API do Google Gemini diretamente (nao pelo gateway Lovable AI).
 
-Os leads entram no sistema via Pipedrive (webhook) e Chatblue, mas a maioria **nao carrega UTMs** nem passa pelo fluxo de atribuicao de criativos. O campo `id_criativo` so e preenchido quando o lead tem `utm_content` com o ID do anuncio -- o que raramente acontece para leads de Pipedrive.
+---
 
-## Solucao Proposta: Vinculacao por Campanha (via utm_campaign)
+## Estrutura do Chat
 
-Criar um caminho alternativo de atribuicao: **lead -> campanha** (direto), sem depender do criativo como intermediario.
+### Painel Flutuante
+- Botao circular fixo no canto inferior direito (icone Sparkles/MessageCircle)
+- Ao clicar, abre painel de ~400x550px (desktop) ou tela cheia (mobile)
+- Cabecalho com: titulo do chat, botao "Novo Chat", botao para ver lista de chats
 
-### Passo 1: Nova coluna na tabela lead
+### Lista de Chats (sidebar/drawer)
+- Lista de conversas anteriores com titulo e data
+- Titulo gerado automaticamente a partir da primeira mensagem do usuario
+- Ao clicar, carrega as mensagens daquele chat
+- Opcao de excluir chat
 
-Adicionar `id_campanha_vinculada` (UUID, FK para campanha) na tabela `lead`. Isso permite vincular o lead diretamente a uma campanha, mesmo sem saber o criativo especifico.
+### Area de Conversa
+- Mensagens renderizadas com Markdown (react-markdown)
+- Streaming token por token
+- Indicador "pensando..." enquanto a IA consulta dados
 
-### Passo 2: Funcao de vinculacao automatica
+### Perguntas Sugeridas
+- Aparecem como botoes/chips no inicio de cada novo chat
+- Mudam conforme a empresa selecionada
+- Exemplos:
+  - "Como estao as campanhas ativas esse mes?"
+  - "Quais leads da {empresa} converteram em venda?"
+  - "Me sugira uma nova campanha de Google Ads"
+  - "Qual criativo esta com melhor CPL?"
+  - "Analise o funil de conversao do ultimo mes"
 
-Criar uma funcao de banco (trigger ou edge function periodica) que tenta vincular leads sem campanha usando 3 estrategias em cascata:
+---
 
-1. **Via id_criativo** (ja existe): se o lead tem `id_criativo`, herda a campanha do criativo
-2. **Via utm_campaign = id_campanha_externo**: match exato do utm com o ID externo da campanha (funciona para Google Ads que usa IDs numericos)  
-3. **Via utm_campaign = nome da campanha**: match por nome (funciona para Meta que usa o nome da campanha no UTM)
+## Persistencia no Banco
 
-### Passo 3: Atualizar a query da pagina de Analise
+### Duas novas tabelas:
 
-Modificar `RelatorioCreativos.tsx` para buscar vendas de duas fontes:
-- Leads vinculados via `id_criativo` (atual)
-- Leads vinculados via `id_campanha_vinculada` (novo)
+**`chat_conversa`**
+- `id` (UUID, PK)
+- `user_id` (UUID, FK auth.users)
+- `titulo` (TEXT) -- gerado pela primeira mensagem
+- `id_empresa` (UUID, nullable) -- empresa no contexto quando criou
+- `created_at`, `updated_at`
 
-Isso garante que vendas aparecam nos cards mesmo quando nao sabemos qual criativo especifico gerou a venda.
+**`chat_mensagem`**
+- `id` (UUID, PK)
+- `id_conversa` (UUID, FK chat_conversa)
+- `role` (TEXT: 'user' | 'assistant')
+- `content` (TEXT)
+- `created_at`
 
-### Passo 4: Indicador visual de atribuicao
+RLS: Cada usuario so ve seus proprios chats (`user_id = auth.uid()`).
 
-Nos cards, mostrar a "confianca" da atribuicao:
-- Icone solido: venda atribuida ao criativo especifico
-- Icone parcial: venda atribuida a campanha (sem criativo identificado)
+---
+
+## Edge Function: `chat-ia-assistente`
+
+### Fluxo
+1. Recebe: mensagens do chat + id_empresa + id_conversa
+2. Busca dados relevantes do banco usando Supabase client (service role)
+3. Chama a API do Google Gemini diretamente com a chave `GEMINI_API_KEY`
+4. Usa **tool calling** para que a IA decida quais dados consultar
+5. Retorna resposta em streaming (SSE)
+
+### Ferramentas disponiveis para a IA (tool calling)
+- `buscar_campanhas` -- campanhas ativas com metricas agregadas
+- `buscar_leads` -- leads com filtros (periodo, venda, canal, empresa)
+- `buscar_criativos` -- criativos com performance e ranking
+- `buscar_metricas_empresa` -- metricas consolidadas (leads, vendas, CPL, ROAS)
+- `buscar_demandas` -- demandas/tarefas de trafego existentes
+- `resumo_geral` -- visao consolidada rapida
+
+### System Prompt
+A IA sera instruida a:
+- Responder em portugues brasileiro
+- Ser proativa, sugerindo acoes concretas ("Posso criar essa demanda no sistema?")
+- Usar dados reais para fundamentar respostas
+- Formatar com Markdown (tabelas, listas, negrito)
 
 ---
 
 ## Detalhes Tecnicos
 
-### Migracao SQL
+### Arquivos a criar
 
+1. **Migracao SQL** -- tabelas `chat_conversa` e `chat_mensagem` com RLS
+2. **`supabase/functions/chat-ia-assistente/index.ts`** -- edge function com tool calling e streaming via API Gemini direta
+3. **`src/components/ChatIAFlutuante.tsx`** -- componente completo (botao + painel + lista de chats + conversa + sugestoes)
+4. **`src/components/AppLayout.tsx`** -- adicionar `<ChatIAFlutuante />` antes do fechamento do div principal
+
+### Modificacoes
+
+- **`supabase/config.toml`** -- registrar `[functions.chat-ia-assistente]` com `verify_jwt = false` (validacao manual no codigo)
+
+### Chamada a API Gemini (direta, sem gateway)
+
+A edge function chamara diretamente:
 ```text
--- Nova coluna
-ALTER TABLE lead ADD COLUMN id_campanha_vinculada UUID REFERENCES campanha(id_campanha);
-
--- Indice para performance
-CREATE INDEX idx_lead_campanha_vinculada ON lead(id_campanha_vinculada);
-
--- Preencher retroativamente via criativo
-UPDATE lead SET id_campanha_vinculada = cr.id_campanha
-FROM criativo cr WHERE lead.id_criativo = cr.id_criativo 
-AND lead.id_campanha_vinculada IS NULL;
-
--- Preencher via utm_campaign = id_campanha_externo
-UPDATE lead SET id_campanha_vinculada = c.id_campanha
-FROM campanha c WHERE lead.utm_campaign = c.id_campanha_externo
-AND lead.id_campanha_vinculada IS NULL AND lead.utm_campaign IS NOT NULL;
-
--- Preencher via utm_campaign = nome
-UPDATE lead SET id_campanha_vinculada = c.id_campanha
-FROM campanha c WHERE lead.utm_campaign = c.nome
-AND lead.id_campanha_vinculada IS NULL AND lead.utm_campaign IS NOT NULL;
+POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse
 ```
+Usando a chave `GEMINI_API_KEY` armazenada nos secrets.
 
-### Trigger para novos leads
+Nota: O modelo `gemini-3-pro-preview` sera usado conforme disponibilidade na API do Google. Se ainda nao estiver disponivel na API direta, usaremos `gemini-2.5-pro` como fallback ate a liberacao.
 
-Criar trigger `AFTER INSERT OR UPDATE` na tabela `lead` que executa a mesma logica de vinculacao automaticamente quando um lead novo chega ou quando `utm_campaign` / `id_criativo` e atualizado.
+---
 
-### Arquivos a modificar
+## Sequencia de Implementacao
 
-1. **Nova migracao SQL** -- coluna + backfill + trigger
-2. **`src/pages/RelatorioCreativos.tsx`** -- alterar a query para buscar leads tambem por `id_campanha_vinculada`, nao so por `id_criativo`
-3. **`src/components/campanhas/CampanhaSuperTrunfo.tsx`** -- adicionar indicador de confianca da atribuicao (ex: "12 vendas diretas + 45 vendas da campanha")
-
-### Impacto esperado
-
-- Dos 39 leads com venda que tem `utm_campaign`, cerca de 6-8 ja fazem match com campanhas cadastradas (Google Ads via ID numerico)
-- Os 11.938 restantes continuarao sem vinculo ate que o fluxo de UTMs seja corrigido na origem (Meta/Google Ads)
-- O ganho imediato e modesto, mas a infraestrutura fica pronta para crescer conforme a qualidade dos UTMs melhora
-
-### Limitacao importante
-
-A grande maioria das vendas (99,5%) nao tem nenhum rastro de campanha. Isso e um problema de **rastreamento na origem** (os links das campanhas nao estao com UTMs configurados, ou o CRM nao repassa essa informacao). A solucao tecnica resolve o que e possivel no banco, mas o salto real vira quando o fluxo de UTMs for padronizado nas campanhas.
+1. Solicitar a chave `GEMINI_API_KEY` ao usuario
+2. Criar migracao SQL (tabelas + RLS)
+3. Criar edge function `chat-ia-assistente` com tool calling e streaming
+4. Registrar no config.toml
+5. Criar componente `ChatIAFlutuante` com lista de chats, sugestoes e streaming
+6. Integrar no AppLayout
 
