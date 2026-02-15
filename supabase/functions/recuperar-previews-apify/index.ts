@@ -289,15 +289,64 @@ Deno.serve(async (req) => {
               bestMatch.snapshot?.videos?.[0]?.video_hd_url ||
               bestMatch.snapshot?.videos?.[0]?.video_sd_url ||
               null;
-            const urlMidia = videoUrl || bestMatch.snapshot?.images?.[0] || null;
+            const urlMidiaOriginal = videoUrl || bestMatch.snapshot?.images?.[0] || null;
 
-            const updateFields: Record<string, any> = {
-              url_preview: urlPreview,
-              url_midia: urlMidia || urlPreview,
-            };
+            const updateFields: Record<string, any> = {};
+
+            // Salvar imagem no Storage para URL permanente
+            if (urlPreview || urlMidiaOriginal) {
+              const mediaUrl = urlMidiaOriginal || urlPreview;
+              try {
+                const mediaRes = await fetch(mediaUrl!, { signal: AbortSignal.timeout(15000) });
+                if (mediaRes.ok) {
+                  const mediaData = await mediaRes.arrayBuffer();
+                  // Limitar a 5MB
+                  if (mediaData.byteLength <= 5 * 1024 * 1024) {
+                    const contentType = mediaRes.headers.get("content-type") || "image/jpeg";
+                    const ext = contentType.includes("video") ? "mp4" : "jpg";
+                    const storagePath = `${criativo.id_criativo}.${ext}`;
+
+                    const { error: uploadError } = await supabase.storage
+                      .from("criativos-media")
+                      .upload(storagePath, mediaData, { contentType, upsert: true });
+
+                    if (!uploadError) {
+                      const { data: publicUrlData } = supabase.storage
+                        .from("criativos-media")
+                        .getPublicUrl(storagePath);
+                      updateFields.url_midia = publicUrlData.publicUrl;
+                      console.log(`💾 Mídia salva no Storage: ${storagePath}`);
+                    } else {
+                      console.error(`⚠️ Upload falhou para ${criativo.id_criativo}: ${uploadError.message}`);
+                      updateFields.url_midia = mediaUrl;
+                    }
+                  } else {
+                    console.log(`⚠️ Mídia muito grande (${(mediaData.byteLength / 1024 / 1024).toFixed(1)}MB), salvando URL direta`);
+                    updateFields.url_midia = mediaUrl;
+                  }
+                } else {
+                  updateFields.url_midia = mediaUrl;
+                }
+              } catch (fetchErr: any) {
+                console.error(`⚠️ Erro ao baixar mídia: ${fetchErr.message}`);
+                updateFields.url_midia = mediaUrl;
+              }
+            }
+
+            // Salvar url_preview (Ad Library link permanente, não temporário)
+            if (bestMatch.adArchiveID) {
+              updateFields.url_preview = `https://www.facebook.com/ads/library/?id=${bestMatch.adArchiveID}`;
+            } else if (urlPreview) {
+              updateFields.url_preview = urlPreview;
+            }
 
             if (videoUrl) {
               updateFields.url_video = videoUrl;
+            }
+
+            // Salvar id_anuncio_externo se não tinha
+            if (!criativo.id_anuncio_externo && bestMatch.adArchiveID) {
+              updateFields.id_anuncio_externo = bestMatch.adArchiveID;
             }
 
             const { error: updateError } = await supabase
@@ -311,6 +360,7 @@ Deno.serve(async (req) => {
                 id_criativo: criativo.id_criativo,
                 match_method: matchMethod,
                 score: bestScore,
+                saved_to_storage: !!updateFields.url_midia?.includes("supabase"),
               });
             } else {
               errors.push(`Update error for ${criativo.id_criativo}: ${updateError.message}`);
