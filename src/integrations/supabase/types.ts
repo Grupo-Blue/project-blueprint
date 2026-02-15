@@ -5082,6 +5082,66 @@ export type Database = {
           },
         ]
       }
+      tarefa_agendada_ia: {
+        Row: {
+          created_at: string
+          data_execucao: string
+          email_destino: string | null
+          enviar_email: boolean
+          executed_at: string | null
+          id: string
+          id_conversa: string | null
+          id_empresa: string | null
+          instrucao: string
+          resultado: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_execucao: string
+          email_destino?: string | null
+          enviar_email?: boolean
+          executed_at?: string | null
+          id?: string
+          id_conversa?: string | null
+          id_empresa?: string | null
+          instrucao: string
+          resultado?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_execucao?: string
+          email_destino?: string | null
+          enviar_email?: boolean
+          executed_at?: string | null
+          id?: string
+          id_conversa?: string | null
+          id_empresa?: string | null
+          instrucao?: string
+          resultado?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tarefa_agendada_ia_id_conversa_fkey"
+            columns: ["id_conversa"]
+            isOneToOne: false
+            referencedRelation: "chat_conversa"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tarefa_agendada_ia_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       tendencia_mercado: {
         Row: {
           categorias: string[] | null

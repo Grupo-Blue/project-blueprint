@@ -277,6 +277,34 @@ const toolDeclarations = [
       required: ["id_empresa", "tipo", "descricao"],
     },
   },
+
+  // === SCHEDULING TOOLS (2) ===
+  {
+    name: "agendar_tarefa_ia",
+    description: "Agenda uma tarefa/análise para ser executada pela IA no futuro. SEMPRE peça confirmação do usuário antes de usar. O resultado pode ser enviado por email.",
+    parameters: {
+      type: "object",
+      properties: {
+        id_empresa: { type: "string", description: "UUID da empresa do contexto" },
+        instrucao: { type: "string", description: "Instrução detalhada do que a IA deve analisar quando executar" },
+        dias: { type: "number", description: "Daqui a quantos dias executar (padrão 1)" },
+        enviar_email: { type: "boolean", description: "Se deve enviar resultado por email (padrão true)" },
+        email_destino: { type: "string", description: "Email de destino (se não informado, usa o email do usuário)" },
+      },
+      required: ["instrucao"],
+    },
+  },
+  {
+    name: "listar_tarefas_agendadas",
+    description: "Lista as tarefas agendadas do usuário. Pode filtrar por status (pendente, concluida, erro).",
+    parameters: {
+      type: "object",
+      properties: {
+        status: { type: "string", description: "Filtrar por status: pendente, executando, concluida, erro" },
+      },
+      required: [],
+    },
+  },
 ];
 
 // Tool execution functions
@@ -937,6 +965,52 @@ async function executeTool(name: string, args: Record<string, any>, userId?: str
       return { sucesso: true, mensagem: `Aprendizado registrado com sucesso!`, aprendizado: data };
     }
 
+    // === SCHEDULING TOOLS ===
+    case "agendar_tarefa_ia": {
+      if (!userId) return { error: "Usuário não autenticado" };
+
+      const dias = args.dias || 1;
+      const dataExecucao = new Date();
+      dataExecucao.setDate(dataExecucao.getDate() + dias);
+
+      const { data, error } = await supabaseAdmin
+        .from("tarefa_agendada_ia")
+        .insert({
+          user_id: userId,
+          id_empresa: args.id_empresa || null,
+          instrucao: args.instrucao,
+          data_execucao: dataExecucao.toISOString(),
+          enviar_email: args.enviar_email !== false,
+          email_destino: args.email_destino || null,
+        })
+        .select("id, instrucao, data_execucao, enviar_email")
+        .single();
+
+      if (error) return { error: error.message };
+      return {
+        sucesso: true,
+        mensagem: `Tarefa agendada para ${dataExecucao.toLocaleDateString("pt-BR")}!`,
+        tarefa: data,
+      };
+    }
+
+    case "listar_tarefas_agendadas": {
+      if (!userId) return { error: "Usuário não autenticado" };
+
+      let query = supabaseAdmin
+        .from("tarefa_agendada_ia")
+        .select("id, instrucao, data_execucao, status, resultado, enviar_email, created_at, executed_at")
+        .eq("user_id", userId)
+        .order("data_execucao", { ascending: false })
+        .limit(20);
+
+      if (args.status) query = query.eq("status", args.status);
+
+      const { data, error } = await query;
+      if (error) return { error: error.message };
+      return { total: data?.length || 0, tarefas: data || [] };
+    }
+
     default:
       return { error: `Ferramenta desconhecida: ${name}` };
   }
@@ -967,6 +1041,12 @@ CAPACIDADES DE ESCRITA:
 - Registrar hipóteses de teste
 - Registrar aprendizados/insights semanais
 
+CAPACIDADES DE AGENDAMENTO:
+- **Agendar tarefas/análises futuras**: O usuário pode pedir "daqui X dias analise Y" e você agenda usando a ferramenta agendar_tarefa_ia
+- **Listar tarefas agendadas**: O usuário pode perguntar quais tarefas tem agendadas
+- A tarefa será executada automaticamente na data programada e o resultado pode ser enviado por email
+- Exemplos: "Daqui 4 dias analise se o gestor fez as tarefas", "Em 7 dias me mande um relatório de performance por email"
+
 REGRAS:
 - Responda SEMPRE em português brasileiro
 - Seja proativo: ao identificar oportunidades ou problemas, sugira ações concretas
@@ -976,9 +1056,10 @@ REGRAS:
 - Calcule e apresente métricas derivadas (CPL, CAC, ROAS, taxa de conversão) quando relevante
 - Se os dados retornados estiverem vazios, informe de forma clara e sugira possíveis motivos
 
-REGRAS DE ESCRITA (CRÍTICO):
-- **NUNCA** execute ferramentas de escrita sem pedir confirmação explícita do usuário primeiro
-- Antes de criar qualquer registro, apresente um resumo do que será criado e pergunte: "Posso registrar isso no sistema?"
+REGRAS DE ESCRITA E AGENDAMENTO (CRÍTICO):
+- **NUNCA** execute ferramentas de escrita ou agendamento sem pedir confirmação explícita do usuário primeiro
+- Antes de criar/agendar qualquer registro, apresente um resumo do que será feito e pergunte: "Posso registrar/agendar isso?"
+- Para agendamentos, informe claramente: instrução, data prevista e se enviará email
 - Ao sugerir demandas de campanha, inclua UTMs, verba e segmentação baseados nos dados históricos
 - Marque demandas criadas pela IA com a flag sugerida_por_ia=true
 
