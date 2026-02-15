@@ -161,3 +161,6 @@ verify_jwt = false
 
 [functions.coletar-conteudo-metricool]
 verify_jwt = false
+
+[functions.executar-tarefas-agendadas]
+verify_jwt = false
