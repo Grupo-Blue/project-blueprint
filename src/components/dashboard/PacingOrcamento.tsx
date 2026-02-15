@@ -61,7 +61,7 @@ export const PacingOrcamento = ({ empresaId }: PacingOrcamentoProps) => {
         .from("campanha_metricas_dia")
         .select("data, verba_investida")
         .in("id_campanha", campanhas.map(c => c.id_campanha))
-        .like("fonte_conversoes", "METRICOOL_%_DAILY")
+        .not("fonte_conversoes", "is", null)
         .gte("data", format(inicioMes, "yyyy-MM-dd"))
         .lte("data", format(fimMes, "yyyy-MM-dd"))
         .order("data");

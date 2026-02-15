@@ -63,6 +63,7 @@ export function MetricasAwareness({ empresaId, dataInicio, dataFim }: MetricasAw
         .from("campanha_metricas_dia")
         .select("verba_investida")
         .in("id_campanha", campanhas.map(c => c.id_campanha))
+        .not("fonte_conversoes", "is", null)
         .gte("data", format(dataInicio, "yyyy-MM-dd"))
         .lte("data", format(dataFim, "yyyy-MM-dd"));
 

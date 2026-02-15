@@ -47,6 +47,7 @@ export function AlertasAnomalias({ empresaId }: AlertasAnomaliasProps) {
             )
           )
         `)
+        .not("fonte_conversoes", "is", null)
         .gte("data", format(data14dias, "yyyy-MM-dd"));
 
       if (metricasError) throw metricasError;
@@ -166,6 +167,7 @@ export function AlertasAnomalias({ empresaId }: AlertasAnomaliasProps) {
       const { data: metricasCampanha } = await supabase
         .from("campanha_metricas_dia")
         .select("id_campanha, verba_investida, leads")
+        .not("fonte_conversoes", "is", null)
         .gte("data", format(subDays(hoje, 30), "yyyy-MM-dd"));
 
       // Buscar vendas por campanha (via leads)

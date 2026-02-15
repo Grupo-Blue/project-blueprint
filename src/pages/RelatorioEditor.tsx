@@ -219,6 +219,7 @@ export default function RelatorioEditor() {
             conta:id_conta (id_empresa)
           )
         `)
+        .not("fonte_conversoes", "is", null)
         .gte("data", periodo.inicio)
         .lte("data", periodo.fim);
 
@@ -274,6 +275,7 @@ export default function RelatorioEditor() {
             conta:id_conta (id_empresa)
           )
         `)
+        .not("fonte_conversoes", "is", null)
         .gte("data", periodo.inicio)
         .lte("data", periodo.fim);
 

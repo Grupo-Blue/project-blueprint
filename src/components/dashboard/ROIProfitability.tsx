@@ -59,6 +59,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
             )
           )
         `)
+        .not("fonte_conversoes", "is", null)
         .gte("data", dataInicioStr)
         .lte("data", dataFimStr);
 
@@ -131,6 +132,7 @@ export function ROIProfitability({ empresaId }: ROIProfitabilityProps) {
             )
           )
         `)
+        .not("fonte_conversoes", "is", null)
         .gte("data", dataInicioHistorico.toISOString().split('T')[0]);
 
       const metricasHistorico = metricasHistoricoCampanhas?.map((m: any) => ({

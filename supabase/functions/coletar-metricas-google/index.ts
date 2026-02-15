@@ -246,6 +246,7 @@ serve(async (req) => {
             leads: a.leads,
             cpc_medio: a.cpc_count > 0 ? a.cpc_total / a.cpc_count : (a.cliques > 0 ? a.verba / a.cliques : 0),
             parcela_impressao: a.impression_share_count > 0 ? a.impression_share_total / a.impression_share_count : null,
+            fonte_conversoes: 'GOOGLE_API_DAILY',
           };
 
           const { error: upsertError } = await supabase
