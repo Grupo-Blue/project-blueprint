@@ -165,6 +165,7 @@ serve(async (req) => {
             cliques: parseInt(result.metrics.clicks || "0"),
             verba_investida: gasto,
             leads: parseInt(result.metrics.conversions || "0"),
+            fonte_conversoes: 'GOOGLE_API_DAILY',
           };
 
           const { error: upsertError } = await supabase

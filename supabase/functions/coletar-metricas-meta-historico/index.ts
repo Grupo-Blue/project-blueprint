@@ -156,6 +156,7 @@ serve(async (req) => {
             cliques: parseInt(metrica.clicks || "0"),
             verba_investida: gasto,
             leads: parseInt(leads),
+            fonte_conversoes: 'META_API_DAILY',
           };
 
           // Inserir ou atualizar métricas do dia
@@ -195,6 +196,7 @@ serve(async (req) => {
               cliques: parseInt(metrica.clicks || "0"),
               verba_investida: gasto,
               leads: parseInt(leads),
+              fonte_conversoes: 'META_API_DAILY',
             };
 
             const { error: upsertError } = await supabase
