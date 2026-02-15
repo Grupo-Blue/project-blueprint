@@ -1,80 +1,56 @@
 
+# Correção: Dados financeiros zerados no Dashboard (Blue)
 
-# Corrigir Coleta de Dados de Ads do Metricool
+## Diagnóstico
 
-## Problema Raiz
+O problema tem duas causas encadeadas:
 
-Analisei a documentacao oficial (Swagger) do Metricool e encontrei o problema: a funcao `enriquecer-campanhas-metricool` esta usando **URLs que nao existem na API**.
+### 1. Dados da Blue sem tag METRICOOL
+A empresa **Blue** (id `95e7adaf`) tem **29 registros** de fevereiro em `campanha_metricas_dia` com `fonte_conversoes = NULL` (totalizando R$ 2.162,91), mas apenas **3 registros** com `METRICOOL_GOOGLE_DAILY` (R$ 0,00). A **Tokeniza** funciona corretamente com 46 registros `METRICOOL_META_DAILY`.
 
-URLs que estamos tentando (ERRADAS):
-- `/ads/google/campaigns` -- NAO EXISTE
-- `/ads/facebook/campaigns` -- NAO EXISTE
-- `/ads/campaigns?network=google` -- NAO EXISTE
+### 2. Filtro exclui dados sem tag
+Ao adicionar `.like("fonte_conversoes", "METRICOOL_%_DAILY")` no PacingOrcamento e Dashboard, os registros da Blue (que possuem `fonte_conversoes = NULL`) foram corretamente excluidos pelo filtro, resultando em gastos zerados.
 
-URLs corretas (da documentacao oficial):
-- `/stats/adwords/campaigns` -- Google Ads (retorna `AdCampaign[]`)
-- `/stats/facebookads/campaigns` -- Facebook/Meta Ads (retorna `AdCampaign[]`)
-- `/stats/tiktokads/campaigns` -- TikTok Ads (retorna `AdCampaign[]`)
+### Por que a Blue nao tem tag METRICOOL?
+A edge function `enriquecer-campanhas-metricool` faz matching de campanhas do Metricool com campanhas locais por `id_campanha_externo` ou `nome`. Se o Metricool retorna nomes diferentes dos cadastrados localmente, o matching falha e o registro nao e salvo com a tag `METRICOOL_*_DAILY`. Os dados com `NULL` provavelmente vem de outras funcoes de coleta (`coletar-metricas-meta`, `coletar-metricas-google`).
 
-## Endpoints de Ads Disponiveis na API
+## Plano de Correção
 
-Com base no Swagger oficial (`app.metricool.com/api/swagger.json`):
+### Passo 1 - Correcao imediata dos dados
+Executar UPDATE no banco para taguear os registros existentes da Blue (e de qualquer empresa) que possuem `fonte_conversoes = NULL`, usando a plataforma da conta de anuncio como referencia:
 
-| Endpoint | Descricao | Parametros |
-|---|---|---|
-| `/stats/facebookads/campaigns` | Lista campanhas Facebook Ads com metricas | `start`, `end`, `sortcolumn` (name, impressions, reach, conversions, clicks, cpm, cpc, ctr, spent) |
-| `/stats/adwords/campaigns` | Lista campanhas Google Ads com metricas | `start`, `end`, `sortcolumn` (impressions, cpm, cpc, ctr, cost) |
-| `/stats/tiktokads/campaigns` | Lista campanhas TikTok Ads com metricas | `start`, `end`, `sortcolumn` |
-| `/stats/adwords/keywords` | Keywords do Google Ads | `start`, `end`, `sortcolumn`, `CAMPAIGN` (filtro) |
-| `/stats/aggregations/fbAdsPerformance` | Metricas agregadas Facebook Ads | `start`, `end`, `campaignid` (opcional) |
-| `/stats/aggregations/adwordsPerformance` | Metricas agregadas Google Ads | `start`, `end`, `campaignid` (opcional) |
-| `/stats/facebookads/metricvalue` | Valor de metrica especifica FB Ads | `metric`, `start`, `end`, `idCampaign` |
-
-Todos usam `blogId` e `userId` como query params + `X-Mc-Auth` no header.
-
-## Plano de Correcao
-
-### 1. Corrigir URLs na funcao `enriquecer-campanhas-metricool`
-
-Substituir os endpoints errados pelos corretos:
-
-```text
-ANTES (errado):
-  /ads/google/campaigns?blogId=...
-  /ads/facebook/campaigns?blogId=...
-  /ads/campaigns?network=google&blogId=...
-
-DEPOIS (correto):
-  /stats/adwords/campaigns?blogId=...&userId=...&start=...&end=...
-  /stats/facebookads/campaigns?blogId=...&userId=...&start=...&end=...
-  /stats/tiktokads/campaigns?blogId=...&userId=...&start=...&end=...
+```sql
+UPDATE campanha_metricas_dia cmd
+SET fonte_conversoes = 'METRICOOL_' || ca.plataforma || '_DAILY'
+FROM campanha c
+JOIN conta_anuncio ca ON ca.id_conta = c.id_conta
+WHERE cmd.id_campanha = c.id_campanha
+AND cmd.data >= '2026-02-01'
+AND cmd.fonte_conversoes IS NULL
 ```
 
-### 2. Adicionar endpoint de agregacoes como complemento
+### Passo 2 - Melhorar matching na edge function
+Atualizar `enriquecer-campanhas-metricool` para usar matching mais flexivel (case-insensitive, trim, e partial match) entre nomes de campanhas do Metricool e campanhas locais. Adicionar logs quando campanhas do Metricool nao encontram correspondencia local para facilitar debug futuro.
 
-Usar `/stats/aggregations/fbAdsPerformance` e `/stats/aggregations/adwordsPerformance` para obter totais agregados por periodo, que podem servir como validacao e fallback.
+### Passo 3 - Garantir que TODAS as coletas tagueem os registros
+Modificar as funcoes `coletar-metricas-meta` e `coletar-metricas-google` para tambem salvar com `fonte_conversoes` preenchido (ex: `META_API_DAILY`, `GOOGLE_API_DAILY`). Assim, nenhum registro fica com NULL.
 
-### 3. Processar resposta corretamente
+### Passo 4 - Aplicar filtro consistente em TODOS os componentes
+Atualizar todos os componentes que consultam `campanha_metricas_dia` para usar o filtro `fonte_conversoes IS NOT NULL` (em vez de filtrar apenas METRICOOL), garantindo que qualquer fonte tagueada seja incluida:
 
-O modelo `AdCampaign` do Metricool retorna os dados diretamente no array (nao aninhados em `stats` ou `daily`). Campos chave:
-- `name`, `impressions`, `reach`, `conversions`, `clicks`, `cpm`, `cpc`, `ctr`, `spent`/`cost`
+Componentes a atualizar:
+- `src/pages/Dashboard.tsx` (TrafficFlowChart) - ja tem filtro METRICOOL
+- `src/components/dashboard/PacingOrcamento.tsx` - ja tem filtro METRICOOL
+- `src/components/dashboard/ROIProfitability.tsx`
+- `src/components/dashboard/AlertasAnomalias.tsx`
+- `src/components/dashboard/MetricasAwareness.tsx`
+- `src/pages/DashboardTrafego.tsx`
+- `src/pages/RelatorioEditor.tsx`
+- `src/pages/RelatorioCreativos.tsx`
 
-### 4. Adicionar TikTok Ads
+### Detalhes Tecnicos
 
-Endpoint disponivel mas nao implementado. Aproveitar para incluir.
-
-## Arquivo a Modificar
-
-- `supabase/functions/enriquecer-campanhas-metricool/index.ts`
-  - Funcao `fetchAdsPlatformData`: trocar URLs dos endpoints
-  - Funcao `fetchAdsCreativeData`: trocar URLs dos endpoints
-  - Adicionar chamada ao endpoint de agregacoes como complemento
-  - Adicionar suporte a TikTok Ads
-
-## Resultado Esperado
-
-Apos a correcao, ao disparar `enriquecer-campanhas-metricool`:
-- Os endpoints corretos serao chamados
-- Dados reais de campanhas de Ads (impressoes, cliques, conversoes, CPC, CTR, ROAS, verba) serao salvos em `campanha_metricas_dia`
-- Os leads vinculados a essas campanhas poderao ser enriquecidos com `metricool_roas_campanha`, `metricool_cpc_campanha`, etc.
-
+- A tabela `campanha_metricas_dia` tem constraint unica em `(id_campanha, data)`, entao so existe 1 registro por campanha/dia
+- O UPDATE do Passo 1 nao cria duplicatas, apenas preenche o campo `fonte_conversoes` nos registros existentes
+- O filtro `.not("fonte_conversoes", "is", null)` e mais robusto que `.like("fonte_conversoes", "METRICOOL_%_DAILY")` porque aceita qualquer fonte tagueada
+- No Passo 3, as funcoes de coleta passam a funcionar como backup: se o Metricool ja gravou com METRICOOL_*_DAILY, o upsert sobrescreve com a nova tag, sem duplicar
