@@ -1,56 +1,42 @@
 
-# Correção: Dados financeiros zerados no Dashboard (Blue)
+# Correcao: Dados Blue faltando de 01 a 08 de Fevereiro
 
-## Diagnóstico
+## Diagnostico
 
-O problema tem duas causas encadeadas:
+A investigacao revelou que os dias **02 a 08 de fevereiro** simplesmente **nao existem** na tabela `campanha_metricas_dia` para a Blue. O dia 01 existe mas com verba = R$ 0.
 
-### 1. Dados da Blue sem tag METRICOOL
-A empresa **Blue** (id `95e7adaf`) tem **29 registros** de fevereiro em `campanha_metricas_dia` com `fonte_conversoes = NULL` (totalizando R$ 2.162,91), mas apenas **3 registros** com `METRICOOL_GOOGLE_DAILY` (R$ 0,00). A **Tokeniza** funciona corretamente com 46 registros `METRICOOL_META_DAILY`.
+### Causa raiz
+1. O **Metricool** nao retornou dados para esses dias (a API pode ter limitacao de historico ou as campanhas nao tinham gasto reportado)
+2. Os coletores nativos (`coletar-metricas-meta` e `coletar-metricas-google`) so coletam o dia **atual** (`date_preset=today`), entao nunca retroagiram
+3. As funcoes historicas (`coletar-metricas-meta-historico` e `coletar-metricas-google-historico`) existem e conseguem buscar dados por periodo, **porem nao incluem `fonte_conversoes`** no upsert - o que faz os registros ficarem com NULL e serem filtrados pelo dashboard
 
-### 2. Filtro exclui dados sem tag
-Ao adicionar `.like("fonte_conversoes", "METRICOOL_%_DAILY")` no PacingOrcamento e Dashboard, os registros da Blue (que possuem `fonte_conversoes = NULL`) foram corretamente excluidos pelo filtro, resultando em gastos zerados.
+## Plano de Correcao
 
-### Por que a Blue nao tem tag METRICOOL?
-A edge function `enriquecer-campanhas-metricool` faz matching de campanhas do Metricool com campanhas locais por `id_campanha_externo` ou `nome`. Se o Metricool retorna nomes diferentes dos cadastrados localmente, o matching falha e o registro nao e salvo com a tag `METRICOOL_*_DAILY`. Os dados com `NULL` provavelmente vem de outras funcoes de coleta (`coletar-metricas-meta`, `coletar-metricas-google`).
+### Passo 1 - Corrigir as funcoes historicas para incluir `fonte_conversoes`
+Atualizar as duas edge functions de coleta historica para incluir `fonte_conversoes` no upsert:
 
-## Plano de Correção
+- `coletar-metricas-meta-historico`: adicionar `fonte_conversoes: 'META_API_DAILY'`
+- `coletar-metricas-google-historico`: adicionar `fonte_conversoes: 'GOOGLE_API_DAILY'`
 
-### Passo 1 - Correcao imediata dos dados
-Executar UPDATE no banco para taguear os registros existentes da Blue (e de qualquer empresa) que possuem `fonte_conversoes = NULL`, usando a plataforma da conta de anuncio como referencia:
+### Passo 2 - Executar coleta historica para a Blue (01-08/02)
+Chamar as duas funcoes com os parametros:
 
-```sql
-UPDATE campanha_metricas_dia cmd
-SET fonte_conversoes = 'METRICOOL_' || ca.plataforma || '_DAILY'
-FROM campanha c
-JOIN conta_anuncio ca ON ca.id_conta = c.id_conta
-WHERE cmd.id_campanha = c.id_campanha
-AND cmd.data >= '2026-02-01'
-AND cmd.fonte_conversoes IS NULL
+```text
+POST coletar-metricas-meta-historico
+{ "data_inicio": "2026-02-01", "data_fim": "2026-02-08" }
+
+POST coletar-metricas-google-historico
+{ "data_inicio": "2026-02-01", "data_fim": "2026-02-08" }
 ```
 
-### Passo 2 - Melhorar matching na edge function
-Atualizar `enriquecer-campanhas-metricool` para usar matching mais flexivel (case-insensitive, trim, e partial match) entre nomes de campanhas do Metricool e campanhas locais. Adicionar logs quando campanhas do Metricool nao encontram correspondencia local para facilitar debug futuro.
+Isso ira buscar os dados diarios diretamente das APIs nativas do Meta e Google para o periodo faltante e salva-los com a tag correta.
 
-### Passo 3 - Garantir que TODAS as coletas tagueem os registros
-Modificar as funcoes `coletar-metricas-meta` e `coletar-metricas-google` para tambem salvar com `fonte_conversoes` preenchido (ex: `META_API_DAILY`, `GOOGLE_API_DAILY`). Assim, nenhum registro fica com NULL.
-
-### Passo 4 - Aplicar filtro consistente em TODOS os componentes
-Atualizar todos os componentes que consultam `campanha_metricas_dia` para usar o filtro `fonte_conversoes IS NOT NULL` (em vez de filtrar apenas METRICOOL), garantindo que qualquer fonte tagueada seja incluida:
-
-Componentes a atualizar:
-- `src/pages/Dashboard.tsx` (TrafficFlowChart) - ja tem filtro METRICOOL
-- `src/components/dashboard/PacingOrcamento.tsx` - ja tem filtro METRICOOL
-- `src/components/dashboard/ROIProfitability.tsx`
-- `src/components/dashboard/AlertasAnomalias.tsx`
-- `src/components/dashboard/MetricasAwareness.tsx`
-- `src/pages/DashboardTrafego.tsx`
-- `src/pages/RelatorioEditor.tsx`
-- `src/pages/RelatorioCreativos.tsx`
+### Passo 3 - Verificar resultados
+Consultar o banco apos a execucao para confirmar que os dias 01-08 agora possuem dados com `fonte_conversoes` preenchido.
 
 ### Detalhes Tecnicos
 
-- A tabela `campanha_metricas_dia` tem constraint unica em `(id_campanha, data)`, entao so existe 1 registro por campanha/dia
-- O UPDATE do Passo 1 nao cria duplicatas, apenas preenche o campo `fonte_conversoes` nos registros existentes
-- O filtro `.not("fonte_conversoes", "is", null)` e mais robusto que `.like("fonte_conversoes", "METRICOOL_%_DAILY")` porque aceita qualquer fonte tagueada
-- No Passo 3, as funcoes de coleta passam a funcionar como backup: se o Metricool ja gravou com METRICOOL_*_DAILY, o upsert sobrescreve com a nova tag, sem duplicar
+- As funcoes historicas ja suportam paginacao (Meta) e segmentacao por data (Google GAQL `segments.date BETWEEN`)
+- O upsert com `onConflict: "id_campanha,data"` garante que se ja existir um registro para um dia, ele sera atualizado (nao duplicado)
+- A Blue possui 2 integracoes META_ADS e 1 GOOGLE_ADS ativas, com campanhas ativas desde janeiro/fevereiro
+- O `coletar-metricas-meta-historico` busca todas as campanhas da conta (nao apenas ativas), garantindo cobertura completa
