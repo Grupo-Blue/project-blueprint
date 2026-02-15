@@ -308,7 +308,7 @@ serve(async (req) => {
             if (ads.length > 0) {
               try {
                 const adIds = ads.map((a: any) => a.id).join(",");
-                const insightsUrl = `https://graph.facebook.com/v22.0/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,actions,reach,frequency&level=ad&date_preset=today&filtering=[{"field":"ad.id","operator":"IN","value":["${adIds.replace(/,/g, '","')}"]}]&access_token=${accessToken}`;
+                const insightsUrl = `https://graph.facebook.com/v22.0/${adAccountId}/insights?fields=ad_id,impressions,clicks,spend,actions,reach,frequency,video_30_sec_watched_actions&level=ad&date_preset=today&filtering=[{"field":"ad.id","operator":"IN","value":["${adIds.replace(/,/g, '","')}"]}]&access_token=${accessToken}`;
                 
                 const insightsResponse = await fetch(insightsUrl);
                 if (insightsResponse.ok) {
@@ -327,6 +327,7 @@ serve(async (req) => {
                     const adLeads = insight.actions?.find((a: any) => a.action_type === "lead")?.value || 0;
                     const adSpend = parseFloat(insight.spend || "0");
                     const adClicks = parseInt(insight.clicks || "0");
+                    const videoViews = parseInt(insight.video_30_sec_watched_actions?.[0]?.value || "0");
                     
                     const metricasCriativo = {
                       id_criativo: criativoDB.id_criativo,
@@ -338,6 +339,7 @@ serve(async (req) => {
                       alcance: parseInt(insight.reach || "0"),
                       frequencia: parseFloat(insight.frequency || "0"),
                       cpc_medio: adClicks > 0 ? adSpend / adClicks : 0,
+                      video_views: videoViews,
                     };
                     
                     await supabase

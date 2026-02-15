@@ -126,14 +126,17 @@ const RelatorioCreativos = () => {
         if ((m as any).cpc_medio > 0) c.cpc_medio = (m as any).cpc_medio;
       });
 
-      // Agregar métricas por criativo
-      const metPorCri: Record<string, { impressoes: number; cliques: number; verba: number; leadsMetrica: number }> = {};
+      // Agregar métricas por criativo (incluindo alcance, frequência, video_views)
+      const metPorCri: Record<string, { impressoes: number; cliques: number; verba: number; leadsMetrica: number; alcance: number; frequencia: number; video_views: number }> = {};
       metricasCri.forEach(m => {
-        if (!metPorCri[m.id_criativo]) metPorCri[m.id_criativo] = { impressoes: 0, cliques: 0, verba: 0, leadsMetrica: 0 };
+        if (!metPorCri[m.id_criativo]) metPorCri[m.id_criativo] = { impressoes: 0, cliques: 0, verba: 0, leadsMetrica: 0, alcance: 0, frequencia: 0, video_views: 0 };
         metPorCri[m.id_criativo].impressoes += m.impressoes || 0;
         metPorCri[m.id_criativo].cliques += m.cliques || 0;
         metPorCri[m.id_criativo].verba += m.verba_investida || 0;
         metPorCri[m.id_criativo].leadsMetrica += m.leads || 0;
+        metPorCri[m.id_criativo].alcance += (m as any).alcance || 0;
+        if ((m as any).frequencia > 0) metPorCri[m.id_criativo].frequencia = (m as any).frequencia;
+        metPorCri[m.id_criativo].video_views += (m as any).video_views || 0;
       });
 
       const leadsPorCri: Record<string, { total: number; mqls: number; vendas: number; valor: number }> = {};
@@ -163,13 +166,13 @@ const RelatorioCreativos = () => {
       });
 
       return campanhasDaEmpresa.map(camp => {
-        const mc = metricasPorCamp[camp.id_campanha] || { impressoes: 0, cliques: 0, verba: 0, leads: 0, conversoes: 0, valor_conv: 0 };
+        const mc = metricasPorCamp[camp.id_campanha] || { impressoes: 0, cliques: 0, verba: 0, leads: 0, conversoes: 0, valor_conv: 0, alcance: 0, frequencia: 0, cpc_medio: 0 };
         const criativosCamp = (criativosData || []).filter(c => c.id_campanha === camp.id_campanha);
         const contaIdExterno = contaIdExternoPorCamp[camp.id_campanha] || null;
 
         // Construir dados dos criativos
         const criativos: CriativoRankingData[] = criativosCamp.map(cr => {
-          const mCr = metPorCri[cr.id_criativo] || { impressoes: 0, cliques: 0, verba: 0, leadsMetrica: 0 };
+          const mCr = metPorCri[cr.id_criativo] || { impressoes: 0, cliques: 0, verba: 0, leadsMetrica: 0, alcance: 0, frequencia: 0, video_views: 0 };
           const lCr = leadsPorCri[cr.id_criativo] || { total: 0, mqls: 0, vendas: 0, valor: 0 };
           const totalLeads = lCr.total > 0 ? lCr.total : mCr.leadsMetrica;
           return {
@@ -190,6 +193,9 @@ const RelatorioCreativos = () => {
             isSemConversao: mCr.verba > 0 && totalLeads === 0,
             id_anuncio_externo: cr.id_anuncio_externo,
             conta_id_externo: contaIdExterno,
+            alcance: mCr.alcance,
+            frequencia: mCr.frequencia,
+            video_views: mCr.video_views,
           };
         });
 
@@ -246,6 +252,11 @@ const RelatorioCreativos = () => {
           criativos_ativos: criativosCamp.filter(c => c.ativo).length,
           criativos_total: criativosCamp.length,
           tem_alerta: criativos.some(c => c.isFadiga || c.isSemConversao),
+          alcance: mc.alcance,
+          frequencia: mc.frequencia,
+          cpc_medio: mc.cpc_medio,
+          conversoes: mc.conversoes,
+          valor_conversao: mc.valor_conv,
         };
       });
     },

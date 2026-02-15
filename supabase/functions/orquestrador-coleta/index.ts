@@ -179,6 +179,13 @@ serve(async (req) => {
       return res.data;
     });
 
+    // === FASE 7: Enriquecer criativos com dados Metricool (proporcional) ===
+    await executarFase("criativos_metricool", async () => {
+      const res = await chamarFuncao(supabaseUrl, anonKey, "coletar-criativos-metricool", { dias: 7 });
+      console.log(`🎯 Criativos Metricool: ${res.ok ? "OK" : "ERRO"}`, res.data?.total_atualizados || 0, "atualizados");
+      return res.data;
+    });
+
     const duracao = Date.now() - startTime;
     const fasesOk = resultados.filter(r => r.status === "sucesso").length;
     const fasesErro = resultados.filter(r => r.status === "erro").length;
