@@ -58,6 +58,7 @@ function getPreviewLink(criativo: CriativoRankingData): string | null {
 
 export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardProps) {
   const [imagemExpandida, setImagemExpandida] = useState(false);
+  const [imagemQuebrada, setImagemQuebrada] = useState(false);
   const maxFunil = Math.max(criativo.impressoes, 1);
   const isVideo = criativo.tipo === 'VIDEO' || criativo.tipo === 'video';
   const previewLink = getPreviewLink(criativo);
@@ -92,10 +93,20 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
               }
             }}
           >
-            {criativo.url_midia ? (
-              <img src={criativo.url_midia} alt="" className="w-full h-full object-cover" />
-            ) : isVideo && criativo.url_video ? (
+            {criativo.url_midia && !imagemQuebrada ? (
+              <img
+                src={criativo.url_midia}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={() => setImagemQuebrada(true)}
+              />
+            ) : isVideo && criativo.url_video && !imagemQuebrada ? (
               <Video className="h-6 w-6 text-muted-foreground" />
+            ) : imagemQuebrada || !criativo.url_midia ? (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-muted/50 gap-0.5">
+                {getTipoIcon(criativo.tipo)}
+                <span className="text-[8px] text-muted-foreground leading-tight">Sem preview</span>
+              </div>
             ) : (
               getTipoIcon(criativo.tipo)
             )}
