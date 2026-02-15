@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Checkbox } from "@/components/ui/checkbox";
+import { KeywordRankingTable } from "./KeywordRankingTable";
 
 export interface CampanhaCard {
   id_campanha: string;
@@ -49,6 +50,8 @@ interface CampanhaSuperTrunfoProps {
   comparando?: boolean;
   onToggleComparar?: (id: string) => void;
   selecionadaComparar?: boolean;
+  isGoogleSearch?: boolean;
+  id_empresa?: string;
 }
 
 const PlataformaIcon = ({ plataforma }: { plataforma: string }) => {
@@ -80,7 +83,7 @@ const PlataformaIcon = ({ plataforma }: { plataforma: string }) => {
   );
 };
 
-export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, onToggleComparar, selecionadaComparar }: CampanhaSuperTrunfoProps) {
+export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, onToggleComparar, selecionadaComparar, isGoogleSearch, id_empresa }: CampanhaSuperTrunfoProps) {
   const [aberto, setAberto] = useState(false);
   const isMobile = useIsMobile();
 
@@ -263,7 +266,11 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
           {cardContent}
         </CollapsibleTrigger>
         <CollapsibleContent className="px-2 py-3">
-          <CriativosDetalhe />
+          {isGoogleSearch && id_empresa ? (
+            <KeywordRankingTable id_campanha={campanha.id_campanha} id_empresa={id_empresa} />
+          ) : (
+            <CriativosDetalhe />
+          )}
         </CollapsibleContent>
       </Collapsible>
     );
@@ -328,7 +335,11 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
               </div>
             )}
 
-            <CriativosDetalhe />
+            {isGoogleSearch && id_empresa ? (
+              <KeywordRankingTable id_campanha={campanha.id_campanha} id_empresa={id_empresa} />
+            ) : (
+              <CriativosDetalhe />
+            )}
           </div>
         </DialogContent>
       </Dialog>
