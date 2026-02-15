@@ -187,6 +187,10 @@ async function fetchTimelineMetrics(
 
       if (resp.ok) {
         const data = await resp.json();
+        // Log raw para diagnostico (apenas primeira metrica)
+        if (metrica.campo === 'conversions') {
+          console.log(`    🔍 RAW ${metrica.nome}: ${JSON.stringify(data).substring(0, 800)}`);
+        }
         console.log(`    ✅ ${metrica.nome}: ${data?.length || 0} registros`);
 
         for (const item of (data || [])) {
@@ -446,50 +450,106 @@ serve(async (req) => {
           status: "success",
         };
 
-        // ============ GOOGLE ADS ============
-        console.log("\n  === GOOGLE ADS (endpoint: /stats/adwords/campaigns) ===");
-        const campanhasGoogle = await fetchAdsCampaigns(config, 'adwords', initDate, endDate, headers);
-        resultado.google.campanhas = campanhasGoogle.length;
+        // ============ COLETA DIÁRIA POR PLATAFORMA ============
+        // Iterar dia a dia nos últimos 7 dias para dados granulares
+        // + snapshot completo de 30 dias para totais de campanhas
 
-        if (campanhasGoogle.length > 0) {
-          resultado.google.metricas = await salvarMetricasCampanha(supabase, empresaId, 'GOOGLE', campanhasGoogle, 'GOOGLE');
-        } else {
-          // Fallback: timeline metrics
-          console.log("  🔄 Fallback: métricas timeline Google Ads...");
-          const timelineGoogle = await fetchTimelineMetrics(config, 'google', initDate, endDate, headers);
-          if (timelineGoogle.size > 0) {
-            resultado.google.metricas = await salvarTimelineAgregado(supabase, empresaId, 'GOOGLE', timelineGoogle, 'GOOGLE');
+        const platformsToFetch: AdsPlatform[] = ['adwords', 'facebookads', 'tiktokads'];
+
+        // 1) Snapshot 30 dias (totais por campanha - salva na data de hoje)
+        for (const platform of platformsToFetch) {
+          const info = PLATFORM_MAP[platform];
+          const key = platform === 'adwords' ? 'google' : platform === 'facebookads' ? 'meta' : 'tiktok';
+          console.log(`\n  === ${info.label} (snapshot 30d) ===`);
+          
+          const campanhas = await fetchAdsCampaigns(config, platform, initDate, endDate, headers);
+          (resultado as any)[key].campanhas = campanhas.length;
+          
+          if (campanhas.length > 0) {
+            (resultado as any)[key].metricas = await salvarMetricasCampanha(supabase, empresaId, info.dbPlataforma, campanhas, info.dbPlataforma);
           }
         }
 
-        // Buscar agregações Google (complementar)
+        // 2) Dados DIÁRIOS (últimos 7 dias, dia a dia, per-campaign)
+        console.log("\n  === COLETA DIÁRIA (últimos 7 dias) ===");
+        let totalDiasSalvos = 0;
+        
+        for (let d = 0; d < 7; d++) {
+          const dia = new Date();
+          dia.setDate(dia.getDate() - d);
+          const diaStr = dia.toISOString().split('T')[0].replace(/-/g, '');
+          const diaIso = dia.toISOString().split('T')[0];
+          
+          for (const platform of ['adwords', 'facebookads'] as AdsPlatform[]) {
+            const info = PLATFORM_MAP[platform];
+            
+            try {
+              const campanhasDia = await fetchAdsCampaigns(config, platform, diaStr, diaStr, headers);
+              
+              if (campanhasDia.length > 0) {
+                // Salvar com a data real do dia
+                for (const mc of campanhasDia) {
+                  if (mc.spent > 0 || mc.clicks > 0 || mc.impressions > 0) {
+                    // Buscar campanha local
+                    const { data: contas } = await supabase
+                      .from('conta_anuncio')
+                      .select('id_conta')
+                      .eq('id_empresa', empresaId)
+                      .eq('plataforma', info.dbPlataforma);
+                    
+                    if (contas && contas.length > 0) {
+                      const { data: campanhasLocais } = await supabase
+                        .from('campanha')
+                        .select('id_campanha, id_campanha_externo, nome')
+                        .in('id_conta', contas.map((c: any) => c.id_conta));
+                      
+                      if (campanhasLocais) {
+                        const local = campanhasLocais.find((c: any) =>
+                          c.id_campanha_externo === mc.campaignId ||
+                          (c.nome && mc.campaignName && c.nome.toLowerCase().trim() === mc.campaignName.toLowerCase().trim())
+                        );
+                        
+                        if (local) {
+                          const { error } = await supabase
+                            .from('campanha_metricas_dia')
+                            .upsert({
+                              id_campanha: local.id_campanha,
+                              data: diaIso,
+                              impressoes: mc.impressions,
+                              cliques: mc.clicks,
+                              verba_investida: mc.spent,
+                              conversoes: mc.conversions,
+                              valor_conversao: mc.conversionValue,
+                              leads: mc.conversions,
+                              fonte_conversoes: `METRICOOL_${info.dbPlataforma}_DAILY`,
+                            }, { onConflict: 'id_campanha,data' });
+                          
+                          if (!error) totalDiasSalvos++;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (err) {
+              console.log(`  ⚠️ Erro dia ${diaIso} ${info.label}:`, err);
+            }
+          }
+        }
+        
+        console.log(`  ✅ Total dias salvos com dados diários: ${totalDiasSalvos}`);
+
+        // 3) Agregações (complementar/validação)
         const aggGoogle = await fetchAdsAggregations(config, 'adwords', initDate, endDate, headers);
         if (aggGoogle) {
           resultado.google.agregacoes = true;
-          console.log(`  📊 Agregações Google: spent=${aggGoogle.spent}, clicks=${aggGoogle.clicks}, imp=${aggGoogle.impressions}, conv=${aggGoogle.conversions}`);
+          console.log(`  📊 Agregações Google: spent=${aggGoogle.spent}, clicks=${aggGoogle.clicks}`);
         }
-
-        // ============ META ADS ============
-        console.log("\n  === META ADS (endpoint: /stats/facebookads/campaigns) ===");
-        const campanhasMeta = await fetchAdsCampaigns(config, 'facebookads', initDate, endDate, headers);
-        resultado.meta.campanhas = campanhasMeta.length;
-
-        if (campanhasMeta.length > 0) {
-          resultado.meta.metricas = await salvarMetricasCampanha(supabase, empresaId, 'META', campanhasMeta, 'META');
-        } else {
-          // Fallback: timeline metrics
-          console.log("  🔄 Fallback: métricas timeline Meta Ads...");
-          const timelineMeta = await fetchTimelineMetrics(config, 'facebook', initDate, endDate, headers);
-          if (timelineMeta.size > 0) {
-            resultado.meta.metricas = await salvarTimelineAgregado(supabase, empresaId, 'META', timelineMeta, 'META');
-          }
-        }
-
-        // Buscar agregações Meta (complementar)
+        
         const aggMeta = await fetchAdsAggregations(config, 'facebookads', initDate, endDate, headers);
         if (aggMeta) {
           resultado.meta.agregacoes = true;
-          console.log(`  📊 Agregações Meta: spent=${aggMeta.spent}, clicks=${aggMeta.clicks}, imp=${aggMeta.impressions}, conv=${aggMeta.conversions}`);
+          console.log(`  📊 Agregações Meta: spent=${aggMeta.spent}, clicks=${aggMeta.clicks}`);
         }
 
         // ============ TIKTOK ADS ============
