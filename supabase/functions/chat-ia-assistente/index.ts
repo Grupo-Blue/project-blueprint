@@ -1000,7 +1000,9 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") || SUPABASE_SERVICE_ROLE_KEY);
+    const supabaseUser = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") || SUPABASE_SERVICE_ROLE_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
     const { data: { user }, error: authError } = await supabaseUser.auth.getUser(token);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Token inválido" }), {
