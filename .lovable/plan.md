@@ -1,110 +1,77 @@
 
-# Enriquecer /relatorio-criativos com dados do Metricool
+# Corrigir Previews de Criativos Meta
 
-## Contexto Atual
+## Problema
 
-A pagina `/relatorio-criativos` exibe campanhas com cards "Super Trunfo" e ranking de criativos. Atualmente:
+Nenhum preview de criativo Meta esta funcionando por 3 razoes encadeadas:
 
-- **Metricas de campanha** vem de `campanha_metricas_dia` (ja enriquecida pelo Metricool com alcance, CPC, frequencia, conversoes)
-- **Metricas de criativos** vem de `criativo_metricas_dia` (populada apenas pelo coletor nativo Meta/Google - sem dados Metricool)
-- O Metricool ja fornece dados granulares por **campanha** via `/stats/facebookads/campaigns` e `/stats/adwords/campaigns`
-- O Metricool **nao possui endpoint nativo para metricas por anuncio/criativo** - trabalha no nivel campanha
+1. **Thumbnails expiradas**: 209 criativos usam URLs `fbcdn.net` que expiram em horas. As imagens nos cards estao quebradas.
+2. **Links preview expirados**: 122 criativos ainda tem `url_preview` com `fb.me` (temporario, ja expirado). A funcao `atualizar-preview-criativos` converteu 300 mas nao alcancou todos (limite de 200 por execucao).
+3. **Apify indisponivel**: O limite mensal do Apify foi excedido, entao o fallback de screenshots nao funciona.
+4. **94 criativos sem id_anuncio_externo**: Esses nao geram nenhum link permanente.
 
-## Oportunidades de Enriquecimento
+## Solucao
 
-### 1. Exibir metricas avancadas ja coletadas (sem backend novo)
+### Passo 1 - Salvar thumbnails no Storage (resolver imagens quebradas)
 
-Os dados de `campanha_metricas_dia` ja possuem campos enriquecidos pelo Metricool que NAO estao sendo exibidos nos cards:
+Criar uma edge function `salvar-thumbnails-criativos` que:
+- Busca criativos com `url_midia` contendo `fbcdn.net` (URLs temporarias)
+- Faz download de cada imagem enquanto ainda esta acessivel
+- Salva no bucket `criativos-media` do Storage
+- Atualiza `url_midia` com a URL publica permanente do Storage
 
-- **Alcance** (30 registros com dados em fevereiro)
-- **Frequencia** (4 registros)
-- **CPC medio** (35 registros)
-- **Conversoes + Valor de conversao** (28 registros)
+Isso resolve definitivamente o problema de thumbnails que expiram.
 
-**Acao**: Adicionar essas metricas aos cards de campanha e ao modal de detalhes.
+### Passo 2 - Corrigir links preview restantes
 
-### 2. Enriquecer criativos com metricas diarias do Metricool (via endpoint de ads)
+Executar `atualizar-preview-criativos` com `forcar: true` e `max_criativos: 500` para converter TODOS os `fb.me` restantes para links permanentes (Ads Manager ou Ad Library).
 
-O Metricool disponibiliza endpoints `/stats/facebookads/ads` e `/stats/adwords/ads` que retornam metricas no nivel de anuncio individual (nao apenas campanha). Isso permitiria popular `criativo_metricas_dia` com dados mais completos.
+Para os 94 sem `id_anuncio_externo`: a funcao ja tem logica para buscar via Graph API usando `id_criativo_externo`. So precisa rodar com limite maior.
 
-**Acao**: Criar uma nova edge function `coletar-criativos-metricool` que busca metricas por anuncio e faz matching com os criativos locais.
+### Passo 3 - Exibir thumbnail placeholder inteligente no card
 
-### 3. Adicionar video_views aos criativos de video
+Atualizar `CriativoRankingCard.tsx` para:
+- Detectar quando a imagem falha (evento `onError`) e mostrar um placeholder com o tipo do criativo
+- Usar `url_preview` como fallback de imagem quando `url_midia` falha
+- Mostrar um indicador visual quando a thumbnail nao esta disponivel
 
-A tabela `criativo_metricas_dia` ja tem o campo `video_views` mas atualmente esta zerado para todos os registros. A coleta nativa nao busca essa metrica, mas o Meta Graph API tem `video_30_sec_watched_actions` e `video_p75_watched_actions` disponiveis.
+### Passo 4 - Automatizar refresh de thumbnails
 
-**Acao**: Atualizar `coletar-criativos-meta` para buscar campos de video views.
-
-## Plano de Implementacao
-
-### Passo 1 - Exibir metricas avancadas nos cards (UI)
-
-Atualizar `CampanhaSuperTrunfo.tsx` para mostrar:
-- Alcance e Frequencia (no modal de detalhes)
-- CPC medio (ja calculado, mas exibir via dados Metricool quando disponivel)
-- ROAS real com valor de conversao do Metricool
-
-Atualizar `CampanhaCard` interface e `RelatorioCreativos.tsx` para passar os novos campos.
-
-### Passo 2 - Edge Function: coletar metricas por anuncio via Metricool
-
-Criar `supabase/functions/coletar-criativos-metricool/index.ts`:
-- Buscar `/stats/facebookads/ads` e `/stats/adwords/ads` (endpoints por anuncio)
-- Fazer matching com criativos locais via `id_anuncio_externo` ou `id_criativo_externo`
-- Salvar em `criativo_metricas_dia` com dados diarios granulares
-- Incluir no pipeline do `orquestrador-coleta` como fase adicional
-
-### Passo 3 - Atualizar coletor nativo para video_views
-
-Atualizar `coletar-criativos-meta/index.ts` para incluir `video_30_sec_watched_actions` nos campos solicitados ao Meta Graph API, e salvar em `criativo_metricas_dia.video_views`.
-
-### Passo 4 - Exibir video_views no card de criativo
-
-Atualizar `CriativoRankingCard.tsx` para mostrar video_views quando o criativo e do tipo VIDEO e tem dados > 0.
-
-### Passo 5 - Adicionar alcance e frequencia ao CriativoRankingCard
-
-Quando disponivel (via Metricool ou Meta API), exibir alcance e frequencia por criativo no mini-funil ou como badges adicionais.
+Adicionar a funcao `salvar-thumbnails-criativos` ao `orquestrador-coleta` para que novas thumbnails sejam salvas automaticamente apos cada coleta de criativos.
 
 ## Detalhes Tecnicos
 
-### Novos campos na interface CriativoRankingData
-```typescript
-// Adicionar ao CriativoRankingData
-alcance?: number;
-frequencia?: number;
-video_views?: number;
+### Edge Function: salvar-thumbnails-criativos
+```text
+1. Buscar criativos com url_midia LIKE '%fbcdn.net%'
+2. Para cada criativo:
+   a. Fetch da url_midia (pode falhar se ja expirou)
+   b. Se sucesso: upload para Storage bucket 'criativos-media/{id_criativo}.jpg'
+   c. Atualizar url_midia com URL publica do Storage
+   d. Se falha: tentar re-buscar thumbnail via Graph API (GET /{ad_id}?fields=creative{thumbnail_url})
+   e. Se re-buscou: fazer download e salvar no Storage
+3. Processar em batches de 10 com delay de 1s
 ```
 
-### Novos campos na interface CampanhaCard
-```typescript
-// Adicionar ao CampanhaCard
-alcance: number;
-frequencia: number;
-cpc_medio: number;
-conversoes: number;
-valor_conversao: number;
-```
+### Bucket Storage
+- Nome: `criativos-media`
+- Politica: publico para leitura (imagens de anuncios nao sao sensiveis)
+- Estrutura: `/{id_criativo}.{ext}`
 
-### Edge Function coletar-criativos-metricool
-- Endpoint Meta: `/stats/facebookads/ads?blogId=X&userId=Y&start=YYYYMMDD&end=YYYYMMDD`
-- Endpoint Google: `/stats/adwords/ads?blogId=X&userId=Y&start=YYYYMMDD&end=YYYYMMDD`
-- Matching: por `id_anuncio_externo` (campo `id` ou `adId` do Metricool)
-- Upsert em `criativo_metricas_dia` com `onConflict: 'id_criativo,data'`
+### Atualizacao no CriativoRankingCard.tsx
+```text
+- Adicionar estado 'imagemQuebrada' com onError no img
+- Quando imagem quebra: mostrar placeholder com icone do tipo (Image/Video/FileText)
+- Background do placeholder em cor suave com texto "Preview indisponivel"
+```
 
 ### Sequencia no orquestrador-coleta
-Adicionar como fase 7 apos o calculo de metricas diarias:
-```
-Fase 1: Metricas Meta/Google
+```text
 Fase 2: Criativos Meta em lote
-Fase 3: Ativos Google
-Fase 4: Previews Apify
-Fase 5: Metricool Ads (campanhas)
-Fase 6: Calculo metricas diarias
-Fase 7: Metricool Ads (criativos) ← NOVO
+Fase 2.5: Salvar thumbnails no Storage  (NOVO)
 ```
 
 ### Riscos e Mitigacoes
-- **Metricool pode nao ter endpoint /ads**: Se nao existir, fallback para distribuir metricas da campanha proporcionalmente entre criativos com base em impressoes
-- **Rate limiting**: Usar batch de 5 dias por vez com delay de 2s entre chamadas
-- **Timeout**: Processar apenas ultimos 7 dias por execucao (vs 30 dias das campanhas)
+- URLs fbcdn ja expiradas: fallback via Graph API para re-buscar thumbnail_url fresca, depois salvar
+- Bucket Storage cheio: limitar a 5MB por imagem, usar compressao
+- Token Meta expirado: pular empresa e logar erro (mesma logica atual)
