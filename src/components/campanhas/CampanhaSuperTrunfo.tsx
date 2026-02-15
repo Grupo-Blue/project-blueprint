@@ -206,7 +206,12 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
         <div className="flex items-start gap-3">
           <PlataformaIcon plataforma={campanha.plataforma} />
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm leading-tight truncate">{campanha.nome}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-semibold text-sm leading-tight truncate">{campanha.nome}</p>
+              {!campanha.ativa && (
+                <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 shrink-0 bg-muted text-muted-foreground">Pausada</Badge>
+              )}
+            </div>
             <div className="flex items-center gap-2 mt-1">
               <Select
                 value={campanha.tipo_funil}

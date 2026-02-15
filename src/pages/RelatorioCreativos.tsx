@@ -53,6 +53,30 @@ const RelatorioCreativos = () => {
       const campanhasDaEmpresa = (campanhasData || []).filter(
         c => c.conta_anuncio?.id_empresa === empresaSelecionada
       );
+
+      // 1b. Buscar campanhas pausadas que tenham keywords vinculadas
+      const { data: keywordCampIds } = await supabase
+        .from("google_ads_keyword")
+        .select("id_campanha")
+        .eq("id_empresa", empresaSelecionada)
+        .not("id_campanha", "is", null);
+
+      const pausedIdsWithKeywords = [...new Set((keywordCampIds || []).map(k => k.id_campanha).filter(Boolean))] as string[];
+      const activeIds = campanhasDaEmpresa.map(c => c.id_campanha);
+      const missingPausedIds = pausedIdsWithKeywords.filter(id => !activeIds.includes(id));
+
+      if (missingPausedIds.length > 0) {
+        const { data: pausedCampanhas } = await supabase
+          .from("campanha")
+          .select("id_campanha, nome, ativa, tipo_funil, conta_anuncio:id_conta(id_empresa, plataforma, id_externo)")
+          .in("id_campanha", missingPausedIds);
+
+        const pausedDaEmpresa = (pausedCampanhas || []).filter(
+          c => c.conta_anuncio?.id_empresa === empresaSelecionada
+        );
+        campanhasDaEmpresa.push(...pausedDaEmpresa);
+      }
+
       if (campanhasDaEmpresa.length === 0) return [];
 
       const campIds = campanhasDaEmpresa.map(c => c.id_campanha);
@@ -336,7 +360,7 @@ const RelatorioCreativos = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Análise de Campanhas</h1>
-          <p className="text-sm text-muted-foreground">{campanhasFiltradas.length} campanhas ativas</p>
+          <p className="text-sm text-muted-foreground">{campanhasFiltradas.length} campanhas</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={periodo} onValueChange={v => setPeriodo(v as PeriodoFiltro)}>
