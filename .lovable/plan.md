@@ -1,77 +1,90 @@
 
-# Corrigir Previews de Criativos Meta
+# Exibir Keywords no Modal de Campanhas Google Search
 
 ## Problema
 
-Nenhum preview de criativo Meta esta funcionando por 3 razoes encadeadas:
-
-1. **Thumbnails expiradas**: 209 criativos usam URLs `fbcdn.net` que expiram em horas. As imagens nos cards estao quebradas.
-2. **Links preview expirados**: 122 criativos ainda tem `url_preview` com `fb.me` (temporario, ja expirado). A funcao `atualizar-preview-criativos` converteu 300 mas nao alcancou todos (limite de 200 por execucao).
-3. **Apify indisponivel**: O limite mensal do Apify foi excedido, entao o fallback de screenshots nao funciona.
-4. **94 criativos sem id_anuncio_externo**: Esses nao geram nenhum link permanente.
+Ao clicar numa campanha Google Search em `/relatorio-criativos`, o modal mostra "Ranking de Criativos" -- mas campanhas de Search nao tem criativos visuais. A informacao relevante sao as **palavras-chave** e sua performance.
 
 ## Solucao
 
-### Passo 1 - Salvar thumbnails no Storage (resolver imagens quebradas)
+Detectar quando a campanha e Google Search e substituir o bloco de criativos por um **painel de keywords** rico e acionavel.
 
-Criar uma edge function `salvar-thumbnails-criativos` que:
-- Busca criativos com `url_midia` contendo `fbcdn.net` (URLs temporarias)
-- Faz download de cada imagem enquanto ainda esta acessivel
-- Salva no bucket `criativos-media` do Storage
-- Atualiza `url_midia` com a URL publica permanente do Storage
+## O que sera exibido no modal de Keywords
 
-Isso resolve definitivamente o problema de thumbnails que expiram.
+### Resumo no topo
+- Total de keywords ativas
+- CPC medio ponderado
+- CTR medio ponderado
+- Total de conversoes
 
-### Passo 2 - Corrigir links preview restantes
+### Tabela de Keywords ordenada por gasto (maior investimento primeiro)
+Cada linha mostra:
+- **Keyword** (texto) + badge do match type (Broad/Phrase/Exact)
+- **Impressoes** | **Cliques** | **CTR%**
+- **Gasto** | **CPC**
+- **Conversoes** | **Custo por Conversao**
+- **Quality Score** (quando disponivel): indicador visual com cor (verde 7-10, amarelo 4-6, vermelho 1-3)
 
-Executar `atualizar-preview-criativos` com `forcar: true` e `max_criativos: 500` para converter TODOS os `fb.me` restantes para links permanentes (Ads Manager ou Ad Library).
+### Indicadores visuais de decisao
+- Barra de proporcao de gasto (quanto % do budget total essa keyword consome)
+- Badge "Estrela" para keywords com CTR > media E CPC < media
+- Badge "Drenar" para keywords com gasto alto e zero conversoes
+- Badge "Oportunidade" para keywords com conversoes mas quality score baixo (pode melhorar)
 
-Para os 94 sem `id_anuncio_externo`: a funcao ja tem logica para buscar via Graph API usando `id_criativo_externo`. So precisa rodar com limite maior.
+## Implementacao Tecnica
 
-### Passo 3 - Exibir thumbnail placeholder inteligente no card
+### 1. Novo componente: `KeywordRankingTable.tsx`
 
-Atualizar `CriativoRankingCard.tsx` para:
-- Detectar quando a imagem falha (evento `onError`) e mostrar um placeholder com o tipo do criativo
-- Usar `url_preview` como fallback de imagem quando `url_midia` falha
-- Mostrar um indicador visual quando a thumbnail nao esta disponivel
+Localizado em `src/components/campanhas/KeywordRankingTable.tsx`:
+- Recebe `id_campanha` e `id_empresa` como props
+- Busca dados de `google_ads_keyword` filtrado pelo periodo selecionado
+- Renderiza tabela responsiva com as metricas e badges
+- Calcula medias e totais internamente
 
-### Passo 4 - Automatizar refresh de thumbnails
+### 2. Atualizar `CampanhaSuperTrunfo.tsx`
 
-Adicionar a funcao `salvar-thumbnails-criativos` ao `orquestrador-coleta` para que novas thumbnails sejam salvas automaticamente apos cada coleta de criativos.
+- Receber nova prop `isGoogleSearch: boolean` (ou detectar pela plataforma + nome contendo "SEARCH")
+- No dialog/collapsible, renderizar `<KeywordRankingTable>` em vez de `<CriativosDetalhe>` quando for Search
+- Manter o card externo identico (mesmas metricas de campanha)
 
-## Detalhes Tecnicos
+### 3. Atualizar `RelatorioCreativos.tsx`
 
-### Edge Function: salvar-thumbnails-criativos
+- Passar a plataforma e o nome da campanha para o `CampanhaSuperTrunfo` (ja passa)
+- Detectar campanhas Google Search (plataforma GOOGLE + nome contendo "SEARCH" ou objetivo "SEARCH")
+- Passar flag `isGoogleSearch` para o componente
+
+### 4. Interface KeywordData
+
 ```text
-1. Buscar criativos com url_midia LIKE '%fbcdn.net%'
-2. Para cada criativo:
-   a. Fetch da url_midia (pode falhar se ja expirou)
-   b. Se sucesso: upload para Storage bucket 'criativos-media/{id_criativo}.jpg'
-   c. Atualizar url_midia com URL publica do Storage
-   d. Se falha: tentar re-buscar thumbnail via Graph API (GET /{ad_id}?fields=creative{thumbnail_url})
-   e. Se re-buscou: fazer download e salvar no Storage
-3. Processar em batches de 10 com delay de 1s
+interface KeywordData {
+  id: string
+  keyword: string
+  match_type: string
+  impressions: number
+  clicks: number
+  spent: number
+  conversions: number
+  cpc: number
+  ctr: number
+  quality_score: number | null
+}
 ```
 
-### Bucket Storage
-- Nome: `criativos-media`
-- Politica: publico para leitura (imagens de anuncios nao sao sensiveis)
-- Estrutura: `/{id_criativo}.{ext}`
+### Dados disponiveis
 
-### Atualizacao no CriativoRankingCard.tsx
-```text
-- Adicionar estado 'imagemQuebrada' com onError no img
-- Quando imagem quebra: mostrar placeholder com icone do tipo (Image/Video/FileText)
-- Background do placeholder em cor suave com texto "Preview indisponivel"
-```
+A tabela `google_ads_keyword` ja tem todos os campos necessarios com dados reais:
+- 6 registros vinculados a campanhas
+- Campos: keyword, impressions, clicks, spent, conversions, cpc, ctr, quality_score, match_type
+- Vinculados por `id_campanha` e `id_empresa`
 
-### Sequencia no orquestrador-coleta
-```text
-Fase 2: Criativos Meta em lote
-Fase 2.5: Salvar thumbnails no Storage  (NOVO)
-```
+### Deteccao de campanha Search
 
-### Riscos e Mitigacoes
-- URLs fbcdn ja expiradas: fallback via Graph API para re-buscar thumbnail_url fresca, depois salvar
-- Bucket Storage cheio: limitar a 5MB por imagem, usar compressao
-- Token Meta expirado: pular empresa e logar erro (mesma logica atual)
+Criterios (qualquer um):
+1. Nome da campanha contem "SEARCH" (padrao atual de nomenclatura)
+2. Campo `objetivo` da campanha = "SEARCH" (quando preenchido pelo coletor Google)
+3. Existem keywords vinculadas ao `id_campanha` na tabela `google_ads_keyword`
+
+### Arquivos modificados
+- **Novo**: `src/components/campanhas/KeywordRankingTable.tsx`
+- **Editar**: `src/components/campanhas/CampanhaSuperTrunfo.tsx` (condicional criativos vs keywords)
+- **Editar**: `src/pages/RelatorioCreativos.tsx` (passar flag isGoogleSearch)
