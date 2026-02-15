@@ -121,20 +121,44 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    const selectFields = 'id_lead, email, id_empresa, is_mql, levantou_mao, tem_reuniao, stage_atual, mautic_score, mautic_page_hits, mautic_last_active, mautic_tags, mautic_first_visit, mautic_segments, cidade_mautic, estado_mautic, id_mautic_contact, tokeniza_investidor, tokeniza_valor_investido, tokeniza_qtd_investimentos, tokeniza_carrinho_abandonado, chatblue_sla_violado, chatblue_prioridade, chatwoot_status_atendimento, chatwoot_conversas_total, chatwoot_tempo_resposta_medio, linkedin_senioridade, id_cliente_notion, data_criacao, data_mql, data_levantou_mao, data_reuniao, score_temperatura, updated_at, webhook_enviado_em, id_campanha_vinculada, metricool_roas_campanha, metricool_cpc_campanha, metricool_ctr_campanha, metricool_conversao_valor, metricool_fonte, utm_source, utm_medium';
+
     // Buscar leads atualizados nos últimos 10 minutos OU que nunca foram verificados
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     
-    const { data: leads, error: leadsError } = await supabase
+    const { data: leadsRecentes, error: leadsError } = await supabase
       .from('lead')
-      .select('id_lead, email, id_empresa, is_mql, levantou_mao, tem_reuniao, stage_atual, mautic_score, mautic_page_hits, mautic_last_active, mautic_tags, mautic_first_visit, mautic_segments, cidade_mautic, estado_mautic, id_mautic_contact, tokeniza_investidor, tokeniza_valor_investido, tokeniza_qtd_investimentos, tokeniza_carrinho_abandonado, chatblue_sla_violado, chatblue_prioridade, chatwoot_status_atendimento, chatwoot_conversas_total, chatwoot_tempo_resposta_medio, linkedin_senioridade, id_cliente_notion, data_criacao, data_mql, data_levantou_mao, data_reuniao, score_temperatura, updated_at, webhook_enviado_em, id_campanha_vinculada, metricool_roas_campanha, metricool_cpc_campanha, metricool_ctr_campanha, metricool_conversao_valor, metricool_fonte, utm_source, utm_medium')
+      .select(selectFields)
       .or(`updated_at.gte.${tenMinutesAgo},webhook_enviado_em.is.null`)
       .not('email', 'is', null)
       .eq('merged', false)
-      .limit(100);
+      .limit(50);
 
     if (leadsError) {
-      throw new Error(`Erro ao buscar leads: ${leadsError.message}`);
+      throw new Error(`Erro ao buscar leads recentes: ${leadsError.message}`);
     }
+
+    // Buscar leads com campanha vinculada mas sem dados Metricool (pendentes de enriquecimento)
+    const { data: leadsMetricoolPendentes, error: metricoolError } = await supabase
+      .from('lead')
+      .select(selectFields)
+      .not('id_campanha_vinculada', 'is', null)
+      .is('metricool_roas_campanha', null)
+      .not('email', 'is', null)
+      .eq('merged', false)
+      .limit(50);
+
+    if (metricoolError) {
+      console.error(`Erro ao buscar leads Metricool pendentes: ${metricoolError.message}`);
+    }
+
+    // Combinar e deduplicar os dois conjuntos
+    const leadsMap = new Map<string, typeof leadsRecentes[0]>();
+    for (const l of (leadsRecentes || [])) leadsMap.set(l.id_lead, l);
+    for (const l of (leadsMetricoolPendentes || [])) leadsMap.set(l.id_lead, l);
+    const leads = Array.from(leadsMap.values());
+
+    console.log(`[Monitorar Enriquecimento] ${leads.length} leads (${leadsRecentes?.length || 0} recentes + ${leadsMetricoolPendentes?.length || 0} metricool pendentes, dedup: ${leads.length})`);
 
     console.log(`[Monitorar Enriquecimento] ${leads?.length || 0} leads para verificar`);
 
@@ -261,6 +285,11 @@ serve(async (req) => {
               leadsMetricoolMudou++;
               console.log(`[Metricool] Lead ${lead.id_lead} enriquecido - ROAS: ${roas.toFixed(2)}, CPC: ${cpc.toFixed(2)}, fonte: ${fonte}`);
             }
+          } else if (lead.id_campanha_vinculada && lead.metricool_roas_campanha === null) {
+            // Campanha não tem dados Metricool - marcar com -1 para não reprocessar
+            await supabase.from('lead').update({
+              metricool_roas_campanha: -1,
+            }).eq('id_lead', lead.id_lead);
           }
         } catch (metricoolError) {
           console.error(`[Metricool] Erro ao enriquecer lead ${lead.id_lead}:`, metricoolError);
