@@ -1559,6 +1559,87 @@ export type Database = {
           },
         ]
       }
+      google_ads_keyword: {
+        Row: {
+          campaign_id_externo: string | null
+          campaign_name: string | null
+          clicks: number | null
+          conversion_value: number | null
+          conversions: number | null
+          cpc: number | null
+          created_at: string
+          ctr: number | null
+          data_fim: string
+          data_inicio: string
+          id: string
+          id_campanha: string | null
+          id_empresa: string
+          impressions: number | null
+          keyword: string
+          match_type: string | null
+          quality_score: number | null
+          spent: number | null
+          updated_at: string
+        }
+        Insert: {
+          campaign_id_externo?: string | null
+          campaign_name?: string | null
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          data_fim: string
+          data_inicio: string
+          id?: string
+          id_campanha?: string | null
+          id_empresa: string
+          impressions?: number | null
+          keyword: string
+          match_type?: string | null
+          quality_score?: number | null
+          spent?: number | null
+          updated_at?: string
+        }
+        Update: {
+          campaign_id_externo?: string | null
+          campaign_name?: string | null
+          clicks?: number | null
+          conversion_value?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          created_at?: string
+          ctr?: number | null
+          data_fim?: string
+          data_inicio?: string
+          id?: string
+          id_campanha?: string | null
+          id_empresa?: string
+          impressions?: number | null
+          keyword?: string
+          match_type?: string | null
+          quality_score?: number | null
+          spent?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_ads_keyword_id_campanha_fkey"
+            columns: ["id_campanha"]
+            isOneToOne: false
+            referencedRelation: "campanha"
+            referencedColumns: ["id_campanha"]
+          },
+          {
+            foreignKeyName: "google_ads_keyword_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       hipotese_teste: {
         Row: {
           anexos: Json | null
