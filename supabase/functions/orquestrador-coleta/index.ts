@@ -136,6 +136,13 @@ serve(async (req) => {
       return { total_processadas: totalProcessadas };
     });
 
+    // === FASE 3.5: Salvar thumbnails no Storage (URLs temporárias → permanentes) ===
+    await executarFase("salvar_thumbnails", async () => {
+      const res = await chamarFuncao(supabaseUrl, anonKey, "salvar-thumbnails-criativos", { limit: 50 }, 120000);
+      console.log(`📸 Thumbnails: ${res.ok ? "OK" : "ERRO"}`, res.data?.salvos || 0, "salvos");
+      return res.data;
+    });
+
     // === FASE 4: Criativos Google ===
     await executarFase("criativos_google", async () => {
       const res = await chamarFuncao(supabaseUrl, anonKey, "coletar-criativos-google", {});
