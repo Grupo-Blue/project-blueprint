@@ -71,13 +71,22 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    console.log("🚀 Enriquecimento Metricool — SOMENTE dados diários granulares...");
+    const body = await req.json().catch(() => ({}));
+    const filtroEmpresa = body.id_empresa || null;
 
-    const { data: integracoes, error: intError } = await supabase
+    console.log(`🚀 Enriquecimento Metricool — SOMENTE dados diários granulares...${filtroEmpresa ? ` (empresa: ${filtroEmpresa})` : ' (todas)'}`);
+
+    let query = supabase
       .from('integracao')
       .select('*')
       .eq('tipo', 'METRICOOL')
       .eq('ativo', true);
+
+    if (filtroEmpresa) {
+      query = query.eq('id_empresa', filtroEmpresa);
+    }
+
+    const { data: integracoes, error: intError } = await query;
 
     if (intError) throw intError;
 
@@ -168,16 +177,16 @@ serve(async (req) => {
                   id_campanha: idCampanhaLocal,
                   keyword,
                   match_type: String(kw.matchType || kw.match_type || ''),
-                  impressions: Number(kw.impressions || 0),
-                  clicks: Number(kw.clicks || 0),
+                  impressions: Math.round(Number(kw.impressions || 0)),
+                  clicks: Math.round(Number(kw.clicks || 0)),
                   spent: Number(kw.spent || kw.cost || 0),
-                  conversions: Number(kw.conversions || kw.allConversions || 0),
+                  conversions: Math.round(Number(kw.conversions || kw.allConversions || 0)),
                   conversion_value: Number(kw.conversionValue || kw.conversion_value || kw.allConversionsValue || 0),
                   cpc: Number(kw.averageCPC || kw.cpc || 0),
                   ctr: Number(kw.ctr || 0),
-                  quality_score: kw.qualityScore || kw.quality_score || null,
+                  quality_score: (kw.qualityScore != null || kw.quality_score != null) ? Math.round(Number(kw.qualityScore ?? kw.quality_score)) : null,
                   campaign_name: campaignName || null,
-                  campaign_id_externo: campaignIdExt || null,
+                  campaign_id_externo: campaignIdExt || '',
                   data_inicio: initDateIso,
                   data_fim: endDateIso,
                 }, { onConflict: 'id_empresa,keyword,campaign_id_externo,data_inicio,data_fim' });
