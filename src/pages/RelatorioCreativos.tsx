@@ -413,16 +413,21 @@ const RelatorioCreativos = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {campanhasFiltradas.filter(c => c.plataforma === 'GOOGLE').map(c => (
-                  <CampanhaSuperTrunfo
-                    key={c.id_campanha}
-                    campanha={c}
-                    onTipoFunilChange={(id, tipo) => updateTipoFunil.mutate({ id, tipo })}
-                    comparando={comparando}
-                    onToggleComparar={toggleComparar}
-                    selecionadaComparar={selecionadasComparar.includes(c.id_campanha)}
-                  />
-                ))}
+                {campanhasFiltradas.filter(c => c.plataforma === 'GOOGLE').map(c => {
+                  const isSearch = c.nome.toUpperCase().includes('SEARCH');
+                  return (
+                    <CampanhaSuperTrunfo
+                      key={c.id_campanha}
+                      campanha={c}
+                      onTipoFunilChange={(id, tipo) => updateTipoFunil.mutate({ id, tipo })}
+                      comparando={comparando}
+                      onToggleComparar={toggleComparar}
+                      selecionadaComparar={selecionadasComparar.includes(c.id_campanha)}
+                      isGoogleSearch={isSearch}
+                      id_empresa={empresaSelecionada}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
