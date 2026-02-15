@@ -178,6 +178,7 @@ serve(async (req) => {
             video_views: parseInt(videoViews),
             video_avg_watch_time: parseFloat(videoAvgWatch),
             inline_link_clicks: inlineLinkClicks,
+            fonte_conversoes: 'META_API_DAILY',
           };
 
           // Inserir ou atualizar métricas do dia

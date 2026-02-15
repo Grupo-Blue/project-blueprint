@@ -772,6 +772,7 @@ export default function DashboardTrafego() {
           impressoes,
           data
         `)
+        .not("fonte_conversoes", "is", null)
         .gte("data", format(inicioMes, "yyyy-MM-dd"))
         .lte("data", format(fimMes, "yyyy-MM-dd"));
       
@@ -1033,6 +1034,7 @@ export default function DashboardTrafego() {
           .from("campanha_metricas_dia")
           .select("verba_investida")
           .in("id_campanha", campanhas.map(c => c.id_campanha))
+          .not("fonte_conversoes", "is", null)
           .gte("data", format(inicioMes, "yyyy-MM-dd"))
           .lte("data", format(fimMes, "yyyy-MM-dd"));
 

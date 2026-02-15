@@ -238,12 +238,21 @@ serve(async (req) => {
               for (const mc of campanhasDia) {
                 if (mc.spent <= 0 && mc.clicks <= 0 && mc.impressions <= 0) continue;
 
-                const local = campanhasLocais.find((c: any) =>
-                  c.id_campanha_externo === mc.campaignId ||
-                  (c.nome && mc.campaignName && c.nome.toLowerCase().trim() === mc.campaignName.toLowerCase().trim())
-                );
+                // Matching flexível: exact ID, exact name, ou partial name match
+                const mcNameNorm = (mc.campaignName || '').toLowerCase().trim();
+                const local = campanhasLocais.find((c: any) => {
+                  if (c.id_campanha_externo === mc.campaignId) return true;
+                  const localNorm = (c.nome || '').toLowerCase().trim();
+                  if (localNorm && mcNameNorm && localNorm === mcNameNorm) return true;
+                  // Partial match: um contém o outro
+                  if (localNorm && mcNameNorm && (localNorm.includes(mcNameNorm) || mcNameNorm.includes(localNorm))) return true;
+                  return false;
+                });
 
-                if (!local) continue;
+                if (!local) {
+                  console.log(`  ⚠️ Campanha Metricool não encontrada localmente: "${mc.campaignName}" (ID: ${mc.campaignId}) - ${info.label}`);
+                  continue;
+                }
 
                 const { error } = await supabase
                   .from('campanha_metricas_dia')

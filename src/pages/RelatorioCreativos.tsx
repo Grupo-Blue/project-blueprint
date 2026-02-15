@@ -62,6 +62,7 @@ const RelatorioCreativos = () => {
         .from("campanha_metricas_dia")
         .select("*")
         .in("id_campanha", campIds)
+        .not("fonte_conversoes", "is", null)
         .gte("data", format(dataInicio, "yyyy-MM-dd"))
         .lte("data", format(dataFim, "yyyy-MM-dd"));
 
