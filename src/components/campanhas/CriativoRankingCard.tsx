@@ -25,6 +25,9 @@ export interface CriativoRankingData {
   isEstrela?: boolean;
   id_anuncio_externo?: string | null;
   conta_id_externo?: string | null;
+  alcance?: number;
+  frequencia?: number;
+  video_views?: number;
 }
 
 interface CriativoRankingCardProps {
@@ -153,6 +156,21 @@ export function CriativoRankingCard({ criativo, posicao }: CriativoRankingCardPr
               <p className="font-semibold">{criativo.vendas}</p>
             </div>
           </div>
+
+          {/* Métricas extras (alcance, frequência, video views) */}
+          {(!!criativo.alcance || !!criativo.video_views) && (
+            <div className="flex gap-3 text-[10px] text-muted-foreground">
+              {!!criativo.alcance && (
+                <span>Alcance: <strong className="text-foreground">{criativo.alcance >= 1000 ? `${(criativo.alcance / 1000).toFixed(1)}K` : criativo.alcance}</strong></span>
+              )}
+              {!!criativo.frequencia && criativo.frequencia > 0 && (
+                <span>Freq: <strong className="text-foreground">{criativo.frequencia.toFixed(1)}</strong></span>
+              )}
+              {!!criativo.video_views && criativo.video_views > 0 && (
+                <span>🎥 Views: <strong className="text-foreground">{criativo.video_views >= 1000 ? `${(criativo.video_views / 1000).toFixed(1)}K` : criativo.video_views}</strong></span>
+              )}
+            </div>
+          )}
 
           {/* Mini Funil */}
           <div className="space-y-0.5">

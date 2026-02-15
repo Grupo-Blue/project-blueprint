@@ -36,6 +36,11 @@ export interface CampanhaCard {
   criativos_ativos: number;
   criativos_total: number;
   tem_alerta: boolean;
+  alcance?: number;
+  frequencia?: number;
+  cpc_medio?: number;
+  conversoes?: number;
+  valor_conversao?: number;
 }
 
 interface CampanhaSuperTrunfoProps {
@@ -292,6 +297,36 @@ export function CampanhaSuperTrunfo({ campanha, onTipoFunilChange, comparando, o
                 </div>
               ))}
             </div>
+
+            {/* Métricas avançadas Metricool */}
+            {(!!campanha.alcance || !!campanha.cpc_medio || !!campanha.conversoes) && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-lg bg-muted/50 text-xs">
+                {!!campanha.alcance && (
+                  <div className="text-center">
+                    <p className="text-muted-foreground">Alcance</p>
+                    <p className="font-bold text-sm">{campanha.alcance >= 1000 ? `${(campanha.alcance / 1000).toFixed(1)}K` : campanha.alcance}</p>
+                  </div>
+                )}
+                {!!campanha.frequencia && campanha.frequencia > 0 && (
+                  <div className="text-center">
+                    <p className="text-muted-foreground">Frequência</p>
+                    <p className="font-bold text-sm">{campanha.frequencia.toFixed(2)}</p>
+                  </div>
+                )}
+                {!!campanha.cpc_medio && campanha.cpc_medio > 0 && (
+                  <div className="text-center">
+                    <p className="text-muted-foreground">CPC Médio</p>
+                    <p className="font-bold text-sm">{formatCurrency(campanha.cpc_medio)}</p>
+                  </div>
+                )}
+                {!!campanha.conversoes && campanha.conversoes > 0 && (
+                  <div className="text-center">
+                    <p className="text-muted-foreground">Conversões</p>
+                    <p className="font-bold text-sm">{campanha.conversoes}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <CriativosDetalhe />
           </div>
