@@ -1,90 +1,44 @@
 
-# Exibir Keywords no Modal de Campanhas Google Search
+# Corrigir "Nenhuma Keyword Encontrada"
 
-## Problema
+## Problema Identificado
 
-Ao clicar numa campanha Google Search em `/relatorio-criativos`, o modal mostra "Ranking de Criativos" -- mas campanhas de Search nao tem criativos visuais. A informacao relevante sao as **palavras-chave** e sua performance.
+A campanha Google Search que possui keywords (`af9ec2f4`) esta com `ativa = false` no banco de dados. A pagina `/relatorio-criativos` filtra apenas campanhas com `ativa = true` (linha 51), por isso ela nunca aparece no grid -- e consequentemente a tabela de keywords nao e exibida.
+
+Todas as 7 campanhas SEARCH desta empresa estao com `ativa = false`.
 
 ## Solucao
 
-Detectar quando a campanha e Google Search e substituir o bloco de criativos por um **painel de keywords** rico e acionavel.
+Duas correcoes complementares:
 
-## O que sera exibido no modal de Keywords
+### 1. Incluir campanhas com keywords mesmo se pausadas
 
-### Resumo no topo
-- Total de keywords ativas
-- CPC medio ponderado
-- CTR medio ponderado
-- Total de conversoes
+Na query da pagina `RelatorioCreativos.tsx`, apos carregar campanhas ativas, fazer uma segunda consulta para buscar campanhas GOOGLE pausadas que tenham keywords vinculadas na tabela `google_ads_keyword`. Essas campanhas serao incluidas no grid com um badge visual "Pausada" para diferenciar.
 
-### Tabela de Keywords ordenada por gasto (maior investimento primeiro)
-Cada linha mostra:
-- **Keyword** (texto) + badge do match type (Broad/Phrase/Exact)
-- **Impressoes** | **Cliques** | **CTR%**
-- **Gasto** | **CPC**
-- **Conversoes** | **Custo por Conversao**
-- **Quality Score** (quando disponivel): indicador visual com cor (verde 7-10, amarelo 4-6, vermelho 1-3)
+Isso garante que qualquer campanha Search com dados de keywords apareca na analise, mesmo pausada.
 
-### Indicadores visuais de decisao
-- Barra de proporcao de gasto (quanto % do budget total essa keyword consome)
-- Badge "Estrela" para keywords com CTR > media E CPC < media
-- Badge "Drenar" para keywords com gasto alto e zero conversoes
-- Badge "Oportunidade" para keywords com conversoes mas quality score baixo (pode melhorar)
+### 2. Badge visual para campanhas pausadas
 
-## Implementacao Tecnica
+No componente `CampanhaSuperTrunfo.tsx`, quando `ativa = false`, mostrar um indicador visual (badge "Pausada" em cinza) no header do card para que o usuario saiba que a campanha nao esta rodando ativamente.
 
-### 1. Novo componente: `KeywordRankingTable.tsx`
+## Detalhes Tecnicos
 
-Localizado em `src/components/campanhas/KeywordRankingTable.tsx`:
-- Recebe `id_campanha` e `id_empresa` como props
-- Busca dados de `google_ads_keyword` filtrado pelo periodo selecionado
-- Renderiza tabela responsiva com as metricas e badges
-- Calcula medias e totais internamente
+### RelatorioCreativos.tsx
 
-### 2. Atualizar `CampanhaSuperTrunfo.tsx`
-
-- Receber nova prop `isGoogleSearch: boolean` (ou detectar pela plataforma + nome contendo "SEARCH")
-- No dialog/collapsible, renderizar `<KeywordRankingTable>` em vez de `<CriativosDetalhe>` quando for Search
-- Manter o card externo identico (mesmas metricas de campanha)
-
-### 3. Atualizar `RelatorioCreativos.tsx`
-
-- Passar a plataforma e o nome da campanha para o `CampanhaSuperTrunfo` (ja passa)
-- Detectar campanhas Google Search (plataforma GOOGLE + nome contendo "SEARCH" ou objetivo "SEARCH")
-- Passar flag `isGoogleSearch` para o componente
-
-### 4. Interface KeywordData
+Apos a query principal de campanhas ativas, adicionar:
 
 ```text
-interface KeywordData {
-  id: string
-  keyword: string
-  match_type: string
-  impressions: number
-  clicks: number
-  spent: number
-  conversions: number
-  cpc: number
-  ctr: number
-  quality_score: number | null
-}
+1. Buscar keywords distintas por id_empresa com id_campanha preenchido
+2. Coletar os id_campanha dessas keywords
+3. Buscar campanhas pausadas cujo id_campanha esteja nessa lista
+4. Mesclar com as campanhas ativas antes de processar metricas
 ```
 
-### Dados disponiveis
+### CampanhaSuperTrunfo.tsx
 
-A tabela `google_ads_keyword` ja tem todos os campos necessarios com dados reais:
-- 6 registros vinculados a campanhas
-- Campos: keyword, impressions, clicks, spent, conversions, cpc, ctr, quality_score, match_type
-- Vinculados por `id_campanha` e `id_empresa`
+- Verificar campo `ativa` da campanha
+- Se `ativa === false`, exibir badge "Pausada" ao lado do nome
 
-### Deteccao de campanha Search
-
-Criterios (qualquer um):
-1. Nome da campanha contem "SEARCH" (padrao atual de nomenclatura)
-2. Campo `objetivo` da campanha = "SEARCH" (quando preenchido pelo coletor Google)
-3. Existem keywords vinculadas ao `id_campanha` na tabela `google_ads_keyword`
-
-### Arquivos modificados
-- **Novo**: `src/components/campanhas/KeywordRankingTable.tsx`
-- **Editar**: `src/components/campanhas/CampanhaSuperTrunfo.tsx` (condicional criativos vs keywords)
-- **Editar**: `src/pages/RelatorioCreativos.tsx` (passar flag isGoogleSearch)
+### Arquivos a modificar
+- `src/pages/RelatorioCreativos.tsx` (incluir campanhas pausadas com keywords)
+- `src/components/campanhas/CampanhaSuperTrunfo.tsx` (badge "Pausada")
