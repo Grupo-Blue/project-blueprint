@@ -186,6 +186,34 @@ serve(async (req) => {
       return res.data;
     });
 
+    // === FASE 6.5: Enriquecer campanhas com dados Metricool (paginado) ===
+    await executarFase("metricool_campanhas", async () => {
+      let totalSynced = 0;
+      let hasNextPage = true;
+      let paginas = 0;
+      const MAX_PAGINAS = 12; // safety limit (12 * 5 dias = 60 dias max)
+
+      while (hasNextPage && paginas < MAX_PAGINAS && tempoRestante() > 20000) {
+        const res = await chamarFuncao(supabaseUrl, anonKey, "enriquecer-campanhas-metricool", {}, 55000);
+        paginas++;
+
+        if (!res.ok) {
+          console.error(`❌ Metricool campanhas página ${paginas}: erro`, res.data);
+          break;
+        }
+
+        const pageResults = res.data?.resultados || [];
+        const pageSynced = pageResults.reduce((sum: number, r: any) => sum + (r.dias_salvos || 0), 0);
+        totalSynced += pageSynced;
+        hasNextPage = res.data?.hasNextPage || false;
+
+        console.log(`📊 Metricool campanhas página ${paginas}: +${pageSynced} registros (hasNext: ${hasNextPage})`);
+      }
+
+      console.log(`📊 Metricool campanhas finalizado: ${totalSynced} registros em ${paginas} páginas`);
+      return { total_synced: totalSynced, paginas };
+    });
+
     // === FASE 7: Enriquecer criativos com dados Metricool (proporcional) ===
     await executarFase("criativos_metricool", async () => {
       const res = await chamarFuncao(supabaseUrl, anonKey, "coletar-criativos-metricool", { dias: 7 });
