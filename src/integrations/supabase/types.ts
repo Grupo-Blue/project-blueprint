@@ -5035,6 +5035,53 @@ export type Database = {
           },
         ]
       }
+      sync_status: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          id_empresa: string
+          last_cursor: Json | null
+          started_at: string | null
+          status: string | null
+          tipo_sync: string
+          total_synced: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          id_empresa: string
+          last_cursor?: Json | null
+          started_at?: string | null
+          status?: string | null
+          tipo_sync: string
+          total_synced?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          id_empresa?: string
+          last_cursor?: Json | null
+          started_at?: string | null
+          status?: string | null
+          tipo_sync?: string
+          total_synced?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_status_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       tendencia_mercado: {
         Row: {
           categorias: string[] | null
