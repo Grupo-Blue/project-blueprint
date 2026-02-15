@@ -68,7 +68,8 @@ const Dashboard = () => {
     queryFn: async () => {
       let query = supabase
         .from("campanha_metricas_dia")
-        .select("data, impressoes, cliques, leads")
+        .select("data, impressoes, cliques, leads, verba_investida")
+        .like("fonte_conversoes", "METRICOOL_%_DAILY")
         .gte("data", format(inicioMes, "yyyy-MM-dd"))
         .lte("data", format(fimMes, "yyyy-MM-dd"))
         .order("data");
