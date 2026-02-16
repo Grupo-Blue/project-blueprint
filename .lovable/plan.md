@@ -1,102 +1,101 @@
 
-
-# Agente de Tarefas Agendadas no Chat IA
+# API de Busca e Enriquecimento de Leads para Sistemas Externos
 
 ## Visao Geral
 
-Adicionar ao assistente IA (que ja usa `GEMINI_API_KEY` com a API Gemini direta) a capacidade de agendar tarefas futuras. As notificacoes de resultado serao enviadas via Brevo (`BREVO_API_KEY`), o mesmo provedor de email ja configurado no sistema.
+Criar uma nova edge function `buscar-lead-api` que permite que sistemas externos enviem um telefone ou email e recebam de volta os dados completos e enriquecidos do lead na base (Mautic, Tokeniza, LinkedIn, GA4, Stape, IRPF, Metricool, score, UTMs, etc).
 
-## Componentes
+## Autenticacao
 
-### 1. Nova tabela: `tarefa_agendada_ia`
+A API sera protegida por um header `x-api-key` validado contra um novo secret `SGT_API_KEY` (ou reutilizar o `SGT_WEBHOOK_SECRET` ja existente, conforme preferencia). Sistemas externos precisam enviar esse token para consultar.
 
-| Coluna | Tipo | Descricao |
-|---|---|---|
-| id | uuid (PK) | Identificador |
-| user_id | uuid | Usuario que pediu |
-| id_empresa | uuid (nullable) | Empresa do contexto |
-| id_conversa | uuid (nullable) | Conversa de origem |
-| instrucao | text | O que a IA deve analisar |
-| data_execucao | timestamptz | Quando executar |
-| status | text | pendente, executando, concluida, erro |
-| resultado | text (nullable) | Resposta da IA |
-| enviar_email | boolean (default true) | Se deve enviar por email |
-| email_destino | text (nullable) | Email de destino (se null, usa email do usuario) |
-| created_at / executed_at | timestamptz | Timestamps |
+## Normalizacao de Telefone
 
-RLS: usuarios so veem suas proprias tarefas.
+Reutiliza a mesma logica de `normalizarTelefone` ja presente em `enriquecer-lead-mautic`:
+- Remove caracteres nao numericos
+- Remove DDI 55 se presente
+- Insere o digito 9 apos DDD quando necessario (10 digitos -> 11)
+- Busca no banco com e sem o prefixo `+55` para garantir match
 
-### 2. Duas novas tools no `chat-ia-assistente/index.ts`
+## Logica de Busca
 
-Ambas adicionadas ao array de `toolDeclarations` e ao `executeTool`:
+1. Se `email` fornecido: busca exata por `email` (case-insensitive via `ilike`)
+2. Se `telefone` fornecido: normaliza e busca em multiplos formatos (`+55XXXXXXXXXXX`, `XXXXXXXXXXX`, parcial via `ilike`)
+3. Se ambos fornecidos: busca por email primeiro, fallback para telefone
+4. Filtra leads com `merged = false` (ou null) para nao retornar duplicados
 
-- **agendar_tarefa_ia**: Recebe instrucao, dias (ou data), enviar_email e email_destino. Calcula `data_execucao = now() + dias`. Insere na tabela. Segue a regra de pedir confirmacao antes.
-- **listar_tarefas_agendadas**: Lista tarefas do usuario com filtro por status (pendente/concluida).
+## Payload de Resposta
 
-O system prompt sera atualizado para incluir essas capacidades e instruir a IA a pedir confirmacao antes de agendar.
-
-### 3. Nova edge function: `executar-tarefas-agendadas/index.ts`
-
-Logica:
-1. Busca tarefas com `status = 'pendente'` e `data_execucao <= now()`
-2. Para cada tarefa:
-   - Chama a API Gemini diretamente (usando `GEMINI_API_KEY`) com a instrucao + contexto da empresa
-   - Reutiliza as mesmas tools de leitura do chat para que a IA tenha acesso aos dados reais
-   - Salva resultado na coluna `resultado`, atualiza status
-3. Se `enviar_email = true`:
-   - Envia resultado formatado via **Brevo** (`BREVO_API_KEY`), seguindo o mesmo padrao de `alertar-integracoes-email`
-   - Sender: `SGT Alertas <noreply@grupoblue.com.br>`
-4. Registra execucao na tabela `cronjob_execucao`
-
-### 4. Cronjob via pg_cron
-
-Agendar `executar-tarefas-agendadas` para rodar a cada hora:
+Retorna um JSON rico com todas as dimensoes de enriquecimento disponiveis:
 
 ```text
-cron.schedule('executar-tarefas-agendadas-hourly', '0 * * * *', ...)
-```
-
-Usa `net.http_post` no mesmo padrao dos outros cronjobs do sistema.
-
-### 5. Atualizar config.toml
-
-Adicionar a nova funcao `executar-tarefas-agendadas` com `verify_jwt = false` (sera chamada pelo pg_cron).
-
-## Fluxo de uso
-
-```text
-Usuario: "Daqui 4 dias analise se o gestor fez as tarefas"
-    |
-    v
-IA: "Vou agendar para 19/02/2026. Posso registrar?"
-    |
-    v
-Usuario: "Sim"
-    |
-    v
-IA chama tool agendar_tarefa_ia
-    |  (insere na tarefa_agendada_ia)
-    v
-pg_cron (a cada hora) -> executar-tarefas-agendadas
-    |  (encontra tarefa com data <= now)
-    |  (chama Gemini com instrucao + tools de leitura)
-    v
-Resultado salvo + Email enviado via Brevo
+{
+  "found": true,
+  "lead": {
+    // Dados basicos
+    "id_lead", "nome_lead", "email", "telefone", "organizacao",
+    "origem_canal", "stage_atual", "id_empresa",
+    
+    // Comercial
+    "venda_realizada", "valor_venda", "data_venda",
+    "is_mql", "levantou_mao", "tem_reuniao",
+    "score_temperatura", "proprietario_nome",
+    
+    // UTMs
+    "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
+    
+    // Mautic
+    "mautic_score", "mautic_page_hits", "mautic_tags", "cidade_mautic", "estado_mautic",
+    
+    // LinkedIn
+    "linkedin_cargo", "linkedin_empresa", "linkedin_setor", "linkedin_senioridade",
+    
+    // Tokeniza
+    "tokeniza_investidor", "tokeniza_valor_investido", "tokeniza_qtd_investimentos",
+    
+    // GA4
+    "ga4_landing_page", "ga4_engajamento_score", "ga4_sessoes",
+    
+    // Stape
+    "stape_paginas_visitadas", "stape_eventos",
+    
+    // IRPF
+    "irpf_renda_anual", "irpf_patrimonio_liquido", "irpf_perfil_investidor",
+    
+    // Metricool
+    "metricool_roas_campanha", "metricool_cpc_campanha"
+  }
+}
 ```
 
 ## Arquivos
 
 | Arquivo | Acao |
 |---|---|
-| Migration SQL (tabela + RLS + pg_cron) | Criar |
-| `supabase/functions/chat-ia-assistente/index.ts` | Editar (2 tools + prompt) |
-| `supabase/functions/executar-tarefas-agendadas/index.ts` | Criar |
-| `supabase/config.toml` | Atualizar automaticamente |
+| `supabase/functions/buscar-lead-api/index.ts` | Criar |
+| `supabase/config.toml` | Atualizar (verify_jwt = false) |
 
-## Secrets utilizados (ja existentes)
+## Exemplo de chamada
 
-- `GEMINI_API_KEY` - para chamadas a IA
-- `BREVO_API_KEY` - para envio de emails
-- `ALERT_EMAIL_TO` - email padrao de fallback
+```text
+POST /functions/v1/buscar-lead-api
+Headers:
+  x-api-key: <SGT_WEBHOOK_SECRET>
+  Content-Type: application/json
 
-Nenhum novo secret necessario.
+Body:
+  { "telefone": "(11) 98765-4321" }
+  -- ou --
+  { "email": "joao@empresa.com" }
+  -- ou --
+  { "telefone": "5511987654321", "email": "joao@empresa.com" }
+```
+
+## Detalhes tecnicos
+
+- Autenticacao via `x-api-key` comparado com `SGT_WEBHOOK_SECRET` (secret ja existente)
+- Busca usa `supabase.from('lead').select(...)` com service role key
+- Normalizacao gera multiplas variantes do telefone para buscar com `or(telefone.eq.variant1, telefone.eq.variant2, ...)`
+- Leads com `merged = true` sao excluidos do resultado
+- Se multiplos leads encontrados, retorna o mais recente (`order by data_criacao desc, limit 1`)
+- Nenhum secret novo necessario
