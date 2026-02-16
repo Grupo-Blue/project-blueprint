@@ -164,3 +164,6 @@ verify_jwt = false
 
 [functions.executar-tarefas-agendadas]
 verify_jwt = false
+
+[functions.buscar-lead-api]
+verify_jwt = false
