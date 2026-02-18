@@ -191,28 +191,79 @@ const Leads = () => {
     refetchInterval: 2 * 60 * 1000, // Auto-refresh a cada 2 minutos
   });
 
+  // Debounced search term for server-side search
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const { data: leads, isLoading, isError: leadsError } = useQuery({
-    queryKey: ["leads", empresaSelecionada],
+    queryKey: ["leads", empresaSelecionada, debouncedSearch],
     queryFn: async () => {
+      const selectFields = `
+        *,
+        empresa:id_empresa (
+          nome
+        ),
+        lead_evento (
+          etapa,
+          data_evento,
+          observacao
+        ),
+        cliente_notion:id_cliente_notion (
+          nome,
+          status_cliente,
+          produtos_contratados,
+          anos_fiscais
+        )
+      `;
+
+      // Se há termo de busca, fazer busca server-side sem limit restritivo
+      if (debouncedSearch.length >= 2) {
+        const searchLower = debouncedSearch.toLowerCase();
+        const searchDigits = debouncedSearch.replace(/\D/g, '');
+        
+        // Construir filtro OR para busca por nome, email, telefone, organização
+        const orFilters: string[] = [
+          `nome_lead.ilike.%${searchLower}%`,
+          `email.ilike.%${searchLower}%`,
+          `organizacao.ilike.%${searchLower}%`,
+          `stage_atual.ilike.%${searchLower}%`,
+        ];
+        
+        // Se tem dígitos, buscar também por telefone
+        if (searchDigits.length >= 3) {
+          orFilters.push(`telefone.ilike.%${searchDigits}%`);
+        } else {
+          orFilters.push(`telefone.ilike.%${searchLower}%`);
+        }
+
+        let query = supabase
+          .from("lead")
+          .select(selectFields)
+          .or("merged.is.null,merged.eq.false")
+          .not("nome_lead", "like", "%(cópia)%")
+          .or(orFilters.join(','))
+          .order("data_criacao", { ascending: false })
+          .limit(200);
+
+        if (empresaSelecionada && empresaSelecionada !== "todas") {
+          query = query.eq("id_empresa", empresaSelecionada);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data;
+      }
+
+      // Sem busca: carregar os últimos 1000
       let query = supabase
         .from("lead")
-        .select(`
-          *,
-          empresa:id_empresa (
-            nome
-          ),
-          lead_evento (
-            etapa,
-            data_evento,
-            observacao
-          ),
-          cliente_notion:id_cliente_notion (
-            nome,
-            status_cliente,
-            produtos_contratados,
-            anos_fiscais
-          )
-        `)
+        .select(selectFields)
         .or("merged.is.null,merged.eq.false")
         .not("nome_lead", "like", "%(cópia)%")
         .order("data_criacao", { ascending: false })
@@ -294,7 +345,9 @@ const Leads = () => {
     }
 
     const searchLower = searchTerm.toLowerCase();
+    // Se a busca server-side está ativa (debouncedSearch >= 2), não filtrar novamente client-side
     const matchesSearch =
+      debouncedSearch.length >= 2 ||
       !searchTerm ||
       lead.nome_lead?.toLowerCase().includes(searchLower) ||
       lead.organizacao?.toLowerCase().includes(searchLower) ||
