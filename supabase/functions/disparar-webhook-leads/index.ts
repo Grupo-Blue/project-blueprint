@@ -6,6 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Investimento individual detalhado
+interface InvestimentoDetalhe {
+  oferta_nome: string;
+  oferta_id: string;
+  valor: number;
+  data: string;
+  status: string;
+  tipo: 'crowdfunding' | 'venda';
+}
+
 // Payload no formato esperado pelo SDR IA
 interface SDRPayload {
   lead_id: string;
@@ -53,6 +63,7 @@ interface SDRPayload {
     ultimo_investimento_em?: string;
     carrinho_abandonado?: boolean;
     valor_carrinho?: number;
+    investimentos?: InvestimentoDetalhe[];
   };
   dados_blue?: {
     qtd_compras_ir: number;
@@ -104,6 +115,86 @@ function getPrioridade(score: number): 'URGENTE' | 'QUENTE' | 'MORNO' | 'FRIO' {
   return 'FRIO';
 }
 
+// Buscar mapa de nomes de projetos Tokeniza (project_id -> nome)
+async function buscarMapaProjetos(supabase: ReturnType<typeof createClient>): Promise<Map<string, string>> {
+  const { data, error } = await supabase
+    .from('tokeniza_projeto')
+    .select('project_id, nome');
+
+  const mapa = new Map<string, string>();
+  if (error || !data) {
+    console.error('[Webhook] Erro ao buscar mapa de projetos:', error?.message);
+    return mapa;
+  }
+  for (const p of data) {
+    if (p.project_id && p.nome) mapa.set(p.project_id, p.nome);
+  }
+  console.log(`[Webhook] Mapa de projetos carregado: ${mapa.size} projetos`);
+  return mapa;
+}
+
+// Buscar investimentos detalhados de um lead Tokeniza
+async function buscarInvestimentosDetalhados(
+  supabase: ReturnType<typeof createClient>,
+  tokenizaUserId: string,
+  mapaProjetos: Map<string, string>
+): Promise<InvestimentoDetalhe[]> {
+  const investimentos: InvestimentoDetalhe[] = [];
+
+  // 1. Crowdfunding (tokeniza_investimento) - apenas pagos
+  const { data: crowdfundings, error: errCrowd } = await supabase
+    .from('tokeniza_investimento')
+    .select('project_id, amount, status, was_paid, data_criacao')
+    .eq('user_id_tokeniza', tokenizaUserId)
+    .or('status.eq.FINISHED,status.eq.PAID,was_paid.eq.true');
+
+  if (errCrowd) {
+    console.error(`[Webhook] Erro ao buscar investimentos crowdfunding para ${tokenizaUserId}:`, errCrowd.message);
+  } else if (crowdfundings) {
+    for (const inv of crowdfundings) {
+      investimentos.push({
+        oferta_nome: mapaProjetos.get(inv.project_id) || inv.project_id || 'Projeto desconhecido',
+        oferta_id: inv.project_id || '',
+        valor: Number(inv.amount) || 0,
+        data: inv.data_criacao || '',
+        status: inv.status || 'PAID',
+        tipo: 'crowdfunding'
+      });
+    }
+  }
+
+  // 2. Vendas (tokeniza_venda) - apenas pagas
+  const { data: vendas, error: errVendas } = await supabase
+    .from('tokeniza_venda')
+    .select('store_id, total_amount, status, data_criacao')
+    .eq('user_id_tokeniza', tokenizaUserId)
+    .eq('was_paid', true);
+
+  if (errVendas) {
+    console.error(`[Webhook] Erro ao buscar vendas para ${tokenizaUserId}:`, errVendas.message);
+  } else if (vendas) {
+    for (const v of vendas) {
+      investimentos.push({
+        oferta_nome: mapaProjetos.get(v.store_id) || v.store_id || 'Venda direta',
+        oferta_id: v.store_id || '',
+        valor: Number(v.total_amount) || 0,
+        data: v.data_criacao || '',
+        status: v.status || 'PAID',
+        tipo: 'venda'
+      });
+    }
+  }
+
+  // Ordenar por data (mais recente primeiro)
+  investimentos.sort((a, b) => {
+    if (!a.data) return 1;
+    if (!b.data) return -1;
+    return new Date(b.data).getTime() - new Date(a.data).getTime();
+  });
+
+  return investimentos;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -135,10 +226,8 @@ serve(async (req) => {
       .eq('merged', false);
 
     if (body.lead_ids && body.lead_ids.length > 0) {
-      // Disparo imediato de leads específicos (manual ou via monitorar-enriquecimento)
       query = query.in('id_lead', body.lead_ids);
     } else {
-      // Modo cron: só buscar leads QUENTES (score >= 70)
       const quinzeMinutosAtras = new Date(Date.now() - 15 * 60 * 1000).toISOString();
       query = query
         .gte('score_temperatura', 70)
@@ -147,7 +236,6 @@ serve(async (req) => {
 
     const { data: leadsRaw, error: leadsError } = await query.limit(100);
 
-    // Filtrar no código: leads onde updated_at > webhook_enviado_em OU webhook_enviado_em IS NULL
     const leads = body.lead_ids?.length 
       ? leadsRaw 
       : leadsRaw?.filter(lead => 
@@ -192,6 +280,10 @@ serve(async (req) => {
       });
     }
 
+    // Carregar mapa de projetos Tokeniza (uma única vez)
+    const temLeadsTokeniza = leads.some(l => l.id_empresa === TOKENIZA_ID);
+    const mapaProjetos = temLeadsTokeniza ? await buscarMapaProjetos(supabase) : new Map<string, string>();
+
     let webhooksEnviados = 0;
     let webhooksErros = 0;
 
@@ -199,10 +291,8 @@ serve(async (req) => {
       const scoreTemperatura = lead.score_temperatura || 0;
       const prioridade = getPrioridade(scoreTemperatura);
 
-      // Determinar empresa no formato SDR IA
       const empresaSDR: 'TOKENIZA' | 'BLUE' = lead.id_empresa === TOKENIZA_ID ? 'TOKENIZA' : 'BLUE';
       
-      // Determinar evento no formato SDR IA
       let evento: SDRPayload['evento'] = 'ATUALIZACAO';
       
       if (body.evento) {
@@ -218,7 +308,6 @@ serve(async (req) => {
         evento = 'MQL';
       }
       
-      // Montar payload completo no formato SDR IA
       const payload: SDRPayload = {
         lead_id: lead.id_lead,
         evento,
@@ -315,6 +404,15 @@ serve(async (req) => {
           valor_carrinho: lead.tokeniza_valor_carrinho || undefined
         };
 
+        // Buscar investimentos detalhados
+        if (lead.tokeniza_user_id) {
+          const investimentos = await buscarInvestimentosDetalhados(supabase, lead.tokeniza_user_id, mapaProjetos);
+          if (investimentos.length > 0) {
+            payload.dados_tokeniza.investimentos = investimentos;
+          }
+          console.log(`[Webhook] Lead ${lead.id_lead}: ${investimentos.length} investimentos detalhados`);
+        }
+
         if (lead.tokeniza_carrinho_abandonado && lead.tokeniza_valor_carrinho) {
           payload.event_metadata = {
             valor_simulado: lead.tokeniza_valor_carrinho,
@@ -336,17 +434,14 @@ serve(async (req) => {
 
       // Enviar para cada destino ativo
       for (const destino of destinos) {
-        // Verificar se destino é para empresa específica ou todas
         if (destino.id_empresa && destino.id_empresa !== lead.id_empresa) {
           continue;
         }
 
-        // Verificar se evento está na lista de eventos do destino
         if (destino.eventos && !destino.eventos.includes(evento)) {
           continue;
         }
 
-        // Respeitar score_minimo_crm do destino (apenas no modo cron, sem lead_ids)
         if (!body.lead_ids?.length) {
           const scoreMinimo = destino.score_minimo_crm ?? 70;
           if (scoreTemperatura < scoreMinimo) {
@@ -362,7 +457,6 @@ serve(async (req) => {
             ...customHeaders
           };
 
-          // Injetar secret do webhook se o destino tiver header x-webhook-secret com placeholder
           if (headers['x-webhook-secret'] === '{{SGT_WEBHOOK_SECRET}}') {
             const webhookSecret = Deno.env.get('SGT_WEBHOOK_SECRET');
             if (webhookSecret) {
@@ -424,7 +518,6 @@ serve(async (req) => {
 
     const duracao = Date.now() - startTime;
 
-    // Registrar execução do cronjob (apenas se não for disparo imediato)
     if (!body.lead_ids) {
       await supabase.from('cronjob_execucao').insert({
         nome_cronjob: 'disparar-webhook-leads',
