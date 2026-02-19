@@ -1,75 +1,52 @@
 
 
-# Enviar historico detalhado de investimentos Tokeniza para a Amelia CRM
+# Adicionar investimentos detalhados na API buscar-lead-api
 
-## Problema atual
+## Problema
 
-O webhook hoje envia apenas dados **agregados** da Tokeniza:
-- `valor_investido` (total)
-- `qtd_investimentos` (total)
-- `projetos` (array de UUIDs, sem nomes)
-- `carrinho_abandonado`
-
-Falta o **detalhamento por oferta**: qual oferta o cliente investiu, quanto e quando.
+A Edge Function `buscar-lead-api` retorna apenas os campos agregados do lead (`tokeniza_valor_investido`, `tokeniza_qtd_investimentos`, etc.) porque faz um simples `select` na tabela `lead`. Ela nao busca os investimentos individuais nas tabelas `tokeniza_investimento` e `tokeniza_venda`, entao o campo `dados_tokeniza.investimentos[]` nunca aparece na resposta.
 
 ## Solucao
 
-Alterar a Edge Function `disparar-webhook-leads` para, quando o lead for da Tokeniza, buscar os investimentos individuais do cliente nas tabelas `tokeniza_investimento` e `tokeniza_venda`, cruzar com `tokeniza_projeto` para obter o nome da oferta, e enviar um array `investimentos` dentro de `dados_tokeniza`.
-
-## Novo formato do payload `dados_tokeniza`
-
-```text
-dados_tokeniza: {
-  // Dados agregados (continuam vindo como hoje)
-  valor_investido: 15000,
-  qtd_investimentos: 3,
-  qtd_projetos: 2,
-  ultimo_investimento_em: "2025-11-20T...",
-  carrinho_abandonado: false,
-  valor_carrinho: 0,
-
-  // NOVO: detalhamento por investimento
-  investimentos: [
-    {
-      oferta_nome: "Token Solar Fazenda MG",
-      oferta_id: "uuid-do-projeto",
-      valor: 5000,
-      data: "2025-06-15T...",
-      status: "FINISHED",
-      tipo: "crowdfunding"
-    },
-    {
-      oferta_nome: "Token Agro SP",
-      oferta_id: "uuid-do-projeto-2",
-      valor: 10000,
-      data: "2025-11-20T...",
-      status: "PAID",
-      tipo: "crowdfunding"
-    }
-  ]
-}
-```
+Reaproveitar a mesma logica ja implementada no webhook (`disparar-webhook-leads`) para enriquecer a resposta da API com o array de investimentos detalhados quando o lead for da Tokeniza.
 
 ## Detalhes tecnicos
 
-### Arquivo alterado: `supabase/functions/disparar-webhook-leads/index.ts`
+### Arquivo alterado: `supabase/functions/buscar-lead-api/index.ts`
 
-1. **Atualizar a interface `SDRPayload`** para incluir o campo `investimentos` dentro de `dados_tokeniza`:
-   - Cada item tera: `oferta_nome`, `oferta_id`, `valor`, `data`, `status`, `tipo` ("crowdfunding" ou "venda")
+1. **Adicionar campos faltantes ao `selectFields`**: incluir `tokeniza_user_id`, `tokeniza_projetos`, `tokeniza_ultimo_investimento`, `tokeniza_carrinho_abandonado`, `tokeniza_valor_carrinho`, `id_empresa` (campos necessarios para a logica)
 
-2. **Buscar investimentos detalhados** dentro do loop de leads Tokeniza:
-   - Usar o `tokeniza_user_id` do lead para consultar `tokeniza_investimento` (crowdfunding) filtrado por status pago (`FINISHED`, `PAID`, ou `was_paid=true`)
-   - Tambem consultar `tokeniza_venda` com `was_paid=true`
-   - Buscar o mapa de nomes de projetos da tabela `tokeniza_projeto` (uma unica query antes do loop)
+2. **Criar funcao `buscarMapaProjetos`**: query unica em `tokeniza_projeto` para mapear `project_id` para `nome` (mesma logica do webhook)
 
-3. **Montar o array `investimentos`** combinando crowdfunding + vendas, ordenado por data
+3. **Criar funcao `buscarInvestimentosDetalhados`**: buscar em `tokeniza_investimento` (filtro `FINISHED`/`PAID`/`was_paid=true`) e `tokeniza_venda` (`was_paid=true`), cruzar com mapa de nomes, ordenar por data
 
-4. **Manter todos os dados agregados existentes** para nao quebrar nada na Amelia CRM -- os novos dados vem como campo adicional
+4. **Enriquecer a resposta**: apos encontrar o lead, se `id_empresa === TOKENIZA_ID` e `tokeniza_user_id` existir, buscar investimentos e adicionar ao objeto de resposta como `dados_tokeniza`:
+
+```text
+{
+  found: true,
+  lead: { ... campos do lead ... },
+  dados_tokeniza: {
+    valor_investido: 701573.97,
+    qtd_investimentos: 264,
+    investimentos: [
+      {
+        oferta_nome: "Mineradora de Bitcoin #1",
+        oferta_id: "uuid",
+        valor: 5000,
+        data: "2025-06-15T...",
+        status: "FINISHED",
+        tipo: "crowdfunding"
+      },
+      ...
+    ]
+  }
+}
+```
+
+5. **Para leads nao-Tokeniza**: o campo `dados_tokeniza` simplesmente nao aparece na resposta (sem impacto)
 
 ### Performance
 
-- Uma query extra por lead Tokeniza para buscar investimentos (filtrada por `user_id_tokeniza`)
-- Uma query extra por lead Tokeniza para buscar vendas
-- Uma unica query no inicio para o mapa de nomes de projetos (`tokeniza_projeto`)
-- Como o webhook processa no maximo 50 leads por execucao, o impacto e minimo
-
+- Apenas 1-2 queries extras por chamada (somente quando o lead e Tokeniza)
+- A API ja retorna 1 lead por vez, entao o impacto e minimo
