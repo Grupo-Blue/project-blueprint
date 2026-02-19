@@ -1,101 +1,75 @@
 
-# API de Busca e Enriquecimento de Leads para Sistemas Externos
 
-## Visao Geral
+# Enviar historico detalhado de investimentos Tokeniza para a Amelia CRM
 
-Criar uma nova edge function `buscar-lead-api` que permite que sistemas externos enviem um telefone ou email e recebam de volta os dados completos e enriquecidos do lead na base (Mautic, Tokeniza, LinkedIn, GA4, Stape, IRPF, Metricool, score, UTMs, etc).
+## Problema atual
 
-## Autenticacao
+O webhook hoje envia apenas dados **agregados** da Tokeniza:
+- `valor_investido` (total)
+- `qtd_investimentos` (total)
+- `projetos` (array de UUIDs, sem nomes)
+- `carrinho_abandonado`
 
-A API sera protegida por um header `x-api-key` validado contra um novo secret `SGT_API_KEY` (ou reutilizar o `SGT_WEBHOOK_SECRET` ja existente, conforme preferencia). Sistemas externos precisam enviar esse token para consultar.
+Falta o **detalhamento por oferta**: qual oferta o cliente investiu, quanto e quando.
 
-## Normalizacao de Telefone
+## Solucao
 
-Reutiliza a mesma logica de `normalizarTelefone` ja presente em `enriquecer-lead-mautic`:
-- Remove caracteres nao numericos
-- Remove DDI 55 se presente
-- Insere o digito 9 apos DDD quando necessario (10 digitos -> 11)
-- Busca no banco com e sem o prefixo `+55` para garantir match
+Alterar a Edge Function `disparar-webhook-leads` para, quando o lead for da Tokeniza, buscar os investimentos individuais do cliente nas tabelas `tokeniza_investimento` e `tokeniza_venda`, cruzar com `tokeniza_projeto` para obter o nome da oferta, e enviar um array `investimentos` dentro de `dados_tokeniza`.
 
-## Logica de Busca
-
-1. Se `email` fornecido: busca exata por `email` (case-insensitive via `ilike`)
-2. Se `telefone` fornecido: normaliza e busca em multiplos formatos (`+55XXXXXXXXXXX`, `XXXXXXXXXXX`, parcial via `ilike`)
-3. Se ambos fornecidos: busca por email primeiro, fallback para telefone
-4. Filtra leads com `merged = false` (ou null) para nao retornar duplicados
-
-## Payload de Resposta
-
-Retorna um JSON rico com todas as dimensoes de enriquecimento disponiveis:
+## Novo formato do payload `dados_tokeniza`
 
 ```text
-{
-  "found": true,
-  "lead": {
-    // Dados basicos
-    "id_lead", "nome_lead", "email", "telefone", "organizacao",
-    "origem_canal", "stage_atual", "id_empresa",
-    
-    // Comercial
-    "venda_realizada", "valor_venda", "data_venda",
-    "is_mql", "levantou_mao", "tem_reuniao",
-    "score_temperatura", "proprietario_nome",
-    
-    // UTMs
-    "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
-    
-    // Mautic
-    "mautic_score", "mautic_page_hits", "mautic_tags", "cidade_mautic", "estado_mautic",
-    
-    // LinkedIn
-    "linkedin_cargo", "linkedin_empresa", "linkedin_setor", "linkedin_senioridade",
-    
-    // Tokeniza
-    "tokeniza_investidor", "tokeniza_valor_investido", "tokeniza_qtd_investimentos",
-    
-    // GA4
-    "ga4_landing_page", "ga4_engajamento_score", "ga4_sessoes",
-    
-    // Stape
-    "stape_paginas_visitadas", "stape_eventos",
-    
-    // IRPF
-    "irpf_renda_anual", "irpf_patrimonio_liquido", "irpf_perfil_investidor",
-    
-    // Metricool
-    "metricool_roas_campanha", "metricool_cpc_campanha"
-  }
+dados_tokeniza: {
+  // Dados agregados (continuam vindo como hoje)
+  valor_investido: 15000,
+  qtd_investimentos: 3,
+  qtd_projetos: 2,
+  ultimo_investimento_em: "2025-11-20T...",
+  carrinho_abandonado: false,
+  valor_carrinho: 0,
+
+  // NOVO: detalhamento por investimento
+  investimentos: [
+    {
+      oferta_nome: "Token Solar Fazenda MG",
+      oferta_id: "uuid-do-projeto",
+      valor: 5000,
+      data: "2025-06-15T...",
+      status: "FINISHED",
+      tipo: "crowdfunding"
+    },
+    {
+      oferta_nome: "Token Agro SP",
+      oferta_id: "uuid-do-projeto-2",
+      valor: 10000,
+      data: "2025-11-20T...",
+      status: "PAID",
+      tipo: "crowdfunding"
+    }
+  ]
 }
-```
-
-## Arquivos
-
-| Arquivo | Acao |
-|---|---|
-| `supabase/functions/buscar-lead-api/index.ts` | Criar |
-| `supabase/config.toml` | Atualizar (verify_jwt = false) |
-
-## Exemplo de chamada
-
-```text
-POST /functions/v1/buscar-lead-api
-Headers:
-  x-api-key: <SGT_WEBHOOK_SECRET>
-  Content-Type: application/json
-
-Body:
-  { "telefone": "(11) 98765-4321" }
-  -- ou --
-  { "email": "joao@empresa.com" }
-  -- ou --
-  { "telefone": "5511987654321", "email": "joao@empresa.com" }
 ```
 
 ## Detalhes tecnicos
 
-- Autenticacao via `x-api-key` comparado com `SGT_WEBHOOK_SECRET` (secret ja existente)
-- Busca usa `supabase.from('lead').select(...)` com service role key
-- Normalizacao gera multiplas variantes do telefone para buscar com `or(telefone.eq.variant1, telefone.eq.variant2, ...)`
-- Leads com `merged = true` sao excluidos do resultado
-- Se multiplos leads encontrados, retorna o mais recente (`order by data_criacao desc, limit 1`)
-- Nenhum secret novo necessario
+### Arquivo alterado: `supabase/functions/disparar-webhook-leads/index.ts`
+
+1. **Atualizar a interface `SDRPayload`** para incluir o campo `investimentos` dentro de `dados_tokeniza`:
+   - Cada item tera: `oferta_nome`, `oferta_id`, `valor`, `data`, `status`, `tipo` ("crowdfunding" ou "venda")
+
+2. **Buscar investimentos detalhados** dentro do loop de leads Tokeniza:
+   - Usar o `tokeniza_user_id` do lead para consultar `tokeniza_investimento` (crowdfunding) filtrado por status pago (`FINISHED`, `PAID`, ou `was_paid=true`)
+   - Tambem consultar `tokeniza_venda` com `was_paid=true`
+   - Buscar o mapa de nomes de projetos da tabela `tokeniza_projeto` (uma unica query antes do loop)
+
+3. **Montar o array `investimentos`** combinando crowdfunding + vendas, ordenado por data
+
+4. **Manter todos os dados agregados existentes** para nao quebrar nada na Amelia CRM -- os novos dados vem como campo adicional
+
+### Performance
+
+- Uma query extra por lead Tokeniza para buscar investimentos (filtrada por `user_id_tokeniza`)
+- Uma query extra por lead Tokeniza para buscar vendas
+- Uma unica query no inicio para o mapa de nomes de projetos (`tokeniza_projeto`)
+- Como o webhook processa no maximo 50 leads por execucao, o impacto e minimo
+
