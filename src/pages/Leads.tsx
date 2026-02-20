@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronRight, Mail, Globe, Target, Wallet, ShoppingCart, MapPin, History, AlertTriangle, Snowflake, Timer, X, Check, Download, ListFilter, Send, Upload } from "lucide-react";
+import { Users, TrendingUp, DollarSign, CheckCircle2, Calendar, ExternalLink, Search, Clock, Building2, Flame, Zap, Activity, Tag, ArrowUpDown, ArrowUp, ArrowDown, Filter, ChevronDown, ChevronRight, Mail, Globe, Target, Wallet, ShoppingCart, MapPin, History, AlertTriangle, Snowflake, Timer, X, Check, Download, ListFilter, Send, Upload, Loader2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, differenceInDays, startOfMonth, endOfMonth, parseISO } from "date-fns";
@@ -197,7 +197,8 @@ const Leads = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm.trim());
-    }, 400);
+      setCurrentPage(1);
+    }, 600);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
@@ -344,17 +345,9 @@ const Leads = () => {
       return alertaLeadIds.includes(lead.id_lead) && matchesEmpresa;
     }
 
-    const searchLower = searchTerm.toLowerCase();
-    // Se a busca server-side está ativa (debouncedSearch >= 2), não filtrar novamente client-side
-    const matchesSearch =
-      debouncedSearch.length >= 2 ||
-      !searchTerm ||
-      lead.nome_lead?.toLowerCase().includes(searchLower) ||
-      lead.organizacao?.toLowerCase().includes(searchLower) ||
-      lead.email?.toLowerCase().includes(searchLower) ||
-      lead.telefone?.toLowerCase().includes(searchLower) ||
-      lead.telefone?.replace(/\D/g, '').includes(searchTerm.replace(/\D/g, '')) ||
-      lead.stage_atual?.toLowerCase().includes(searchLower);
+    // Busca server-side: não filtrar client-side para evitar flickering
+    // Se tem searchTerm digitado, confiar inteiramente na busca server-side
+    const matchesSearch = !searchTerm || debouncedSearch.length >= 2;
 
     const matchesStatus =
       statusFilter === "all" ||
@@ -746,7 +739,11 @@ const Leads = () => {
           <CardContent className="pt-4">
             <div className="flex flex-col md:flex-row gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                {searchTerm.length >= 2 && searchTerm !== debouncedSearch ? (
+                  <Loader2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+                ) : (
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                )}
                 <Input
                   placeholder="Buscar por nome, email, telefone..."
                   value={searchTerm}
