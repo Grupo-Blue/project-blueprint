@@ -1,98 +1,58 @@
 
 
-# Sincronizar TODOS os clientes do Notion Blue para o SGT
+# Melhorar busca na pagina /leads
 
-## Situacao atual
+## Problemas identificados
 
-- O Notion da Blue possui centenas de clientes no database "Info Clientes - Clientes Blue Consult"
-- A tabela `cliente_notion` no SGT tem apenas **141 registros** (limitada pela falta de paginacao na Edge Function)
-- Apenas **69 leads** estao vinculados a um `id_cliente_notion`
-- A tabela `cliente_notion` nao possui colunas para campos extras do Notion (cidade, CEP, endereco, perfil, motivo de cancelamento, etc.)
+1. **Filtro client-side conflita com busca server-side**: Enquanto o usuario digita, o `searchTerm` atualiza imediatamente e filtra os 1000 leads carregados em memoria (linhas 347-357). So apos 400ms o `debouncedSearch` dispara a busca no banco. Isso causa resultados inconsistentes durante a digitacao -- o usuario ve os resultados "sumirem" antes da busca real acontecer.
 
-## Plano
+2. **Busca client-side limitada a 1000 registros**: Antes do debounce disparar, a busca filtra apenas os 1000 leads ja carregados, perdendo matches que estao alem desse limite.
 
-### Parte 1: Adicionar colunas na tabela `cliente_notion`
+3. **Pagina nao reseta ao buscar**: Quando o usuario digita uma busca, a pagina atual nao volta para a 1 automaticamente.
 
-Migracao SQL para adicionar os campos que existem no Notion mas nao estao sendo capturados:
+## Solucao
 
-- `cidade` (varchar)
-- `cep` (varchar)
-- `endereco` (text)
-- `perfil_cliente` (varchar) - ex: "Baixa complexidade", "Colaborativo", "Complexo"
-- `motivo_cancelamento` (varchar) - ex: "Concorrente", "Insatisfacao"
-- `data_cancelamento` (date)
-- `tag` (varchar)
-- `url_google_drive` (text)
-- `vencimento_procuracao` (date)
-- `apuracao_b3` (varchar) - "Sim"/"Nao"
-- `telefone_secundario` (varchar)
+### Arquivo: `src/pages/Leads.tsx`
 
-### Parte 2: Atualizar a Edge Function `sincronizar-notion`
+1. **Remover filtro client-side de busca**: Na secao `filteredLeads` (linha 347-357), quando houver `searchTerm` digitado mas o `debouncedSearch` ainda nao atualizou, nao aplicar filtro local. Apenas confiar na busca server-side apos o debounce.
 
-Corrigir os dois problemas principais:
+2. **Mostrar indicador de "buscando..."**: Enquanto `searchTerm !== debouncedSearch`, exibir um estado visual de loading no campo de busca para o usuario saber que a busca esta sendo processada.
 
-1. **Paginacao**: Implementar loop com `next_cursor` para buscar TODOS os registros (nao apenas os primeiros 100)
-2. **Campos extras**: Extrair e salvar os novos campos do Notion (cidade, CEP, endereco, perfil, motivo de cancelamento, etc.)
-3. **Nome do campo corrigido**: O Notion usa `"Cliente inativo?"` (com i minusculo), e o codigo atual busca `"Cliente Inativo?"` (com I maiusculo) -- corrigir para o nome real
+3. **Resetar pagina ao buscar**: Adicionar `setCurrentPage(1)` quando `debouncedSearch` mudar.
 
-### Parte 3: Enriquecer leads com dados dos clientes Notion
+4. **Aumentar debounce para 600ms**: Dar mais tempo para o usuario terminar de digitar antes de disparar a query.
 
-Apos sincronizar todos os clientes, o match por email ja existente vinculara os leads encontrados. Adicionalmente:
+### Detalhes tecnicos
 
-- Atualizar `cliente_status` nos leads para `"cliente"` ou `"ex_cliente"`
-- Vincular `id_cliente_notion` para referencia cruzada
-- Match tambem por telefone (alem de email) para capturar mais vinculos
+**Mudanca 1 - Remover filtro client-side de busca (linhas 347-357)**:
 
-### Parte 4: Executar a sincronizacao
-
-Apos deploy, chamar a funcao para importar todos os registros do Notion de uma vez.
-
-## Detalhes tecnicos
-
-### Migracao SQL
-
+Substituir a logica atual por:
 ```text
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS cidade varchar;
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS cep varchar;
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS endereco text;
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS perfil_cliente varchar;
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS motivo_cancelamento varchar;
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS data_cancelamento date;
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS tag varchar;
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS url_google_drive text;
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS vencimento_procuracao date;
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS apuracao_b3 varchar;
-ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS telefone_secundario varchar;
+// Se tem searchTerm digitado, confiar inteiramente na busca server-side
+// Nao filtrar client-side para evitar inconsistencias
+const matchesSearch = !searchTerm || debouncedSearch.length >= 2;
 ```
 
-### Edge Function `sincronizar-notion/index.ts`
+Isso significa: se o usuario digitou algo, os resultados so mudam quando a busca server-side retornar (apos o debounce). Sem flickering.
 
-Alteracoes principais:
+**Mudanca 2 - Indicador de loading no input**:
 
-1. **Loop de paginacao**:
-```text
-let hasMore = true;
-let startCursor = undefined;
-while (hasMore) {
-  const response = await fetch(notionDbQuery, {
-    body: { page_size: 100, start_cursor: startCursor }
-  });
-  // processar resultados
-  hasMore = response.has_more;
-  startCursor = response.next_cursor;
-}
-```
+Adicionar um spinner ou texto "Buscando..." ao lado do campo de busca quando `searchTerm.length >= 2 && searchTerm !== debouncedSearch`. Isso da feedback visual ao usuario de que a busca vai acontecer.
 
-2. **Extracao de campos adicionais**: Cidade, CEP, Endereco, Perfil do cliente, Motivo de cancelamento, Data de Cancelamento, Tag, URL Google Drive, Vencimento Procuracao, Apuracao B3, Telefone 1 (secundario)
+**Mudanca 3 - Reset de pagina**:
 
-3. **Match por telefone**: Alem do match por email, tambem buscar leads pelo numero de telefone normalizado (com +55)
+No useEffect do debounce, adicionar `setCurrentPage(1)` apos atualizar o `debouncedSearch`.
 
-### Arquivo alterado
+**Mudanca 4 - Debounce de 600ms**:
 
-- `supabase/functions/sincronizar-notion/index.ts`
+Alterar o `setTimeout` de 400ms para 600ms para dar mais margem ao usuario.
 
-### Performance
+### Resultado esperado
 
-- A paginacao garante que todos os registros serao importados, independente da quantidade
-- O upsert por `id_notion` evita duplicatas
-- Match por email + telefone maximiza a vinculacao com leads existentes
+- Usuario digita no campo de busca
+- Resultados atuais permanecem estaveis (sem flickering)
+- Apos 600ms sem digitar, aparece um loading
+- Query server-side dispara e retorna resultados parciais via `ilike %termo%`
+- Pagina reseta para a primeira automaticamente
+- Busca funciona em toda a base (nao limitada a 1000)
+
