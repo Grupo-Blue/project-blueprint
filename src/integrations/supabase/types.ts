@@ -728,51 +728,84 @@ export type Database = {
       cliente_notion: {
         Row: {
           anos_fiscais: Json | null
+          apuracao_b3: string | null
+          cep: string | null
+          cidade: string | null
           cpf_cnpj: string | null
           created_at: string | null
+          data_cancelamento: string | null
           data_nascimento: string | null
           email: string | null
           email_secundario: string | null
+          endereco: string | null
           id_cliente: string
           id_notion: string
           last_edited_time: string | null
+          motivo_cancelamento: string | null
           nome: string
+          perfil_cliente: string | null
           produtos_contratados: Json | null
           status_cliente: string
+          tag: string | null
           telefone: string | null
+          telefone_secundario: string | null
           updated_at: string | null
+          url_google_drive: string | null
+          vencimento_procuracao: string | null
         }
         Insert: {
           anos_fiscais?: Json | null
+          apuracao_b3?: string | null
+          cep?: string | null
+          cidade?: string | null
           cpf_cnpj?: string | null
           created_at?: string | null
+          data_cancelamento?: string | null
           data_nascimento?: string | null
           email?: string | null
           email_secundario?: string | null
+          endereco?: string | null
           id_cliente?: string
           id_notion: string
           last_edited_time?: string | null
+          motivo_cancelamento?: string | null
           nome: string
+          perfil_cliente?: string | null
           produtos_contratados?: Json | null
           status_cliente?: string
+          tag?: string | null
           telefone?: string | null
+          telefone_secundario?: string | null
           updated_at?: string | null
+          url_google_drive?: string | null
+          vencimento_procuracao?: string | null
         }
         Update: {
           anos_fiscais?: Json | null
+          apuracao_b3?: string | null
+          cep?: string | null
+          cidade?: string | null
           cpf_cnpj?: string | null
           created_at?: string | null
+          data_cancelamento?: string | null
           data_nascimento?: string | null
           email?: string | null
           email_secundario?: string | null
+          endereco?: string | null
           id_cliente?: string
           id_notion?: string
           last_edited_time?: string | null
+          motivo_cancelamento?: string | null
           nome?: string
+          perfil_cliente?: string | null
           produtos_contratados?: Json | null
           status_cliente?: string
+          tag?: string | null
           telefone?: string | null
+          telefone_secundario?: string | null
           updated_at?: string | null
+          url_google_drive?: string | null
+          vencimento_procuracao?: string | null
         }
         Relationships: []
       }
