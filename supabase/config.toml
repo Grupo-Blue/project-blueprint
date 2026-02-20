@@ -167,3 +167,6 @@ verify_jwt = false
 
 [functions.buscar-lead-api]
 verify_jwt = false
+
+[functions.listar-clientes-api]
+verify_jwt = false
