@@ -53,7 +53,55 @@ serve(async (req) => {
     projetosMapeados?.forEach(p => {
       projetoNomeMap[p.project_id] = p.nome;
     });
-    console.log(`Projetos mapeados: ${Object.keys(projetoNomeMap).length}`);
+    console.log(`Projetos mapeados (banco): ${Object.keys(projetoNomeMap).length}`);
+
+    // ========== BUSCAR NOMES DE PROJETOS AUTOMATICAMENTE DA API TOKENIZA ==========
+    console.log("Buscando projetos da API Tokeniza para atualizar nomes automaticamente...");
+    let projetosDescobertos = 0;
+    try {
+      const projectsResponse = await fetch(`${baseUrl}/v1/projects`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${apiToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (projectsResponse.ok) {
+        const projectsData = await projectsResponse.json();
+        const projectsList: any[] = Array.isArray(projectsData) ? projectsData : (projectsData.data || projectsData.items || []);
+        console.log(`API retornou ${projectsList.length} projetos`);
+
+        const projetosParaUpsert = projectsList
+          .filter(p => p.id)
+          .map(p => ({
+            project_id: p.id,
+            nome: p.title || p.name || p.description || p.id,
+          }));
+
+        if (projetosParaUpsert.length > 0) {
+          const { error: upsertError } = await supabase
+            .from("tokeniza_projeto")
+            .upsert(projetosParaUpsert, { onConflict: "project_id" });
+
+          if (upsertError) {
+            console.error("Erro ao fazer upsert de projetos:", upsertError.message);
+          } else {
+            // Atualizar o mapa local com os dados recém-obtidos da API
+            projetosParaUpsert.forEach(p => {
+              projetoNomeMap[p.project_id] = p.nome;
+            });
+            projetosDescobertos = projetosParaUpsert.length;
+            console.log(`Projetos atualizados automaticamente: ${projetosDescobertos}`);
+          }
+        }
+      } else {
+        console.warn(`API /v1/projects retornou status ${projectsResponse.status} — nomes serão usados do banco de dados`);
+      }
+    } catch (e) {
+      console.warn("Erro ao buscar projetos da API Tokeniza (não crítico):", e);
+    }
+    console.log(`Projetos mapeados (total após API): ${Object.keys(projetoNomeMap).length}`);
 
     // Buscar dados de usuários para enriquecer leads com nome e email
     const { data: usuarios } = await supabase
@@ -301,6 +349,7 @@ serve(async (req) => {
         leads_criados: resultados.leads.success,
         leads_erros: resultados.leads.error,
         projetos_mapeados: Object.keys(projetoNomeMap).length,
+        projetos_descobertos_api: projetosDescobertos,
       },
     });
 
