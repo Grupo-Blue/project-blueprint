@@ -115,6 +115,21 @@ function getPrioridade(score: number): 'URGENTE' | 'QUENTE' | 'MORNO' | 'FRIO' {
   return 'FRIO';
 }
 
+// Mapear origem_tipo do SGT para valores aceitos pelo CRM (Amelia)
+function mapearOrigemTipo(origemTipo: string | null | undefined): string {
+  const mapa: Record<string, string> = {
+    'MANUAL': 'OUTBOUND',
+    'PAGO': 'INBOUND',
+    'ORGANICO': 'INBOUND',
+    'INBOUND': 'INBOUND',
+    'OUTBOUND': 'OUTBOUND',
+    'REFERRAL': 'REFERRAL',
+    'PARTNER': 'PARTNER',
+  };
+  if (!origemTipo) return 'INBOUND';
+  return mapa[origemTipo.toUpperCase()] ?? 'INBOUND';
+}
+
 // Buscar mapa de nomes de projetos Tokeniza (project_id -> nome)
 async function buscarMapaProjetos(supabase: ReturnType<typeof createClient>): Promise<Map<string, string>> {
   const { data, error } = await supabase
@@ -209,11 +224,71 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parâmetros opcionais para disparo imediato de leads específicos
-    let body: { lead_ids?: string[], evento?: string } = {};
+    let body: { lead_ids?: string[], evento?: string, replay_erros?: boolean } = {};
     try {
       body = await req.json();
     } catch {
       body = {};
+    }
+
+    // Modo replay: buscar leads com erro 400 e reenviar todos
+    if (body.replay_erros === true) {
+      console.log('[Disparar Webhook] Modo REPLAY ativado — buscando leads com erro 400...');
+
+      const { data: logsErro, error: logsError } = await supabase
+        .from('lead_webhook_log')
+        .select('id_lead')
+        .eq('status', 'erro')
+        .eq('status_code', 400);
+
+      if (logsError) throw new Error(`Erro ao buscar logs de erro: ${logsError.message}`);
+
+      const idsDistintos = [...new Set((logsErro || []).map((l: { id_lead: string }) => l.id_lead).filter(Boolean))];
+      console.log(`[Disparar Webhook] Replay: ${idsDistintos.length} leads distintos com erro 400`);
+
+      if (idsDistintos.length === 0) {
+        return new Response(JSON.stringify({ success: true, message: 'Nenhum lead com erro 400 encontrado', leads_processados: 0 }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Processar em lotes de 50
+      const BATCH_SIZE = 50;
+      let totalEnviados = 0;
+      let totalErros = 0;
+
+      for (let i = 0; i < idsDistintos.length; i += BATCH_SIZE) {
+        const lote = idsDistintos.slice(i, i + BATCH_SIZE);
+        console.log(`[Replay] Processando lote ${Math.floor(i / BATCH_SIZE) + 1} — ${lote.length} leads`);
+        
+        // Chamar a própria função recursivamente com lead_ids
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const resp = await fetch(`${supabaseUrl}/functions/v1/disparar-webhook-leads`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceKey}`,
+            'apikey': serviceKey
+          },
+          body: JSON.stringify({ lead_ids: lote, evento: 'ATUALIZACAO' })
+        });
+
+        const resultado = await resp.json();
+        totalEnviados += resultado.webhooks_enviados || 0;
+        totalErros += resultado.webhooks_erros || 0;
+        console.log(`[Replay] Lote ${Math.floor(i / BATCH_SIZE) + 1}: ${resultado.webhooks_enviados} enviados, ${resultado.webhooks_erros} erros`);
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        mode: 'replay',
+        leads_distintos: idsDistintos.length,
+        webhooks_enviados: totalEnviados,
+        webhooks_erros: totalErros
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Buscar leads pendentes de webhook
@@ -327,7 +402,7 @@ serve(async (req) => {
           utm_campaign: lead.utm_campaign || undefined,
           utm_content: lead.utm_content || undefined,
           utm_term: lead.utm_term || undefined,
-          origem_tipo: lead.origem_tipo || undefined,
+          origem_tipo: mapearOrigemTipo(lead.origem_tipo),
           lead_pago: lead.lead_pago || false,
           score: lead.mautic_score || 0,
           stage: lead.stage_atual || 'Lead',
