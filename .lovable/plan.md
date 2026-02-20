@@ -1,52 +1,68 @@
 
 
-# Adicionar investimentos detalhados na API buscar-lead-api
+# Replay de Webhooks Rejeitados + Mapeamento de origem_tipo
 
-## Problema
+## Diagnostico
 
-A Edge Function `buscar-lead-api` retorna apenas os campos agregados do lead (`tokeniza_valor_investido`, `tokeniza_qtd_investimentos`, etc.) porque faz um simples `select` na tabela `lead`. Ela nao busca os investimentos individuais nas tabelas `tokeniza_investimento` e `tokeniza_venda`, entao o campo `dados_tokeniza.investimentos[]` nunca aparece na resposta.
+O CRM (Amelia) rejeitou **~44.600 webhooks** com status 400 pelos seguintes motivos:
 
-## Solucao
+| Motivo da rejeicao | Ocorrencias |
+|---|---|
+| `origem_tipo = 'MANUAL'` nao aceito | 32.366 |
+| `origem_tipo = 'PAGO'` nao aceito | 11.438 |
+| `origem_tipo = 'ORGANICO'` nao aceito | 754 |
+| Outros erros (evento invalido, lead_id vazio) | 100 |
 
-Reaproveitar a mesma logica ja implementada no webhook (`disparar-webhook-leads`) para enriquecer a resposta da API com o array de investimentos detalhados quando o lead for da Tokeniza.
+Sao **366 leads distintos** que tiveram pelo menos um envio com erro.
 
-## Detalhes tecnicos
+## Solucao em 2 partes
 
-### Arquivo alterado: `supabase/functions/buscar-lead-api/index.ts`
+### Parte 1: Corrigir o mapeamento de `origem_tipo`
 
-1. **Adicionar campos faltantes ao `selectFields`**: incluir `tokeniza_user_id`, `tokeniza_projetos`, `tokeniza_ultimo_investimento`, `tokeniza_carrinho_abandonado`, `tokeniza_valor_carrinho`, `id_empresa` (campos necessarios para a logica)
-
-2. **Criar funcao `buscarMapaProjetos`**: query unica em `tokeniza_projeto` para mapear `project_id` para `nome` (mesma logica do webhook)
-
-3. **Criar funcao `buscarInvestimentosDetalhados`**: buscar em `tokeniza_investimento` (filtro `FINISHED`/`PAID`/`was_paid=true`) e `tokeniza_venda` (`was_paid=true`), cruzar com mapa de nomes, ordenar por data
-
-4. **Enriquecer a resposta**: apos encontrar o lead, se `id_empresa === TOKENIZA_ID` e `tokeniza_user_id` existir, buscar investimentos e adicionar ao objeto de resposta como `dados_tokeniza`:
+No arquivo `supabase/functions/disparar-webhook-leads/index.ts`, adicionar uma funcao de mapeamento antes de montar o payload:
 
 ```text
-{
-  found: true,
-  lead: { ... campos do lead ... },
-  dados_tokeniza: {
-    valor_investido: 701573.97,
-    qtd_investimentos: 264,
-    investimentos: [
-      {
-        oferta_nome: "Mineradora de Bitcoin #1",
-        oferta_id: "uuid",
-        valor: 5000,
-        data: "2025-06-15T...",
-        status: "FINISHED",
-        tipo: "crowdfunding"
-      },
-      ...
-    ]
-  }
-}
+SGT (origem)        ->  CRM (destino)
+-----------------------------------------
+MANUAL              ->  OUTBOUND
+PAGO                ->  INBOUND
+ORGANICO            ->  INBOUND
+INBOUND             ->  INBOUND (sem mudanca)
+OUTBOUND            ->  OUTBOUND (sem mudanca)
+REFERRAL            ->  REFERRAL (sem mudanca)
+PARTNER             ->  PARTNER (sem mudanca)
+qualquer outro      ->  INBOUND (fallback seguro)
 ```
 
-5. **Para leads nao-Tokeniza**: o campo `dados_tokeniza` simplesmente nao aparece na resposta (sem impacto)
+A linha 330 que hoje envia `origem_tipo: lead.origem_tipo || undefined` passara a usar a funcao de mapeamento para garantir que apenas valores aceitos pelo CRM sejam enviados.
 
-### Performance
+### Parte 2: Replay dos leads rejeitados
 
-- Apenas 1-2 queries extras por chamada (somente quando o lead e Tokeniza)
-- A API ja retorna 1 lead por vez, entao o impacto e minimo
+A funcao `disparar-webhook-leads` ja aceita o parametro `lead_ids` no body para disparo imediato (sem filtro de score). O plano e:
+
+1. Consultar os leads distintos que tiveram erro 400 no log
+2. Chamar a funcao com esses `lead_ids` em lotes de 50 (limite da funcao)
+3. Os leads serao reenviados com o mapeamento corrigido
+
+Para isso, sera criado um script de replay **temporario** dentro da propria funcao, acionavel via parametro `replay_erros: true` no body da requisicao. Ao receber esse parametro:
+- Busca os `id_lead` distintos da tabela `lead_webhook_log` onde `status = 'erro'` e `status_code = 400`
+- Processa em lotes de 50
+- Envia cada lead com o mapeamento corrigido
+
+### Arquivo alterado
+
+- `supabase/functions/disparar-webhook-leads/index.ts`
+  - Adicionar funcao `mapearOrigemTipo()` para converter valores do SGT para valores aceitos pelo CRM
+  - Usar essa funcao na linha 330 ao montar `dados_lead.origem_tipo`
+  - Adicionar logica de replay quando `body.replay_erros === true`
+
+### Como executar o replay
+
+Apos o deploy, basta chamar a funcao uma vez:
+
+```text
+POST disparar-webhook-leads
+Body: { "replay_erros": true }
+```
+
+A funcao vai identificar automaticamente os leads com erro e reenviar todos com o payload corrigido.
