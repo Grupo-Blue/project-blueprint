@@ -1,68 +1,98 @@
 
 
-# Replay de Webhooks Rejeitados + Mapeamento de origem_tipo
+# Sincronizar TODOS os clientes do Notion Blue para o SGT
 
-## Diagnostico
+## Situacao atual
 
-O CRM (Amelia) rejeitou **~44.600 webhooks** com status 400 pelos seguintes motivos:
+- O Notion da Blue possui centenas de clientes no database "Info Clientes - Clientes Blue Consult"
+- A tabela `cliente_notion` no SGT tem apenas **141 registros** (limitada pela falta de paginacao na Edge Function)
+- Apenas **69 leads** estao vinculados a um `id_cliente_notion`
+- A tabela `cliente_notion` nao possui colunas para campos extras do Notion (cidade, CEP, endereco, perfil, motivo de cancelamento, etc.)
 
-| Motivo da rejeicao | Ocorrencias |
-|---|---|
-| `origem_tipo = 'MANUAL'` nao aceito | 32.366 |
-| `origem_tipo = 'PAGO'` nao aceito | 11.438 |
-| `origem_tipo = 'ORGANICO'` nao aceito | 754 |
-| Outros erros (evento invalido, lead_id vazio) | 100 |
+## Plano
 
-Sao **366 leads distintos** que tiveram pelo menos um envio com erro.
+### Parte 1: Adicionar colunas na tabela `cliente_notion`
 
-## Solucao em 2 partes
+Migracao SQL para adicionar os campos que existem no Notion mas nao estao sendo capturados:
 
-### Parte 1: Corrigir o mapeamento de `origem_tipo`
+- `cidade` (varchar)
+- `cep` (varchar)
+- `endereco` (text)
+- `perfil_cliente` (varchar) - ex: "Baixa complexidade", "Colaborativo", "Complexo"
+- `motivo_cancelamento` (varchar) - ex: "Concorrente", "Insatisfacao"
+- `data_cancelamento` (date)
+- `tag` (varchar)
+- `url_google_drive` (text)
+- `vencimento_procuracao` (date)
+- `apuracao_b3` (varchar) - "Sim"/"Nao"
+- `telefone_secundario` (varchar)
 
-No arquivo `supabase/functions/disparar-webhook-leads/index.ts`, adicionar uma funcao de mapeamento antes de montar o payload:
+### Parte 2: Atualizar a Edge Function `sincronizar-notion`
+
+Corrigir os dois problemas principais:
+
+1. **Paginacao**: Implementar loop com `next_cursor` para buscar TODOS os registros (nao apenas os primeiros 100)
+2. **Campos extras**: Extrair e salvar os novos campos do Notion (cidade, CEP, endereco, perfil, motivo de cancelamento, etc.)
+3. **Nome do campo corrigido**: O Notion usa `"Cliente inativo?"` (com i minusculo), e o codigo atual busca `"Cliente Inativo?"` (com I maiusculo) -- corrigir para o nome real
+
+### Parte 3: Enriquecer leads com dados dos clientes Notion
+
+Apos sincronizar todos os clientes, o match por email ja existente vinculara os leads encontrados. Adicionalmente:
+
+- Atualizar `cliente_status` nos leads para `"cliente"` ou `"ex_cliente"`
+- Vincular `id_cliente_notion` para referencia cruzada
+- Match tambem por telefone (alem de email) para capturar mais vinculos
+
+### Parte 4: Executar a sincronizacao
+
+Apos deploy, chamar a funcao para importar todos os registros do Notion de uma vez.
+
+## Detalhes tecnicos
+
+### Migracao SQL
 
 ```text
-SGT (origem)        ->  CRM (destino)
------------------------------------------
-MANUAL              ->  OUTBOUND
-PAGO                ->  INBOUND
-ORGANICO            ->  INBOUND
-INBOUND             ->  INBOUND (sem mudanca)
-OUTBOUND            ->  OUTBOUND (sem mudanca)
-REFERRAL            ->  REFERRAL (sem mudanca)
-PARTNER             ->  PARTNER (sem mudanca)
-qualquer outro      ->  INBOUND (fallback seguro)
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS cidade varchar;
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS cep varchar;
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS endereco text;
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS perfil_cliente varchar;
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS motivo_cancelamento varchar;
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS data_cancelamento date;
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS tag varchar;
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS url_google_drive text;
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS vencimento_procuracao date;
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS apuracao_b3 varchar;
+ALTER TABLE cliente_notion ADD COLUMN IF NOT EXISTS telefone_secundario varchar;
 ```
 
-A linha 330 que hoje envia `origem_tipo: lead.origem_tipo || undefined` passara a usar a funcao de mapeamento para garantir que apenas valores aceitos pelo CRM sejam enviados.
+### Edge Function `sincronizar-notion/index.ts`
 
-### Parte 2: Replay dos leads rejeitados
+Alteracoes principais:
 
-A funcao `disparar-webhook-leads` ja aceita o parametro `lead_ids` no body para disparo imediato (sem filtro de score). O plano e:
+1. **Loop de paginacao**:
+```text
+let hasMore = true;
+let startCursor = undefined;
+while (hasMore) {
+  const response = await fetch(notionDbQuery, {
+    body: { page_size: 100, start_cursor: startCursor }
+  });
+  // processar resultados
+  hasMore = response.has_more;
+  startCursor = response.next_cursor;
+}
+```
 
-1. Consultar os leads distintos que tiveram erro 400 no log
-2. Chamar a funcao com esses `lead_ids` em lotes de 50 (limite da funcao)
-3. Os leads serao reenviados com o mapeamento corrigido
+2. **Extracao de campos adicionais**: Cidade, CEP, Endereco, Perfil do cliente, Motivo de cancelamento, Data de Cancelamento, Tag, URL Google Drive, Vencimento Procuracao, Apuracao B3, Telefone 1 (secundario)
 
-Para isso, sera criado um script de replay **temporario** dentro da propria funcao, acionavel via parametro `replay_erros: true` no body da requisicao. Ao receber esse parametro:
-- Busca os `id_lead` distintos da tabela `lead_webhook_log` onde `status = 'erro'` e `status_code = 400`
-- Processa em lotes de 50
-- Envia cada lead com o mapeamento corrigido
+3. **Match por telefone**: Alem do match por email, tambem buscar leads pelo numero de telefone normalizado (com +55)
 
 ### Arquivo alterado
 
-- `supabase/functions/disparar-webhook-leads/index.ts`
-  - Adicionar funcao `mapearOrigemTipo()` para converter valores do SGT para valores aceitos pelo CRM
-  - Usar essa funcao na linha 330 ao montar `dados_lead.origem_tipo`
-  - Adicionar logica de replay quando `body.replay_erros === true`
+- `supabase/functions/sincronizar-notion/index.ts`
 
-### Como executar o replay
+### Performance
 
-Apos o deploy, basta chamar a funcao uma vez:
-
-```text
-POST disparar-webhook-leads
-Body: { "replay_erros": true }
-```
-
-A funcao vai identificar automaticamente os leads com erro e reenviar todos com o payload corrigido.
+- A paginacao garante que todos os registros serao importados, independente da quantidade
+- O upsert por `id_notion` evita duplicatas
+- Match por email + telefone maximiza a vinculacao com leads existentes
