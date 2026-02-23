@@ -28,6 +28,32 @@ function parseElementorPayload(body: Record<string, string>): Record<string, str
   return parsed;
 }
 
+function parseFlatPayload(body: Record<string, any>): Record<string, string> {
+  const parsed: Record<string, string> = {};
+  const directFields = [
+    "name", "email", "phone", "cpf", "prefix", "pipeline_id", "stage_id",
+    "channel", "channel_id", "value", "utm_source", "utm_medium",
+    "utm_campaign", "utm_content", "utm_term", "fbp", "fbc", "fbclid",
+    "gclid", "gbraid", "gad_source", "title", "currency", "owner_id",
+    "person_id",
+  ];
+  for (const key of directFields) {
+    if (body[key] !== undefined && body[key] !== null && String(body[key]).trim()) {
+      parsed[key] = String(body[key]).trim();
+    }
+  }
+  // Extract fbp from custom_fields if present
+  if (!parsed.fbp && body.custom_fields) {
+    for (const val of Object.values(body.custom_fields)) {
+      if (typeof val === "string" && val.startsWith("fb.")) {
+        parsed.fbp = val;
+        break;
+      }
+    }
+  }
+  return parsed;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -45,10 +71,12 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 1. Parse payload
+    // 1. Parse payload — support both Elementor format and flat JSON
     const rawBody = await req.json();
-    const fields = parseElementorPayload(rawBody);
-    console.log("📥 lp-lead-webhook fields:", JSON.stringify(fields));
+    const elementorFields = parseElementorPayload(rawBody);
+    const isElementor = Object.keys(elementorFields).length > 0;
+    const fields = isElementor ? elementorFields : parseFlatPayload(rawBody);
+    console.log("📥 lp-lead-webhook fields:", JSON.stringify(fields), "format:", isElementor ? "elementor" : "flat");
 
     const email = fields.email || null;
     const phone = fields.phone ? normalizePhone(fields.phone) : null;
