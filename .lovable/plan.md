@@ -1,71 +1,86 @@
 
-# Buscar nomes de ofertas automaticamente da API Tokeniza
+# Webhook para receber disparos do sistema de WhatsApp Business
 
-## Diagnóstico
+## O que vai ser feito
 
-Existe um endpoint `/api/v1/projects` na API da Tokeniza que retorna a lista de projetos com seus nomes. Ele já é chamado na função `validar-integracao` para checar as credenciais, mas **nunca foi aproveitado para popular a tabela `tokeniza_projeto` automaticamente**.
+Criar uma nova edge function `whatsapp-disparo-webhook` que recebe o payload do sistema de mensageria quando uma campanha de WhatsApp e concluida. A function vai:
 
-Hoje os nomes são cadastrados manualmente no painel de Integrações, o que gerou 61 projetos sem nome (47% dos IDs com investimentos pagos).
+1. Receber o payload com `event`, `company`, `campaignName`, `contacts[]`, etc.
+2. Mapear o campo `company` (nome da empresa) para o `id_empresa` correspondente no banco
+3. Para cada contato: buscar lead por telefone -- se existir, atualizar nome; se nao existir, criar lead novo
+4. Criar um registro em `disparo_whatsapp` ja marcado como enviado
+5. Vincular todos os leads processados na tabela `disparo_whatsapp_lead`
 
-Para vendas automáticas (`tokeniza_venda`): o campo `items` chega vazio e `store_id = "TEMP"`. Isso é uma limitação da API — esses registros realmente não têm nome disponível.
+## Autenticacao
 
-## Solução
+A function vai validar um Bearer token via header `Authorization`. O secret `SGT_WEBHOOK_SECRET` (que ja existe no projeto) sera reutilizado para isso.
 
-Adicionar uma etapa no início da função `sincronizar-tokeniza` que:
+## Mapeamento de empresa
 
-1. Chama `GET /api/v1/projects` para buscar todos os projetos com nome
-2. Faz upsert na tabela `tokeniza_projeto` automaticamente
-3. Usa esse mapa atualizado durante a sincronização de investimentos
+O campo `company` do payload e um nome de empresa. A function faz um `SELECT` na tabela `empresa` com `ilike` no campo `nome` para encontrar o `id_empresa`. Se nao encontrar, retorna erro 400.
 
-Isso elimina a necessidade de cadastro manual e garante que todos os projetos tenham nome a partir da próxima sincronização.
+## Processamento de leads (em lote)
 
-## Endpoint a chamar
+Para milhares de contatos, o processamento sera feito em batches de 500:
 
+1. Normalizar todos os telefones para formato E.164 (+55...)
+2. Buscar leads existentes por telefone (batch query)
+3. Leads existentes: atualizar `nome_lead` se o nome vier no payload e o lead nao tiver nome
+4. Leads novos: inserir com `origem_tipo: WEBHOOK`, `origem_canal: WHATSAPP`, `stage_atual: WhatsApp Disparo`
+5. Coletar todos os `id_lead` (novos + existentes)
+
+## Criacao do disparo
+
+Inserir em `disparo_whatsapp`:
+- `nome`: campo `campaignName` do payload
+- `id_empresa`: mapeado pelo campo `company`
+- `qtd_leads`: total de contatos processados
+- `preset_usado`: "webhook-externo"
+- `enviado`: true
+- `data_envio`: campo `dispatchedAt` do payload
+
+## Vinculacao
+
+Inserir em `disparo_whatsapp_lead` todos os pares `id_disparo` + `id_lead` em batches de 500.
+
+## Resposta
+
+Retorna JSON com resumo: leads criados, atualizados, total, e id do disparo.
+
+---
+
+## Detalhes tecnicos
+
+### Arquivo novo
+
+`supabase/functions/whatsapp-disparo-webhook/index.ts`
+
+### Config
+
+Adicionar ao `supabase/config.toml`:
 ```
-GET https://plataforma.tokeniza.com.br/api/v1/projects
-Authorization: Bearer {TOKENIZA_API_TOKEN}
+[functions.whatsapp-disparo-webhook]
+verify_jwt = false
 ```
 
-O response provavelmente contém algo como:
-```json
-[
-  {
-    "id": "ab0cb21a-1f89-11ef-8605-06aff79fa023",
-    "title": "CRI Ápice Securitizadora",
-    "name": "CRI Ápice...",
-    ...
-  }
-]
-```
-
-Precisamos testar o response real para confirmar os campos de nome (`title`, `name`, `description`, etc.).
-
-## O que muda em `sincronizar-tokeniza/index.ts`
-
-Adicionar logo após a conexão com Supabase, antes de processar os dados:
+### Fluxo resumido
 
 ```text
-1. Chamar GET /api/v1/projects com o token
-2. Para cada projeto retornado com id e nome:
-   - Fazer upsert em tokeniza_projeto (project_id, nome)
-3. Recarregar o projetoNomeMap com os dados atualizados
-4. Continuar o fluxo normal
+POST /whatsapp-disparo-webhook
+  |
+  +-- Validar Authorization Bearer token (SGT_WEBHOOK_SECRET)
+  +-- Validar event == "campaign.dispatched"
+  +-- Mapear company name -> id_empresa
+  +-- Para cada batch de 500 contatos:
+  |     +-- Normalizar telefones
+  |     +-- Buscar leads existentes por telefone
+  |     +-- Inserir leads novos
+  |     +-- Coletar IDs
+  +-- Criar disparo_whatsapp
+  +-- Inserir disparo_whatsapp_lead (batches)
+  +-- Retornar resumo
 ```
 
-Também registrar nos logs e no `detalhes_execucao` quantos projetos foram descobertos automaticamente.
+### Nenhuma migracao de banco necessaria
 
-## Impacto
-
-| Situação | Antes | Depois |
-|---|---|---|
-| Crowdfunding com nome | 69 de 130 (53%) | Potencialmente 130 de 130 (100%) |
-| Vendas automáticas com nome | 0% | Continuará 0% (limitação da API) |
-| Cadastro manual necessário | Sim | Não (automático na sincronização) |
-
-## Arquivo alterado
-
-- `supabase/functions/sincronizar-tokeniza/index.ts` — adição de ~30 linhas no início da função principal, antes do loop de processamento
-
-## Nenhuma migração de banco necessária
-
-A tabela `tokeniza_projeto` já existe e já tem o campo `project_id` e `nome`. O upsert usará `project_id` como chave de conflito.
+As tabelas `disparo_whatsapp`, `disparo_whatsapp_lead` e `lead` ja possuem todas as colunas necessarias. O service role key contorna RLS.
