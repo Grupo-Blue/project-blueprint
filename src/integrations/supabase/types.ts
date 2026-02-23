@@ -1280,6 +1280,7 @@ export type Database = {
           enviado: boolean
           filtros_aplicados: Json | null
           id: string
+          id_campanha_externa: string | null
           id_empresa: string
           nome: string
           preset_usado: string | null
@@ -1293,6 +1294,7 @@ export type Database = {
           enviado?: boolean
           filtros_aplicados?: Json | null
           id?: string
+          id_campanha_externa?: string | null
           id_empresa: string
           nome: string
           preset_usado?: string | null
@@ -1306,6 +1308,7 @@ export type Database = {
           enviado?: boolean
           filtros_aplicados?: Json | null
           id?: string
+          id_campanha_externa?: string | null
           id_empresa?: string
           nome?: string
           preset_usado?: string | null

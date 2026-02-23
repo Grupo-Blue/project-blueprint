@@ -66,7 +66,7 @@ serve(async (req) => {
       });
     }
 
-    const { campaignName, company, contacts, dispatchedAt } = payload;
+    const { campaignId, campaignName, company, contacts, dispatchedAt } = payload;
 
     if (!company || !contacts || !Array.isArray(contacts) || contacts.length === 0) {
       return new Response(JSON.stringify({ error: "Campos obrigatórios: company, contacts[]" }), {
@@ -75,7 +75,25 @@ serve(async (req) => {
       });
     }
 
-    // 3. Map company name → id_empresa
+    // 3. Idempotency check: campaignId + dispatchedAt
+    if (campaignId && dispatchedAt) {
+      const { data: existing } = await supabase
+        .from("disparo_whatsapp")
+        .select("id")
+        .eq("id_campanha_externa", String(campaignId))
+        .eq("data_envio", dispatchedAt)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        console.log(`⚠️ Disparo duplicado detectado: campaignId=${campaignId}, dispatchedAt=${dispatchedAt}`);
+        return new Response(
+          JSON.stringify({ success: true, duplicado: true, id_disparo: existing[0].id, message: "Disparo já processado anteriormente" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // 4. Map company name → id_empresa
     const { data: empresas } = await supabase
       .from("empresa")
       .select("id_empresa, nome")
@@ -178,6 +196,7 @@ serve(async (req) => {
         preset_usado: "webhook-externo",
         enviado: true,
         data_envio: dispatchedAt || new Date().toISOString(),
+        id_campanha_externa: campaignId ? String(campaignId) : null,
       })
       .select("id_disparo")
       .single();
