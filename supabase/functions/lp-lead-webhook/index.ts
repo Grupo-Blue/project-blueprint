@@ -210,15 +210,14 @@ serve(async (req) => {
       console.log(`✅ Lead criado: ${leadId}`);
     }
 
-    // 7. Trigger SDR webhook
-    try {
-      await supabase.functions.invoke("disparar-webhook-leads", {
-        body: { id_lead: leadId },
-      });
+    // 7. Trigger SDR webhook (fire-and-forget — don't block the response)
+    supabase.functions.invoke("disparar-webhook-leads", {
+      body: { id_lead: leadId },
+    }).then(() => {
       console.log(`🔔 Webhook SDR disparado para lead ${leadId}`);
-    } catch (webhookErr) {
+    }).catch((webhookErr: unknown) => {
       console.warn("⚠️ Erro ao disparar webhook SDR:", webhookErr);
-    }
+    });
 
     return json({
       success: true,
