@@ -3494,6 +3494,7 @@ export type Database = {
           chatwoot_ultima_conversa: string | null
           cidade_mautic: string | null
           cliente_status: string | null
+          cpf: string | null
           created_at: string
           data_criacao: string
           data_levantou_mao: string | null
@@ -3502,12 +3503,16 @@ export type Database = {
           data_venda: string | null
           email: string | null
           estado_mautic: string | null
+          fbc: string | null
+          fbp: string | null
           ga4_bounce_rate: number | null
           ga4_categoria_jornada: string | null
           ga4_engajamento_score: number | null
           ga4_landing_page: string | null
           ga4_sessoes: number | null
           ga4_tempo_site_segundos: number | null
+          gbraid: string | null
+          gclid: string | null
           id_campanha_vinculada: string | null
           id_cliente_notion: string | null
           id_criativo: string | null
@@ -3548,6 +3553,7 @@ export type Database = {
           linkedin_setor: string | null
           linkedin_ultima_atualizacao: string | null
           linkedin_url: string | null
+          lp_prefix: string | null
           mautic_first_visit: string | null
           mautic_last_active: string | null
           mautic_page_hits: number | null
@@ -3630,6 +3636,7 @@ export type Database = {
           chatwoot_ultima_conversa?: string | null
           cidade_mautic?: string | null
           cliente_status?: string | null
+          cpf?: string | null
           created_at?: string
           data_criacao?: string
           data_levantou_mao?: string | null
@@ -3638,12 +3645,16 @@ export type Database = {
           data_venda?: string | null
           email?: string | null
           estado_mautic?: string | null
+          fbc?: string | null
+          fbp?: string | null
           ga4_bounce_rate?: number | null
           ga4_categoria_jornada?: string | null
           ga4_engajamento_score?: number | null
           ga4_landing_page?: string | null
           ga4_sessoes?: number | null
           ga4_tempo_site_segundos?: number | null
+          gbraid?: string | null
+          gclid?: string | null
           id_campanha_vinculada?: string | null
           id_cliente_notion?: string | null
           id_criativo?: string | null
@@ -3684,6 +3695,7 @@ export type Database = {
           linkedin_setor?: string | null
           linkedin_ultima_atualizacao?: string | null
           linkedin_url?: string | null
+          lp_prefix?: string | null
           mautic_first_visit?: string | null
           mautic_last_active?: string | null
           mautic_page_hits?: number | null
@@ -3766,6 +3778,7 @@ export type Database = {
           chatwoot_ultima_conversa?: string | null
           cidade_mautic?: string | null
           cliente_status?: string | null
+          cpf?: string | null
           created_at?: string
           data_criacao?: string
           data_levantou_mao?: string | null
@@ -3774,12 +3787,16 @@ export type Database = {
           data_venda?: string | null
           email?: string | null
           estado_mautic?: string | null
+          fbc?: string | null
+          fbp?: string | null
           ga4_bounce_rate?: number | null
           ga4_categoria_jornada?: string | null
           ga4_engajamento_score?: number | null
           ga4_landing_page?: string | null
           ga4_sessoes?: number | null
           ga4_tempo_site_segundos?: number | null
+          gbraid?: string | null
+          gclid?: string | null
           id_campanha_vinculada?: string | null
           id_cliente_notion?: string | null
           id_criativo?: string | null
@@ -3820,6 +3837,7 @@ export type Database = {
           linkedin_setor?: string | null
           linkedin_ultima_atualizacao?: string | null
           linkedin_url?: string | null
+          lp_prefix?: string | null
           mautic_first_visit?: string | null
           mautic_last_active?: string | null
           mautic_page_hits?: number | null
@@ -4372,6 +4390,32 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "pipedrive_note_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      pipeline_empresa_mapa: {
+        Row: {
+          created_at: string
+          id_empresa: string
+          pipeline_id: string
+        }
+        Insert: {
+          created_at?: string
+          id_empresa: string
+          pipeline_id: string
+        }
+        Update: {
+          created_at?: string
+          id_empresa?: string
+          pipeline_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_empresa_mapa_id_empresa_fkey"
             columns: ["id_empresa"]
             isOneToOne: false
             referencedRelation: "empresa"

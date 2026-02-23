@@ -173,3 +173,6 @@ verify_jwt = false
 
 [functions.whatsapp-disparo-webhook]
 verify_jwt = false
+
+[functions.lp-lead-webhook]
+verify_jwt = false
