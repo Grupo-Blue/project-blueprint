@@ -1,109 +1,116 @@
 
-
-# Webhook para receber leads de Landing Pages (Elementor)
+# Melhorias Completas na Integracao Stape
 
 ## Resumo
 
-Criar a edge function `lp-lead-webhook` que recebe formularios de landing pages, cria ou atualiza leads e enriquece com dados de tracking (UTMs, Facebook Pixel, Google Ads).
+Implementar 4 melhorias na integracao Stape: cross-match via FBP, inferencia automatica de empresa nos eventos, disparo automatico de Meta CAPI em vendas, e correcao das metricas agregadas no enriquecimento.
 
-## O que sera feito
+---
 
-1. **Nova edge function** `lp-lead-webhook` (publica, sem autenticacao)
-2. **Migracoes de banco** para adicionar colunas de tracking e CPF no lead
-3. **Mapeamento automatico de empresa** via `pipeline_id` (pipeline 5 = Blue, pipeline 9 = Tokeniza)
+## 1. Cross-match Stape via FBP (Facebook Browser ID)
 
-## Detalhes do processamento
+**Problema**: O `enriquecer-leads-stape` so faz match por email no `custom_data`. Muitos eventos Stape nao tem email, mas tem `fbp`. Leads que chegam pelo `lp-lead-webhook` ja salvam o `fbp` na tabela `lead`.
 
-### Parsing do payload
+**Solucao**: Adicionar uma estrategia de match por `fbp` no `enriquecer-leads-stape`:
+1. Alem de buscar eventos por email no `custom_data`, buscar eventos cujo `fbp` corresponda ao `fbp` do lead
+2. Tambem no `stape-webhook`, alem de buscar lead por email/telefone e por `client_id`, adicionar busca por `fbp`
 
-O payload vem no formato `fields[campo][value]`, sera parseado para extrair:
-- Dados pessoais: `name`, `email`, `phone`, `cpf`
-- Dados comerciais: `prefix`, `pipeline_id`, `stage_id`, `channel`, `value`
-- UTMs: `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`
-- Tracking: `fbp`, `fbc`, `fbclid`, `gclid`, `gbraid`, `gad_source`
+**Arquivos alterados**:
+- `supabase/functions/enriquecer-leads-stape/index.ts` - Adicionar match por `fbp`
+- `supabase/functions/stape-webhook/index.ts` - Adicionar busca de lead por `fbp`
 
-### Mapeamento de empresa
-
-Usar o `pipeline_id` para identificar a empresa:
-- Consultar leads existentes que tem aquele `pipeline_id` e pegar o `id_empresa`
-- Manter uma tabela de fallback (pipeline_id 5 = Blue, 9 = Tokeniza)
-- Se nao encontrar, retornar erro 400
-
-### Logica de lead (upsert)
-
-1. Buscar lead por email ou telefone (nessa ordem) na empresa mapeada
-2. Se existir: atualizar campos vazios (nome, UTMs, tracking, CPF, prefix)
-3. Se nao existir: criar lead novo com:
-   - `origem_tipo`: PAGO
-   - `origem_canal`: OUTRO (sera ajustado conforme UTM se disponivel)
-   - `stage_atual`: valor do `prefix` (ex: "LP-Prejuizo-Cripto")
-   - `pipeline_id`: do payload
-   - `valor_venda`: campo `value` do payload
-
-### Enriquecimento
-
-Todos os campos de tracking serao salvos no lead:
-- UTMs nas colunas existentes (`utm_source`, `utm_medium`, etc.)
-- `fbp`, `fbc`, `gclid`, `gbraid` em novas colunas dedicadas
-- `cpf` em nova coluna
-
-### Webhook SDR
-
-Apos criar/atualizar, disparar `disparar-webhook-leads` para notificar o CRM (igual ao fluxo do Mautic webhook).
-
-## Migracoes de banco
-
-Adicionar colunas na tabela `lead`:
-- `cpf` (text, nullable)
-- `fbp` (text, nullable) - Facebook Browser ID do formulario
-- `fbc` (text, nullable) - Facebook Click ID
-- `gclid` (text, nullable) - Google Click ID
-- `gbraid` (text, nullable) - Google Broad Match ID
-- `lp_prefix` (text, nullable) - Identificador da LP/oferta
-
-Criar tabela `pipeline_empresa_mapa` para mapeamento fixo:
-- `pipeline_id` (text, PK)
-- `id_empresa` (uuid, FK para empresa)
-
-Inserir mapeamentos iniciais (pipeline 5 = Blue, 9 = Tokeniza).
-
-## Detalhes tecnicos
-
-### Arquivo novo
-
-`supabase/functions/lp-lead-webhook/index.ts`
-
-### Config
-
-Adicionar ao `supabase/config.toml`:
+**Migracao**: Criar indice na coluna `fbp` da tabela `stape_evento` para performance:
 ```text
-[functions.lp-lead-webhook]
+CREATE INDEX IF NOT EXISTS idx_stape_evento_fbp ON public.stape_evento(fbp);
+CREATE INDEX IF NOT EXISTS idx_lead_fbp ON public.lead(fbp);
+```
+
+---
+
+## 2. Inferir empresa nos eventos Stape
+
+**Problema**: Eventos chegam com `id_empresa = NULL` no `stape-webhook` quando o GTM Server nao envia esse campo.
+
+**Solucao**: Quando `id_empresa` nao vier no payload, inferir pela `stape_container_url` cadastrada na `empresa_stape_config`:
+1. Extrair o dominio do `page_location` do evento
+2. Comparar com os dominios das `stape_container_url` cadastradas
+3. Fallback: usar mapeamento hardcoded dos dominios conhecidos (Blue = blueconsult.com.br, Tokeniza = tokeniza.com.br)
+
+**Arquivo alterado**:
+- `supabase/functions/stape-webhook/index.ts` - Adicionar logica de inferencia de empresa
+
+---
+
+## 3. Auto-disparar Meta CAPI em vendas
+
+**Problema**: O `stape-meta-capi` existe mas nunca e chamado automaticamente. Quando um lead tem venda confirmada (`venda_realizada = true`), deveriamos enviar um evento `Purchase` para o Meta.
+
+**Solucao**: Criar uma nova Edge Function `disparar-meta-capi-venda` que:
+1. Busca leads com `venda_realizada = true` que ainda nao tiveram o evento CAPI enviado (nova coluna `meta_capi_purchase_enviado`)
+2. Para cada lead com `fbp` ou `fbc` ou email, monta o payload e chama o `stape-meta-capi`
+3. Marca o lead como enviado
+
+Tambem integrar no `pipedrive-webhook`: quando um deal e marcado como won, disparar o CAPI de forma fire-and-forget.
+
+**Arquivos**:
+- Nova Edge Function: `supabase/functions/disparar-meta-capi-venda/index.ts`
+- `supabase/functions/pipedrive-webhook/index.ts` - Adicionar disparo fire-and-forget quando `venda_realizada = true`
+
+**Migracao**:
+```text
+ALTER TABLE public.lead ADD COLUMN IF NOT EXISTS meta_capi_purchase_enviado BOOLEAN DEFAULT false;
+ALTER TABLE public.lead ADD COLUMN IF NOT EXISTS meta_capi_purchase_at TIMESTAMPTZ;
+```
+
+**Config**:
+```text
+[functions.disparar-meta-capi-venda]
 verify_jwt = false
 ```
 
-### Fluxo resumido
+---
+
+## 4. Corrigir metricas agregadas no enriquecimento
+
+**Problema**: O calculo de `stape_tempo_total_segundos` esta invertido (usa `firstEvent` e `lastEvent` da array filtrada por email, nao da array completa por `client_id`).
+
+**Solucao**: Corrigir a logica para usar `todosEventos[0]` como primeiro e `todosEventos[todosEventos.length - 1]` como ultimo (ja que a query ordena por `ascending: true`). Tambem atualizar a busca de leads na fase 2 para recalcular metricas mesmo quando `stape_tempo_total_segundos` ja tem valor (atualizar periodicamente).
+
+**Arquivo alterado**:
+- `supabase/functions/enriquecer-leads-stape/index.ts` - Corrigir calculo de timestamps
+
+---
+
+## Resumo tecnico de alteracoes
+
+| Arquivo | Acao |
+|---|---|
+| `supabase/functions/stape-webhook/index.ts` | Adicionar inferencia de empresa + match por FBP |
+| `supabase/functions/enriquecer-leads-stape/index.ts` | Adicionar match FBP + corrigir metricas |
+| `supabase/functions/disparar-meta-capi-venda/index.ts` | Novo - disparo automatico Purchase |
+| `supabase/functions/pipedrive-webhook/index.ts` | Adicionar trigger CAPI em venda |
+| `supabase/config.toml` | Adicionar config da nova funcao |
+| Migracao SQL | Indices FBP + coluna `meta_capi_purchase_enviado` |
+
+## Fluxo apos melhorias
 
 ```text
-POST /lp-lead-webhook
+Evento Stape chega
   |
-  +-- Parsear fields[...][value] do body
-  +-- Validar email ou phone presente
-  +-- Mapear pipeline_id -> id_empresa (via pipeline_empresa_mapa)
-  +-- Buscar lead existente por email/telefone
-  +-- Criar ou atualizar lead com todos os dados
-  +-- Disparar webhook SDR (se lead novo ou relevante)
-  +-- Retornar { success, lead_id, is_novo }
-```
+  +-- Inferir id_empresa pelo dominio (se nao veio no payload)
+  +-- Inserir evento
+  +-- Match lead por: email/telefone -> client_id -> FBP (novo!)
+  +-- Atualizar lead com dados Stape
 
-### Seguranca
+Lead chega pelo LP webhook
+  |
+  +-- Salvar com fbp, fbc, gclid
+  +-- Enriquecer-leads-stape depois faz cross-match via FBP
 
-O endpoint e publico (sem auth) pois recebe submissions de formularios web. Para mitigar abuso:
-- Validacao de campos obrigatorios (email ou telefone)
-- Nenhuma operacao destrutiva (apenas insert/update)
-- Service role key usado internamente para contornar RLS
-
-### Resposta
-
-```text
-{ success: true, lead_id: "uuid", is_novo: true/false, empresa: "Blue" }
+Venda confirmada no Pipedrive
+  |
+  +-- pipedrive-webhook atualiza venda_realizada = true
+  +-- Fire-and-forget: disparar-meta-capi-venda
+  +-- Envia Purchase event para Meta CAPI com fbp/fbc/email
+  +-- Marca meta_capi_purchase_enviado = true
 ```
