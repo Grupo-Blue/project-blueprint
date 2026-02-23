@@ -3564,6 +3564,8 @@ export type Database = {
           merged_at: string | null
           merged_by: string | null
           merged_into_lead_id: string | null
+          meta_capi_purchase_at: string | null
+          meta_capi_purchase_enviado: boolean | null
           metricool_conversao_valor: number | null
           metricool_cpc_campanha: number | null
           metricool_ctr_campanha: number | null
@@ -3706,6 +3708,8 @@ export type Database = {
           merged_at?: string | null
           merged_by?: string | null
           merged_into_lead_id?: string | null
+          meta_capi_purchase_at?: string | null
+          meta_capi_purchase_enviado?: boolean | null
           metricool_conversao_valor?: number | null
           metricool_cpc_campanha?: number | null
           metricool_ctr_campanha?: number | null
@@ -3848,6 +3852,8 @@ export type Database = {
           merged_at?: string | null
           merged_by?: string | null
           merged_into_lead_id?: string | null
+          meta_capi_purchase_at?: string | null
+          meta_capi_purchase_enviado?: boolean | null
           metricool_conversao_valor?: number | null
           metricool_cpc_campanha?: number | null
           metricool_ctr_campanha?: number | null

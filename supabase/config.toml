@@ -176,3 +176,6 @@ verify_jwt = false
 
 [functions.lp-lead-webhook]
 verify_jwt = false
+
+[functions.disparar-meta-capi-venda]
+verify_jwt = false
