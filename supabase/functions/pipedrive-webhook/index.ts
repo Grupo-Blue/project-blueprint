@@ -655,6 +655,15 @@ Deno.serve(async (req) => {
           data_evento: leadData.data_venda || agora,
           observacao: `Venda realizada - ${valorDeal ? `R$ ${valorDeal.toFixed(2)}` : 'valor não informado'}`
         });
+
+        // NOVO: Disparar Meta CAPI Purchase (fire-and-forget)
+        supabase.functions.invoke("disparar-meta-capi-venda", {
+          body: { id_lead: upsertedLead.id_lead },
+        }).then((res: any) => {
+          console.log(`[CAPI] Purchase disparado para lead ${upsertedLead.id_lead}:`, res.data);
+        }).catch((err: any) => {
+          console.warn(`[CAPI] Erro ao disparar Purchase para lead ${upsertedLead.id_lead}:`, err);
+        });
       }
 
       // Inserir eventos em lote
