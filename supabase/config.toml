@@ -170,3 +170,6 @@ verify_jwt = false
 
 [functions.listar-clientes-api]
 verify_jwt = false
+
+[functions.whatsapp-disparo-webhook]
+verify_jwt = false
