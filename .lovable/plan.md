@@ -1,86 +1,109 @@
 
-# Webhook para receber disparos do sistema de WhatsApp Business
 
-## O que vai ser feito
+# Webhook para receber leads de Landing Pages (Elementor)
 
-Criar uma nova edge function `whatsapp-disparo-webhook` que recebe o payload do sistema de mensageria quando uma campanha de WhatsApp e concluida. A function vai:
+## Resumo
 
-1. Receber o payload com `event`, `company`, `campaignName`, `contacts[]`, etc.
-2. Mapear o campo `company` (nome da empresa) para o `id_empresa` correspondente no banco
-3. Para cada contato: buscar lead por telefone -- se existir, atualizar nome; se nao existir, criar lead novo
-4. Criar um registro em `disparo_whatsapp` ja marcado como enviado
-5. Vincular todos os leads processados na tabela `disparo_whatsapp_lead`
+Criar a edge function `lp-lead-webhook` que recebe formularios de landing pages, cria ou atualiza leads e enriquece com dados de tracking (UTMs, Facebook Pixel, Google Ads).
 
-## Autenticacao
+## O que sera feito
 
-A function vai validar um Bearer token via header `Authorization`. O secret `SGT_WEBHOOK_SECRET` (que ja existe no projeto) sera reutilizado para isso.
+1. **Nova edge function** `lp-lead-webhook` (publica, sem autenticacao)
+2. **Migracoes de banco** para adicionar colunas de tracking e CPF no lead
+3. **Mapeamento automatico de empresa** via `pipeline_id` (pipeline 5 = Blue, pipeline 9 = Tokeniza)
 
-## Mapeamento de empresa
+## Detalhes do processamento
 
-O campo `company` do payload e um nome de empresa. A function faz um `SELECT` na tabela `empresa` com `ilike` no campo `nome` para encontrar o `id_empresa`. Se nao encontrar, retorna erro 400.
+### Parsing do payload
 
-## Processamento de leads (em lote)
+O payload vem no formato `fields[campo][value]`, sera parseado para extrair:
+- Dados pessoais: `name`, `email`, `phone`, `cpf`
+- Dados comerciais: `prefix`, `pipeline_id`, `stage_id`, `channel`, `value`
+- UTMs: `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`
+- Tracking: `fbp`, `fbc`, `fbclid`, `gclid`, `gbraid`, `gad_source`
 
-Para milhares de contatos, o processamento sera feito em batches de 500:
+### Mapeamento de empresa
 
-1. Normalizar todos os telefones para formato E.164 (+55...)
-2. Buscar leads existentes por telefone (batch query)
-3. Leads existentes: atualizar `nome_lead` se o nome vier no payload e o lead nao tiver nome
-4. Leads novos: inserir com `origem_tipo: WEBHOOK`, `origem_canal: WHATSAPP`, `stage_atual: WhatsApp Disparo`
-5. Coletar todos os `id_lead` (novos + existentes)
+Usar o `pipeline_id` para identificar a empresa:
+- Consultar leads existentes que tem aquele `pipeline_id` e pegar o `id_empresa`
+- Manter uma tabela de fallback (pipeline_id 5 = Blue, 9 = Tokeniza)
+- Se nao encontrar, retornar erro 400
 
-## Criacao do disparo
+### Logica de lead (upsert)
 
-Inserir em `disparo_whatsapp`:
-- `nome`: campo `campaignName` do payload
-- `id_empresa`: mapeado pelo campo `company`
-- `qtd_leads`: total de contatos processados
-- `preset_usado`: "webhook-externo"
-- `enviado`: true
-- `data_envio`: campo `dispatchedAt` do payload
+1. Buscar lead por email ou telefone (nessa ordem) na empresa mapeada
+2. Se existir: atualizar campos vazios (nome, UTMs, tracking, CPF, prefix)
+3. Se nao existir: criar lead novo com:
+   - `origem_tipo`: PAGO
+   - `origem_canal`: OUTRO (sera ajustado conforme UTM se disponivel)
+   - `stage_atual`: valor do `prefix` (ex: "LP-Prejuizo-Cripto")
+   - `pipeline_id`: do payload
+   - `valor_venda`: campo `value` do payload
 
-## Vinculacao
+### Enriquecimento
 
-Inserir em `disparo_whatsapp_lead` todos os pares `id_disparo` + `id_lead` em batches de 500.
+Todos os campos de tracking serao salvos no lead:
+- UTMs nas colunas existentes (`utm_source`, `utm_medium`, etc.)
+- `fbp`, `fbc`, `gclid`, `gbraid` em novas colunas dedicadas
+- `cpf` em nova coluna
 
-## Resposta
+### Webhook SDR
 
-Retorna JSON com resumo: leads criados, atualizados, total, e id do disparo.
+Apos criar/atualizar, disparar `disparar-webhook-leads` para notificar o CRM (igual ao fluxo do Mautic webhook).
 
----
+## Migracoes de banco
+
+Adicionar colunas na tabela `lead`:
+- `cpf` (text, nullable)
+- `fbp` (text, nullable) - Facebook Browser ID do formulario
+- `fbc` (text, nullable) - Facebook Click ID
+- `gclid` (text, nullable) - Google Click ID
+- `gbraid` (text, nullable) - Google Broad Match ID
+- `lp_prefix` (text, nullable) - Identificador da LP/oferta
+
+Criar tabela `pipeline_empresa_mapa` para mapeamento fixo:
+- `pipeline_id` (text, PK)
+- `id_empresa` (uuid, FK para empresa)
+
+Inserir mapeamentos iniciais (pipeline 5 = Blue, 9 = Tokeniza).
 
 ## Detalhes tecnicos
 
 ### Arquivo novo
 
-`supabase/functions/whatsapp-disparo-webhook/index.ts`
+`supabase/functions/lp-lead-webhook/index.ts`
 
 ### Config
 
 Adicionar ao `supabase/config.toml`:
-```
-[functions.whatsapp-disparo-webhook]
+```text
+[functions.lp-lead-webhook]
 verify_jwt = false
 ```
 
 ### Fluxo resumido
 
 ```text
-POST /whatsapp-disparo-webhook
+POST /lp-lead-webhook
   |
-  +-- Validar Authorization Bearer token (SGT_WEBHOOK_SECRET)
-  +-- Validar event == "campaign.dispatched"
-  +-- Mapear company name -> id_empresa
-  +-- Para cada batch de 500 contatos:
-  |     +-- Normalizar telefones
-  |     +-- Buscar leads existentes por telefone
-  |     +-- Inserir leads novos
-  |     +-- Coletar IDs
-  +-- Criar disparo_whatsapp
-  +-- Inserir disparo_whatsapp_lead (batches)
-  +-- Retornar resumo
+  +-- Parsear fields[...][value] do body
+  +-- Validar email ou phone presente
+  +-- Mapear pipeline_id -> id_empresa (via pipeline_empresa_mapa)
+  +-- Buscar lead existente por email/telefone
+  +-- Criar ou atualizar lead com todos os dados
+  +-- Disparar webhook SDR (se lead novo ou relevante)
+  +-- Retornar { success, lead_id, is_novo }
 ```
 
-### Nenhuma migracao de banco necessaria
+### Seguranca
 
-As tabelas `disparo_whatsapp`, `disparo_whatsapp_lead` e `lead` ja possuem todas as colunas necessarias. O service role key contorna RLS.
+O endpoint e publico (sem auth) pois recebe submissions de formularios web. Para mitigar abuso:
+- Validacao de campos obrigatorios (email ou telefone)
+- Nenhuma operacao destrutiva (apenas insert/update)
+- Service role key usado internamente para contornar RLS
+
+### Resposta
+
+```text
+{ success: true, lead_id: "uuid", is_novo: true/false, empresa: "Blue" }
+```
