@@ -46,6 +46,8 @@ type StatusAcao = "PENDENTE" | "APROVADA" | "REPROVADA" | "EXECUTADA";
 
 interface Acao {
   id_acao: string;
+  id_usuario: string;
+  id_empresa: string;
   categoria: CategoriaAcao;
   tipo_acao: string;
   descricao: string;
@@ -85,6 +87,7 @@ const Acoes = () => {
   const [filtroCategoria, setFiltroCategoria] = useState<string>("TODAS");
   const [filtroStatus, setFiltroStatus] = useState<string>("TODOS");
   const [profile, setProfile] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -96,6 +99,17 @@ const Acoes = () => {
   const [demandaSelecionada, setDemandaSelecionada] = useState<DemandaCampanha | null>(null);
   const [dadosPrePreenchidos, setDadosPrePreenchidos] = useState<Partial<DemandaCampanha> | null>(null);
   const [detalheOpen, setDetalheOpen] = useState(false);
+
+  // Edit state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingAcao, setEditingAcao] = useState<Acao | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    categoria: "A" as CategoriaAcao,
+    tipo_acao: "",
+    descricao: "",
+    impacto_esperado: "",
+  });
+  const [saving, setSaving] = useState(false);
 
   // Form state for Ações
   const [formData, setFormData] = useState({
@@ -128,6 +142,8 @@ const Acoes = () => {
       navigate("/auth");
       return;
     }
+
+    setCurrentUserId(session.user.id);
 
     // Fetch profile to check role
     const { data: profileData } = await supabase
@@ -383,6 +399,48 @@ const Acoes = () => {
     C: ["Escalar campanha (>30%)", "Pausar campanha principal", "Trocar objetivo da campanha", "Alterar ICP estratégico", "Campanha sobre tema sensível", "Mudança de estratégia completa", "Investimento acima do orçamento", "Outro (Categoria C)"],
   };
 
+  const editTiposAcaoFiltrados = tiposAcaoPorCategoria[editFormData.categoria] || [];
+
+  const handleEditClick = (acao: Acao) => {
+    setEditingAcao(acao);
+    setEditFormData({
+      categoria: acao.categoria,
+      tipo_acao: acao.tipo_acao,
+      descricao: acao.descricao,
+      impacto_esperado: acao.impacto_esperado || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAcao) return;
+    setSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from("acao")
+        .update({
+          categoria: editFormData.categoria,
+          tipo_acao: editFormData.tipo_acao,
+          descricao: editFormData.descricao,
+          impacto_esperado: editFormData.impacto_esperado,
+        })
+        .eq("id_acao", editingAcao.id_acao);
+
+      if (error) throw error;
+
+      toast({ title: "Ação atualizada com sucesso!" });
+      setEditDialogOpen(false);
+      setEditingAcao(null);
+      fetchAcoes();
+    } catch (error: any) {
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const tiposAcaoFiltrados = tiposAcaoPorCategoria[formData.categoria] || [];
 
   const handleSugestaoSelecionada = (sugestao: Partial<DemandaCampanha>) => {
@@ -603,11 +661,22 @@ const Acoes = () => {
                           {getStatusLabel(acao.status)}
                         </Badge>
                       </div>
-                      <div className="text-right text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           {format(new Date(acao.data_criacao), "dd/MM/yyyy", { locale: ptBR })}
                         </div>
+                        {currentUserId === acao.id_usuario && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditClick(acao)}
+                            className="h-7 px-2"
+                          >
+                            <FileEdit className="h-3.5 w-3.5 mr-1" />
+                            Editar
+                          </Button>
+                        )}
                       </div>
                     </div>
 
@@ -814,6 +883,57 @@ const Acoes = () => {
         onOpenChange={setDetalheOpen}
         onUpdate={() => queryClient.invalidateQueries({ queryKey: ["demandas-campanha"] })}
       />
+
+      {/* Dialog de Edição de Ação */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Ação</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Categoria *</Label>
+              <Select value={editFormData.categoria} onValueChange={(value: CategoriaAcao) => setEditFormData({ ...editFormData, categoria: value, tipo_acao: "" })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">Categoria A (Execução livre)</SelectItem>
+                  <SelectItem value="B">Categoria B (Comunicar)</SelectItem>
+                  <SelectItem value="C">Categoria C (Aprovação obrigatória)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de Ação *</Label>
+              <Select value={editFormData.tipo_acao} onValueChange={(value) => setEditFormData({ ...editFormData, tipo_acao: value })}>
+                <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
+                <SelectContent>
+                  {editTiposAcaoFiltrados.map((tipo) => (
+                    <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Descrição / Motivo *</Label>
+              <Textarea value={editFormData.descricao} onChange={(e) => setEditFormData({ ...editFormData, descricao: e.target.value })} required rows={4} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Impacto Esperado</Label>
+              <Textarea value={editFormData.impacto_esperado} onChange={(e) => setEditFormData({ ...editFormData, impacto_esperado: e.target.value })} rows={3} />
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Salvando..." : "Salvar Alterações"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
