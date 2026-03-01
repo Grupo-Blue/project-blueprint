@@ -31,11 +31,13 @@ import {
   Image,
   ClipboardList,
   ListChecks,
-  FileEdit
+  FileEdit,
+  Trash2
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { SugestoesIA } from "@/components/SugestoesIA";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import FormularioDemandaCampanha from "@/components/demandas/FormularioDemandaCampanha";
 import SugestoesIACampanhas from "@/components/demandas/SugestoesIACampanhas";
 import DetalheDemanda from "@/components/demandas/DetalheDemanda";
@@ -110,6 +112,9 @@ const Acoes = () => {
     impacto_esperado: "",
   });
   const [saving, setSaving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingAcao, setDeletingAcao] = useState<Acao | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Form state for Ações
   const [formData, setFormData] = useState({
@@ -441,6 +446,35 @@ const Acoes = () => {
     }
   };
 
+  const handleDeleteClick = (acao: Acao) => {
+    setDeletingAcao(acao);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingAcao) return;
+    setDeleting(true);
+    try {
+      // Delete related approval records first
+      await supabase.from("acao_aprovacao").delete().eq("id_acao", deletingAcao.id_acao);
+      await supabase.from("acao_campanha").delete().eq("id_acao", deletingAcao.id_acao);
+      
+      const { error } = await supabase.from("acao").delete().eq("id_acao", deletingAcao.id_acao);
+      if (error) throw error;
+
+      toast({ title: "Ação excluída com sucesso!" });
+      setDeleteDialogOpen(false);
+      setDeletingAcao(null);
+      fetchAcoes();
+    } catch (error: any) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const canEditAcao = (acao: Acao) => currentUserId === acao.id_usuario || isAdminUser;
+
   const tiposAcaoFiltrados = tiposAcaoPorCategoria[formData.categoria] || [];
 
   const handleSugestaoSelecionada = (sugestao: Partial<DemandaCampanha>) => {
@@ -666,16 +700,28 @@ const Acoes = () => {
                           <Calendar className="h-3 w-3" />
                           {format(new Date(acao.data_criacao), "dd/MM/yyyy", { locale: ptBR })}
                         </div>
-                        {currentUserId === acao.id_usuario && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditClick(acao)}
-                            className="h-7 px-2"
-                          >
-                            <FileEdit className="h-3.5 w-3.5 mr-1" />
-                            Editar
-                          </Button>
+                        {canEditAcao(acao) && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditClick(acao)}
+                              className="h-7 px-2"
+                            >
+                              <FileEdit className="h-3.5 w-3.5 mr-1" />
+                              Editar
+                            </Button>
+                            {isAdminUser && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteClick(acao)}
+                                className="h-7 px-2 text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -934,6 +980,24 @@ const Acoes = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Ação</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a ação "{deletingAcao?.tipo_acao}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
