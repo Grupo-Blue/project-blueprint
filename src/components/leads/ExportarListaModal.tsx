@@ -237,7 +237,7 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
 
     try {
       // 1. Criar o registro do disparo
-      const { data: user } = await supabase.auth.getUser();
+      const { data: sessionData } = await supabase.auth.getSession();
       const { data: disparo, error: errDisparo } = await supabase
         .from("disparo_whatsapp")
         .insert({
@@ -252,7 +252,7 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
             mesesNegociacao: preset === "negociacao_sem_compra" ? mesesNegociacao : null,
           },
           qtd_leads: leadsFiltrados.length,
-          created_by: user?.user?.id || null,
+          created_by: sessionData?.session?.user?.id || null,
         } as any)
         .select("id")
         .single();
