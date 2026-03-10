@@ -82,9 +82,9 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
     enabled: open && (excluirTodosDisparos || disparoExcluirId !== "none"),
   });
 
-  // Server-side fetch for "perdidos" preset (bypasses 1000-row page limit)
-  const { data: leadsPerdidosServer, isLoading: loadingPerdidos } = useQuery({
-    queryKey: ["leads-perdidos-server", empresaSelecionada],
+  // Server-side fetch: busca TODA a base de leads (paginada, sem limite de 1000)
+  const { data: leadsServerFull, isLoading: loadingLeadsServer } = useQuery({
+    queryKey: ["leads-exportacao-full", empresaSelecionada],
     queryFn: async () => {
       const allLeads: any[] = [];
       const pageSize = 1000;
@@ -95,9 +95,8 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
         let query = supabase
           .from("lead")
           .select("*, empresa:id_empresa(nome), cliente_notion:id_cliente_notion(nome, status_cliente, produtos_contratados, anos_fiscais)")
-          .eq("stage_atual", "Perdido")
-          .not("telefone", "is", null)
           .or("merged.is.null,merged.eq.false")
+          .not("nome_lead", "like", "%(cópia)%")
           .order("data_criacao", { ascending: false })
           .range(offset, offset + pageSize - 1);
 
@@ -115,35 +114,12 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
 
       return allLeads;
     },
-    enabled: open && preset === "perdidos",
+    enabled: open,
   });
 
   // Filtrar leads com base no preset
   const leadsFiltrados = useMemo(() => {
-    // For "perdidos", use server-side data
-    if (preset === "perdidos") {
-      let filtered = leadsPerdidosServer || [];
-
-      // Excluir leads que já receberam disparos
-      if (leadsComDisparo && leadsComDisparo.size > 0) {
-        filtered = filtered.filter(l => !leadsComDisparo.has(l.id_lead));
-      }
-
-      // Exigir telefone válido
-      if (exigirTelefone) {
-        filtered = filtered.filter(l => {
-          const tel = (l.telefone || "").replace(/\D/g, "");
-          return tel.length >= 10;
-        });
-      }
-
-      return filtered;
-    }
-
-    let filtered = leads.filter(l => {
-      if (empresaSelecionada && empresaSelecionada !== "todas" && l.id_empresa !== empresaSelecionada) return false;
-      return true;
-    });
+    let filtered = leadsServerFull || [];
 
     const stagesNegociacao = ["Negociação", "Aguardando pagamento", "Proposta", "Reunião agendada"];
 
@@ -180,6 +156,9 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
       case "carrinho_abandonado":
         filtered = filtered.filter(l => l.tokeniza_carrinho_abandonado && !l.tokeniza_investidor);
         break;
+      case "perdidos":
+        filtered = filtered.filter(l => l.stage_atual === "Perdido");
+        break;
     }
 
     // Excluir leads que já receberam disparos
@@ -196,7 +175,7 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
     }
 
     return filtered;
-  }, [leads, preset, empresaSelecionada, mesesNegociacao, leadsComDisparo, exigirTelefone, leadsPerdidosServer]);
+  }, [leadsServerFull, preset, empresaSelecionada, mesesNegociacao, leadsComDisparo, exigirTelefone]);
 
   const limparNomeLead = (nome: string | null): string => {
     if (!nome) return "";
