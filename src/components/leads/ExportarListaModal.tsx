@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Download, Users, Filter, Flame, Zap, Activity, Snowflake, ShoppingCart, UserX, Target, ListFilter } from "lucide-react";
+import { Download, Users, Filter, Flame, Zap, Activity, Snowflake, ShoppingCart, UserX, Target, ListFilter, Loader2 } from "lucide-react";
 import { calcularScoreTemperatura, getPrioridade } from "@/lib/lead-scoring";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { format, subMonths, parseISO } from "date-fns";
