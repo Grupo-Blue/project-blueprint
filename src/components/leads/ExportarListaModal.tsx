@@ -26,6 +26,7 @@ const PRESETS: { value: Preset; label: string; icon: React.ReactNode; descriptio
   { value: "mornos", label: "Leads mornos", icon: <Activity className="h-4 w-4 text-yellow-500" />, description: "Score entre 30 e 69" },
   { value: "frios", label: "Leads frios", icon: <Snowflake className="h-4 w-4 text-blue-400" />, description: "Score < 30" },
   { value: "carrinho_abandonado", label: "Carrinho abandonado", icon: <ShoppingCart className="h-4 w-4 text-orange-500" />, description: "Carrinho abandonado e não investidor" },
+  { value: "perdidos", label: "Perdidos com telefone", icon: <UserX className="h-4 w-4 text-red-500" />, description: "Leads perdidos que possuem telefone" },
 ];
 
 interface ExportarListaModalProps {
