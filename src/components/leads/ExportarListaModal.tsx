@@ -237,7 +237,7 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
 
     try {
       // 1. Criar o registro do disparo
-      const { data: user } = await supabase.auth.getUser();
+      const { data: sessionData } = await supabase.auth.getSession();
       const { data: disparo, error: errDisparo } = await supabase
         .from("disparo_whatsapp")
         .insert({
