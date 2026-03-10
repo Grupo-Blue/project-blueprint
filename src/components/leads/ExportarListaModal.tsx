@@ -124,6 +124,9 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
       case "carrinho_abandonado":
         filtered = filtered.filter(l => l.tokeniza_carrinho_abandonado && !l.tokeniza_investidor);
         break;
+      case "perdidos":
+        filtered = filtered.filter(l => l.stage_atual === "Perdido");
+        break;
     }
 
     // Excluir leads que já receberam disparos
