@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Download, Users, Filter, Flame, Zap, Activity, Snowflake, ShoppingCart, UserX, Target, ListFilter } from "lucide-react";
+import { Download, Users, Filter, Flame, Zap, Activity, Snowflake, ShoppingCart, UserX, Target, ListFilter, Loader2 } from "lucide-react";
 import { calcularScoreTemperatura, getPrioridade } from "@/lib/lead-scoring";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { format, subMonths, parseISO } from "date-fns";
@@ -82,8 +82,64 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
     enabled: open && (excluirTodosDisparos || disparoExcluirId !== "none"),
   });
 
+  // Server-side fetch for "perdidos" preset (bypasses 1000-row page limit)
+  const { data: leadsPerdidosServer, isLoading: loadingPerdidos } = useQuery({
+    queryKey: ["leads-perdidos-server", empresaSelecionada],
+    queryFn: async () => {
+      const allLeads: any[] = [];
+      const pageSize = 1000;
+      let offset = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        let query = supabase
+          .from("lead")
+          .select("*, empresa:id_empresa(nome), cliente_notion:id_cliente_notion(nome, status_cliente, produtos_contratados, anos_fiscais)")
+          .eq("stage_atual", "Perdido")
+          .not("telefone", "is", null)
+          .or("merged.is.null,merged.eq.false")
+          .order("data_criacao", { ascending: false })
+          .range(offset, offset + pageSize - 1);
+
+        if (empresaSelecionada && empresaSelecionada !== "todas") {
+          query = query.eq("id_empresa", empresaSelecionada);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        
+        allLeads.push(...(data || []));
+        hasMore = (data?.length || 0) === pageSize;
+        offset += pageSize;
+      }
+
+      return allLeads;
+    },
+    enabled: open && preset === "perdidos",
+  });
+
   // Filtrar leads com base no preset
   const leadsFiltrados = useMemo(() => {
+    // For "perdidos", use server-side data
+    if (preset === "perdidos") {
+      let filtered = leadsPerdidosServer || [];
+
+      // Excluir leads que já receberam disparos
+      if (leadsComDisparo && leadsComDisparo.size > 0) {
+        filtered = filtered.filter(l => !leadsComDisparo.has(l.id_lead));
+      }
+
+      // Exigir telefone válido
+      if (exigirTelefone) {
+        filtered = filtered.filter(l => {
+          const tel = (l.telefone || "").replace(/\D/g, "");
+          return tel.length >= 10;
+        });
+      }
+
+      return filtered;
+    }
+
     let filtered = leads.filter(l => {
       if (empresaSelecionada && empresaSelecionada !== "todas" && l.id_empresa !== empresaSelecionada) return false;
       return true;
@@ -124,9 +180,6 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
       case "carrinho_abandonado":
         filtered = filtered.filter(l => l.tokeniza_carrinho_abandonado && !l.tokeniza_investidor);
         break;
-      case "perdidos":
-        filtered = filtered.filter(l => l.stage_atual === "Perdido");
-        break;
     }
 
     // Excluir leads que já receberam disparos
@@ -143,7 +196,7 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
     }
 
     return filtered;
-  }, [leads, preset, empresaSelecionada, mesesNegociacao, leadsComDisparo, exigirTelefone]);
+  }, [leads, preset, empresaSelecionada, mesesNegociacao, leadsComDisparo, exigirTelefone, leadsPerdidosServer]);
 
   const limparNomeLead = (nome: string | null): string => {
     if (!nome) return "";
@@ -356,7 +409,11 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium">Preview da lista</span>
               <Badge variant="secondary" className="text-lg px-3">
-                {leadsFiltrados.length} leads
+                {preset === "perdidos" && loadingPerdidos ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  `${leadsFiltrados.length} leads`
+                )}
               </Badge>
             </div>
             {leadsFiltrados.length > 0 && (

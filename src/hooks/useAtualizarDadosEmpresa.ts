@@ -27,7 +27,7 @@ export function useAtualizarDadosEmpresa() {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const execucaoIdRef = useRef<string | null>(null);
 
   const resetState = useCallback(() => {

@@ -48,7 +48,7 @@ export default function AnaliseCompetitiva() {
   // Async polling state
   const [pendingRuns, setPendingRuns] = useState<RunInfo[]>([]);
   const [coletaStatus, setColetaStatus] = useState<string | null>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isColetando = pendingRuns.length > 0;
 
