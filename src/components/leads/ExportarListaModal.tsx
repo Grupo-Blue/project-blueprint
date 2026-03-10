@@ -82,9 +82,23 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
     enabled: open && (excluirTodosDisparos || disparoExcluirId !== "none"),
   });
 
-  // Server-side fetch: busca TODA a base de leads (paginada, sem limite de 1000)
+  // Colunas mínimas necessárias para exportação + scoring + filtros
+  const EXPORT_COLUMNS = [
+    "id_lead", "id_empresa", "nome_lead", "email", "telefone", "stage_atual",
+    "data_criacao", "venda_realizada", "is_mql", "levantou_mao", "tem_reuniao",
+    "data_reuniao", "data_levantou_mao", "data_mql",
+    "mautic_score", "mautic_page_hits", "mautic_last_active", "mautic_tags",
+    "tokeniza_investidor", "tokeniza_qtd_investimentos", "tokeniza_carrinho_abandonado",
+    "chatblue_sla_violado", "chatblue_prioridade",
+    "chatwoot_status_atendimento", "chatwoot_conversas_total", "chatwoot_tempo_resposta_medio",
+    "linkedin_senioridade", "id_cliente_notion",
+    "metricool_roas_campanha", "metricool_ctr_campanha",
+    "score_temperatura"
+  ].join(",");
+
+  // Server-side fetch: busca leads com colunas mínimas, filtro por preset server-side
   const { data: leadsServerFull, isLoading: loadingLeadsServer } = useQuery({
-    queryKey: ["leads-exportacao-full", empresaSelecionada],
+    queryKey: ["leads-exportacao-full", empresaSelecionada, preset, mesesNegociacao],
     queryFn: async () => {
       const allLeads: any[] = [];
       const pageSize = 1000;
@@ -94,7 +108,7 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
       while (hasMore) {
         let query = supabase
           .from("lead")
-          .select("*, empresa:id_empresa(nome), cliente_notion:id_cliente_notion(nome, status_cliente, produtos_contratados, anos_fiscais)")
+          .select(`${EXPORT_COLUMNS}, empresa:id_empresa(nome), cliente_notion:id_cliente_notion(nome, status_cliente)`)
           .or("merged.is.null,merged.eq.false")
           .not("nome_lead", "like", "%(cópia)%")
           .order("data_criacao", { ascending: false })
@@ -102,6 +116,21 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
 
         if (empresaSelecionada && empresaSelecionada !== "todas") {
           query = query.eq("id_empresa", empresaSelecionada);
+        }
+
+        // Aplicar filtros server-side por preset quando possível
+        switch (preset) {
+          case "perdidos":
+            query = query.eq("stage_atual", "Perdido");
+            break;
+          case "carrinho_abandonado":
+            query = query.eq("tokeniza_carrinho_abandonado", true).eq("tokeniza_investidor", false);
+            break;
+          case "negociacao_sem_compra":
+            query = query.in("stage_atual", ["Negociação", "Aguardando pagamento", "Proposta", "Reunião agendada"])
+              .eq("venda_realizada", false)
+              .gte("data_criacao", subMonths(new Date(), mesesNegociacao).toISOString());
+            break;
         }
 
         const { data, error } = await query;
