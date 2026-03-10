@@ -409,7 +409,11 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium">Preview da lista</span>
               <Badge variant="secondary" className="text-lg px-3">
-                {leadsFiltrados.length} leads
+                {preset === "perdidos" && loadingPerdidos ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  `${leadsFiltrados.length} leads`
+                )}
               </Badge>
             </div>
             {leadsFiltrados.length > 0 && (
