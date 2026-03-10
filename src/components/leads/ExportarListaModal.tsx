@@ -252,7 +252,7 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
             mesesNegociacao: preset === "negociacao_sem_compra" ? mesesNegociacao : null,
           },
           qtd_leads: leadsFiltrados.length,
-          created_by: user?.user?.id || null,
+          created_by: sessionData?.session?.user?.id || null,
         } as any)
         .select("id")
         .single();
