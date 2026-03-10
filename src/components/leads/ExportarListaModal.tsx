@@ -15,7 +15,7 @@ import { format, subMonths, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 
-type Preset = "base_completa" | "sem_clientes" | "negociacao_sem_compra" | "ex_clientes" | "quentes" | "mornos" | "frios" | "carrinho_abandonado";
+type Preset = "base_completa" | "sem_clientes" | "negociacao_sem_compra" | "ex_clientes" | "quentes" | "mornos" | "frios" | "carrinho_abandonado" | "perdidos";
 
 const PRESETS: { value: Preset; label: string; icon: React.ReactNode; description: string }[] = [
   { value: "base_completa", label: "Base completa", icon: <Users className="h-4 w-4" />, description: "Todos os leads da empresa" },
