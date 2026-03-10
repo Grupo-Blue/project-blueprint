@@ -15,7 +15,7 @@ import { format, subMonths, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 
-type Preset = "base_completa" | "sem_clientes" | "negociacao_sem_compra" | "ex_clientes" | "quentes" | "mornos" | "frios" | "carrinho_abandonado";
+type Preset = "base_completa" | "sem_clientes" | "negociacao_sem_compra" | "ex_clientes" | "quentes" | "mornos" | "frios" | "carrinho_abandonado" | "perdidos";
 
 const PRESETS: { value: Preset; label: string; icon: React.ReactNode; description: string }[] = [
   { value: "base_completa", label: "Base completa", icon: <Users className="h-4 w-4" />, description: "Todos os leads da empresa" },
@@ -26,6 +26,7 @@ const PRESETS: { value: Preset; label: string; icon: React.ReactNode; descriptio
   { value: "mornos", label: "Leads mornos", icon: <Activity className="h-4 w-4 text-yellow-500" />, description: "Score entre 30 e 69" },
   { value: "frios", label: "Leads frios", icon: <Snowflake className="h-4 w-4 text-blue-400" />, description: "Score < 30" },
   { value: "carrinho_abandonado", label: "Carrinho abandonado", icon: <ShoppingCart className="h-4 w-4 text-orange-500" />, description: "Carrinho abandonado e não investidor" },
+  { value: "perdidos", label: "Perdidos com telefone", icon: <UserX className="h-4 w-4 text-red-500" />, description: "Leads perdidos que possuem telefone" },
 ];
 
 interface ExportarListaModalProps {
@@ -122,6 +123,9 @@ export function ExportarListaModal({ open, onOpenChange, leads }: ExportarListaM
         break;
       case "carrinho_abandonado":
         filtered = filtered.filter(l => l.tokeniza_carrinho_abandonado && !l.tokeniza_investidor);
+        break;
+      case "perdidos":
+        filtered = filtered.filter(l => l.stage_atual === "Perdido");
         break;
     }
 
