@@ -18,8 +18,8 @@ function buildActorInput(tipo: string, parametros: Record<string, any>): object 
   switch (tipo) {
     case "INSTAGRAM_FOLLOWERS":
       return {
-        usernames: [parametros.username?.replace("@", "")],
-        resultsLimit: parametros.limit || 200,
+        username: parametros.username?.replace("@", ""),
+        resultsLimit: parametros.limit ? parseInt(String(parametros.limit)) : 200,
       };
     case "LINKEDIN_SEARCH":
       return {
