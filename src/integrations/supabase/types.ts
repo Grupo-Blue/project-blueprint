@@ -1595,6 +1595,56 @@ export type Database = {
           },
         ]
       }
+      extracao_lead_frio: {
+        Row: {
+          apify_run_id: string | null
+          created_at: string
+          criado_por: string
+          id: string
+          id_empresa: string
+          parametros: Json
+          resultados: Json | null
+          status: string
+          tipo_extracao: string
+          total_resultados: number | null
+          updated_at: string
+        }
+        Insert: {
+          apify_run_id?: string | null
+          created_at?: string
+          criado_por: string
+          id?: string
+          id_empresa: string
+          parametros?: Json
+          resultados?: Json | null
+          status?: string
+          tipo_extracao: string
+          total_resultados?: number | null
+          updated_at?: string
+        }
+        Update: {
+          apify_run_id?: string | null
+          created_at?: string
+          criado_por?: string
+          id?: string
+          id_empresa?: string
+          parametros?: Json
+          resultados?: Json | null
+          status?: string
+          tipo_extracao?: string
+          total_resultados?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extracao_lead_frio_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       google_ads_keyword: {
         Row: {
           campaign_id_externo: string | null
