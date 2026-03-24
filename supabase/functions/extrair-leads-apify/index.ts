@@ -8,7 +8,7 @@ const corsHeaders = {
 const APIFY_BASE_URL = "https://api.apify.com/v2";
 
 const ACTOR_MAP: Record<string, string> = {
-  INSTAGRAM_FOLLOWERS: "apify~instagram-followers-scraper",
+  INSTAGRAM_FOLLOWERS: "instaprism~instagram-followers-scraper",
   LINKEDIN_SEARCH: "anchor~linkedin-people-search",
   LINKEDIN_COMPANY: "anchor~linkedin-company-scraper",
   FACEBOOK_PAGE: "apify~facebook-pages-scraper",
