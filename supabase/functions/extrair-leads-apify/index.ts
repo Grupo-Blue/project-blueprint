@@ -75,7 +75,8 @@ Deno.serve(async (req) => {
     const actorInput = buildActorInput(tipo_extracao, parametros || {});
 
     // Start Apify actor
-    const res = await fetch(`${APIFY_BASE_URL}/acts/${actorId}/runs?token=${APIFY_API_TOKEN}`, {
+    const actorPath = actorId.replace("~", "/");
+    const res = await fetch(`${APIFY_BASE_URL}/acts/${actorPath}/runs?token=${APIFY_API_TOKEN}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(actorInput),
