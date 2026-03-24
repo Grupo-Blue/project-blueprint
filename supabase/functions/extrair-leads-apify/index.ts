@@ -22,15 +22,23 @@ function buildActorInput(tipo: string, parametros: Record<string, any>): object 
         resultsLimit: parametros.limit ? parseInt(String(parametros.limit)) : 200,
         extractEmails: true,
       };
-    case "LINKEDIN_PROFILE_SEARCH":
-      return {
-        keyword: parametros.keyword || parametros.cargo || "",
-        company: parametros.company || parametros.empresa || "",
-        location: parametros.location || parametros.localizacao || "",
-        industry: parametros.industry || parametros.setor || "",
+    case "LINKEDIN_PROFILE_SEARCH": {
+      const input: Record<string, any> = {
+        profileScraperMode: "Full",
+        searchQuery: parametros.keyword || parametros.cargo || "",
         maxItems: parametros.limit ? parseInt(String(parametros.limit)) : 100,
-        scrapeProfiles: "full + email",
       };
+      if (parametros.location || parametros.localizacao) {
+        input.locations = [parametros.location || parametros.localizacao];
+      }
+      if (parametros.industry || parametros.setor) {
+        input.industries = [parametros.industry || parametros.setor];
+      }
+      if (parametros.company || parametros.empresa) {
+        input.searchQuery += ` ${parametros.company || parametros.empresa}`;
+      }
+      return input;
+    }
     case "LINKEDIN_ENRICH": {
       const urls = (parametros.urls || "")
         .split("\n")
