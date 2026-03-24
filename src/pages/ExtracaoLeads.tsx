@@ -36,7 +36,7 @@ export default function ExtracaoLeads() {
   const [historico, setHistorico] = useState<any[]>([]);
   const [resultados, setResultados] = useState<any[] | null>(null);
   const [extracaoAtiva, setExtracaoAtiva] = useState<string | null>(null);
-  const [polling, setPolling] = useState(false);
+  const [pollingIds, setPollingIds] = useState<Set<string>>(new Set());
   const [importando, setImportando] = useState(false);
 
   const tipoConfig = TIPOS_EXTRACAO.find((t) => t.value === tipo);
@@ -78,7 +78,7 @@ export default function ExtracaoLeads() {
   }
 
   function startPolling(id: string) {
-    setPolling(true);
+    setPollingIds((prev) => new Set(prev).add(id));
     const interval = setInterval(async () => {
       try {
         const { data, error } = await supabase.functions.invoke("verificar-extracao-leads", {
@@ -88,19 +88,20 @@ export default function ExtracaoLeads() {
 
         if (data?.status === "CONCLUIDO") {
           clearInterval(interval);
-          setPolling(false);
+          setPollingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
           setResultados(data.resultados || []);
+          setExtracaoAtiva(id);
           toast.success(`Extração concluída: ${data.total} resultados`);
           fetchHistorico();
         } else if (data?.status === "ERRO") {
           clearInterval(interval);
-          setPolling(false);
+          setPollingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
           toast.error("Extração falhou: " + (data.error || "erro no Apify"));
           fetchHistorico();
         }
       } catch {
         clearInterval(interval);
-        setPolling(false);
+        setPollingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
       }
     }, 15000);
   }
@@ -214,15 +215,15 @@ export default function ExtracaoLeads() {
             </div>
           ))}
 
-          <Button onClick={iniciarExtracao} disabled={loading || !tipo || polling}>
+          <Button onClick={iniciarExtracao} disabled={loading || !tipo}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Play className="h-4 w-4 mr-2" />}
             Iniciar Extração
           </Button>
 
-          {polling && (
+          {pollingIds.size > 0 && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Aguardando resultados do Apify... (verificação a cada 15s)
+              {pollingIds.size} extração(ões) em andamento... (verificação a cada 15s)
             </div>
           )}
         </CardContent>
