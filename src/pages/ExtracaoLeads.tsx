@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -13,17 +14,18 @@ import { Download, Import, Loader2, Play, RefreshCw, Search, Users } from "lucid
 
 const TIPOS_EXTRACAO = [
   { value: "INSTAGRAM_FOLLOWERS", label: "Seguidores Instagram", campos: ["username", "limit"] },
-  { value: "LINKEDIN_SEARCH", label: "Busca LinkedIn por Cargo", campos: ["cargo", "localizacao", "setor", "limit"] },
-  { value: "LINKEDIN_COMPANY", label: "Funcionários LinkedIn Company", campos: ["company_url", "limit"] },
+  { value: "LINKEDIN_PROFILE_SEARCH", label: "Busca LinkedIn (com Email)", campos: ["keyword", "company", "location", "industry", "limit"] },
+  { value: "LINKEDIN_ENRICH", label: "Enriquecer LinkedIn (Email + Telefone)", campos: ["urls"] },
   { value: "FACEBOOK_PAGE", label: "Seguidores Facebook Page", campos: ["page_url", "limit"] },
 ];
 
 const CAMPO_LABELS: Record<string, string> = {
   username: "Username Instagram (sem @)",
-  cargo: "Cargo / Título",
-  localizacao: "Localização",
-  setor: "Setor / Indústria",
-  company_url: "URL da Company Page",
+  keyword: "Cargo / Palavra-chave",
+  company: "Empresa",
+  location: "Localização",
+  industry: "Setor / Indústria",
+  urls: "URLs de perfis LinkedIn (uma por linha)",
   page_url: "URL da Facebook Page",
   limit: "Limite de resultados",
 };
@@ -137,7 +139,7 @@ export default function ExtracaoLeads() {
   async function importarParaSGT() {
     if (!resultados?.length || !empresaSelecionada) return;
     setImportando(true);
-    const empresaNome = "BLUE"; // TODO: resolve from context
+    const empresaNome = "BLUE";
     let ok = 0;
     let erros = 0;
 
@@ -150,7 +152,7 @@ export default function ExtracaoLeads() {
             lead: {
               nome_lead: r.nome || r.username || "",
               email: r.email || null,
-              telefone: null,
+              telefone: r.telefone || null,
               origem_canal: "SCRAPING",
               utm_source: r.plataforma?.toLowerCase() || "scraping",
               utm_medium: "cold_list",
@@ -206,12 +208,21 @@ export default function ExtracaoLeads() {
           {tipoConfig?.campos.map((campo) => (
             <div key={campo}>
               <Label>{CAMPO_LABELS[campo] || campo}</Label>
-              <Input
-                value={parametros[campo] || ""}
-                onChange={(e) => setParametros((p) => ({ ...p, [campo]: e.target.value }))}
-                placeholder={campo === "limit" ? "200" : ""}
-                type={campo === "limit" ? "number" : "text"}
-              />
+              {campo === "urls" ? (
+                <Textarea
+                  value={parametros[campo] || ""}
+                  onChange={(e) => setParametros((p) => ({ ...p, [campo]: e.target.value }))}
+                  placeholder="https://linkedin.com/in/perfil1&#10;https://linkedin.com/in/perfil2&#10;https://linkedin.com/in/perfil3"
+                  rows={6}
+                />
+              ) : (
+                <Input
+                  value={parametros[campo] || ""}
+                  onChange={(e) => setParametros((p) => ({ ...p, [campo]: e.target.value }))}
+                  placeholder={campo === "limit" ? "100" : ""}
+                  type={campo === "limit" ? "number" : "text"}
+                />
+              )}
             </div>
           ))}
 
