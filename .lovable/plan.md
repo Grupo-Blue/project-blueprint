@@ -1,88 +1,43 @@
 
 
-# Extração de Leads Frios via Apify
+# Adicionar Extrator LinkedIn com Email e Telefone
 
-## O que será construído
+## Análise dos Actors
 
-Uma nova página **"Extração de Leads"** (`/extracao-leads`) no SGT que permite configurar e executar scrapers do Apify para gerar listas frias de leads. O usuário seleciona o tipo de extração, configura os parâmetros e recebe os resultados em uma tabela com opção de exportar CSV ou importar direto para a base de leads via `criar-lead-api`.
+Ambos os actors que você encontrou são bons, e cada um serve um caso diferente:
 
-## Tipos de extração suportados (Apify Actors)
+| Actor | O que faz | Email | Telefone | Melhor para |
+|-------|-----------|-------|----------|-------------|
+| **harvestapi/linkedin-profile-search** | Busca pessoas por filtros (cargo, empresa, localização) | Sim (modo "Full + email") | Não | Encontrar leads por critérios |
+| **dev_fusion/linkedin-profile-scraper** | Enriquece perfis a partir de URLs do LinkedIn | Sim | Sim (para usuários pagos do Apify) | Enriquecer uma lista existente |
 
-1. **Seguidores Instagram** — Actor `apify/instagram-profile-scraper` → extrai seguidores de um perfil (nome, bio, email se público)
-2. **Seguidores LinkedIn Company** — Actor `anchor/linkedin-company-scraper` → extrai funcionários/seguidores de uma empresa
-3. **Busca LinkedIn por cargo** — Actor `anchor/linkedin-people-search` → busca pessoas por cargo + localização + setor
-4. **Seguidores Facebook Page** — Actor `apify/facebook-pages-scraper` → extrai curtidores/seguidores
+**Recomendação**: usar os dois em combo. O `harvestapi` busca os perfis por filtros e o `dev_fusion` enriquece com email + telefone. Mas para simplificar, podemos começar com o **harvestapi** no modo "Full + email search" que já retorna perfis completos com email numa única etapa. Se quiser telefone, rodamos o `dev_fusion` como segunda passada nos perfis encontrados.
 
-## Arquitetura
+## O que será feito
 
-```text
-┌─────────────────────┐
-│  Página Frontend    │
-│  /extracao-leads    │
-│                     │
-│  [Tipo] [Params]    │
-│  [Iniciar Extração] │
-│        │            │
-│        ▼            │
-│  Edge Function      │
-│  extrair-leads-apify│
-│    ├─ Inicia Actor  │
-│    ├─ Retorna runId │
-│        │            │
-│        ▼            │
-│  Polling status     │
-│  (mesmo padrão da   │
-│   análise competit.)│
-│        │            │
-│        ▼            │
-│  Tabela resultados  │
-│  [Exportar CSV]     │
-│  [Importar p/ SGT]  │
-└─────────────────────┘
-```
+1. **Novo tipo de extração `LINKEDIN_PROFILE_SEARCH`** usando `harvestapi/linkedin-profile-search` com filtros avançados (cargo, empresa, localização, setor, keywords) e modo "Full + email search" ativado
+2. **Novo tipo `LINKEDIN_ENRICH`** usando `dev_fusion/linkedin-profile-scraper` para enriquecer perfis do LinkedIn com email + telefone (aceita URLs de perfis)
+3. Substituir os actors antigos `anchor~linkedin-people-search` e `anchor~linkedin-company-scraper` que não retornavam email
 
-## Componentes
+## Alterações
 
-### 1. Tabela `extracao_lead_frio` (nova)
-- `id` (uuid PK)
-- `id_empresa` (uuid FK empresa)
-- `criado_por` (uuid FK auth.users)
-- `tipo_extracao` (text: INSTAGRAM_FOLLOWERS, LINKEDIN_SEARCH, LINKEDIN_COMPANY, FACEBOOK_PAGE)
-- `parametros` (jsonb — perfil alvo, cargo, localização etc.)
-- `status` (text: PENDENTE, EXECUTANDO, CONCLUIDO, ERRO)
-- `apify_run_id` (text)
-- `total_resultados` (int)
-- `resultados` (jsonb — array de leads extraídos)
-- `created_at`, `updated_at`
-- RLS: usuário vê apenas suas extrações + admin vê todas
+### Edge Function `extrair-leads-apify/index.ts`
+- Substituir `LINKEDIN_SEARCH` → actor `harvestapi~linkedin-profile-search` com input: `keyword`, `company`, `location`, `industry`, `maxItems`, `scrapeProfiles: "full + email"`
+- Substituir `LINKEDIN_COMPANY` → mesmo actor com filtro por empresa
+- Adicionar `LINKEDIN_ENRICH` → actor `dev_fusion~linkedin-profile-scraper` com input: `urls` (array de URLs de perfis)
 
-### 2. Edge Function `extrair-leads-apify`
-- Recebe tipo + parâmetros
-- Mapeia para o Actor correto do Apify
-- Inicia o run e salva na tabela com status PENDENTE
-- Retorna `id` da extração
+### Edge Function `verificar-extracao-leads/index.ts`
+- Atualizar parsers para os novos schemas de output (harvestapi retorna `fullName`, `headline`, `location`, `email`, `profileUrl`, etc.; dev_fusion retorna `email`, `mobileNumber`, `fullName`, `headline`)
 
-### 3. Edge Function `verificar-extracao-leads` 
-- Recebe `id` da extração
-- Consulta status no Apify
-- Se SUCCEEDED: parseia resultados, salva na tabela, retorna dados
-- Mesmo padrão de polling já usado em `verificar-coleta-concorrentes`
-
-### 4. Página `ExtracaoLeads.tsx`
-- Formulário com select do tipo de extração
-- Campos dinâmicos por tipo (ex: URL do perfil, cargo, localização)
-- Histórico de extrações anteriores
-- Tabela de resultados com nome, email, cargo, empresa
-- Botões: **Exportar CSV** e **Importar para SGT** (chama `criar-lead-api` em lote)
-
-### 5. Rota + Sidebar
-- Rota `/extracao-leads` no App.tsx
-- Link na sidebar em seção de ferramentas/leads
+### Página `ExtracaoLeads.tsx`
+- Atualizar tipos de extração com novos campos:
+  - **Busca LinkedIn**: keyword, empresa, localização, setor, limite
+  - **Enriquecer LinkedIn**: campo de texto para colar URLs de perfis (uma por linha)
+- Exibir colunas de email e telefone na tabela de resultados
 
 ## Detalhes técnicos
 
-- Os Actors do Apify são chamados com a `APIFY_API_TOKEN` já configurada
-- O padrão assíncrono (start → poll → collect) reutiliza a mesma lógica do monitoramento de concorrentes
-- Resultados ficam armazenados em JSONB para flexibilidade (cada actor retorna schema diferente)
-- A importação para o SGT usa o endpoint `criar-lead-api` com `origem_canal = "SCRAPING"` e os UTMs zerados
+- O `harvestapi` cobra $0.10/página de busca + $0.01/perfil com email — custo controlável
+- O `dev_fusion` cobra por uso do actor — telefone só disponível para contas pagas do Apify
+- Nenhum cookie ou login do LinkedIn é necessário em ambos os actors
 
