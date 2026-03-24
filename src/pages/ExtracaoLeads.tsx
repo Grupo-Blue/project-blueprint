@@ -215,15 +215,15 @@ export default function ExtracaoLeads() {
             </div>
           ))}
 
-          <Button onClick={iniciarExtracao} disabled={loading || !tipo || polling}>
+          <Button onClick={iniciarExtracao} disabled={loading || !tipo}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Play className="h-4 w-4 mr-2" />}
             Iniciar Extração
           </Button>
 
-          {polling && (
+          {pollingIds.size > 0 && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Aguardando resultados do Apify... (verificação a cada 15s)
+              {pollingIds.size} extração(ões) em andamento... (verificação a cada 15s)
             </div>
           )}
         </CardContent>
