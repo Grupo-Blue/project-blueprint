@@ -20,6 +20,7 @@ function buildActorInput(tipo: string, parametros: Record<string, any>): object 
       return {
         username: parametros.username?.replace("@", ""),
         resultsLimit: parametros.limit ? parseInt(String(parametros.limit)) : 200,
+        extractEmails: true,
       };
     case "LINKEDIN_SEARCH":
       return {
