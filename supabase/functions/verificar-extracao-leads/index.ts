@@ -11,11 +11,11 @@ function parseResults(tipo: string, items: any[]): any[] {
   switch (tipo) {
     case "INSTAGRAM_FOLLOWERS":
       return items.map((i) => ({
-        nome: i.fullName || i.full_name || i.username || "",
+        nome: i.fullName || i.full_name || "",
         username: i.username || "",
-        email: i.email || i.public_email || i.publicEmail || "",
-        bio: i.biography || i.bio || "",
-        seguidores: i.followersCount || i.follower_count || i.edge_followed_by?.count || 0,
+        user_id: i.userId || i.id || "",
+        verificado: i.isVerified || false,
+        foto_perfil: i.profilePicUrl || i.profile_pic_url || "",
         plataforma: "Instagram",
       }));
     case "LINKEDIN_SEARCH":
