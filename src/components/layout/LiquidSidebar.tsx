@@ -40,6 +40,7 @@ const navItems: NavItem[] = [
   { label: "Hipóteses", to: "/hipoteses", icon: Target, group: "Análise" },
   { label: "Aprendizados", to: "/aprendizados", icon: Lightbulb, group: "Análise" },
   { label: "Guia UTM", to: "/guia-utm", icon: BookOpen, group: "Análise" },
+  { label: "Extração Leads", to: "/extracao-leads", icon: Users, group: "Análise", requiredRole: ["TRAFEGO", "ADMIN"] },
   // Admin
   { label: "IRPF", to: "/irpf-importacoes", icon: Receipt, group: "Admin", requiredRole: ["DIRECAO", "ADMIN"] },
   { label: "Contas Anúncio", to: "/contas-anuncio", icon: Building2, group: "Admin", requiredRole: ["TRAFEGO", "ADMIN"] },
