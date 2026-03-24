@@ -36,7 +36,7 @@ export default function ExtracaoLeads() {
   const [historico, setHistorico] = useState<any[]>([]);
   const [resultados, setResultados] = useState<any[] | null>(null);
   const [extracaoAtiva, setExtracaoAtiva] = useState<string | null>(null);
-  const [polling, setPolling] = useState(false);
+  const [pollingIds, setPollingIds] = useState<Set<string>>(new Set());
   const [importando, setImportando] = useState(false);
 
   const tipoConfig = TIPOS_EXTRACAO.find((t) => t.value === tipo);
