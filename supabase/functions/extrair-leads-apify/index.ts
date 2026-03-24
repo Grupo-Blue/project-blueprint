@@ -19,7 +19,6 @@ function buildActorInput(tipo: string, parametros: Record<string, any>): object 
     case "INSTAGRAM_FOLLOWERS":
       return {
         usernames: [parametros.username?.replace("@", "")],
-        resultsType: "details",
         resultsLimit: parametros.limit || 200,
       };
     case "LINKEDIN_SEARCH":
