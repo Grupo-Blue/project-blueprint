@@ -8,7 +8,7 @@ const corsHeaders = {
 const APIFY_BASE_URL = "https://api.apify.com/v2";
 
 const ACTOR_MAP: Record<string, string> = {
-  INSTAGRAM_FOLLOWERS: "apify~instagram-profile-scraper",
+  INSTAGRAM_FOLLOWERS: "apify~instagram-followers-scraper",
   LINKEDIN_SEARCH: "anchor~linkedin-people-search",
   LINKEDIN_COMPANY: "anchor~linkedin-company-scraper",
   FACEBOOK_PAGE: "apify~facebook-pages-scraper",
@@ -19,7 +19,6 @@ function buildActorInput(tipo: string, parametros: Record<string, any>): object 
     case "INSTAGRAM_FOLLOWERS":
       return {
         usernames: [parametros.username?.replace("@", "")],
-        resultsType: "details",
         resultsLimit: parametros.limit || 200,
       };
     case "LINKEDIN_SEARCH":
