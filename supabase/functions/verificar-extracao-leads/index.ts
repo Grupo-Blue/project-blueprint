@@ -16,17 +16,28 @@ function parseResults(tipo: string, items: any[]): any[] {
         user_id: i.userId || i.id || "",
         verificado: i.isVerified || false,
         foto_perfil: i.profilePicUrl || i.profile_pic_url || "",
+        email: i.email || i.contactEmail || "",
         plataforma: "Instagram",
       }));
-    case "LINKEDIN_SEARCH":
-    case "LINKEDIN_COMPANY":
+    case "LINKEDIN_PROFILE_SEARCH":
       return items.map((i) => ({
         nome: i.fullName || i.name || `${i.firstName || ""} ${i.lastName || ""}`.trim(),
-        cargo: i.title || i.headline || "",
-        empresa: i.company || i.companyName || "",
-        localizacao: i.location || "",
-        linkedin_url: i.profileUrl || i.url || "",
-        email: i.email || "",
+        cargo: i.headline || i.title || "",
+        empresa: i.company || i.companyName || i.currentCompany || "",
+        localizacao: i.location || i.geo || "",
+        linkedin_url: i.profileUrl || i.linkedinUrl || i.url || "",
+        email: i.email || i.emails?.[0] || "",
+        plataforma: "LinkedIn",
+      }));
+    case "LINKEDIN_ENRICH":
+      return items.map((i) => ({
+        nome: i.fullName || i.name || `${i.firstName || ""} ${i.lastName || ""}`.trim(),
+        cargo: i.headline || i.title || "",
+        empresa: i.company || i.companyName || i.currentCompany || "",
+        localizacao: i.location || i.geo || "",
+        linkedin_url: i.profileUrl || i.linkedinUrl || i.url || "",
+        email: i.email || i.emails?.[0] || "",
+        telefone: i.mobileNumber || i.phoneNumber || i.phone || "",
         plataforma: "LinkedIn",
       }));
     case "FACEBOOK_PAGE":
@@ -57,7 +68,6 @@ Deno.serve(async (req) => {
     const { id } = await req.json();
     if (!id) throw new Error("id da extração é obrigatório");
 
-    // Fetch extraction record
     const { data: extracao, error: fetchError } = await supabase
       .from("extracao_lead_frio")
       .select("*")
@@ -75,7 +85,6 @@ Deno.serve(async (req) => {
     const runId = extracao.apify_run_id;
     if (!runId) throw new Error("Sem apify_run_id");
 
-    // Check Apify status
     const statusRes = await fetch(`${APIFY_BASE_URL}/actor-runs/${runId}?token=${APIFY_API_TOKEN}`);
     if (!statusRes.ok) throw new Error(`Apify status check failed: ${statusRes.status}`);
     const statusData = await statusRes.json();

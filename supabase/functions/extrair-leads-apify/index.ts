@@ -9,8 +9,8 @@ const APIFY_BASE_URL = "https://api.apify.com/v2";
 
 const ACTOR_MAP: Record<string, string> = {
   INSTAGRAM_FOLLOWERS: "instaprism~instagram-followers-scraper",
-  LINKEDIN_SEARCH: "anchor~linkedin-people-search",
-  LINKEDIN_COMPANY: "anchor~linkedin-company-scraper",
+  LINKEDIN_PROFILE_SEARCH: "harvestapi~linkedin-profile-search",
+  LINKEDIN_ENRICH: "dev_fusion~linkedin-profile-scraper",
   FACEBOOK_PAGE: "apify~facebook-pages-scraper",
 };
 
@@ -22,18 +22,25 @@ function buildActorInput(tipo: string, parametros: Record<string, any>): object 
         resultsLimit: parametros.limit ? parseInt(String(parametros.limit)) : 200,
         extractEmails: true,
       };
-    case "LINKEDIN_SEARCH":
+    case "LINKEDIN_PROFILE_SEARCH":
       return {
-        keyword: parametros.cargo || "",
-        location: parametros.localizacao || "",
-        industry: parametros.setor || "",
-        maxItems: parametros.limit || 100,
+        keyword: parametros.keyword || parametros.cargo || "",
+        company: parametros.company || parametros.empresa || "",
+        location: parametros.location || parametros.localizacao || "",
+        industry: parametros.industry || parametros.setor || "",
+        maxItems: parametros.limit ? parseInt(String(parametros.limit)) : 100,
+        scrapeProfiles: "full + email",
       };
-    case "LINKEDIN_COMPANY":
+    case "LINKEDIN_ENRICH": {
+      const urls = (parametros.urls || "")
+        .split("\n")
+        .map((u: string) => u.trim())
+        .filter((u: string) => u.length > 0);
       return {
-        startUrls: [{ url: parametros.company_url }],
-        maxItems: parametros.limit || 100,
+        startUrls: urls.map((url: string) => ({ url })),
+        maxItems: urls.length || 100,
       };
+    }
     case "FACEBOOK_PAGE":
       return {
         startUrls: [{ url: parametros.page_url }],
@@ -74,6 +81,8 @@ Deno.serve(async (req) => {
 
     const actorId = ACTOR_MAP[tipo_extracao];
     const actorInput = buildActorInput(tipo_extracao, parametros || {});
+
+    console.log(`Starting Apify actor: ${actorId}`, JSON.stringify(actorInput));
 
     // Start Apify actor
     const res = await fetch(`${APIFY_BASE_URL}/acts/${actorId}/runs?token=${APIFY_API_TOKEN}`, {
