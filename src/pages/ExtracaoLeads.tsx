@@ -78,7 +78,7 @@ export default function ExtracaoLeads() {
   }
 
   function startPolling(id: string) {
-    setPolling(true);
+    setPollingIds((prev) => new Set(prev).add(id));
     const interval = setInterval(async () => {
       try {
         const { data, error } = await supabase.functions.invoke("verificar-extracao-leads", {
@@ -88,19 +88,20 @@ export default function ExtracaoLeads() {
 
         if (data?.status === "CONCLUIDO") {
           clearInterval(interval);
-          setPolling(false);
+          setPollingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
           setResultados(data.resultados || []);
+          setExtracaoAtiva(id);
           toast.success(`Extração concluída: ${data.total} resultados`);
           fetchHistorico();
         } else if (data?.status === "ERRO") {
           clearInterval(interval);
-          setPolling(false);
+          setPollingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
           toast.error("Extração falhou: " + (data.error || "erro no Apify"));
           fetchHistorico();
         }
       } catch {
         clearInterval(interval);
-        setPolling(false);
+        setPollingIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
       }
     }, 15000);
   }
