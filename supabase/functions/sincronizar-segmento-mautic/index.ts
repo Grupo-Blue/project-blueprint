@@ -60,9 +60,9 @@ serve(async (req) => {
     }
 
     const config = integracoes[0].config_json as any;
-    const mauticUrl = config.mautic_url?.replace(/\/$/, '');
-    const mauticUser = config.mautic_user || config.username;
-    const mauticPass = config.mautic_password || config.password;
+    const mauticUrl = (config.mautic_url || config.url_base || '')?.replace(/\/$/, '');
+    const mauticUser = config.mautic_user || config.login || config.username;
+    const mauticPass = config.mautic_password || config.senha || config.password;
 
     if (!mauticUrl || !mauticUser || !mauticPass) {
       throw new Error('Configuração Mautic incompleta');
