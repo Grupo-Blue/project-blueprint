@@ -1186,9 +1186,79 @@ const Leads = () => {
                                     </div>
                                   </div>
 
-                                  {/* Coluna 4: Dados Extra */}
+                                  {/* Coluna 4: Amélia CRM */}
                                   <div className="space-y-2">
                                     <h4 className="font-semibold flex items-center gap-2 text-foreground">
+                                      <Zap className="h-4 w-4" /> Qualificação
+                                    </h4>
+                                    <div className="space-y-1 text-xs">
+                                      {lead.amelia_icp && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">ICP:</span>
+                                          <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-700 border-blue-300">{lead.amelia_icp}</Badge>
+                                        </div>
+                                      )}
+                                      {lead.amelia_persona && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Persona:</span>
+                                          <span className="truncate max-w-[100px] font-medium">{lead.amelia_persona}</span>
+                                        </div>
+                                      )}
+                                      {lead.amelia_disc && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">DISC:</span>
+                                          <Badge variant="outline" className={cn("text-[10px] font-bold",
+                                            lead.amelia_disc === "D" ? "bg-red-100 text-red-700 border-red-300" :
+                                            lead.amelia_disc === "I" ? "bg-yellow-100 text-yellow-700 border-yellow-300" :
+                                            lead.amelia_disc === "S" ? "bg-green-100 text-green-700 border-green-300" :
+                                            "bg-blue-100 text-blue-700 border-blue-300"
+                                          )}>{lead.amelia_disc}</Badge>
+                                        </div>
+                                      )}
+                                      {lead.amelia_temperatura && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Temp:</span>
+                                          <span className={cn("font-medium",
+                                            lead.amelia_temperatura === "QUENTE" ? "text-red-600" :
+                                            lead.amelia_temperatura === "MORNO" ? "text-yellow-600" : "text-blue-600"
+                                          )}>
+                                            {lead.amelia_temperatura === "QUENTE" ? "🔥" : lead.amelia_temperatura === "MORNO" ? "🌤️" : "❄️"} {lead.amelia_temperatura}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {lead.amelia_health_score != null && (
+                                        <div className="space-y-0.5">
+                                          <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Health:</span>
+                                            <span className={cn("font-medium",
+                                              lead.amelia_health_score >= 70 ? "text-green-600" :
+                                              lead.amelia_health_score >= 40 ? "text-yellow-600" : "text-red-600"
+                                            )}>{lead.amelia_health_score}/100</span>
+                                          </div>
+                                          <div className="w-full bg-muted rounded-full h-1.5">
+                                            <div className={cn("h-1.5 rounded-full",
+                                              lead.amelia_health_score >= 70 ? "bg-green-500" :
+                                              lead.amelia_health_score >= 40 ? "bg-yellow-500" : "bg-red-500"
+                                            )} style={{ width: `${lead.amelia_health_score}%` }} />
+                                          </div>
+                                        </div>
+                                      )}
+                                      {lead.amelia_estado_funil && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Funil:</span>
+                                          <span className="font-medium">{lead.amelia_estado_funil}</span>
+                                        </div>
+                                      )}
+                                      {lead.amelia_score != null && (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Score:</span>
+                                          <Badge variant={lead.amelia_score >= 70 ? "default" : "secondary"} className="text-[10px]">{lead.amelia_score}</Badge>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Dados Extra originais */}
+                                    <h4 className="font-semibold flex items-center gap-2 text-foreground pt-2 border-t border-border">
                                       <Wallet className="h-4 w-4" /> Dados Extra
                                     </h4>
                                     <div className="space-y-1 text-xs">
