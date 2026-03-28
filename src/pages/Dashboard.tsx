@@ -24,6 +24,7 @@ import { LiquidKPICard } from "@/components/dashboard/LiquidKPICard";
 import { TrafficFlowChart } from "@/components/dashboard/TrafficFlowChart";
 import { LeadQualityBubbles } from "@/components/dashboard/LeadQualityBubbles";
 import { LiquidFunnel } from "@/components/dashboard/LiquidFunnel";
+import { IdentityGraphWidget } from "@/components/dashboard/IdentityGraphWidget";
 
 const Dashboard = () => {
   const { getDataReferencia, labelPeriodo } = usePeriodo();
@@ -204,6 +205,7 @@ const Dashboard = () => {
           <ROIProfitability empresaId={empresaIdQuery} />
           <TempoCiclo empresaId={empresaIdQuery} />
           <CriativosFadiga empresaId={empresaIdQuery} />
+          <IdentityGraphWidget empresaId={empresaIdQuery} />
           <MetricasMultiRede empresaId={empresaIdQuery} dataReferencia={dataReferencia} />
           <InteligenciaIA empresaId={empresaIdQuery} />
         </div>
