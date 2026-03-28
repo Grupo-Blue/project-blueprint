@@ -1,67 +1,81 @@
 
 
-# Identidades Anônimas + Integração de Segmentos (Mautic, WhatsApp, Meta Ads)
+# Webhook Amélia → SGT: Enriquecimento com ICP, Persona, DISC, Health Score
 
-## Sobre os anônimos
+## Contexto
 
-Sim, a falta de identidades anônimas é uma lacuna. O Mautic rastreia visitantes anônimos por IP/cookie antes de se identificarem. O Identity Graph deveria fazer o mesmo: registrar `cookie_id`, `session_id`, `fbp` vindos do Stape **sem exigir lead** (`id_lead = null`). Quando o visitante se identifica (preenche formulário), todos os IDs anônimos são automaticamente vinculados via merge transitivo — isso já está implementado na lógica do `resolver-identidade`, mas o `stape-webhook` atualmente só chama o resolver quando já tem email/telefone. A correção é simples: chamar o resolver **sempre**, mesmo sem email.
+Hoje o fluxo é unidirecional: SGT envia leads para Amélia via `disparar-webhook-leads`. A Amélia classifica (ICP, persona, temperatura, DISC) e gerencia CS (health score), mas esses dados ficam presos lá. O objetivo é criar o caminho de volta: quando a Amélia classificar ou atualizar um lead, ela empurra os dados para o SGT via webhook.
 
 ## O que será construído
 
-### 1. Captura de identidades anônimas no Stape Webhook
+### 1. Edge Function `amelia-webhook` (SGT)
 
-Atualizar `stape-webhook` para chamar `resolver-identidade` em **todo** evento, mesmo sem email/telefone. Isso registra `cookie_id`, `session_id`, `fbp`, `fbc`, `gclid` como entradas anônimas (`id_lead = null`). Quando o mesmo cookie aparecer num evento com email, o merge acontece automaticamente.
+Receptor no SGT que aceita POSTs da Amélia com dados de enriquecimento:
 
-### 2. Ações nos Segmentos (página `/segmentos`)
+```text
+POST /functions/v1/amelia-webhook
+Header: x-webhook-secret: <SGT_WEBHOOK_SECRET>
 
-Adicionar botões de ação em cada segmento:
+Payload:
+{
+  "lead_id": "uuid-do-lead-no-sgt",
+  "empresa": "BLUE" | "TOKENIZA",
+  "evento": "CLASSIFICACAO" | "CS_UPDATE" | "DISC_DETECTADO" | "QUALIFICACAO",
+  "dados": {
+    "icp": "TOKENIZA_SERIAL",
+    "persona": "CONSTRUTOR_PATRIMONIO",
+    "temperatura": "QUENTE",
+    "prioridade": 1,
+    "score_interno": 85,
+    "perfil_disc": "D",
+    "health_score": 78,
+    "estado_funil": "QUALIFICACAO",
+    "framework_ativo": "SPIN",
+    "mql": true,
+    "data_mql": "2026-03-28T..."
+  }
+}
+```
 
-| Ação | O que faz |
-|------|-----------|
-| **Sincronizar Mautic** | Cria/atualiza um segmento no Mautic com os leads do segmento SGT (via API do Mautic) |
-| **Disparar WhatsApp** | Gera CSV com telefones do segmento e dispara para a API de mensageria existente |
-| **Enviar Meta Ads** | Cria Custom Audience via Meta CAPI com emails+phones hasheados (SHA-256) |
-| **Exportar CSV** | Download direto da lista de leads |
+A function valida o token (reutiliza `SGT_WEBHOOK_SECRET`), faz upsert na tabela `lead` com os campos de enriquecimento e registra log.
 
-### 3. Edge Function `sincronizar-segmento-mautic`
+### 2. Migration: Novas colunas na tabela `lead`
 
-- Recebe `id_segmento`
-- Busca membros do segmento com email
-- Chama API do Mautic (`POST /api/segments/{id}/contact/{contactId}/add`) para cada lead
-- Se o segmento não existe no Mautic, cria via `POST /api/segments/new`
-- Armazena `mautic_segment_id` no campo `regras` do segmento SGT
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `amelia_icp` | text | Classificação ICP da Amélia |
+| `amelia_persona` | text | Persona identificada |
+| `amelia_temperatura` | text | FRIO/MORNO/QUENTE |
+| `amelia_prioridade` | int | 1, 2 ou 3 |
+| `amelia_score` | int | Score consolidado 0-100 |
+| `amelia_disc` | text | Perfil DISC (D/I/S/C) |
+| `amelia_health_score` | int | Health Score CS (0-100) |
+| `amelia_estado_funil` | text | Estado no funil conversacional |
+| `amelia_framework` | text | Framework ativo (SPIN, BANT, etc.) |
+| `amelia_updated_at` | timestamptz | Última atualização da Amélia |
 
-### 4. Edge Function `exportar-segmento-meta`
+Prefixo `amelia_` para não conflitar com campos existentes do SGT.
 
-- Recebe `id_segmento` + `ad_account_id`
-- Busca membros com email/telefone
-- Hasheia com SHA-256 (padrão Meta)
-- Chama Meta Marketing API `POST /{ad_account_id}/customaudiences` para criar audiência
-- Depois `POST /{audience_id}/users` com os hashes
-- Usa o `META_ACCESS_TOKEN` já usado pelo sistema CAPI
+### 3. Webhook de saída na Amélia (projeto separado)
 
-### 5. Edge Function `disparar-segmento-whatsapp`
+Criar edge function `sgt-enrichment-callback` na Amélia que é chamada após classificação ou update de CS. Envia POST para o SGT com os dados acima. Isso será implementado no projeto da Amélia como etapa separada.
 
-- Recebe `id_segmento` + `mensagem` + `template_id`
-- Busca membros com telefone
-- Chama a mesma API de mensageria que o sistema já usa (ou gera CSV para download)
+### 4. Exibição no SGT
+
+Atualizar a página de Leads para mostrar os campos de enriquecimento da Amélia (badges de ICP, persona, DISC, barra de health score) quando disponíveis.
 
 ## Alterações por arquivo
 
 | Arquivo | Ação |
 |---------|------|
-| `supabase/functions/stape-webhook/index.ts` | Chamar resolver-identidade em TODOS os eventos (não só quando tem email) |
-| `supabase/functions/sincronizar-segmento-mautic/index.ts` | Nova — sincroniza segmento SGT → Mautic |
-| `supabase/functions/exportar-segmento-meta/index.ts` | Nova — cria Custom Audience no Meta Ads |
-| `supabase/functions/disparar-segmento-whatsapp/index.ts` | Nova — dispara campanha WhatsApp por segmento |
-| `src/pages/Segmentos.tsx` | Adicionar botões de ação (Mautic, WhatsApp, Meta, CSV) com modais de configuração |
-| Migration SQL | Adicionar colunas `mautic_segment_id` e `meta_audience_id` na tabela `lead_segmento` |
+| `supabase/functions/amelia-webhook/index.ts` | Nova — receptor de enriquecimento |
+| Migration SQL | Adicionar colunas `amelia_*` na tabela `lead` |
+| `src/pages/Leads.tsx` | Exibir badges ICP/Persona/DISC/Health quando preenchidos |
 
 ## Detalhes técnicos
 
-- A API do Mautic já está configurada (usada por `enriquecer-lead-mautic`) — reutiliza as mesmas credenciais
-- Meta Custom Audiences usa a Graph API v22.0 com o mesmo token do CAPI
-- O disparo de WhatsApp reutiliza a infraestrutura do `whatsapp-disparo-webhook`
-- Os anônimos no Identity Graph só consomem espaço se nunca convertem — pode-se implementar um cleanup periódico (TTL de 90 dias para entradas sem `id_lead`)
-- Cada ação é idempotente: sincronizar o mesmo segmento duas vezes não duplica dados
+- Autenticação via `x-webhook-secret` usando o `SGT_WEBHOOK_SECRET` já existente (mesmo token que a Amélia já usa para receber do SGT)
+- O `lead_id` no payload é o UUID do SGT — a Amélia já armazena isso em `lead_contacts.lead_id`
+- Idempotência: upsert por `id_lead` — reprocessar o mesmo lead apenas atualiza os campos
+- A Amélia precisará de uma edge function de callback (segundo projeto), mas o receptor no SGT fica pronto agora
 
