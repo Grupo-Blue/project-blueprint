@@ -1048,7 +1048,7 @@ const Leads = () => {
                           <CollapsibleContent asChild>
                             <TableRow className="bg-muted/30">
                               <TableCell colSpan={10} className="p-4">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-sm">
                                   {/* Coluna 1: Histórico */}
                                   <div className="space-y-2">
                                     <h4 className="font-semibold flex items-center gap-2 text-foreground">
@@ -1241,6 +1241,9 @@ const Leads = () => {
                                       )}
                                     </div>
                                   </div>
+
+                                  {/* Coluna 5: Identity Graph */}
+                                  <LeadIdentidades leadId={lead.id_lead} />
                                 </div>
                               </TableCell>
                             </TableRow>
