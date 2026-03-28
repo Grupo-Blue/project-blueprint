@@ -173,6 +173,21 @@ serve(async (req) => {
 
     console.log(`[criar-lead-api] Lead criado: ${criado.id_lead} - ${criado.nome_lead}`);
 
+    // Feed Identity Graph
+    const identifiers: { type: string; value: string }[] = [];
+    if (lead.email) identifiers.push({ type: 'email', value: lead.email });
+    if (lead.telefone) identifiers.push({ type: 'phone', value: lead.telefone });
+    if (lead.cpf) identifiers.push({ type: 'cpf', value: lead.cpf });
+    if (identifiers.length > 0) {
+      try {
+        await supabase.functions.invoke('resolver-identidade', {
+          body: { id_empresa, identifiers, source: 'criar-lead-api' },
+        });
+      } catch (igErr) {
+        console.warn('[criar-lead-api] Identity Graph erro não-crítico:', igErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
