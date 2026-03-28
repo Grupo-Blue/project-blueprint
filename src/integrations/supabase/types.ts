@@ -3578,6 +3578,16 @@ export type Database = {
       }
       lead: {
         Row: {
+          amelia_disc: string | null
+          amelia_estado_funil: string | null
+          amelia_framework: string | null
+          amelia_health_score: number | null
+          amelia_icp: string | null
+          amelia_persona: string | null
+          amelia_prioridade: number | null
+          amelia_score: number | null
+          amelia_temperatura: string | null
+          amelia_updated_at: string | null
           chatblue_atendido_por_ia: boolean | null
           chatblue_departamento: string | null
           chatblue_prioridade: string | null
@@ -3722,6 +3732,16 @@ export type Database = {
           webhook_enviado_em: string | null
         }
         Insert: {
+          amelia_disc?: string | null
+          amelia_estado_funil?: string | null
+          amelia_framework?: string | null
+          amelia_health_score?: number | null
+          amelia_icp?: string | null
+          amelia_persona?: string | null
+          amelia_prioridade?: number | null
+          amelia_score?: number | null
+          amelia_temperatura?: string | null
+          amelia_updated_at?: string | null
           chatblue_atendido_por_ia?: boolean | null
           chatblue_departamento?: string | null
           chatblue_prioridade?: string | null
@@ -3866,6 +3886,16 @@ export type Database = {
           webhook_enviado_em?: string | null
         }
         Update: {
+          amelia_disc?: string | null
+          amelia_estado_funil?: string | null
+          amelia_framework?: string | null
+          amelia_health_score?: number | null
+          amelia_icp?: string | null
+          amelia_persona?: string | null
+          amelia_prioridade?: number | null
+          amelia_score?: number | null
+          amelia_temperatura?: string | null
+          amelia_updated_at?: string | null
           chatblue_atendido_por_ia?: boolean | null
           chatblue_departamento?: string | null
           chatblue_prioridade?: string | null
