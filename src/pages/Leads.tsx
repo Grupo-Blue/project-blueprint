@@ -28,6 +28,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { LeadCardMobile } from "@/components/leads/LeadCardMobile";
 import { FiltrosMobileSheet } from "@/components/leads/FiltrosMobileSheet";
 import { useLeadsRealtime } from "@/hooks/useLeadsRealtime";
+import { LeadIdentidades } from "@/components/leads/LeadIdentidades";
 
 // Helpers - Canal simplificado
 const getCanal = (source: string | null) => {
