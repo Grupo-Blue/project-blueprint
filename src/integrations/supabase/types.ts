@@ -1799,6 +1799,57 @@ export type Database = {
           },
         ]
       }
+      identity_graph: {
+        Row: {
+          confidence: number
+          first_seen_at: string
+          id: string
+          id_empresa: string
+          id_lead: string | null
+          identifier_type: Database["public"]["Enums"]["identifier_type"]
+          identifier_value: string
+          last_seen_at: string
+          source: string
+        }
+        Insert: {
+          confidence?: number
+          first_seen_at?: string
+          id?: string
+          id_empresa: string
+          id_lead?: string | null
+          identifier_type: Database["public"]["Enums"]["identifier_type"]
+          identifier_value: string
+          last_seen_at?: string
+          source?: string
+        }
+        Update: {
+          confidence?: number
+          first_seen_at?: string
+          id?: string
+          id_empresa?: string
+          id_lead?: string | null
+          identifier_type?: Database["public"]["Enums"]["identifier_type"]
+          identifier_value?: string
+          last_seen_at?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "identity_graph_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+          {
+            foreignKeyName: "identity_graph_id_lead_fkey"
+            columns: ["id_lead"]
+            isOneToOne: false
+            referencedRelation: "lead"
+            referencedColumns: ["id_lead"]
+          },
+        ]
+      }
       instagram_metricas_dia: {
         Row: {
           alcance: number
@@ -4045,6 +4096,86 @@ export type Database = {
           },
         ]
       }
+      lead_segmento: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          id_empresa: string
+          nome: string
+          regras: Json
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          id_empresa: string
+          nome: string
+          regras?: Json
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          id_empresa?: string
+          nome?: string
+          regras?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_segmento_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      lead_segmento_membro: {
+        Row: {
+          adicionado_em: string
+          id: string
+          id_lead: string
+          id_segmento: string
+          removido_em: string | null
+        }
+        Insert: {
+          adicionado_em?: string
+          id?: string
+          id_lead: string
+          id_segmento: string
+          removido_em?: string | null
+        }
+        Update: {
+          adicionado_em?: string
+          id?: string
+          id_lead?: string
+          id_segmento?: string
+          removido_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_segmento_membro_id_lead_fkey"
+            columns: ["id_lead"]
+            isOneToOne: false
+            referencedRelation: "lead"
+            referencedColumns: ["id_lead"]
+          },
+          {
+            foreignKeyName: "lead_segmento_membro_id_segmento_fkey"
+            columns: ["id_segmento"]
+            isOneToOne: false
+            referencedRelation: "lead_segmento"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_webhook_log: {
         Row: {
           created_at: string | null
@@ -5096,6 +5227,7 @@ export type Database = {
           client_id: string
           created_at: string | null
           custom_data: Json | null
+          event_category: Database["public"]["Enums"]["event_category"] | null
           event_name: string
           event_timestamp: string | null
           fbc: string | null
@@ -5119,6 +5251,7 @@ export type Database = {
           client_id: string
           created_at?: string | null
           custom_data?: Json | null
+          event_category?: Database["public"]["Enums"]["event_category"] | null
           event_name: string
           event_timestamp?: string | null
           fbc?: string | null
@@ -5142,6 +5275,7 @@ export type Database = {
           client_id?: string
           created_at?: string | null
           custom_data?: Json | null
+          event_category?: Database["public"]["Enums"]["event_category"] | null
           event_name?: string
           event_timestamp?: string | null
           fbc?: string | null
@@ -5709,6 +5843,30 @@ export type Database = {
       app_role: "admin" | "direcao" | "trafego" | "sdr"
       canal_origem: "META" | "GOOGLE" | "ORGANICO" | "OUTRO" | "WHATSAPP"
       categoria_acao: "A" | "B" | "C"
+      event_category:
+        | "page_view"
+        | "view_content"
+        | "lead"
+        | "qualify_lead"
+        | "schedule_call"
+        | "purchase"
+        | "revenue_event"
+        | "custom"
+      identifier_type:
+        | "email"
+        | "phone"
+        | "cookie_id"
+        | "session_id"
+        | "fbp"
+        | "fbc"
+        | "gclid"
+        | "gbraid"
+        | "mautic_id"
+        | "pipedrive_id"
+        | "tokeniza_id"
+        | "cpf"
+        | "linkedin_url"
+        | "device_id"
       origem_lead: "PAGO" | "ORGANICO" | "INDICACAO" | "LISTA" | "MANUAL"
       perfil_usuario: "TRAFEGO" | "SDR_COMERCIAL" | "DIRECAO" | "ADMIN"
       plataforma_ads: "META" | "GOOGLE"
@@ -5886,6 +6044,32 @@ export const Constants = {
       app_role: ["admin", "direcao", "trafego", "sdr"],
       canal_origem: ["META", "GOOGLE", "ORGANICO", "OUTRO", "WHATSAPP"],
       categoria_acao: ["A", "B", "C"],
+      event_category: [
+        "page_view",
+        "view_content",
+        "lead",
+        "qualify_lead",
+        "schedule_call",
+        "purchase",
+        "revenue_event",
+        "custom",
+      ],
+      identifier_type: [
+        "email",
+        "phone",
+        "cookie_id",
+        "session_id",
+        "fbp",
+        "fbc",
+        "gclid",
+        "gbraid",
+        "mautic_id",
+        "pipedrive_id",
+        "tokeniza_id",
+        "cpf",
+        "linkedin_url",
+        "device_id",
+      ],
       origem_lead: ["PAGO", "ORGANICO", "INDICACAO", "LISTA", "MANUAL"],
       perfil_usuario: ["TRAFEGO", "SDR_COMERCIAL", "DIRECAO", "ADMIN"],
       plataforma_ads: ["META", "GOOGLE"],
