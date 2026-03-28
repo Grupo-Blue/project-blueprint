@@ -846,6 +846,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Feed Identity Graph
+    if (idEmpresa) {
+      const igIdentifiers: { type: string; value: string }[] = [];
+      if (personEmail) igIdentifiers.push({ type: 'email', value: personEmail });
+      if (personPhone) igIdentifiers.push({ type: 'phone', value: personPhone });
+      igIdentifiers.push({ type: 'pipedrive_id', value: String(dealId) });
+      if (igIdentifiers.length > 1) {
+        try {
+          await supabase.functions.invoke('resolver-identidade', {
+            body: { id_empresa: idEmpresa, identifiers: igIdentifiers, source: 'pipedrive' },
+          });
+        } catch (igErr) {
+          console.warn('[Pipedrive] Identity Graph erro não-crítico:', igErr);
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         message: "Webhook processed successfully",
