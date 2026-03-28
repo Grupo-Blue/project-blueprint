@@ -229,7 +229,7 @@ serve(async (req) => {
       }
     }
 
-    // Feed Identity Graph (fire-and-forget)
+    // Feed Identity Graph (fire-and-forget) — ALWAYS, even without email/phone (anonymous tracking)
     if (empresaInferida) {
       const identifiers: { type: string; value: string; confidence?: number }[] = [];
       if (client_id) identifiers.push({ type: 'cookie_id', value: client_id });
@@ -239,12 +239,14 @@ serve(async (req) => {
       if (gclid) identifiers.push({ type: 'gclid', value: gclid });
       if (emailLimpo) identifiers.push({ type: 'email', value: emailLimpo });
       if (telefoneLimpo) identifiers.push({ type: 'phone', value: telefoneLimpo });
+      if (ip_address) identifiers.push({ type: 'ip_address', value: ip_address, confidence: 0.3 });
 
       if (identifiers.length > 0) {
         try {
           await supabase.functions.invoke('resolver-identidade', {
             body: { id_empresa: empresaInferida, identifiers, source: 'stape' },
           });
+          console.log(`[Identity Graph] Enviados ${identifiers.length} identificadores (anônimo: ${!emailLimpo && !telefoneLimpo})`);
         } catch (igErr) {
           console.warn('[Identity Graph] Erro não-crítico:', igErr);
         }

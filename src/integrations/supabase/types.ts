@@ -4103,6 +4103,8 @@ export type Database = {
           descricao: string | null
           id: string
           id_empresa: string
+          mautic_segment_id: string | null
+          meta_audience_id: string | null
           nome: string
           regras: Json
           updated_at: string
@@ -4113,6 +4115,8 @@ export type Database = {
           descricao?: string | null
           id?: string
           id_empresa: string
+          mautic_segment_id?: string | null
+          meta_audience_id?: string | null
           nome: string
           regras?: Json
           updated_at?: string
@@ -4123,6 +4127,8 @@ export type Database = {
           descricao?: string | null
           id?: string
           id_empresa?: string
+          mautic_segment_id?: string | null
+          meta_audience_id?: string | null
           nome?: string
           regras?: Json
           updated_at?: string

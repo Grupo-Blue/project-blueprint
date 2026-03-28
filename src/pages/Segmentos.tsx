@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Fingerprint, Users, Plus, Eye, Trash2, RefreshCw, Layers } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Fingerprint, Users, Plus, RefreshCw, Layers, MoreHorizontal, Send, Download, Facebook, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -132,10 +133,99 @@ const Segmentos = () => {
     onError: (e) => toast.error(e.message),
   });
 
+  // --- Segment Actions ---
+  const syncMautic = useMutation({
+    mutationFn: async (id_segmento: string) => {
+      const { data, error } = await supabase.functions.invoke("sincronizar-segmento-mautic", {
+        body: { id_segmento },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Mautic sincronizado: ${data.adicionados} leads adicionados`);
+      queryClient.invalidateQueries({ queryKey: ["segmentos"] });
+    },
+    onError: (e) => toast.error(`Erro Mautic: ${e.message}`),
+  });
+
+  const exportMeta = useMutation({
+    mutationFn: async (id_segmento: string) => {
+      const { data, error } = await supabase.functions.invoke("exportar-segmento-meta", {
+        body: { id_segmento },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Meta Ads: ${data.usuarios_enviados} usuários enviados para Custom Audience`);
+      queryClient.invalidateQueries({ queryKey: ["segmentos"] });
+    },
+    onError: (e) => toast.error(`Erro Meta: ${e.message}`),
+  });
+
+  const disparoWhatsApp = useMutation({
+    mutationFn: async (id_segmento: string) => {
+      const seg = segmentos?.find(s => s.id === id_segmento);
+      const { data, error } = await supabase.functions.invoke("disparar-segmento-whatsapp", {
+        body: { id_segmento, nome_disparo: `Segmento: ${seg?.nome || id_segmento}` },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Disparo WhatsApp criado com ${data.leads_com_telefone} leads`);
+    },
+    onError: (e) => toast.error(`Erro WhatsApp: ${e.message}`),
+  });
+
+  const exportCSV = async (id_segmento: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("lead_segmento_membro")
+        .select("lead:id_lead (nome_lead, email, telefone, stage_atual, origem_canal)")
+        .eq("id_segmento", id_segmento)
+        .is("removido_em", null);
+
+      if (error) throw error;
+
+      const rows = (data || []).map((m: any) => ({
+        nome: m.lead?.nome_lead || "",
+        email: m.lead?.email || "",
+        telefone: m.lead?.telefone || "",
+        stage: m.lead?.stage_atual || "",
+        canal: m.lead?.origem_canal || "",
+      }));
+
+      const headers = ["nome", "email", "telefone", "stage", "canal"];
+      const csv = [
+        headers.join(","),
+        ...rows.map(r => headers.map(h => `"${(r as any)[h] || ""}"`).join(",")),
+      ].join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const seg = segmentos?.find(s => s.id === id_segmento);
+      a.download = `segmento-${seg?.nome || "export"}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("CSV exportado!");
+    } catch (e: any) {
+      toast.error(`Erro ao exportar: ${e.message}`);
+    }
+  };
+
   if (loadingEmpresas) {
     return <div className="flex items-center justify-center min-h-[50vh]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
   }
   if (!hasAccess) return <SemAcessoEmpresas />;
+
+  const selectedSeg = segmentos?.find(s => s.id === selectedSegmento);
 
   return (
     <>
@@ -207,13 +297,53 @@ const Segmentos = () => {
                     onClick={() => setSelectedSegmento(seg.id)}
                   >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-foreground">{seg.nome}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-foreground truncate">{seg.nome}</p>
+                          {seg.mautic_segment_id && <Badge variant="outline" className="text-[10px] px-1">Mautic</Badge>}
+                          {seg.meta_audience_id && <Badge variant="outline" className="text-[10px] px-1">Meta</Badge>}
+                        </div>
                         <p className="text-xs text-muted-foreground">{seg.descricao || regras?.tipo}</p>
                       </div>
-                      <Badge variant={count > 0 ? "default" : "secondary"} className="text-xs">
-                        {count} leads
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={count > 0 ? "default" : "secondary"} className="text-xs">
+                          {count} leads
+                        </Badge>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                            <DropdownMenuItem
+                              onClick={() => syncMautic.mutate(seg.id)}
+                              disabled={syncMautic.isPending}
+                            >
+                              <Send className="h-4 w-4 mr-2" />
+                              Sincronizar Mautic
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => exportMeta.mutate(seg.id)}
+                              disabled={exportMeta.isPending}
+                            >
+                              <Facebook className="h-4 w-4 mr-2" />
+                              Enviar Meta Ads
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => disparoWhatsApp.mutate(seg.id)}
+                              disabled={disparoWhatsApp.isPending}
+                            >
+                              <MessageCircle className="h-4 w-4 mr-2" />
+                              Disparar WhatsApp
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => exportCSV(seg.id)}>
+                              <Download className="h-4 w-4 mr-2" />
+                              Exportar CSV
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </GlassCard>
                 );
@@ -231,11 +361,42 @@ const Segmentos = () => {
             {selectedSegmento ? (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Leads do Segmento
-                    <Badge variant="outline" className="ml-auto">{membros?.length || 0} resultados</Badge>
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      {selectedSeg?.nome || "Leads do Segmento"}
+                      <Badge variant="outline" className="ml-2">{membros?.length || 0} resultados</Badge>
+                    </CardTitle>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => syncMautic.mutate(selectedSegmento)}
+                        disabled={syncMautic.isPending}
+                      >
+                        <Send className="h-3 w-3 mr-1" /> Mautic
+                      </Button>
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => exportMeta.mutate(selectedSegmento)}
+                        disabled={exportMeta.isPending}
+                      >
+                        <Facebook className="h-3 w-3 mr-1" /> Meta
+                      </Button>
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => disparoWhatsApp.mutate(selectedSegmento)}
+                        disabled={disparoWhatsApp.isPending}
+                      >
+                        <MessageCircle className="h-3 w-3 mr-1" /> WhatsApp
+                      </Button>
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => exportCSV(selectedSegmento)}
+                      >
+                        <Download className="h-3 w-3 mr-1" /> CSV
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <Table>
