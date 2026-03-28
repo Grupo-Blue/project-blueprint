@@ -182,3 +182,9 @@ verify_jwt = false
 
 [functions.criar-lead-api]
 verify_jwt = false
+
+[functions.resolver-identidade]
+verify_jwt = false
+
+[functions.calcular-segmentos]
+verify_jwt = false
