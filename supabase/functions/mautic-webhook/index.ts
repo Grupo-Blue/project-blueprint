@@ -312,6 +312,18 @@ serve(async (req) => {
       estado_mautic: estado || undefined,
     };
 
+    // Salvar segmentos Mautic no lead
+    if (contactSegments.length > 0) {
+      dadosMautic.mautic_segments = contactSegments.map(s => ({ id: s.id, name: s.name }));
+    }
+
+    // Salvar flag DoNotContact
+    const doNotContact = Array.isArray(contact.doNotContact) && contact.doNotContact.length > 0;
+    dadosMautic.mautic_do_not_contact = doNotContact;
+    if (doNotContact) {
+      console.log(`[Mautic Webhook] ⚠️ Contato marcou DoNotContact: ${email || telefone}`);
+    }
+
     // UTMs do Mautic
     if (latestUtm) {
       dadosMautic.utm_source_mautic = (latestUtm as Record<string, unknown>).utmSource || null;
@@ -469,9 +481,9 @@ serve(async (req) => {
     // Feed Identity Graph
     if (leadId) {
       const identifiers: { type: string; value: string }[] = [];
-      const contactEmail = getCoreField(contactData, 'email');
-      const contactPhone = getCoreField(contactData, 'phone') || getCoreField(contactData, 'mobile');
-      const mauticId = String(contactData.id || '');
+      const contactEmail = getCoreField(contact, 'email');
+      const contactPhone = getCoreField(contact, 'phone') || getCoreField(contact, 'mobile');
+      const mauticId = String(contact.id || '');
       if (contactEmail) identifiers.push({ type: 'email', value: contactEmail });
       if (contactPhone) identifiers.push({ type: 'phone', value: contactPhone });
       if (mauticId) identifiers.push({ type: 'mautic_id', value: mauticId });

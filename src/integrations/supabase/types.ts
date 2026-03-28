@@ -3665,6 +3665,7 @@ export type Database = {
           linkedin_ultima_atualizacao: string | null
           linkedin_url: string | null
           lp_prefix: string | null
+          mautic_do_not_contact: boolean | null
           mautic_first_visit: string | null
           mautic_last_active: string | null
           mautic_page_hits: number | null
@@ -3819,6 +3820,7 @@ export type Database = {
           linkedin_ultima_atualizacao?: string | null
           linkedin_url?: string | null
           lp_prefix?: string | null
+          mautic_do_not_contact?: boolean | null
           mautic_first_visit?: string | null
           mautic_last_active?: string | null
           mautic_page_hits?: number | null
@@ -3973,6 +3975,7 @@ export type Database = {
           linkedin_ultima_atualizacao?: string | null
           linkedin_url?: string | null
           lp_prefix?: string | null
+          mautic_do_not_contact?: boolean | null
           mautic_first_visit?: string | null
           mautic_last_active?: string | null
           mautic_page_hits?: number | null
