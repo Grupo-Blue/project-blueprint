@@ -37,6 +37,7 @@ import IRPFImportacoes from "./pages/IRPFImportacoes";
 import DashboardComercial from "./pages/DashboardComercial";
 import MetasComerciais from "./pages/MetasComerciais";
 import ExtracaoLeads from "./pages/ExtracaoLeads";
+import Segmentos from "./pages/Segmentos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -81,6 +82,7 @@ const App = () => (
             <Route path="/dashboard-comercial" element={<AppLayout><DashboardComercial /></AppLayout>} />
             <Route path="/metas-comerciais" element={<AppLayout><MetasComerciais /></AppLayout>} />
             <Route path="/extracao-leads" element={<AppLayout><ExtracaoLeads /></AppLayout>} />
+            <Route path="/segmentos" element={<AppLayout><Segmentos /></AppLayout>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
