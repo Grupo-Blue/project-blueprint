@@ -6,7 +6,7 @@ import {
   BarChart3, ListChecks, FileText, BookOpen, Target, Lightbulb,
   Eye, Activity, Building2, Calculator, AlertTriangle, Image,
   Shield, Link as LinkIcon, TrendingUp, Users, ChevronLeft,
-  ChevronRight, LogOut, Receipt, Menu
+  ChevronRight, LogOut, Receipt, Menu, Fingerprint
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +41,7 @@ const navItems: NavItem[] = [
   { label: "Aprendizados", to: "/aprendizados", icon: Lightbulb, group: "Análise" },
   { label: "Guia UTM", to: "/guia-utm", icon: BookOpen, group: "Análise" },
   { label: "Extração Leads", to: "/extracao-leads", icon: Users, group: "Análise", requiredRole: ["TRAFEGO", "ADMIN"] },
+  { label: "Segmentos", to: "/segmentos", icon: Fingerprint, group: "Análise" },
   // Admin
   { label: "IRPF", to: "/irpf-importacoes", icon: Receipt, group: "Admin", requiredRole: ["DIRECAO", "ADMIN"] },
   { label: "Contas Anúncio", to: "/contas-anuncio", icon: Building2, group: "Admin", requiredRole: ["TRAFEGO", "ADMIN"] },
