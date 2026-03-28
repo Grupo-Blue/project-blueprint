@@ -466,6 +466,29 @@ serve(async (req) => {
       }
     }
 
+    // Feed Identity Graph
+    if (leadId) {
+      const identifiers: { type: string; value: string }[] = [];
+      const contactEmail = getCoreField(contactData, 'email');
+      const contactPhone = getCoreField(contactData, 'phone') || getCoreField(contactData, 'mobile');
+      const mauticId = String(contactData.id || '');
+      if (contactEmail) identifiers.push({ type: 'email', value: contactEmail });
+      if (contactPhone) identifiers.push({ type: 'phone', value: contactPhone });
+      if (mauticId) identifiers.push({ type: 'mautic_id', value: mauticId });
+      if (identifiers.length > 0) {
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+          await fetch(`${supabaseUrl}/functions/v1/resolver-identidade`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}` },
+            body: JSON.stringify({ id_empresa: idEmpresa, identifiers, source: 'mautic' }),
+          });
+        } catch (igErr) {
+          console.warn('[Mautic Webhook] Identity Graph erro não-crítico:', igErr);
+        }
+      }
+    }
+
     const duracao = Date.now() - startTime;
     console.log(`[Mautic Webhook] Concluído em ${duracao}ms`);
 

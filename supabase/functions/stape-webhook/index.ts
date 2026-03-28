@@ -229,6 +229,28 @@ serve(async (req) => {
       }
     }
 
+    // Feed Identity Graph (fire-and-forget)
+    if (empresaInferida) {
+      const identifiers: { type: string; value: string; confidence?: number }[] = [];
+      if (client_id) identifiers.push({ type: 'cookie_id', value: client_id });
+      if (session_id) identifiers.push({ type: 'session_id', value: session_id });
+      if (fbp) identifiers.push({ type: 'fbp', value: fbp });
+      if (fbc) identifiers.push({ type: 'fbc', value: fbc });
+      if (gclid) identifiers.push({ type: 'gclid', value: gclid });
+      if (emailLimpo) identifiers.push({ type: 'email', value: emailLimpo });
+      if (telefoneLimpo) identifiers.push({ type: 'phone', value: telefoneLimpo });
+
+      if (identifiers.length > 0) {
+        try {
+          await supabase.functions.invoke('resolver-identidade', {
+            body: { id_empresa: empresaInferida, identifiers, source: 'stape' },
+          });
+        } catch (igErr) {
+          console.warn('[Identity Graph] Erro não-crítico:', igErr);
+        }
+      }
+    }
+
     const duracao = Date.now() - startTime;
 
     // Log de execução
