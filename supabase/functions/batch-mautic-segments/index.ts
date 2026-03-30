@@ -89,7 +89,13 @@ serve(async (req) => {
 
         if (!res.ok) {
           console.warn(`[Batch Mautic] Erro ao buscar contato ${lead.id_mautic_contact}: ${res.status}`);
-          errors++;
+          // If 404 (contact not found in Mautic), mark as processed with empty segments
+          if (res.status === 404) {
+            await supabase.from('lead').update({ mautic_segments: [], mautic_do_not_contact: false }).eq('id_lead', lead.id_lead);
+            updated++;
+          } else {
+            errors++;
+          }
           continue;
         }
 
