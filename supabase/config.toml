@@ -188,3 +188,6 @@ verify_jwt = false
 
 [functions.calcular-segmentos]
 verify_jwt = false
+
+[functions.mcp-server]
+verify_jwt = false
