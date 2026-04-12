@@ -393,6 +393,7 @@ export default function IRPFImportacoes() {
                 ))}
               </div>
             </ScrollArea>
+            </div>
 
             {/* Actions */}
             <div className="flex justify-end gap-2">
