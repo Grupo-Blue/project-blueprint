@@ -342,7 +342,7 @@ export default function IRPFImportacoes() {
 
       {/* Batch Processing Dialog */}
       <Dialog open={batchDialogOpen} onOpenChange={(open) => { if (!open) handleCloseBatchDialog(); }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FolderUp className="w-5 h-5" />
