@@ -67,15 +67,14 @@ serve(async (req) => {
     let erros = 0;
 
     for (const arquivo of arquivos) {
-      // Check if lote was cancelled
       const { data: loteCheck } = await supabase
         .from('irpf_importacao_lote')
         .select('status')
         .eq('id', id_lote)
         .single();
 
-      if (loteCheck?.status === 'cancelado') {
-        console.log('[processar-irpf-lote] Lote cancelado, parando processamento');
+      if (loteCheck?.status && !['pendente', 'processando'].includes(loteCheck.status)) {
+        console.log(`[processar-irpf-lote] Lote ${id_lote} interrompido com status ${loteCheck.status}`);
         break;
       }
 
@@ -86,6 +85,19 @@ serve(async (req) => {
       }
 
       try {
+        const { data: filaCheck, error: filaCheckError } = await supabase
+          .from('irpf_importacao_fila')
+          .select('status')
+          .eq('id', arquivo.id)
+          .single();
+
+        if (filaCheckError) throw filaCheckError;
+
+        if (filaCheck?.status !== 'pendente') {
+          console.log(`[processar-irpf-lote] Arquivo ${arquivo.id} ignorado com status ${filaCheck?.status}`);
+          continue;
+        }
+
         // Mark file as processing
         await supabase
           .from('irpf_importacao_fila')
@@ -186,18 +198,20 @@ serve(async (req) => {
       .eq('id', id_lote)
       .single();
 
-    const wasCancelled = loteFinal?.status === 'cancelado';
+    const hasLockedFinalStatus = !!loteFinal?.status && !['pendente', 'processando'].includes(loteFinal.status);
 
-    const finalStatus = wasCancelled ? 'cancelado' : (pendingCount || 0) > 0 ? 'processando' : 'concluido';
+    const finalStatus = hasLockedFinalStatus && loteFinal?.status
+      ? loteFinal.status
+      : (pendingCount || 0) > 0 ? 'processando' : 'concluido';
 
-    if (!wasCancelled) {
+    if (!hasLockedFinalStatus) {
       await supabase
         .from('irpf_importacao_lote')
         .update({ status: finalStatus })
         .eq('id', id_lote);
     }
 
-    // If there are still pending files and not cancelled, re-invoke via fetch
+    // If there are still pending files and not manually stopped, re-invoke via fetch
     if (finalStatus === 'processando' && (pendingCount || 0) > 0) {
       console.log(`[processar-irpf-lote] ${pendingCount} pendentes, re-invocando via fetch...`);
       fetch(`${supabaseUrl}/functions/v1/processar-irpf-lote`, {
