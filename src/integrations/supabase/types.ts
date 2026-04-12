@@ -2947,6 +2947,94 @@ export type Database = {
           },
         ]
       }
+      irpf_importacao_fila: {
+        Row: {
+          created_at: string
+          erro_mensagem: string | null
+          id: string
+          id_lote: string
+          nome_arquivo: string
+          resultado: Json | null
+          status: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          erro_mensagem?: string | null
+          id?: string
+          id_lote: string
+          nome_arquivo: string
+          resultado?: Json | null
+          status?: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          erro_mensagem?: string | null
+          id?: string
+          id_lote?: string
+          nome_arquivo?: string
+          resultado?: Json | null
+          status?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_importacao_fila_id_lote_fkey"
+            columns: ["id_lote"]
+            isOneToOne: false
+            referencedRelation: "irpf_importacao_lote"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irpf_importacao_lote: {
+        Row: {
+          created_at: string
+          created_by: string
+          erros: number
+          id: string
+          id_empresa: string
+          processados: number
+          status: string
+          total_arquivos: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          erros?: number
+          id?: string
+          id_empresa: string
+          processados?: number
+          status?: string
+          total_arquivos?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          erros?: number
+          id?: string
+          id_empresa?: string
+          processados?: number
+          status?: string
+          total_arquivos?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_importacao_lote_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       irpf_imposto_pago: {
         Row: {
           codigo: string
