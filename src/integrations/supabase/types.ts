@@ -5951,7 +5951,13 @@ export type Database = {
         | "cpf"
         | "linkedin_url"
         | "device_id"
-      origem_lead: "PAGO" | "ORGANICO" | "INDICACAO" | "LISTA" | "MANUAL"
+      origem_lead:
+        | "PAGO"
+        | "ORGANICO"
+        | "INDICACAO"
+        | "LISTA"
+        | "MANUAL"
+        | "IRPF"
       perfil_usuario: "TRAFEGO" | "SDR_COMERCIAL" | "DIRECAO" | "ADMIN"
       plataforma_ads: "META" | "GOOGLE"
       plataforma_midia: "META" | "GOOGLE"
@@ -6154,7 +6160,7 @@ export const Constants = {
         "linkedin_url",
         "device_id",
       ],
-      origem_lead: ["PAGO", "ORGANICO", "INDICACAO", "LISTA", "MANUAL"],
+      origem_lead: ["PAGO", "ORGANICO", "INDICACAO", "LISTA", "MANUAL", "IRPF"],
       perfil_usuario: ["TRAFEGO", "SDR_COMERCIAL", "DIRECAO", "ADMIN"],
       plataforma_ads: ["META", "GOOGLE"],
       plataforma_midia: ["META", "GOOGLE"],

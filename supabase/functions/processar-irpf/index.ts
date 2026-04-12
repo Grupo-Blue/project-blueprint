@@ -818,7 +818,7 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
         nome_lead: irpfData.identificacao.nome,
         email: irpfData.endereco?.email || null,
         telefone: telefoneNormalizado,
-        origem_tipo: 'IRPF_IMPORTACAO',
+        origem_tipo: 'IRPF',
         stage_atual: 'Lead',
         id_irpf_declaracao: declaracao.id,
         id_cliente_notion: clienteNotion?.id_cliente || null,
