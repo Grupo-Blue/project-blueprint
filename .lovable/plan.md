@@ -1,28 +1,38 @@
 
 
-## Diagnóstico do Erro
+## Diagnóstico
 
-Dois problemas foram identificados nos logs:
+Todos os 10 erros são idênticos: o campo `origem_tipo` na tabela `lead` usa o enum `origem_lead`, que aceita apenas: `PAGO`, `ORGANICO`, `INDICACAO`, `LISTA`, `MANUAL`. O valor `IRPF_IMPORTACAO` não existe nesse enum.
 
-### Bug 1: Coluna `origem` não existe na tabela `lead`
-O código tenta inserir `origem: 'IRPF'` ao criar um lead automaticamente (linha 808), mas a tabela `lead` não possui essa coluna -- só possui `origem_tipo`. Isso causa o erro `PGRST204: Could not find the 'origem' column`.
+Os erros acontecem apenas quando nenhum lead existente é encontrado (por email, telefone ou CPF), e o sistema tenta criar um novo lead com `origem_tipo: 'IRPF_IMPORTACAO'`.
 
-### Bug 2: IA retorna JSON com markdown (parcialmente tratado)
-A IA às vezes retorna o JSON envolvido em ` ```json ``` `. O regex de limpeza já existe (linha 322), mas o erro indica que falhou neste caso específico -- provavelmente porque a resposta tem formatação ligeiramente diferente do esperado.
+A declaração IRPF é processada e salva corretamente -- o erro ocorre somente na etapa de criação automática do lead.
 
 ---
 
 ## Plano de Correção
 
-### 1. Remover campo `origem` do insert de lead
-Na função `processar-irpf/index.ts`, remover a linha `origem: 'IRPF'` do objeto `novoLead` (linha 808), mantendo apenas `origem_tipo: 'IRPF_IMPORTACAO'` que é a coluna válida.
+### 1. Adicionar valor ao enum `origem_lead`
+Criar uma migration SQL para adicionar `IRPF` ao enum:
+```sql
+ALTER TYPE origem_lead ADD VALUE 'IRPF';
+```
 
-### 2. Melhorar o parsing de JSON da IA
-Tornar o regex de extração de JSON mais robusto para lidar com variações de formatação:
-- Tentar primeiro o regex existente
-- Se falhar, tentar encontrar o primeiro `{` e último `}` no conteúdo
-- Adicionar trim mais agressivo antes do parse
+### 2. Atualizar o código da Edge Function
+Em `supabase/functions/processar-irpf/index.ts`, alterar a linha 821 de:
+```
+origem_tipo: 'IRPF_IMPORTACAO'
+```
+para:
+```
+origem_tipo: 'IRPF'
+```
+
+### 3. Redeployar a função `processar-irpf`
 
 ### Arquivos alterados
-- `supabase/functions/processar-irpf/index.ts` (duas correções)
+- Migration SQL (novo enum value)
+- `supabase/functions/processar-irpf/index.ts` (linha 821)
+
+Após a correção, as 10 declarações que deram erro podem ser reimportadas -- os dados fiscais já foram salvos, falta apenas a criação do lead.
 
