@@ -319,9 +319,22 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
     let irpfData: IRPFData;
     try {
       // Tentar extrair JSON de blocos de código
-      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
-      const jsonStr = jsonMatch ? jsonMatch[1] : content;
-      irpfData = JSON.parse(jsonStr.trim());
+      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/```\s*([\s\S]*?)\s*```/);
+      let jsonStr = jsonMatch ? jsonMatch[1].trim() : content.trim();
+      
+      // Fallback: encontrar primeiro { e último }
+      if (!jsonStr.startsWith('{')) {
+        const firstBrace = jsonStr.indexOf('{');
+        const lastBrace = jsonStr.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+        }
+      }
+      
+      // Remover trailing commas antes de } ou ]
+      jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+      
+      irpfData = JSON.parse(jsonStr);
     } catch (parseError) {
       console.error("[processar-irpf] Erro ao parsear JSON:", parseError);
       console.log("[processar-irpf] Conteúdo recebido:", content.substring(0, 500));
@@ -805,7 +818,6 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
         nome_lead: irpfData.identificacao.nome,
         email: irpfData.endereco?.email || null,
         telefone: telefoneNormalizado,
-        origem: 'IRPF',
         origem_tipo: 'IRPF_IMPORTACAO',
         stage_atual: 'Lead',
         id_irpf_declaracao: declaracao.id,
