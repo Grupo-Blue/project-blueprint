@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const BATCH_SIZE = 5; // Processar 5 arquivos por invocação para evitar timeout
+const MAX_EXECUTION_MS = 50000; // 50s safety limit (edge function timeout ~60s)
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -17,7 +20,16 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    console.log('[monitorar-pasta-irpf] Iniciando monitoramento...');
+    // Aceitar batch_size customizado via body
+    let customBatchSize = BATCH_SIZE;
+    try {
+      const body = await req.json();
+      if (body?.batch_size && typeof body.batch_size === 'number') {
+        customBatchSize = Math.min(body.batch_size, 10); // Max 10 por segurança
+      }
+    } catch { /* sem body, usar default */ }
+
+    console.log(`[monitorar-pasta-irpf] Iniciando (batch_size=${customBatchSize})...`);
 
     // Buscar configuração de integração Google Drive
     const { data: integracao, error: intError } = await supabase
@@ -65,8 +77,8 @@ serve(async (req) => {
 
     const { access_token } = await tokenResponse.json();
 
-    // Listar arquivos PDF na pasta
-    const listUrl = `https://www.googleapis.com/drive/v3/files?q='${config.folder_id}'+in+parents+and+mimeType='application/pdf'+and+trashed=false&fields=files(id,name,createdTime)`;
+    // Listar PDFs com paginação - pegar apenas batch_size arquivos
+    const listUrl = `https://www.googleapis.com/drive/v3/files?q='${config.folder_id}'+in+parents+and+mimeType='application/pdf'+and+trashed=false&fields=files(id,name,createdTime),nextPageToken&pageSize=${customBatchSize}&orderBy=createdTime`;
     
     const listResponse = await fetch(listUrl, {
       headers: { Authorization: `Bearer ${access_token}` },
@@ -78,13 +90,61 @@ serve(async (req) => {
       throw new Error('Falha ao listar arquivos');
     }
 
-    const { files } = await listResponse.json();
-    console.log(`[monitorar-pasta-irpf] Encontrados ${files?.length || 0} PDFs`);
+    const listData = await listResponse.json();
+    const files = listData.files || [];
+    const hasMore = !!listData.nextPageToken;
+
+    // Contar total de PDFs na pasta (query separada, sem baixar)
+    let totalPendentes = files.length;
+    if (hasMore) {
+      const countUrl = `https://www.googleapis.com/drive/v3/files?q='${config.folder_id}'+in+parents+and+mimeType='application/pdf'+and+trashed=false&fields=files(id)&pageSize=1000`;
+      const countResponse = await fetch(countUrl, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      if (countResponse.ok) {
+        const countData = await countResponse.json();
+        totalPendentes = countData.files?.length || files.length;
+      }
+    }
+
+    console.log(`[monitorar-pasta-irpf] ${files.length} PDFs neste lote, ${totalPendentes} total pendentes`);
 
     let processados = 0;
     let erros = 0;
 
-    for (const file of files || []) {
+    // Garantir pasta "processados" existe (uma vez por invocação)
+    let processadosFolderId: string | null = null;
+    const checkFolderUrl = `https://www.googleapis.com/drive/v3/files?q='${config.folder_id}'+in+parents+and+name='processados'+and+mimeType='application/vnd.google-apps.folder'+and+trashed=false`;
+    const checkFolderResponse = await fetch(checkFolderUrl, {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    const { files: existingFolders } = await checkFolderResponse.json();
+    processadosFolderId = existingFolders?.[0]?.id || null;
+
+    if (!processadosFolderId) {
+      const createFolderResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'processados',
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: [config.folder_id],
+        }),
+      });
+      const newFolder = await createFolderResponse.json();
+      processadosFolderId = newFolder.id;
+    }
+
+    for (const file of files) {
+      // Verificar se estamos próximos do timeout
+      if (Date.now() - startTime > MAX_EXECUTION_MS) {
+        console.log('[monitorar-pasta-irpf] Próximo do timeout, parando lote');
+        break;
+      }
+
       try {
         console.log(`[monitorar-pasta-irpf] Processando: ${file.name}`);
 
@@ -118,32 +178,6 @@ serve(async (req) => {
           continue;
         }
 
-        // Criar/verificar pasta "processados"
-        const checkFolderUrl = `https://www.googleapis.com/drive/v3/files?q='${config.folder_id}'+in+parents+and+name='processados'+and+mimeType='application/vnd.google-apps.folder'+and+trashed=false`;
-        const checkFolderResponse = await fetch(checkFolderUrl, {
-          headers: { Authorization: `Bearer ${access_token}` },
-        });
-        
-        const { files: existingFolders } = await checkFolderResponse.json();
-        let processadosFolderId = existingFolders?.[0]?.id;
-
-        if (!processadosFolderId) {
-          const createFolderResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              name: 'processados',
-              mimeType: 'application/vnd.google-apps.folder',
-              parents: [config.folder_id],
-            }),
-          });
-          const newFolder = await createFolderResponse.json();
-          processadosFolderId = newFolder.id;
-        }
-
         // Mover arquivo para pasta "processados"
         await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?addParents=${processadosFolderId}&removeParents=${config.folder_id}`, {
           method: 'PATCH',
@@ -159,6 +193,7 @@ serve(async (req) => {
     }
 
     const duracao = Date.now() - startTime;
+    const restantes = totalPendentes - processados;
 
     // Registrar execução
     await supabase.from('cronjob_execucao').insert({
@@ -166,19 +201,25 @@ serve(async (req) => {
       status: erros === 0 ? 'sucesso' : 'parcial',
       duracao_ms: duracao,
       detalhes_execucao: {
-        arquivos_encontrados: files?.length || 0,
+        arquivos_neste_lote: files.length,
+        total_pendentes: totalPendentes,
         processados,
         erros,
+        restantes,
+        has_more: restantes > 0,
       },
     });
 
-    console.log(`[monitorar-pasta-irpf] Concluído: ${processados} processados, ${erros} erros`);
+    console.log(`[monitorar-pasta-irpf] Lote concluído: ${processados} processados, ${erros} erros, ${restantes} restantes`);
 
     return new Response(JSON.stringify({
       success: true,
-      arquivos_encontrados: files?.length || 0,
+      arquivos_neste_lote: files.length,
+      total_pendentes: totalPendentes,
       processados,
       erros,
+      restantes,
+      has_more: restantes > 0,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
