@@ -369,8 +369,7 @@ export default function IRPFImportacoes() {
             )}
 
             {/* File list */}
-            <div className="flex-1 min-h-0 overflow-hidden" style={{ maxHeight: '400px' }}>
-            <ScrollArea className="h-full">
+            <div className="flex-1 min-h-0 overflow-y-auto max-h-[400px] pr-1">
               <div className="space-y-1">
                 {batchFiles.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-3 p-2 rounded-md border text-sm">
@@ -392,7 +391,6 @@ export default function IRPFImportacoes() {
                   </div>
                 ))}
               </div>
-            </ScrollArea>
             </div>
 
             {/* Actions */}
