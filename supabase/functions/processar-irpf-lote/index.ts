@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const MAX_EXECUTION_MS = 55000; // 55s safety limit
+const MAX_EXECUTION_MS = 50000; // 50s safety limit
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -69,7 +69,7 @@ serve(async (req) => {
     for (const arquivo of arquivos) {
       // Check timeout
       if (Date.now() - startTime > MAX_EXECUTION_MS) {
-        console.log('[processar-irpf-lote] Próximo do timeout, parando');
+        console.log('[processar-irpf-lote] Próximo do timeout, parando loop');
         break;
       }
 
@@ -122,7 +122,7 @@ serve(async (req) => {
 
         processados++;
 
-        // Delete file from storage (não precisa armazenar)
+        // Delete file from storage
         await supabase.storage.from('irpf-uploads').remove([arquivo.storage_path]);
 
       } catch (err) {
@@ -136,29 +136,29 @@ serve(async (req) => {
 
         erros++;
 
-        // Also delete file from storage on error
+        // Delete file from storage on error too
         await supabase.storage.from('irpf-uploads').remove([arquivo.storage_path]);
       }
 
-      // Update lote counters after each file
-      await supabase.rpc('increment_lote_counters', { 
-        lote_id: id_lote, 
-        add_processados: arquivo.id === arquivos[arquivos.length - 1]?.id ? processados : 0,
-        add_erros: arquivo.id === arquivos[arquivos.length - 1]?.id ? erros : 0,
-      }).catch(() => {
-        // Fallback: direct update
-      });
+      // Update lote counters after EACH file
+      const { data: currentLote } = await supabase
+        .from('irpf_importacao_lote')
+        .select('processados, erros')
+        .eq('id', id_lote)
+        .single();
+
+      await supabase
+        .from('irpf_importacao_lote')
+        .update({
+          processados: (currentLote?.processados || 0) + (processados > 0 ? 1 : 0),
+          erros: (currentLote?.erros || 0) + (erros > 0 ? 1 : 0),
+        })
+        .eq('id', id_lote);
+
+      // Reset per-iteration counters (already flushed to DB)
+      processados = 0;
+      erros = 0;
     }
-
-    // Final update of lote counters
-    const { data: currentLote } = await supabase
-      .from('irpf_importacao_lote')
-      .select('processados, erros')
-      .eq('id', id_lote)
-      .single();
-
-    const newProcessados = (currentLote?.processados || 0) + processados;
-    const newErros = (currentLote?.erros || 0) + erros;
 
     // Check if there are still pending files
     const { count: pendingCount } = await supabase
@@ -171,29 +171,28 @@ serve(async (req) => {
 
     await supabase
       .from('irpf_importacao_lote')
-      .update({
-        processados: newProcessados,
-        erros: newErros,
-        status: finalStatus,
-      })
+      .update({ status: finalStatus })
       .eq('id', id_lote);
 
-    // If there are still pending files (timeout), re-invoke self
+    // If there are still pending files, re-invoke via fetch
     if (finalStatus === 'processando' && (pendingCount || 0) > 0) {
-      console.log(`[processar-irpf-lote] ${pendingCount} pendentes, re-invocando...`);
-      // Fire and forget
-      supabase.functions.invoke('processar-irpf-lote', {
-        body: { id_lote },
+      console.log(`[processar-irpf-lote] ${pendingCount} pendentes, re-invocando via fetch...`);
+      fetch(`${supabaseUrl}/functions/v1/processar-irpf-lote`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify({ id_lote }),
       }).catch(err => console.error('[processar-irpf-lote] Erro ao re-invocar:', err));
     }
 
-    console.log(`[processar-irpf-lote] Lote ${id_lote}: ${processados} processados, ${erros} erros, status=${finalStatus}`);
+    console.log(`[processar-irpf-lote] Lote ${id_lote}: status=${finalStatus}, pendentes=${pendingCount || 0}`);
 
     return new Response(JSON.stringify({
       success: true,
-      processados,
-      erros,
       status: finalStatus,
+      pending: pendingCount || 0,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

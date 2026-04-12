@@ -182,7 +182,11 @@ export default function IRPFImportacoes() {
       // 2. Upload each file and create fila record
       for (let i = 0; i < pdfFiles.length; i++) {
         const file = pdfFiles[i];
-        const storagePath = `${lote.id}/${crypto.randomUUID()}_${file.name}`;
+        const safeName = file.name
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-zA-Z0-9._-]/g, '_')
+          .replace(/_+/g, '_');
+        const storagePath = `${lote.id}/${crypto.randomUUID()}_${safeName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('irpf-uploads')
