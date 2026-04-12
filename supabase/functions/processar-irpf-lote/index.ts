@@ -67,6 +67,18 @@ serve(async (req) => {
     let erros = 0;
 
     for (const arquivo of arquivos) {
+      // Check if lote was cancelled
+      const { data: loteCheck } = await supabase
+        .from('irpf_importacao_lote')
+        .select('status')
+        .eq('id', id_lote)
+        .single();
+
+      if (loteCheck?.status === 'cancelado') {
+        console.log('[processar-irpf-lote] Lote cancelado, parando processamento');
+        break;
+      }
+
       // Check timeout
       if (Date.now() - startTime > MAX_EXECUTION_MS) {
         console.log('[processar-irpf-lote] Próximo do timeout, parando loop');
