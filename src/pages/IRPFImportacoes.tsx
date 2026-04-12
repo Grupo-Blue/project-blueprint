@@ -353,7 +353,7 @@ export default function IRPFImportacoes() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-hidden flex flex-col min-h-0">
             {/* Progress bar */}
             {isBatchProcessing && (
               <div className="space-y-2">
@@ -369,15 +369,15 @@ export default function IRPFImportacoes() {
             )}
 
             {/* File list */}
-            <ScrollArea className="max-h-[400px]">
-              <div className="space-y-1">
+            <ScrollArea className="max-h-[400px] min-h-0 flex-1">
+              <div className="space-y-1 pr-3">
                 {batchFiles.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-2 rounded-md border text-sm">
+                  <div key={idx} className="flex items-center gap-3 p-2 rounded-md border text-sm overflow-hidden">
                     {item.status === 'pending' && <Clock className="w-4 h-4 text-muted-foreground shrink-0" />}
                     {item.status === 'processing' && <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />}
                     {item.status === 'success' && <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />}
                     {item.status === 'error' && <AlertCircle className="w-4 h-4 text-destructive shrink-0" />}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 overflow-hidden">
                       <p className="truncate font-medium">{item.file.name}</p>
                       {item.result && (
                         <p className={`text-xs truncate ${item.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
