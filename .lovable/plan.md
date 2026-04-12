@@ -1,55 +1,40 @@
-## Importação IRPF em Segundo Plano
 
-### Problema Atual
 
-Os PDFs são processados um a um no frontend. O usuário precisa manter a tela aberta durante todo o processamento.
+## Diagnóstico
 
-### Solução
+### Problema 1: Uploads falham com "Invalid key"
+O Supabase Storage **não aceita espaços** nos caminhos de arquivo. Nomes como `1 - Cópia da última declaração entregue.pdf` e `01 DECLARAÇÃO IRPF ANO 2019 EXERCICIO 2020.pdf` geram erro `Invalid key`. São 4 dos 12 arquivos.
 
-Dividir em duas etapas: **upload rápido** para o Storage e **processamento assíncrono** em background via Edge Function.
+**Correção**: Sanitizar o nome do arquivo antes do upload, substituindo espaços e caracteres especiais por underscores/hifens.
 
-### Arquitetura
+### Problema 2: Processamento travou após 1 arquivo
+Três causas combinadas:
 
-```text
-1. Usuário seleciona PDFs
-2. Frontend faz upload de todos para Storage (bucket irpf-uploads)
-3. Frontend cria registros na tabela irpf_importacao_fila (status: pendente)
-4. Frontend cria um registro "lote" na tabela irpf_importacao_lote
-5. Após todos os uploads, chama Edge Function processar-irpf-lote (fire-and-forget)
-6. Edge Function processa cada arquivo da fila sequencialmente
-7. Usuário pode sair e voltar — consulta o lote para ver resultado
+1. **RPC inexistente**: O código chama `supabase.rpc('increment_lote_counters')` mas essa função **não existe** no banco. O `.catch()` silencia o erro, então os contadores nunca são atualizados durante o processamento.
+
+2. **Timeout + re-invocação falhando**: Cada chamada ao `processar-irpf` (que usa IA) leva dezenas de segundos. Com o limite de 55s, a função só consegue processar ~1 arquivo por execução. A re-invocação (`supabase.functions.invoke` de si mesma) aparentemente não está funcionando — não há logs da função sendo executada novamente.
+
+3. **Contadores zerados**: O lote mostra `processados: 0` apesar de 1 arquivo ter sido processado com sucesso, porque o RPC falhou silenciosamente e a lógica de fallback não foi implementada.
+
+---
+
+## Plano de Correção
+
+### 1. Sanitizar nomes de arquivos no upload (Frontend)
+Em `src/pages/IRPFImportacoes.tsx`, criar função que substitui espaços e caracteres acentuados/especiais por equivalentes seguros antes de montar o `storagePath`:
+```
+"01 DECLARAÇÃO IRPF.pdf" → "01_DECLARACAO_IRPF.pdf"
 ```
 
-### Mudanças no Banco de Dados
+### 2. Remover RPC inexistente e atualizar contadores diretamente (Edge Function)
+Em `processar-irpf-lote/index.ts`:
+- Remover a chamada ao `supabase.rpc('increment_lote_counters')`
+- Atualizar os contadores do lote diretamente via `.update()` após **cada arquivo** processado (não apenas no final)
 
-**Tabela `irpf_importacao_lote**` — agrupa um lote de importação:
+### 3. Corrigir re-invocação para continuar processamento
+A re-invocação precisa usar a URL completa da função com `fetch()` e o service role key, porque `supabase.functions.invoke()` de dentro de uma Edge Function pode não funcionar corretamente. Usar `fetch` direto com o header `Authorization: Bearer <service_role_key>`.
 
-- `id`, `id_empresa`, `total_arquivos`, `processados`, `erros`, `status` (pendente/processando/concluido), `created_at`, `updated_at`, `created_by`
+### Arquivos alterados
+- `src/pages/IRPFImportacoes.tsx` — sanitização de nomes de arquivo
+- `supabase/functions/processar-irpf-lote/index.ts` — contadores diretos + re-invocação via fetch
 
-**Tabela `irpf_importacao_fila**` — cada arquivo individual:
-
-- `id`, `id_lote`, `nome_arquivo`, `storage_path`, `status` (pendente/processando/sucesso/erro), `resultado`, `erro_mensagem`, `created_at`, `updated_at`
-
-**Storage bucket** `irpf-uploads` (privado) com RLS para usuários autenticados.
-
-### Nova Edge Function: `processar-irpf-lote`
-
-- Recebe `id_lote`
-- Busca arquivos pendentes da fila
-- Para cada: baixa do Storage, converte para base64, chama `processar-irpf` internamente
-- Atualiza status de cada item e contadores do lote
-- Ao final, marca lote como concluído
-- O arquivo PDF após processado pode ser jogado fora, não precisa armazenar.
-
-### Mudanças no Frontend (`IRPFImportacoes.tsx`)
-
-1. **Upload**: Ao selecionar arquivos, faz upload para Storage e cria registros na fila. Mostra progresso de upload (rápido).
-2. **Processamento**: Após uploads, chama `processar-irpf-lote` sem esperar resposta.
-3. **Histórico de Lotes**: Nova seção mostrando lotes recentes com status, contagem de sucesso/erro, e lista dos arquivos com erro expandível.
-4. **Polling**: Enquanto um lote estiver "processando", faz polling a cada 5s para atualizar status.
-
-### Arquivos Alterados
-
-- **Migration SQL**: criar tabelas, bucket e RLS
-- `**supabase/functions/processar-irpf-lote/index.ts**`: nova Edge Function
-- `**src/pages/IRPFImportacoes.tsx**`: refatorar upload e adicionar seção de histórico de lotes
