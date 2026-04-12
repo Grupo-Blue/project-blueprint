@@ -347,41 +347,112 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
       console.log("[processar-irpf] Cliente Notion encontrado:", clienteExistente.nome);
     }
 
-    // 2. Inserir declaração principal
-    const { data: declaracao, error: declError } = await supabase
+    // 2. Verificar se já existe declaração para este CPF + exercício (deduplicação)
+    const { data: declaracaoExistente } = await supabase
       .from('irpf_declaracao')
-      .insert({
-        id_empresa,
-        id_cliente_notion: clienteNotion?.id_cliente,
-        cpf: cpfFormatado,
-        nome_contribuinte: irpfData.identificacao.nome,
-        data_nascimento: irpfData.identificacao.dataNascimento || null,
-        exercicio: irpfData.identificacao.exercicio,
-        ano_calendario: irpfData.identificacao.anoCalendario,
-        tipo_declaracao: irpfData.identificacao.tipoDeclaracao || 'original',
-        possui_conjuge: irpfData.conjuge?.possui || false,
-        cpf_conjuge: irpfData.conjuge?.cpf,
-        nome_conjuge: irpfData.conjuge?.nome,
-        endereco_logradouro: irpfData.endereco?.logradouro,
-        endereco_numero: irpfData.endereco?.numero,
-        endereco_complemento: irpfData.endereco?.complemento,
-        endereco_bairro: irpfData.endereco?.bairro,
-        endereco_municipio: irpfData.endereco?.municipio,
-        endereco_uf: irpfData.endereco?.uf,
-        endereco_cep: irpfData.endereco?.cep,
-        email: irpfData.endereco?.email,
-        status_processamento: 'concluido',
-        arquivo_origem,
-      })
-      .select()
-      .single();
+      .select('id')
+      .eq('cpf', cpfFormatado)
+      .eq('exercicio', irpfData.identificacao.exercicio)
+      .eq('id_empresa', id_empresa)
+      .maybeSingle();
 
-    if (declError) {
-      console.error("[processar-irpf] Erro ao inserir declaração:", declError);
-      throw new Error(`Erro ao salvar declaração: ${declError.message}`);
+    if (declaracaoExistente) {
+      console.log(`[processar-irpf] Declaração já existe para CPF ${cpfFormatado} exercício ${irpfData.identificacao.exercicio}, atualizando...`);
+      
+      // Deletar dados antigos das subtabelas para reinserir com dados novos
+      const oldId = declaracaoExistente.id;
+      await Promise.all([
+        supabase.from('irpf_dependente').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_alimentando').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_rendimento').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_imposto_pago').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_pagamento_deducao').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_doacao').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_bem_direito').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_divida_onus').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_atividade_rural').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_ganho_capital').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_renda_variavel').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_fundo_imobiliario').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_demonstrativo_lei_14754').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_resumo_tributario').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_evolucao_patrimonial').delete().eq('id_declaracao', oldId),
+        supabase.from('irpf_outras_informacoes').delete().eq('id_declaracao', oldId),
+      ]);
     }
 
-    console.log("[processar-irpf] Declaração criada:", declaracao.id);
+    // Inserir ou atualizar declaração principal
+    let declaracao: { id: string };
+    
+    if (declaracaoExistente) {
+      const { data: declAtualizada, error: declError } = await supabase
+        .from('irpf_declaracao')
+        .update({
+          id_cliente_notion: clienteNotion?.id_cliente,
+          nome_contribuinte: irpfData.identificacao.nome,
+          data_nascimento: irpfData.identificacao.dataNascimento || null,
+          ano_calendario: irpfData.identificacao.anoCalendario,
+          tipo_declaracao: irpfData.identificacao.tipoDeclaracao || 'original',
+          possui_conjuge: irpfData.conjuge?.possui || false,
+          cpf_conjuge: irpfData.conjuge?.cpf,
+          nome_conjuge: irpfData.conjuge?.nome,
+          endereco_logradouro: irpfData.endereco?.logradouro,
+          endereco_numero: irpfData.endereco?.numero,
+          endereco_complemento: irpfData.endereco?.complemento,
+          endereco_bairro: irpfData.endereco?.bairro,
+          endereco_municipio: irpfData.endereco?.municipio,
+          endereco_uf: irpfData.endereco?.uf,
+          endereco_cep: irpfData.endereco?.cep,
+          email: irpfData.endereco?.email,
+          status_processamento: 'concluido',
+          arquivo_origem,
+        })
+        .eq('id', declaracaoExistente.id)
+        .select()
+        .single();
+
+      if (declError) {
+        console.error("[processar-irpf] Erro ao atualizar declaração:", declError);
+        throw new Error(`Erro ao atualizar declaração: ${declError.message}`);
+      }
+      declaracao = declAtualizada!;
+      console.log("[processar-irpf] Declaração atualizada:", declaracao.id);
+    } else {
+      const { data: declNova, error: declError } = await supabase
+        .from('irpf_declaracao')
+        .insert({
+          id_empresa,
+          id_cliente_notion: clienteNotion?.id_cliente,
+          cpf: cpfFormatado,
+          nome_contribuinte: irpfData.identificacao.nome,
+          data_nascimento: irpfData.identificacao.dataNascimento || null,
+          exercicio: irpfData.identificacao.exercicio,
+          ano_calendario: irpfData.identificacao.anoCalendario,
+          tipo_declaracao: irpfData.identificacao.tipoDeclaracao || 'original',
+          possui_conjuge: irpfData.conjuge?.possui || false,
+          cpf_conjuge: irpfData.conjuge?.cpf,
+          nome_conjuge: irpfData.conjuge?.nome,
+          endereco_logradouro: irpfData.endereco?.logradouro,
+          endereco_numero: irpfData.endereco?.numero,
+          endereco_complemento: irpfData.endereco?.complemento,
+          endereco_bairro: irpfData.endereco?.bairro,
+          endereco_municipio: irpfData.endereco?.municipio,
+          endereco_uf: irpfData.endereco?.uf,
+          endereco_cep: irpfData.endereco?.cep,
+          email: irpfData.endereco?.email,
+          status_processamento: 'concluido',
+          arquivo_origem,
+        })
+        .select()
+        .single();
+
+      if (declError) {
+        console.error("[processar-irpf] Erro ao inserir declaração:", declError);
+        throw new Error(`Erro ao salvar declaração: ${declError.message}`);
+      }
+      declaracao = declNova!;
+      console.log("[processar-irpf] Declaração criada:", declaracao.id);
+    }
 
     // 3. Inserir dependentes
     if (irpfData.dependentes?.length > 0) {
