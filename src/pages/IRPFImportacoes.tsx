@@ -649,37 +649,60 @@ function LoteItem({ lote }: { lote: any }) {
     e.stopPropagation();
     setIsCancelling(true);
     try {
-      // 1. Get pending files to clean up storage
-      const { data: pendingFiles } = await supabase
+      const { data: pendingFiles, error: pendingFilesError } = await supabase
         .from('irpf_importacao_fila')
         .select('id, storage_path')
         .eq('id_lote', lote.id)
-        .in('status', ['pendente', 'processando']);
+        .eq('status', 'pendente');
 
-      // 2. Mark pending files as cancelled
-      await supabase
+      if (pendingFilesError) throw pendingFilesError;
+
+      const { error: filaUpdateError } = await supabase
         .from('irpf_importacao_fila')
         .update({ status: 'erro', erro_mensagem: 'Cancelado pelo usuário' })
         .eq('id_lote', lote.id)
-        .in('status', ['pendente', 'processando']);
+        .eq('status', 'pendente');
 
-      // 3. Delete pending files from storage
-      if (pendingFiles && pendingFiles.length > 0) {
-        const paths = pendingFiles.map(f => f.storage_path);
-        await supabase.storage.from('irpf-uploads').remove(paths);
-      }
+      if (filaUpdateError) throw filaUpdateError;
 
-      // 4. Mark lote as cancelled
-      await supabase
+      const { data: filaSnapshot, error: filaSnapshotError } = await supabase
+        .from('irpf_importacao_fila')
+        .select('status')
+        .eq('id_lote', lote.id);
+
+      if (filaSnapshotError) throw filaSnapshotError;
+
+      const processados = filaSnapshot?.filter((item) => item.status === 'sucesso').length ?? 0;
+      const erros = filaSnapshot?.filter((item) => item.status === 'erro').length ?? 0;
+
+      const { error: loteUpdateError } = await supabase
         .from('irpf_importacao_lote')
-        .update({ status: 'cancelado' })
+        .update({ status: 'concluido', processados, erros })
         .eq('id', lote.id);
+
+      if (loteUpdateError) throw loteUpdateError;
+
+      if (pendingFiles && pendingFiles.length > 0) {
+        const paths = pendingFiles
+          .map((file) => file.storage_path)
+          .filter(Boolean);
+
+        if (paths.length > 0) {
+          const { error: storageError } = await supabase.storage
+            .from('irpf-uploads')
+            .remove(paths);
+
+          if (storageError) {
+            console.error('Erro ao limpar arquivos cancelados:', storageError);
+          }
+        }
+      }
 
       toast.success('Importação cancelada');
       queryClient.invalidateQueries({ queryKey: ['irpf-lotes'] });
       queryClient.invalidateQueries({ queryKey: ['irpf-fila', lote.id] });
     } catch (err) {
-      toast.error('Erro ao cancelar importação');
+      toast.error(err instanceof Error ? err.message : 'Erro ao cancelar importação');
     } finally {
       setIsCancelling(false);
     }
