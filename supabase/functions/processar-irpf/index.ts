@@ -747,34 +747,49 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
     }
 
     if (leadId) {
-      await supabase
+      // Verificar se este exercício é mais recente que o atual do lead
+      const { data: leadAtual } = await supabase
         .from('lead')
-        .update({
-          id_irpf_declaracao: declaracao.id,
-          irpf_ano_mais_recente: irpfData.identificacao.exercicio,
-          irpf_renda_anual: rendaAnual,
-          irpf_patrimonio_liquido: patrimonioLiquido,
-          irpf_total_bens: totalBens,
-          irpf_total_dividas: totalDividas,
-          irpf_aliquota_efetiva: irpfData.resumoTributario?.aliquotaEfetiva || 0,
-          irpf_imposto_restituir: irpfData.resumoTributario?.impostoARestituir || 0,
-          irpf_imposto_pagar: irpfData.resumoTributario?.impostoAPagar || 0,
-          irpf_possui_cripto: tiposCripto.length > 0,
-          irpf_valor_cripto: totalCripto,
-          irpf_tipos_cripto: tiposCripto,
-          irpf_possui_empresas: qtdEmpresas > 0,
-          irpf_qtd_empresas: qtdEmpresas,
-          irpf_possui_imoveis: qtdImoveis > 0,
-          irpf_qtd_imoveis: qtdImoveis,
-          irpf_possui_investimentos: valorInvestimentos > 0,
-          irpf_valor_investimentos: valorInvestimentos,
-          irpf_perfil_investidor: perfilInvestidor,
-          irpf_faixa_patrimonial: faixaPatrimonial,
-          irpf_complexidade_declaracao: complexidade,
-        })
-        .eq('id_lead', leadId);
+        .select('irpf_ano_mais_recente')
+        .eq('id_lead', leadId)
+        .single();
 
-      // Atualizar declaração com id_lead
+      const anoAtualLead = leadAtual?.irpf_ano_mais_recente || 0;
+      const deveEnriquecer = irpfData.identificacao.exercicio >= anoAtualLead;
+
+      if (deveEnriquecer) {
+        await supabase
+          .from('lead')
+          .update({
+            id_irpf_declaracao: declaracao.id,
+            irpf_ano_mais_recente: irpfData.identificacao.exercicio,
+            irpf_renda_anual: rendaAnual,
+            irpf_patrimonio_liquido: patrimonioLiquido,
+            irpf_total_bens: totalBens,
+            irpf_total_dividas: totalDividas,
+            irpf_aliquota_efetiva: irpfData.resumoTributario?.aliquotaEfetiva || 0,
+            irpf_imposto_restituir: irpfData.resumoTributario?.impostoARestituir || 0,
+            irpf_imposto_pagar: irpfData.resumoTributario?.impostoAPagar || 0,
+            irpf_possui_cripto: tiposCripto.length > 0,
+            irpf_valor_cripto: totalCripto,
+            irpf_tipos_cripto: tiposCripto,
+            irpf_possui_empresas: qtdEmpresas > 0,
+            irpf_qtd_empresas: qtdEmpresas,
+            irpf_possui_imoveis: qtdImoveis > 0,
+            irpf_qtd_imoveis: qtdImoveis,
+            irpf_possui_investimentos: valorInvestimentos > 0,
+            irpf_valor_investimentos: valorInvestimentos,
+            irpf_perfil_investidor: perfilInvestidor,
+            irpf_faixa_patrimonial: faixaPatrimonial,
+            irpf_complexidade_declaracao: complexidade,
+          })
+          .eq('id_lead', leadId);
+        console.log("[processar-irpf] Lead enriquecido via", metodoVinculacao, "(exercício", irpfData.identificacao.exercicio, "):", leadId);
+      } else {
+        console.log(`[processar-irpf] Lead já tem exercício mais recente (${anoAtualLead}), não sobrescrevendo com ${irpfData.identificacao.exercicio}`);
+      }
+
+      // Sempre vincular a declaração ao lead
       await supabase
         .from('irpf_declaracao')
         .update({ id_lead: leadId })
