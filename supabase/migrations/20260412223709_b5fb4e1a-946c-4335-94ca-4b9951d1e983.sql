@@ -1,0 +1,1 @@
+ALTER TYPE origem_lead ADD VALUE 'IRPF';
