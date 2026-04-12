@@ -67,6 +67,18 @@ serve(async (req) => {
     let erros = 0;
 
     for (const arquivo of arquivos) {
+      // Check if lote was cancelled
+      const { data: loteCheck } = await supabase
+        .from('irpf_importacao_lote')
+        .select('status')
+        .eq('id', id_lote)
+        .single();
+
+      if (loteCheck?.status === 'cancelado') {
+        console.log('[processar-irpf-lote] Lote cancelado, parando processamento');
+        break;
+      }
+
       // Check timeout
       if (Date.now() - startTime > MAX_EXECUTION_MS) {
         console.log('[processar-irpf-lote] Próximo do timeout, parando loop');
@@ -167,14 +179,25 @@ serve(async (req) => {
       .eq('id_lote', id_lote)
       .eq('status', 'pendente');
 
-    const finalStatus = (pendingCount || 0) > 0 ? 'processando' : 'concluido';
-
-    await supabase
+    // Re-check lote status before deciding next steps
+    const { data: loteFinal } = await supabase
       .from('irpf_importacao_lote')
-      .update({ status: finalStatus })
-      .eq('id', id_lote);
+      .select('status')
+      .eq('id', id_lote)
+      .single();
 
-    // If there are still pending files, re-invoke via fetch
+    const wasCancelled = loteFinal?.status === 'cancelado';
+
+    const finalStatus = wasCancelled ? 'cancelado' : (pendingCount || 0) > 0 ? 'processando' : 'concluido';
+
+    if (!wasCancelled) {
+      await supabase
+        .from('irpf_importacao_lote')
+        .update({ status: finalStatus })
+        .eq('id', id_lote);
+    }
+
+    // If there are still pending files and not cancelled, re-invoke via fetch
     if (finalStatus === 'processando' && (pendingCount || 0) > 0) {
       console.log(`[processar-irpf-lote] ${pendingCount} pendentes, re-invocando via fetch...`);
       fetch(`${supabaseUrl}/functions/v1/processar-irpf-lote`, {
