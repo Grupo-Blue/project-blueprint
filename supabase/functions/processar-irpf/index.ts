@@ -711,7 +711,61 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
 
       console.log("[processar-irpf] Lead enriquecido via", metodoVinculacao, ":", leadId);
     } else {
-      console.log("[processar-irpf] Nenhum lead encontrado para vinculação automática");
+      // Criar lead automaticamente
+      console.log("[processar-irpf] Nenhum lead encontrado, criando automaticamente...");
+
+      const novoLead: Record<string, unknown> = {
+        id_empresa,
+        nome_lead: irpfData.identificacao.nome,
+        email: irpfData.endereco?.email || null,
+        telefone: telefoneNormalizado,
+        origem: 'IRPF',
+        origem_tipo: 'IRPF_IMPORTACAO',
+        stage_atual: 'Lead',
+        id_irpf_declaracao: declaracao.id,
+        id_cliente_notion: clienteNotion?.id_cliente || null,
+        irpf_ano_mais_recente: irpfData.identificacao.exercicio,
+        irpf_renda_anual: rendaAnual,
+        irpf_patrimonio_liquido: patrimonioLiquido,
+        irpf_total_bens: totalBens,
+        irpf_total_dividas: totalDividas,
+        irpf_aliquota_efetiva: irpfData.resumoTributario?.aliquotaEfetiva || 0,
+        irpf_imposto_restituir: irpfData.resumoTributario?.impostoARestituir || 0,
+        irpf_imposto_pagar: irpfData.resumoTributario?.impostoAPagar || 0,
+        irpf_possui_cripto: tiposCripto.length > 0,
+        irpf_valor_cripto: totalCripto,
+        irpf_tipos_cripto: tiposCripto,
+        irpf_possui_empresas: qtdEmpresas > 0,
+        irpf_qtd_empresas: qtdEmpresas,
+        irpf_possui_imoveis: qtdImoveis > 0,
+        irpf_qtd_imoveis: qtdImoveis,
+        irpf_possui_investimentos: valorInvestimentos > 0,
+        irpf_valor_investimentos: valorInvestimentos,
+        irpf_perfil_investidor: perfilInvestidor,
+        irpf_faixa_patrimonial: faixaPatrimonial,
+        irpf_complexidade_declaracao: complexidade,
+      };
+
+      const { data: leadCriado, error: leadError } = await supabase
+        .from('lead')
+        .insert(novoLead)
+        .select('id_lead')
+        .single();
+
+      if (leadCriado) {
+        leadId = leadCriado.id_lead;
+        metodoVinculacao = 'criacao_automatica';
+
+        // Vincular declaração ao lead criado
+        await supabase
+          .from('irpf_declaracao')
+          .update({ id_lead: leadId })
+          .eq('id', declaracao.id);
+
+        console.log("[processar-irpf] Lead criado automaticamente:", leadId);
+      } else {
+        console.error("[processar-irpf] Erro ao criar lead:", leadError);
+      }
     }
 
     const duracao = Date.now() - startTime;
