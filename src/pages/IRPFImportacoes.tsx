@@ -342,7 +342,7 @@ export default function IRPFImportacoes() {
 
       {/* Batch Processing Dialog */}
       <Dialog open={batchDialogOpen} onOpenChange={(open) => { if (!open) handleCloseBatchDialog(); }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FolderUp className="w-5 h-5" />
@@ -353,7 +353,7 @@ export default function IRPFImportacoes() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-4 flex-1 min-h-0 flex flex-col">
             {/* Progress bar */}
             {isBatchProcessing && (
               <div className="space-y-2">
@@ -369,7 +369,8 @@ export default function IRPFImportacoes() {
             )}
 
             {/* File list */}
-            <ScrollArea className="max-h-[400px]">
+            <div className="flex-1 min-h-0 overflow-hidden" style={{ maxHeight: '400px' }}>
+            <ScrollArea className="h-full">
               <div className="space-y-1">
                 {batchFiles.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-3 p-2 rounded-md border text-sm">
