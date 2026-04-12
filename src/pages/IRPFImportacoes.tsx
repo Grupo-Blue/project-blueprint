@@ -628,6 +628,8 @@ export default function IRPFImportacoes() {
 // ── Componente de Lote ──
 function LoteItem({ lote }: { lote: any }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: arquivos } = useQuery({
     queryKey: ['irpf-fila', lote.id],
@@ -643,16 +645,59 @@ function LoteItem({ lote }: { lote: any }) {
     enabled: isOpen,
   });
 
+  const handleCancelLote = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsCancelling(true);
+    try {
+      // 1. Get pending files to clean up storage
+      const { data: pendingFiles } = await supabase
+        .from('irpf_importacao_fila')
+        .select('id, storage_path')
+        .eq('id_lote', lote.id)
+        .in('status', ['pendente', 'processando']);
+
+      // 2. Mark pending files as cancelled
+      await supabase
+        .from('irpf_importacao_fila')
+        .update({ status: 'erro', erro_mensagem: 'Cancelado pelo usuário' })
+        .eq('id_lote', lote.id)
+        .in('status', ['pendente', 'processando']);
+
+      // 3. Delete pending files from storage
+      if (pendingFiles && pendingFiles.length > 0) {
+        const paths = pendingFiles.map(f => f.storage_path);
+        await supabase.storage.from('irpf-uploads').remove(paths);
+      }
+
+      // 4. Mark lote as cancelled
+      await supabase
+        .from('irpf_importacao_lote')
+        .update({ status: 'cancelado' })
+        .eq('id', lote.id);
+
+      toast.success('Importação cancelada');
+      queryClient.invalidateQueries({ queryKey: ['irpf-lotes'] });
+      queryClient.invalidateQueries({ queryKey: ['irpf-fila', lote.id] });
+    } catch (err) {
+      toast.error('Erro ao cancelar importação');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const isActive = lote.status === 'processando' || lote.status === 'pendente';
+  const isCancelled = lote.status === 'cancelado';
   const progress = lote.total_arquivos > 0
     ? ((lote.processados + lote.erros) / lote.total_arquivos) * 100
     : 0;
 
   const statusIcon = isActive
     ? <Loader2 className="w-4 h-4 animate-spin text-yellow-500" />
-    : lote.erros > 0
-      ? <AlertCircle className="w-4 h-4 text-destructive" />
-      : <CheckCircle className="w-4 h-4 text-green-500" />;
+    : isCancelled
+      ? <Ban className="w-4 h-4 text-muted-foreground" />
+      : lote.erros > 0
+        ? <AlertCircle className="w-4 h-4 text-destructive" />
+        : <CheckCircle className="w-4 h-4 text-green-500" />;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -668,6 +713,7 @@ function LoteItem({ lote }: { lote: any }) {
               <Badge variant="secondary" className="text-xs">
                 {lote.total_arquivos} arquivo(s)
               </Badge>
+              {isCancelled && <Badge variant="outline" className="text-xs text-muted-foreground">Cancelado</Badge>}
             </div>
             {isActive && (
               <Progress value={progress} className="h-1.5 mt-1" />
@@ -677,6 +723,18 @@ function LoteItem({ lote }: { lote: any }) {
             {lote.processados > 0 && <span className="text-green-600">✓ {lote.processados}</span>}
             {lote.erros > 0 && <span className="text-destructive">✗ {lote.erros}</span>}
             {isActive && <span className="text-muted-foreground">{lote.total_arquivos - lote.processados - lote.erros} pendente(s)</span>}
+            {isActive && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-destructive hover:text-destructive"
+                onClick={handleCancelLote}
+                disabled={isCancelling}
+              >
+                {isCancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                <span className="ml-1 text-xs">Cancelar</span>
+              </Button>
+            )}
           </div>
         </div>
       </CollapsibleTrigger>
