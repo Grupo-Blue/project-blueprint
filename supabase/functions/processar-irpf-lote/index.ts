@@ -123,16 +123,24 @@ serve(async (req) => {
         const pdfBase64 = btoa(binary);
 
         // Call processar-irpf
-        const { data: processResult, error: processError } = await supabase.functions.invoke('processar-irpf', {
-          body: {
+        const processResponse = await fetch(`${supabaseUrl}/functions/v1/processar-irpf`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
             pdfBase64,
             id_empresa,
             arquivo_origem: arquivo.nome_arquivo,
-          },
+          }),
         });
 
-        if (processError || !processResult?.success) {
-          throw new Error(processError?.message || processResult?.error || 'Erro ao processar');
+        const processResult = await processResponse.json().catch(() => null);
+
+        if (!processResponse.ok || !processResult?.success) {
+          const errorMsg = processResult?.error || processResult?.message || `Status ${processResponse.status}`;
+          throw new Error(errorMsg);
         }
 
         // Mark as success
