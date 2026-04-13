@@ -215,10 +215,15 @@ export default function IRPFImportacoes() {
         setUploadProgress({ current: i + 1, total: pdfFiles.length });
       }
 
-      // 3. Fire-and-forget: trigger background processing
-      supabase.functions.invoke('processar-irpf-lote', {
-        body: { id_lote: lote.id },
-      }).catch(err => console.error('Erro ao disparar processamento:', err));
+      // 3. Trigger processing (self-chaining — one file per invocation)
+      try {
+        const resp = await supabase.functions.invoke('processar-irpf-lote', {
+          body: { id_lote: lote.id },
+        });
+        if (resp.error) console.error('Erro ao disparar processamento:', resp.error);
+      } catch (err) {
+        console.error('Erro ao disparar processamento:', err);
+      }
 
       toast.success(`${pdfFiles.length} arquivo(s) enviados! O processamento continua em segundo plano.`);
       refetchLotes();
@@ -631,7 +636,9 @@ function LoteItem({ lote }: { lote: any }) {
   const [isCancelling, setIsCancelling] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: arquivos } = useQuery({
+  const isActive = lote.status === 'processando' || lote.status === 'pendente';
+
+  const { data: arquivos, refetch: refetchArquivos } = useQuery({
     queryKey: ['irpf-fila', lote.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -643,6 +650,7 @@ function LoteItem({ lote }: { lote: any }) {
       return data;
     },
     enabled: isOpen,
+    refetchInterval: isOpen && isActive ? 4000 : false,
   });
 
   const handleCancelLote = async (e: React.MouseEvent) => {
@@ -677,7 +685,7 @@ function LoteItem({ lote }: { lote: any }) {
 
       const { error: loteUpdateError } = await supabase
         .from('irpf_importacao_lote')
-        .update({ status: 'concluido', processados, erros })
+        .update({ status: 'cancelado', processados, erros })
         .eq('id', lote.id);
 
       if (loteUpdateError) throw loteUpdateError;
@@ -708,7 +716,6 @@ function LoteItem({ lote }: { lote: any }) {
     }
   };
 
-  const isActive = lote.status === 'processando' || lote.status === 'pendente';
   const isCancelled = lote.status === 'cancelado';
   const progress = lote.total_arquivos > 0
     ? ((lote.processados + lote.erros) / lote.total_arquivos) * 100
