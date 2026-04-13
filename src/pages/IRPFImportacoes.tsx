@@ -716,7 +716,6 @@ function LoteItem({ lote }: { lote: any }) {
     }
   };
 
-  const isActive = lote.status === 'processando' || lote.status === 'pendente';
   const isCancelled = lote.status === 'cancelado';
   const progress = lote.total_arquivos > 0
     ? ((lote.processados + lote.erros) / lote.total_arquivos) * 100
