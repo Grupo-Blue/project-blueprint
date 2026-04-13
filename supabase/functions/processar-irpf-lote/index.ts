@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const MAX_EXECUTION_MS = 50000; // 50s safety limit
+const MAX_EXECUTION_MS = 550000; // 550s safety limit (600s max)
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -122,7 +122,7 @@ serve(async (req) => {
         }
         const pdfBase64 = btoa(binary);
 
-        // Call processar-irpf
+        // Call processar-irpf with 5min timeout per file
         const processResponse = await fetch(`${supabaseUrl}/functions/v1/processar-irpf`, {
           method: 'POST',
           headers: {
@@ -134,12 +134,31 @@ serve(async (req) => {
             id_empresa,
             arquivo_origem: arquivo.nome_arquivo,
           }),
+          signal: AbortSignal.timeout(300000), // 5 min per file
         });
+
+        // Handle non-OK responses gracefully before parsing JSON
+        if (!processResponse.ok) {
+          const statusCode = processResponse.status;
+          let errorMsg = `Status ${statusCode}`;
+          if (statusCode === 504) {
+            errorMsg = 'Timeout no processamento (PDF muito grande ou complexo)';
+          } else {
+            const errorBody = await processResponse.text().catch(() => '');
+            try {
+              const parsed = JSON.parse(errorBody);
+              errorMsg = parsed?.error || parsed?.message || errorMsg;
+            } catch {
+              if (errorBody) errorMsg = errorBody.substring(0, 500);
+            }
+          }
+          throw new Error(errorMsg);
+        }
 
         const processResult = await processResponse.json().catch(() => null);
 
-        if (!processResponse.ok || !processResult?.success) {
-          const errorMsg = processResult?.error || processResult?.message || `Status ${processResponse.status}`;
+        if (!processResult?.success) {
+          const errorMsg = processResult?.error || processResult?.message || 'Resposta inválida do processamento';
           throw new Error(errorMsg);
         }
 
