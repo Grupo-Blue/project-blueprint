@@ -298,7 +298,7 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
             ]
           }
         ],
-        max_tokens: 16000,
+        max_tokens: 32000,
       }),
     });
 
@@ -336,9 +336,65 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
       
       irpfData = JSON.parse(jsonStr);
     } catch (parseError) {
-      console.error("[processar-irpf] Erro ao parsear JSON:", parseError);
-      console.log("[processar-irpf] Conteúdo recebido:", content.substring(0, 500));
-      throw new Error("Falha ao interpretar resposta da IA como JSON");
+      console.log("[processar-irpf] Parse falhou, tentando normalizar com IA rápida...");
+      console.log("[processar-irpf] Conteúdo original (primeiros 500 chars):", content.substring(0, 500));
+      
+      // Retry: enviar para IA rápida para normalizar o JSON
+      try {
+        const normalizeResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-lite",
+            messages: [
+              {
+                role: "system",
+                content: "Você é um normalizador de JSON. O usuário vai enviar um texto que contém um JSON de declaração IRPF, mas pode ter texto extra antes, depois, ou estar levemente malformado. Extraia e retorne APENAS o JSON válido, sem nenhum texto adicional, sem blocos de código markdown. Se o JSON estiver truncado, feche as chaves/colchetes abertos para torná-lo válido."
+              },
+              {
+                role: "user",
+                content: content
+              }
+            ],
+            max_tokens: 32000,
+          }),
+        });
+
+        if (!normalizeResponse.ok) {
+          throw new Error(`IA normalizadora retornou ${normalizeResponse.status}`);
+        }
+
+        const normalizeData = await normalizeResponse.json();
+        const normalizedContent = normalizeData.choices?.[0]?.message?.content;
+        
+        if (!normalizedContent) {
+          throw new Error("Resposta vazia da IA normalizadora");
+        }
+
+        // Tentar parsear o resultado normalizado
+        let normalizedJson = normalizedContent.trim();
+        const jsonMatch2 = normalizedJson.match(/```json\s*([\s\S]*?)\s*```/) || normalizedJson.match(/```\s*([\s\S]*?)\s*```/);
+        if (jsonMatch2) normalizedJson = jsonMatch2[1].trim();
+        
+        if (!normalizedJson.startsWith('{')) {
+          const fb = normalizedJson.indexOf('{');
+          const lb = normalizedJson.lastIndexOf('}');
+          if (fb !== -1 && lb !== -1 && lb > fb) {
+            normalizedJson = normalizedJson.substring(fb, lb + 1);
+          }
+        }
+        normalizedJson = normalizedJson.replace(/,\s*([}\]])/g, '$1');
+        
+        irpfData = JSON.parse(normalizedJson);
+        console.log("[processar-irpf] JSON normalizado com sucesso pela IA rápida");
+      } catch (retryError) {
+        console.error("[processar-irpf] Normalização também falhou:", retryError);
+        console.error("[processar-irpf] Erro original do parse:", parseError);
+        throw new Error("Falha ao interpretar resposta da IA como JSON mesmo após normalização");
+      }
     }
 
     console.log("[processar-irpf] Dados extraídos:", JSON.stringify(irpfData.identificacao));
