@@ -215,10 +215,15 @@ export default function IRPFImportacoes() {
         setUploadProgress({ current: i + 1, total: pdfFiles.length });
       }
 
-      // 3. Fire-and-forget: trigger background processing
-      supabase.functions.invoke('processar-irpf-lote', {
-        body: { id_lote: lote.id },
-      }).catch(err => console.error('Erro ao disparar processamento:', err));
+      // 3. Trigger processing (self-chaining — one file per invocation)
+      try {
+        const resp = await supabase.functions.invoke('processar-irpf-lote', {
+          body: { id_lote: lote.id },
+        });
+        if (resp.error) console.error('Erro ao disparar processamento:', resp.error);
+      } catch (err) {
+        console.error('Erro ao disparar processamento:', err);
+      }
 
       toast.success(`${pdfFiles.length} arquivo(s) enviados! O processamento continua em segundo plano.`);
       refetchLotes();
