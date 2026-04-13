@@ -1,0 +1,2 @@
+UPDATE irpf_importacao_fila SET status = 'pendente' WHERE id_lote = 'cfcf6261-4f93-432c-b2e6-be0c9eed65ad' AND status IN ('processando', 'pendente');
+UPDATE irpf_importacao_lote SET status = 'pendente', processados = 1, erros = 1 WHERE id = 'cfcf6261-4f93-432c-b2e6-be0c9eed65ad';
