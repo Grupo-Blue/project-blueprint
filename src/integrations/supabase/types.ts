@@ -2954,9 +2954,11 @@ export type Database = {
           id: string
           id_lote: string
           nome_arquivo: string
+          processing_started_at: string | null
           resultado: Json | null
           status: string
           storage_path: string
+          tentativas: number
           updated_at: string
         }
         Insert: {
@@ -2965,9 +2967,11 @@ export type Database = {
           id?: string
           id_lote: string
           nome_arquivo: string
+          processing_started_at?: string | null
           resultado?: Json | null
           status?: string
           storage_path: string
+          tentativas?: number
           updated_at?: string
         }
         Update: {
@@ -2976,9 +2980,11 @@ export type Database = {
           id?: string
           id_lote?: string
           nome_arquivo?: string
+          processing_started_at?: string | null
           resultado?: Json | null
           status?: string
           storage_path?: string
+          tentativas?: number
           updated_at?: string
         }
         Relationships: [
