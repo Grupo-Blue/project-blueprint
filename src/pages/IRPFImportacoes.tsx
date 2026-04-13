@@ -636,7 +636,9 @@ function LoteItem({ lote }: { lote: any }) {
   const [isCancelling, setIsCancelling] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: arquivos } = useQuery({
+  const isActive = lote.status === 'processando' || lote.status === 'pendente';
+
+  const { data: arquivos, refetch: refetchArquivos } = useQuery({
     queryKey: ['irpf-fila', lote.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -648,6 +650,7 @@ function LoteItem({ lote }: { lote: any }) {
       return data;
     },
     enabled: isOpen,
+    refetchInterval: isOpen && isActive ? 4000 : false,
   });
 
   const handleCancelLote = async (e: React.MouseEvent) => {
@@ -682,7 +685,7 @@ function LoteItem({ lote }: { lote: any }) {
 
       const { error: loteUpdateError } = await supabase
         .from('irpf_importacao_lote')
-        .update({ status: 'concluido', processados, erros })
+        .update({ status: 'cancelado', processados, erros })
         .eq('id', lote.id);
 
       if (loteUpdateError) throw loteUpdateError;
