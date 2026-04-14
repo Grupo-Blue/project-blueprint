@@ -6,7 +6,7 @@ import {
   BarChart3, ListChecks, FileText, BookOpen, Target, Lightbulb,
   Eye, Activity, Building2, Calculator, AlertTriangle, Image,
   Shield, Link as LinkIcon, TrendingUp, Users, ChevronLeft,
-  ChevronRight, LogOut, Receipt, Menu, Fingerprint
+  ChevronRight, LogOut, Receipt, Menu, Fingerprint, Brain, Crosshair
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,7 +41,11 @@ const navItems: NavItem[] = [
   { label: "Aprendizados", to: "/aprendizados", icon: Lightbulb, group: "Análise" },
   { label: "Guia UTM", to: "/guia-utm", icon: BookOpen, group: "Análise" },
   { label: "Extração Leads", to: "/extracao-leads", icon: Users, group: "Análise", requiredRole: ["TRAFEGO", "ADMIN"] },
-  { label: "Segmentos", to: "/segmentos", icon: Fingerprint, group: "Análise" },
+  // Inteligência
+  { label: "Perfis ICP", to: "/inteligencia/icp", icon: Brain, group: "Inteligência" },
+  { label: "Match Leads", to: "/inteligencia/match", icon: Crosshair, group: "Inteligência" },
+  { label: "Segmentos", to: "/inteligencia/segmentos", icon: Fingerprint, group: "Inteligência" },
+  { label: "Oport. IRPF", to: "/inteligencia/irpf", icon: Receipt, group: "Inteligência" },
   // Admin
   { label: "IRPF", to: "/irpf-importacoes", icon: Receipt, group: "Admin", requiredRole: ["DIRECAO", "ADMIN"] },
   { label: "Contas Anúncio", to: "/contas-anuncio", icon: Building2, group: "Admin", requiredRole: ["TRAFEGO", "ADMIN"] },
