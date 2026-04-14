@@ -116,7 +116,7 @@ const InteligenciaIRPF = () => {
       if (!empresaId) return [];
       const { data, error } = await supabase
         .from("lead")
-        .select("id_lead, nome_lead, email, telefone, stage_atual, origem_canal, venda_realizada, irpf_renda_anual, irpf_patrimonio_total, irpf_valor_investimentos, irpf_possui_empresas, irpf_possui_cripto, irpf_valor_cripto, irpf_complexidade_declaracao, irpf_aliquota_efetiva, tokeniza_investidor, tokeniza_qtd_investimentos, tokeniza_valor_investido")
+        .select("id_lead, nome_lead, email, telefone, stage_atual, origem_canal, venda_realizada, irpf_renda_anual, irpf_patrimonio_liquido, irpf_valor_investimentos, irpf_possui_empresas, irpf_possui_cripto, irpf_valor_cripto, irpf_complexidade_declaracao, irpf_aliquota_efetiva, tokeniza_investidor, tokeniza_qtd_investimentos, tokeniza_valor_investido")
         .eq("id_empresa", empresaId)
         .not("irpf_renda_anual", "is", null)
         .order("irpf_renda_anual", { ascending: false })
