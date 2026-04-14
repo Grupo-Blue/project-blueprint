@@ -1844,6 +1844,92 @@ export type Database = {
           },
         ]
       }
+      icp_match: {
+        Row: {
+          calculated_at: string
+          campos_faltantes: Json | null
+          campos_match: Json | null
+          id: string
+          id_icp: string
+          id_lead: string
+          score_match: number
+        }
+        Insert: {
+          calculated_at?: string
+          campos_faltantes?: Json | null
+          campos_match?: Json | null
+          id?: string
+          id_icp: string
+          id_lead: string
+          score_match?: number
+        }
+        Update: {
+          calculated_at?: string
+          campos_faltantes?: Json | null
+          campos_match?: Json | null
+          id?: string
+          id_icp?: string
+          id_lead?: string
+          score_match?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "icp_match_id_icp_fkey"
+            columns: ["id_icp"]
+            isOneToOne: false
+            referencedRelation: "icp_perfil"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "icp_match_id_lead_fkey"
+            columns: ["id_lead"]
+            isOneToOne: false
+            referencedRelation: "lead"
+            referencedColumns: ["id_lead"]
+          },
+        ]
+      }
+      icp_perfil: {
+        Row: {
+          auto_gerado: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          id_empresa: string
+          nome: string
+          regras: Json
+          updated_at: string
+        }
+        Insert: {
+          auto_gerado?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          id_empresa: string
+          nome: string
+          regras?: Json
+          updated_at?: string
+        }
+        Update: {
+          auto_gerado?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          id_empresa?: string
+          nome?: string
+          regras?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "icp_perfil_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
       identity_graph: {
         Row: {
           confidence: number
@@ -4275,6 +4361,7 @@ export type Database = {
           descricao: string | null
           id: string
           id_empresa: string
+          id_icp: string | null
           mautic_segment_id: string | null
           meta_audience_id: string | null
           nome: string
@@ -4287,6 +4374,7 @@ export type Database = {
           descricao?: string | null
           id?: string
           id_empresa: string
+          id_icp?: string | null
           mautic_segment_id?: string | null
           meta_audience_id?: string | null
           nome: string
@@ -4299,6 +4387,7 @@ export type Database = {
           descricao?: string | null
           id?: string
           id_empresa?: string
+          id_icp?: string | null
           mautic_segment_id?: string | null
           meta_audience_id?: string | null
           nome?: string
@@ -4312,6 +4401,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "empresa"
             referencedColumns: ["id_empresa"]
+          },
+          {
+            foreignKeyName: "lead_segmento_id_icp_fkey"
+            columns: ["id_icp"]
+            isOneToOne: false
+            referencedRelation: "icp_perfil"
+            referencedColumns: ["id"]
           },
         ]
       }
