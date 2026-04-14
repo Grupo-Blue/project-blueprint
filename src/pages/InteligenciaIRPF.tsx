@@ -128,13 +128,16 @@ const InteligenciaIRPF = () => {
   });
 
   // Generate insights for all leads
-  const leadsComInsights = (leadsIRPF || []).map(lead => {
-    const leadObj = lead as Record<string, any>;
-    return {
-      ...leadObj,
-      insights: gerarInsights(leadObj),
-    };
-  }).filter(l => l.insights.length > 0);
+  const leadsComInsights = (leadsIRPF || []).map(lead => ({
+    id_lead: lead.id_lead,
+    nome_lead: lead.nome_lead,
+    email: lead.email,
+    telefone: lead.telefone,
+    stage_atual: lead.stage_atual,
+    venda_realizada: lead.venda_realizada,
+    irpf_renda_anual: lead.irpf_renda_anual,
+    insights: gerarInsights(lead as any),
+  })).filter(l => l.insights.length > 0);
 
   const leadsFiltrados = filtroTipo === "todos"
     ? leadsComInsights
