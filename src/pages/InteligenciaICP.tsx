@@ -18,9 +18,11 @@ import { Separator } from "@/components/ui/separator";
 import { Brain, Plus, Sparkles, Target, Trash2, Edit, RefreshCw, Users } from "lucide-react";
 import { toast } from "sonner";
 
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
 const CAMPOS_ICP = [
   { campo: "irpf_renda_anual", label: "Renda Anual IRPF", categoria: "renda", tipo: "range" },
-  { campo: "irpf_patrimonio_total", label: "Patrimônio Total", categoria: "patrimonio", tipo: "range" },
+  { campo: "irpf_patrimonio_liquido", label: "Patrimônio Líquido", categoria: "patrimonio", tipo: "range" },
   { campo: "irpf_valor_investimentos", label: "Investimentos Financeiros", categoria: "investidor", tipo: "range" },
   { campo: "irpf_valor_cripto", label: "Valor em Cripto", categoria: "investidor", tipo: "range" },
   { campo: "irpf_possui_empresas", label: "Possui Empresas", categoria: "renda", tipo: "boolean" },
@@ -102,17 +104,17 @@ const InteligenciaICP = () => {
   const salvarIcp = useMutation({
     mutationFn: async () => {
       if (!empresaId || !nome) throw new Error("Preencha o nome do ICP");
-      const regras = { criterios, pesos };
+      const regras = { criterios: criterios as unknown as JsonValue[], pesos: pesos as unknown as Record<string, JsonValue> } as unknown as Record<string, JsonValue>;
       if (editingIcp) {
         const { error } = await supabase
           .from("icp_perfil")
-          .update({ nome, descricao, regras })
+          .update({ nome, descricao, regras } as any)
           .eq("id", editingIcp.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("icp_perfil")
-          .insert({ id_empresa: empresaId, nome, descricao, regras });
+          .insert([{ id_empresa: empresaId, nome, descricao, regras }] as any);
         if (error) throw error;
       }
     },
@@ -157,14 +159,13 @@ const InteligenciaICP = () => {
       // Fetch leads with sales to generate ICP profile
       const { data: leadsVenda, error } = await supabase
         .from("lead")
-        .select("irpf_renda_anual, irpf_patrimonio_total, irpf_valor_investimentos, irpf_possui_empresas, irpf_possui_cripto, tokeniza_investidor, tokeniza_qtd_investimentos, tokeniza_valor_investido, irpf_complexidade_declaracao")
+        .select("irpf_renda_anual, irpf_patrimonio_liquido, irpf_valor_investimentos, irpf_possui_empresas, irpf_possui_cripto, tokeniza_investidor, tokeniza_qtd_investimentos, tokeniza_valor_investido, irpf_complexidade_declaracao")
         .eq("id_empresa", empresaId)
         .eq("venda_realizada", true)
         .limit(1000);
       if (error) throw error;
       if (!leadsVenda || leadsVenda.length === 0) throw new Error("Nenhum lead com venda encontrado");
 
-      // Calculate medians
       const getMedian = (vals: number[]) => {
         const sorted = vals.filter(v => v != null).sort((a, b) => a - b);
         if (sorted.length === 0) return 0;
@@ -173,7 +174,7 @@ const InteligenciaICP = () => {
       };
 
       const rendas = leadsVenda.map(l => l.irpf_renda_anual).filter(Boolean) as number[];
-      const patrimonios = leadsVenda.map(l => l.irpf_patrimonio_total).filter(Boolean) as number[];
+      const patrimonios = leadsVenda.map(l => l.irpf_patrimonio_liquido).filter(Boolean) as number[];
       const investimentos = leadsVenda.map(l => l.irpf_valor_investimentos).filter(Boolean) as number[];
       const possuiEmpresa = leadsVenda.filter(l => l.irpf_possui_empresas === true).length;
       const possuiCripto = leadsVenda.filter(l => l.irpf_possui_cripto === true).length;
@@ -184,7 +185,7 @@ const InteligenciaICP = () => {
         autoCriterios.push({ campo: "irpf_renda_anual", operador: "gte", valor: Math.round(getMedian(rendas) * 0.7), categoria: "renda" });
       }
       if (patrimonios.length > 5) {
-        autoCriterios.push({ campo: "irpf_patrimonio_total", operador: "gte", valor: Math.round(getMedian(patrimonios) * 0.6), categoria: "patrimonio" });
+        autoCriterios.push({ campo: "irpf_patrimonio_liquido", operador: "gte", valor: Math.round(getMedian(patrimonios) * 0.6), categoria: "patrimonio" });
       }
       if (investimentos.length > 5) {
         autoCriterios.push({ campo: "irpf_valor_investimentos", operador: "gte", valor: Math.round(getMedian(investimentos) * 0.5), categoria: "investidor" });
