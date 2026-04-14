@@ -156,30 +156,31 @@ const InteligenciaICP = () => {
   const gerarICPAuto = useMutation({
     mutationFn: async () => {
       if (!empresaId) throw new Error("Selecione uma empresa");
-      // Fetch leads with sales to generate ICP profile
       const { data: leadsVenda, error } = await supabase
         .from("lead")
-        .select("irpf_renda_anual, irpf_patrimonio_liquido, irpf_valor_investimentos, irpf_possui_empresas, irpf_possui_cripto, tokeniza_investidor, tokeniza_qtd_investimentos, tokeniza_valor_investido, irpf_complexidade_declaracao")
+        .select("irpf_renda_anual, irpf_patrimonio_liquido, irpf_valor_investimentos, irpf_possui_empresas, irpf_possui_cripto, tokeniza_investidor, tokeniza_qtd_investimentos, tokeniza_valor_investido, irpf_complexidade_declaracao, amelia_icp, amelia_temperatura, amelia_score")
         .eq("id_empresa", empresaId)
         .eq("venda_realizada", true)
-        .limit(1000);
+        .limit(5000);
       if (error) throw error;
       if (!leadsVenda || leadsVenda.length === 0) throw new Error("Nenhum lead com venda encontrado");
 
       const getMedian = (vals: number[]) => {
-        const sorted = vals.filter(v => v != null).sort((a, b) => a - b);
+        const sorted = vals.filter(v => v != null && v > 0).sort((a, b) => a - b);
         if (sorted.length === 0) return 0;
         const mid = Math.floor(sorted.length / 2);
         return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
       };
 
-      const rendas = leadsVenda.map(l => l.irpf_renda_anual).filter(Boolean) as number[];
-      const patrimonios = leadsVenda.map(l => l.irpf_patrimonio_liquido).filter(Boolean) as number[];
-      const investimentos = leadsVenda.map(l => l.irpf_valor_investimentos).filter(Boolean) as number[];
+      const total = leadsVenda.length;
+      const autoCriterios: Criterio[] = [];
+
+      // IRPF fields
+      const rendas = leadsVenda.map(l => l.irpf_renda_anual).filter(v => v != null && v > 0) as number[];
+      const patrimonios = leadsVenda.map(l => l.irpf_patrimonio_liquido).filter(v => v != null && v > 0) as number[];
+      const investimentos = leadsVenda.map(l => l.irpf_valor_investimentos).filter(v => v != null && v > 0) as number[];
       const possuiEmpresa = leadsVenda.filter(l => l.irpf_possui_empresas === true).length;
       const possuiCripto = leadsVenda.filter(l => l.irpf_possui_cripto === true).length;
-
-      const autoCriterios: Criterio[] = [];
 
       if (rendas.length > 5) {
         autoCriterios.push({ campo: "irpf_renda_anual", operador: "gte", valor: Math.round(getMedian(rendas) * 0.7), categoria: "renda" });
@@ -190,19 +191,52 @@ const InteligenciaICP = () => {
       if (investimentos.length > 5) {
         autoCriterios.push({ campo: "irpf_valor_investimentos", operador: "gte", valor: Math.round(getMedian(investimentos) * 0.5), categoria: "investidor" });
       }
-      if (possuiEmpresa / leadsVenda.length > 0.4) {
+      if (possuiEmpresa / total > 0.4) {
         autoCriterios.push({ campo: "irpf_possui_empresas", operador: "is_true", valor: true, categoria: "renda" });
       }
-      if (possuiCripto / leadsVenda.length > 0.3) {
+      if (possuiCripto / total > 0.3) {
         autoCriterios.push({ campo: "irpf_possui_cripto", operador: "is_true", valor: true, categoria: "investidor" });
       }
 
-      return { criterios: autoCriterios, stats: { total: leadsVenda.length, rendas: rendas.length, patrimonios: patrimonios.length } };
+      // Tokeniza fields
+      const tokenizaInvestidores = leadsVenda.filter(l => l.tokeniza_investidor === true).length;
+      const tokenizaQtd = leadsVenda.map(l => l.tokeniza_qtd_investimentos).filter(v => v != null && v > 0) as number[];
+      const tokenizaValor = leadsVenda.map(l => l.tokeniza_valor_investido).filter(v => v != null && v > 0) as number[];
+
+      if (tokenizaInvestidores / total > 0.4) {
+        autoCriterios.push({ campo: "tokeniza_investidor", operador: "is_true", valor: true, categoria: "investidor" });
+      }
+      if (tokenizaQtd.length > 5) {
+        autoCriterios.push({ campo: "tokeniza_qtd_investimentos", operador: "gte", valor: Math.round(getMedian(tokenizaQtd)), categoria: "investidor" });
+      }
+      if (tokenizaValor.length > 5) {
+        autoCriterios.push({ campo: "tokeniza_valor_investido", operador: "gte", valor: Math.round(getMedian(tokenizaValor) * 0.5), categoria: "investidor" });
+      }
+
+      // Amélia fields
+      const ameliaScores = leadsVenda.map(l => l.amelia_score).filter(v => v != null && v > 0) as number[];
+      const ameliaTemps = leadsVenda.map(l => l.amelia_temperatura).filter(Boolean) as string[];
+
+      if (ameliaScores.length > 5) {
+        autoCriterios.push({ campo: "amelia_score", operador: "gte", valor: Math.round(getMedian(ameliaScores) * 0.7), categoria: "amelia" });
+      }
+      if (ameliaTemps.length > 0) {
+        const quentes = ameliaTemps.filter(t => t === "quente").length;
+        if (quentes / ameliaTemps.length > 0.3) {
+          autoCriterios.push({ campo: "amelia_temperatura", operador: "eq", valor: "quente", categoria: "amelia" });
+        }
+      }
+
+      if (autoCriterios.length === 0) {
+        throw new Error("Dados insuficientes para gerar ICP automático. Enriqueça seus leads com dados IRPF, Tokeniza ou Amélia.");
+      }
+
+      return { criterios: autoCriterios, stats: { total, tokeniza: tokenizaInvestidores, amelia: ameliaScores.length, irpf: rendas.length } };
     },
     onSuccess: (data) => {
       setCriterios(data.criterios);
       setNome("ICP Auto-gerado");
-      setDescricao(`Gerado a partir de ${data.stats.total} leads com venda`);
+      setDescricao(`Gerado a partir de ${data.stats.total} leads com venda (${data.stats.tokeniza} Tokeniza, ${data.stats.amelia} Amélia, ${data.stats.irpf} IRPF)`);
       setShowCreate(true);
       toast.success(`Perfil gerado com ${data.criterios.length} critérios a partir de ${data.stats.total} vendas`);
     },
