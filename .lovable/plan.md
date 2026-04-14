@@ -1,81 +1,103 @@
-<final-text>
-## Plano de correção definitiva — Importação IRPF
 
-### Diagnóstico
-- O lote mais recente (`493cd4f5-7c50-4d28-944a-5091a9f1739f`) ficou em:
-  - `1 erro`
-  - `1 sucesso`
-  - `1 arquivo preso em processando`
-  - `15 pendentes`
-- Os registros de execução mostram que o `processar-irpf` continuou funcionando e chegou a concluir outro arquivo com sucesso depois de mais de 2 minutos.
-- Isso indica que o problema principal não é mais a IA da Isa: o gargalo está no **orquestrador do lote**, que para no meio do caminho e deixa a fila inconsistente.
-- Também existe um problema estrutural no banco:
-  - a tabela de lote só aceita `pendente | processando | concluido`
-  - mas o código tenta usar `erro`
-  - e a UI já trata `cancelado`
-- Resultado: quando algo quebra, o lote pode ficar “preso” em `processando` para sempre.
 
-### O que vou corrigir
-#### 1. Refatorar o `processar-irpf-lote` para ser retomável
-- Parar de tentar processar o lote inteiro em uma única execução longa.
-- Mudar para um fluxo **1 arquivo por execução** (ou lote muito pequeno), com auto-continuação:
-  1. buscar/claim do próximo arquivo
-  2. processar
-  3. atualizar status e contadores
-  4. disparar a próxima execução se ainda houver pendentes
-- Assim o sistema não depende de uma execução única sobreviver por muitos minutos.
+# Plano — SGT Intelligence (Módulo de Inteligência Comercial)
 
-#### 2. Tornar a fila resiliente a travamentos
-- Adicionar controle de execução na fila, com campos de apoio como:
-  - `tentativas`
-  - `processing_started_at`
-  - `heartbeat_at` ou equivalente
-- Criar recuperação automática para arquivos presos em `processando`:
-  - se ficar travado por tempo demais, o item volta para `pendente` ou vai para `erro` com mensagem clara
-  - limitar tentativas para não entrar em loop infinito
+## O que já existe e será reaproveitado
 
-#### 3. Corrigir o modelo de status no banco
-- Ajustar a constraint/status do lote para refletir o que o sistema realmente usa:
-  - `pendente`
-  - `processando`
-  - `concluido`
-  - `erro`
-  - `cancelado`
-- Alinhar backend e frontend para trabalhar com os mesmos estados.
+| Recurso existente | Como será usado |
+|---|---|
+| Tabela `lead` com todos os campos necessários (irpf_*, tokeniza_*, mautic_*, linkedin_*, amelia_*) | Base de dados para ICP e Match — **nenhuma coluna nova necessária** |
+| `lead_segmento` + `lead_segmento_membro` + `calcular-segmentos` Edge Function | Segmentos ICP serão criados nessas tabelas, adicionando novos tipos ao motor existente |
+| `Segmentos.tsx` (página existente) | Será **evoluída**, não duplicada — ganha visualizações extras (variação, temperatura, conversão) |
+| `lead-scoring.ts` | Reaproveitado como base do Score de Match |
+| `IRPFDashboardInsights.tsx` | Componente de insights IRPF já existe — será estendido com insights comerciais |
+| 30k leads, 12k vendas, 41 com IRPF, 2.5k investidores Tokeniza | Volume real para cálculos |
 
-#### 4. Recalcular contadores do lote do jeito certo
-- Parar de incrementar `processados` e `erros` “no braço”.
-- Recalcular os totais a partir da própria `irpf_importacao_fila` após cada etapa importante.
-- Isso evita lote com números errados quando houver retomada, cancelamento ou recuperação de item travado.
+## O que será criado
 
-#### 5. Ajustar cancelamento e retomada
-- Fazer o cancelamento marcar o lote como `cancelado` de verdade.
-- Garantir que o worker pare antes de pegar o próximo arquivo.
-- Adicionar retomada segura para lote travado, sem duplicar processamento.
+### Fase 1 — Backend (tabelas + edge function)
 
-#### 6. Melhorar o frontend para refletir a realidade
-- Em vez de “fire-and-forget” silencioso, aguardar a confirmação inicial do disparo do lote.
-- Atualizar também a fila de arquivos quando o lote estiver aberto, não só o resumo do lote.
-- Exibir com clareza:
-  - processando
-  - travado/retomando
-  - cancelado
-  - erro real do arquivo
+**Nova tabela: `icp_perfil`**
+- `id`, `id_empresa`, `nome` (ex: "Blue Premium"), `descricao`, `regras` (JSONB com critérios e pesos), `auto_gerado` (bool), `created_at`, `updated_at`
+- Cada ICP gera automaticamente um `lead_segmento` vinculado (campo `id_icp` adicionado a `lead_segmento`)
 
-#### 7. Corrigir o lote atual
-- Depois do ajuste, aplicar uma correção pontual no lote que travou:
-  - liberar o item preso em `processando`
-  - recalcular os contadores
-  - retomar os 15 pendentes restantes
+**Nova tabela: `icp_match`**
+- `id`, `id_lead`, `id_icp`, `score_match` (0-100), `campos_match` (JSONB — quais critérios bateram), `campos_faltantes` (JSONB), `calculated_at`
+- Índice em `(id_icp, score_match DESC)` para queries rápidas de ranking
+- Recalculada periodicamente
 
-### Arquivos envolvidos
-- `supabase/functions/processar-irpf-lote/index.ts`
-- `src/pages/IRPFImportacoes.tsx`
-- `supabase/migrations/*` (nova migration para status/controle de fila)
+**Edge Function: `calcular-icp-match`**
+- Recebe `id_icp` ou roda para todos
+- Para cada ICP, busca leads sem venda e calcula score baseado nos pesos configuráveis
+- Grava em `icp_match`
+- Pode ser chamada manualmente ou via cron (1x/dia)
 
-### Detalhes técnicos
-- O modelo principal da Isa será mantido em `google/gemini-2.5-pro`.
-- Os tempos recentes de sucesso do `processar-irpf` ficaram na faixa de ~120s a ~145s, então o problema não exige troca de modelo.
-- O foco será remover o ponto único de falha do lote e tornar a importação **retomável, idempotente e auto-recuperável**.
-- Não vejo necessidade de alterar autenticação; o ajuste é de orquestração, estado e consistência de backend.
-</final-text>
+**Novo tipo no motor de segmentos:**
+- Adicionar tipo `icp_match` ao `calcular-segmentos` — segmentos vinculados a ICPs usam a tabela `icp_match` com threshold configurável
+
+### Fase 2 — Frontend (4 sub-páginas + sidebar)
+
+**Sidebar**: Novo grupo "Inteligência" com 4 itens:
+- Perfis ICP (`/inteligencia/icp`)
+- Match de Leads (`/inteligencia/match`)
+- Segmentos Inteligentes (`/inteligencia/segmentos`) — evolução do `/segmentos` atual
+- Oportunidades IRPF (`/inteligencia/irpf`)
+
+**Página 1 — Motor de Perfis ICP** (`/inteligencia/icp`)
+- Cards por empresa mostrando perfis existentes
+- Botão "Gerar ICP automaticamente" → analisa leads com `venda_realizada = true`, calcula medianas/distribuições dos campos-chave, sugere nome e critérios
+- Editor de regras: sliders para faixas (renda, patrimônio, investimentos) + toggles (possui_cripto, possui_empresas) + pesos
+- Ao salvar, cria automaticamente o segmento vinculado
+
+**Página 2 — Match de Leads** (`/inteligencia/match`)
+- Dropdown para selecionar ICP ativo
+- Lista ranqueada de leads com: score (0-100), badges dos campos que bateram, indicadores de campos faltantes
+- Filtros: score mínimo, empresa, canal
+- KPIs no topo: total de matches, matches >80, oportunidades cross-sell
+- Botão de ação: enviar para Mautic/Meta/WhatsApp (reusa mutations do Segmentos.tsx)
+
+**Página 3 — Segmentos Inteligentes** (`/inteligencia/segmentos`)
+- Migra a página `Segmentos.tsx` para cá com adições:
+  - KPI cards no topo: tamanho vs semana anterior (variação %), distribuição de temperatura, taxa de conversão histórica
+  - Segmentos automáticos de ICP aparecem com badge "ICP"
+  - Segmentos cross-sell pré-configurados
+- Mantém toda funcionalidade existente (Mautic, Meta, WhatsApp, CSV)
+
+**Página 4 — Oportunidades IRPF** (`/inteligencia/irpf`)
+- Lista de leads com dados IRPF importados
+- Para cada lead: cards de insight gerados por regras simples no frontend (sem IA):
+  - "Declaração simplificada com renda > 150k — pode estar pagando mais imposto"
+  - "Possui X empresas — potencial para planejamento societário"
+  - "R$ X em investimentos financeiros — perfil para diversificação Tokeniza"
+  - "Possui cripto — familiarizado com ativos digitais"
+- Filtros: empresa, faixa de renda, tipo de oportunidade
+- Botão "Enviar para cadência" (dispara webhook Amélia)
+
+### Fase 3 — Dashboard KPIs (widget no Dashboard principal ou sub-página)
+
+- Widget compacto no Dashboard Comercial com:
+  - Leads por segmento ICP
+  - Pipeline estimado cross-sell
+  - Cobertura IRPF (leads com dados vs total)
+- Pode ser implementado como aba extra no Dashboard Comercial existente
+
+## Detalhes técnicos
+
+- **Tabelas novas**: `icp_perfil`, `icp_match` (+ coluna `id_icp` em `lead_segmento`)
+- **Edge Function nova**: `calcular-icp-match`
+- **Edge Function alterada**: `calcular-segmentos` (novo tipo `icp_match`)
+- **Páginas novas**: 4 páginas em `/inteligencia/*`
+- **Sidebar alterada**: `LiquidSidebar.tsx` — novo grupo "Inteligência"
+- **Página removida/redirect**: `/segmentos` → `/inteligencia/segmentos`
+- **RLS**: `icp_perfil` e `icp_match` com policies baseadas em `user_empresa`
+- **Cron**: `calcular-icp-match` 1x/dia após `calcular-segmentos`
+
+## Ordem de implementação
+
+1. Migration: criar `icp_perfil` + `icp_match` + alterar `lead_segmento` + RLS
+2. Edge Function `calcular-icp-match`
+3. Atualizar `calcular-segmentos` com tipo `icp_match`
+4. Páginas frontend (ICP → Match → Segmentos → IRPF)
+5. Sidebar + rotas
+6. Widget no Dashboard Comercial
+
