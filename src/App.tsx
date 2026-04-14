@@ -38,6 +38,9 @@ import DashboardComercial from "./pages/DashboardComercial";
 import MetasComerciais from "./pages/MetasComerciais";
 import ExtracaoLeads from "./pages/ExtracaoLeads";
 import Segmentos from "./pages/Segmentos";
+import InteligenciaICP from "./pages/InteligenciaICP";
+import InteligenciaMatch from "./pages/InteligenciaMatch";
+import InteligenciaIRPF from "./pages/InteligenciaIRPF";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -83,6 +86,10 @@ const App = () => (
             <Route path="/metas-comerciais" element={<AppLayout><MetasComerciais /></AppLayout>} />
             <Route path="/extracao-leads" element={<AppLayout><ExtracaoLeads /></AppLayout>} />
             <Route path="/segmentos" element={<AppLayout><Segmentos /></AppLayout>} />
+            <Route path="/inteligencia/icp" element={<AppLayout><InteligenciaICP /></AppLayout>} />
+            <Route path="/inteligencia/match" element={<AppLayout><InteligenciaMatch /></AppLayout>} />
+            <Route path="/inteligencia/segmentos" element={<AppLayout><Segmentos /></AppLayout>} />
+            <Route path="/inteligencia/irpf" element={<AppLayout><InteligenciaIRPF /></AppLayout>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
