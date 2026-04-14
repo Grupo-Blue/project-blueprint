@@ -67,12 +67,12 @@ function gerarInsights(lead: any): Insight[] {
     });
   }
 
-  if (lead.irpf_patrimonio_total && lead.irpf_patrimonio_total > 500000) {
+  if (lead.irpf_patrimonio_liquido && lead.irpf_patrimonio_liquido > 500000) {
     insights.push({
       tipo: "investidor",
       icone: DollarSign,
       titulo: "Patrimônio expressivo",
-      descricao: `Patrimônio de ${formatCurrency(lead.irpf_patrimonio_total)} — potencial investidor qualificado.`,
+      descricao: `Patrimônio de ${formatCurrency(lead.irpf_patrimonio_liquido)} — potencial investidor qualificado.`,
       cor: "text-green-700",
     });
   }
