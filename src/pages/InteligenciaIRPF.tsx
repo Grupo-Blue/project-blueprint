@@ -128,10 +128,13 @@ const InteligenciaIRPF = () => {
   });
 
   // Generate insights for all leads
-  const leadsComInsights = (leadsIRPF || []).map(lead => ({
-    ...lead,
-    insights: gerarInsights(lead),
-  })).filter(l => l.insights.length > 0);
+  const leadsComInsights = (leadsIRPF || []).map(lead => {
+    const leadObj = lead as Record<string, any>;
+    return {
+      ...leadObj,
+      insights: gerarInsights(leadObj),
+    };
+  }).filter(l => l.insights.length > 0);
 
   const leadsFiltrados = filtroTipo === "todos"
     ? leadsComInsights

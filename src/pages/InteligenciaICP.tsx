@@ -266,7 +266,7 @@ const InteligenciaICP = () => {
             <Sparkles className={`h-4 w-4 mr-1 ${gerarICPAuto.isPending ? "animate-spin" : ""}`} />
             Gerar ICP Automático
           </Button>
-          <Button variant="outline" size="sm" onClick={() => calcularMatches.mutate()} disabled={calcularMatches.isPending}>
+          <Button variant="outline" size="sm" onClick={() => calcularMatches.mutate(undefined)} disabled={calcularMatches.isPending}>
             <RefreshCw className={`h-4 w-4 mr-1 ${calcularMatches.isPending ? "animate-spin" : ""}`} />
             Calcular Matches
           </Button>
