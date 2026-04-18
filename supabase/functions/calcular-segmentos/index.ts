@@ -320,11 +320,14 @@ async function criarSegmentosPadrao(supabase: any) {
   const { data: empresas } = await supabase.from('empresa').select('id_empresa');
 
   const segmentosPadrao = [
-    { nome: 'Alta Intenção', descricao: 'Visitou LP + eventos recentes, sem venda (últimos 7 dias)', regras: { tipo: 'alta_intencao' } },
-    { nome: 'Aquecimento', descricao: 'Mautic page_hits > 3, engajamento crescente', regras: { tipo: 'aquecimento' } },
-    { nome: 'Quase Cliente', descricao: 'Stage avançado (proposta/negociação) sem venda', regras: { tipo: 'quase_cliente' } },
-    { nome: 'Cliente Quente', descricao: 'Comprou + voltou ao site nos últimos 7 dias', regras: { tipo: 'cliente_quente' } },
-    { nome: 'Reativação', descricao: 'MQL inativo há 30+ dias', regras: { tipo: 'reativacao' } },
+    { nome: 'Alta Intenção', descricao: 'Sinais de intenção: stape recente, Amélia quente, "Atacar agora" ou Levantada de mão', regras: { tipo: 'alta_intencao' } },
+    { nome: 'Aquecimento', descricao: 'Mautic page_hits > 3 ou score > 30', regras: { tipo: 'aquecimento' } },
+    { nome: 'Quase Cliente', descricao: 'Stages avançados (Apresentação/Negociação) ou alta qualificação', regras: { tipo: 'quase_cliente' } },
+    { nome: 'Cliente Quente', descricao: 'Comprou + voltou via stape/mautic nos últimos 7 dias', regras: { tipo: 'cliente_quente' } },
+    { nome: 'Reativação', descricao: 'Lead/MQL/Contato inativo há 30+ dias', regras: { tipo: 'reativacao' } },
+    { nome: 'Investidores Tokeniza', descricao: 'Leads com tokeniza_investidor = true', regras: { tipo: 'investidor_tokeniza' } },
+    { nome: 'Alta Qualificação Amélia', descricao: 'Score Amélia ≥ 70 ou temperatura quente', regras: { tipo: 'amelia_qualificado' } },
+    { nome: 'Engajados Mautic', descricao: 'Mautic page_hits > 3 ou score > 50', regras: { tipo: 'mautic_engajado' } },
   ];
 
   for (const empresa of (empresas || [])) {
