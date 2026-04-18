@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
+import { AutomatizarCadenciaDialog } from "@/components/segmentos/AutomatizarCadenciaDialog";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Fingerprint, Users, Plus, RefreshCw, Layers, MoreHorizontal, Send, Download, Facebook, MessageCircle } from "lucide-react";
+import { Fingerprint, Users, Plus, RefreshCw, Layers, MoreHorizontal, Send, Download, Facebook, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -38,6 +38,7 @@ const Segmentos = () => {
   const [novoNome, setNovoNome] = useState("");
   const [novoTipo, setNovoTipo] = useState("");
   const [novaDescricao, setNovaDescricao] = useState("");
+  const [cadenciaDialogSegId, setCadenciaDialogSegId] = useState<string | null>(null);
 
   const empresaId = empresaSelecionada && empresaSelecionada !== "todas" ? empresaSelecionada : null;
 
