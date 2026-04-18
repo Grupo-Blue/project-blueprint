@@ -1,54 +1,74 @@
 
 
-## Plano — Paginação na lista de leads + esclarecer o "Disparar WhatsApp"
+## Plano — Botão "Automatizar Cadência" integrado à Amélia
 
-### 1. O que o "Disparar WhatsApp" faz hoje (resposta direta)
+### O que muda na UI
 
-Olhando a edge function `disparar-segmento-whatsapp` que é chamada pelo botão:
+No `src/pages/Segmentos.tsx`:
+- Renomear o item do dropdown e o botão do header de **"Preparar Disparo WhatsApp"** → **"Automatizar Cadência"**.
+- Trocar o ícone `MessageCircle` por `Bot` (lucide-react).
+- Manter o botão "Preparar Disparo WhatsApp" antigo? **Não** — substituir totalmente, conforme o pedido. (A função `disparar-segmento-whatsapp` continua existindo no backend caso precise no futuro, mas some da UI.)
 
-1. Pega o segmento e busca todos os membros com telefone válido (≥10 dígitos).
-2. Cria um registro na tabela **`disparo_whatsapp`** com `enviado: false`, contendo nome, empresa, qtd de leads e os filtros aplicados.
-3. Vincula os leads ao disparo na tabela **`disparo_whatsapp_lead`** (em lotes de 500).
-4. Retorna sucesso com a contagem de leads com telefone.
+### Novo fluxo ao clicar "Automatizar Cadência"
 
-**Importante:** ele **NÃO envia mensagens** pelo WhatsApp. Apenas **cria a fila de disparo** (`enviado: false`) que precisa ser consumida por um sistema externo (a edge function `whatsapp-disparo-webhook` recebe o callback `campaign.dispatched` desse sistema externo quando ele de fato envia).
+1. Identifica a empresa do segmento (via `lead_segmento.id_empresa` → mapeia nome para `BLUE` ou `TOKENIZA` usando `empresa-constants.ts`).
+2. Abre um **Dialog "Automatizar Cadência na Amélia"** que:
+   - Mostra contagem de leads elegíveis (com **nome E telefone** — filtra os demais).
+   - Lista as cadências existentes da empresa (chama MCP `list_cadences`).
+   - Permite selecionar uma cadência **OU** clicar em "Criar nova cadência" (abre sub-form com nome, código, canal — chama MCP `create_cadence`).
+3. Ao confirmar:
+   - Para cada lead elegível, garante que existe um contato na Amélia (`search_contacts` por telefone → se não achar, `create_contact` com nome/telefone/empresa).
+   - Coleta os IDs dos contatos da Amélia.
+   - Chama MCP `enroll_lead_cadence` com `cadence_id`, `lead_ids`, `empresa`.
+   - Mostra resumo: "X leads inscritos, Y já estavam inscritos, Z criados como novos contatos".
 
-Ou seja, o botão hoje funciona como "preparar lista de disparo" e não como "enviar agora". Vou deixar isso claro na UI ajustando o texto do toast e o label do botão (ex: "Preparar disparo WhatsApp") para evitar confusão.
+### Arquitetura técnica
 
-### 2. Por que aparecem só 100 leads mesmo tendo 137
+**Nova edge function: `amelia-cadencia-proxy`**
+- Recebe do frontend: `{ action: 'list_cadences' | 'create_cadence' | 'enroll_leads', empresa, ...args }`.
+- Para `enroll_leads`: recebe `id_segmento` + `cadence_id`, busca os leads do segmento no banco SGT, filtra por `nome IS NOT NULL AND telefone valido`, depois faz o ciclo search/create/enroll na Amélia via MCP.
+- Faz proxy para `https://xdjvlcelauvibznnbrzb.supabase.co/functions/v1/mcp-server` com header `Authorization: Bearer ${AMELIA_MCP_API_KEY}` e `Accept: application/json, text/event-stream`.
+- Valida JWT do usuário antes de qualquer ação.
 
-Em `src/pages/Segmentos.tsx`, linha 91:
+**Por que edge function e não chamar MCP direto do frontend:**
+- A API key da Amélia fica server-side (secret).
+- O ciclo search-or-create-then-enroll envolve N+1 chamadas — melhor server-side.
+- Permite logar a operação localmente.
+
+### Secret necessário
+
+- `AMELIA_MCP_API_KEY` (você vai me passar). Vou usar `add_secret` para configurá-lo.
+
+### Mapeamento empresa SGT → Amélia
+
+Vou ler `src/lib/empresa-constants.ts` para confirmar IDs, mas a lógica:
+- Empresa Tokeniza (`61b5ffeb-fbbc-47c1-8ced-152bb647ed20`) → `TOKENIZA`
+- Empresa Blue (Blue Consult) → `BLUE`
+- Outras → erro "empresa não suportada na Amélia ainda"
+
+### Filtro obrigatório (nome + telefone)
+
+No backend, antes de enviar para Amélia:
 ```ts
-.eq("id_segmento", selectedSegmento)
-.is("removido_em", null)
-.limit(100);   // ← cap fixo
+const elegiveis = leads.filter(l => 
+  l.nome_lead?.trim() && 
+  l.telefone?.replace(/\D/g, "").length >= 10
+);
 ```
+Telefones são normalizados para E.164 com `55` como prefixo Brasil antes de enviar.
 
-A query da lista de membros está fixa em 100. O badge "X leads" no card vem de uma query separada com `count: "exact"` (137), mas a tabela só recebe 100. Por isso o descasamento.
+### Arquivos afetados
 
-### 3. Adicionar paginação na lista de leads do segmento
+- **Novo**: `supabase/functions/amelia-cadencia-proxy/index.ts`
+- **Novo**: `src/components/segmentos/AutomatizarCadenciaDialog.tsx`
+- **Editado**: `src/pages/Segmentos.tsx` (substituir botão/item dropdown, abrir o dialog em vez de chamar `disparar-segmento-whatsapp`)
+- **Secret**: `AMELIA_MCP_API_KEY`
 
-**Em `src/pages/Segmentos.tsx`:**
+### Ordem de implementação
 
-- Adicionar estado `paginaMembros` (default 1) e constante `PAGE_SIZE = 50`.
-- Substituir `.limit(100)` por `.range((paginaMembros - 1) * PAGE_SIZE, paginaMembros * PAGE_SIZE - 1)`.
-- Mudar a query para retornar `{ data, count }` usando `select(..., { count: 'exact' })`.
-- Resetar `paginaMembros` para 1 sempre que `selectedSegmento` mudar.
-- Renderizar o componente `Pagination` (já existe em `src/components/ui/pagination.tsx`) abaixo da tabela com:
-  - Botões Anterior / Próxima
-  - Indicador "Página X de Y" e "Mostrando A–B de N"
-  - Desabilitar Anterior na página 1 e Próxima na última
-- Atualizar o badge no `CardTitle` para mostrar o total real (`count`) em vez de `membros?.length`.
-
-### 4. Esclarecer o fluxo do botão WhatsApp na UI
-
-- Renomear o item no dropdown e botão de "Disparar WhatsApp" → **"Preparar Disparo WhatsApp"**.
-- Atualizar o toast de sucesso para: *"Lista de disparo criada com X leads. Aguardando envio pelo sistema externo."*
-- Adicionar um tooltip pequeno explicando: "Cria a lista na fila `disparo_whatsapp`. O envio efetivo é feito pelo sistema externo de mensageria."
-
-### Arquivos alterados
-- `src/pages/Segmentos.tsx` — paginação + textos do botão WhatsApp
-
-### Não vai mudar
-- Edge functions (`disparar-segmento-whatsapp` e `whatsapp-disparo-webhook`) — o fluxo backend já está correto, é só a UI que estava ambígua.
+1. Pedir o secret `AMELIA_MCP_API_KEY` (`add_secret`).
+2. Criar edge function `amelia-cadencia-proxy` com 3 actions (list_cadences, create_cadence, enroll_leads).
+3. Criar componente `AutomatizarCadenciaDialog`.
+4. Atualizar `Segmentos.tsx` — botão + dropdown + estado do dialog.
+5. Testar end-to-end com um segmento real da Tokeniza.
 
