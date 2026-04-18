@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
@@ -98,6 +98,23 @@ const InteligenciaMatch = () => {
     onError: (e) => toast.error(e.message),
   });
 
+  // Auto-disparar cálculo quando ICP tem 0 matches (uma vez por ICP)
+  const autoTriggered = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (selectedIcp && kpis && kpis.total === 0 && !autoTriggered.current.has(selectedIcp) && !recalcular.isPending) {
+      autoTriggered.current.add(selectedIcp);
+      toast.info("Nenhum match encontrado. Calculando automaticamente...");
+      recalcular.mutate();
+    }
+  }, [selectedIcp, kpis]);
+
+  // Selecionar primeiro ICP automaticamente
+  useEffect(() => {
+    if (icps && icps.length > 0 && !selectedIcp) {
+      setSelectedIcp(icps[0].id);
+    }
+  }, [icps, selectedIcp]);
+
   const exportCSV = async () => {
     if (!matches || matches.length === 0) return;
     const rows = matches.map((m: any) => ({
@@ -190,7 +207,16 @@ const InteligenciaMatch = () => {
       {!selectedIcp ? (
         <GlassCard className="p-8 text-center">
           <Crosshair className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground">Selecione um perfil ICP para ver os leads compatíveis.</p>
+          <p className="text-muted-foreground mb-3">
+            {(icps || []).length === 0
+              ? "Nenhum perfil ICP criado ainda."
+              : "Selecione um perfil ICP para ver os leads compatíveis."}
+          </p>
+          {(icps || []).length === 0 && (
+            <Button variant="outline" size="sm" onClick={() => (window.location.href = "/inteligencia/icp")}>
+              <Target className="h-4 w-4 mr-1" /> Criar ICP em /inteligencia/icp
+            </Button>
+          )}
         </GlassCard>
       ) : loadingMatches ? (
         <div className="animate-pulse space-y-2">
