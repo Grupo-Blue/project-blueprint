@@ -457,6 +457,34 @@ const Segmentos = () => {
                       )}
                     </TableBody>
                   </Table>
+                  {totalMembros > PAGE_SIZE && (
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                      <p className="text-xs text-muted-foreground">
+                        Mostrando {(paginaMembros - 1) * PAGE_SIZE + 1}–{Math.min(paginaMembros * PAGE_SIZE, totalMembros)} de {totalMembros}
+                      </p>
+                      <Pagination className="mx-0 w-auto justify-end">
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={(e) => { e.preventDefault(); if (paginaMembros > 1) setPaginaMembros(p => p - 1); }}
+                              className={paginaMembros === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          <PaginationItem>
+                            <PaginationLink isActive className="cursor-default">
+                              {paginaMembros} / {totalPaginas}
+                            </PaginationLink>
+                          </PaginationItem>
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={(e) => { e.preventDefault(); if (paginaMembros < totalPaginas) setPaginaMembros(p => p + 1); }}
+                              className={paginaMembros >= totalPaginas ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : (
