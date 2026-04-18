@@ -104,24 +104,36 @@ const InteligenciaICP = () => {
   const salvarIcp = useMutation({
     mutationFn: async () => {
       if (!empresaId || !nome) throw new Error("Preencha o nome do ICP");
+      if (criterios.length === 0) throw new Error("Adicione pelo menos 1 critério");
       const regras = { criterios: criterios as unknown as JsonValue[], pesos: pesos as unknown as Record<string, JsonValue> } as unknown as Record<string, JsonValue>;
+      let icpId: string | null = null;
       if (editingIcp) {
         const { error } = await supabase
           .from("icp_perfil")
           .update({ nome, descricao, regras } as any)
           .eq("id", editingIcp.id);
         if (error) throw error;
+        icpId = editingIcp.id;
       } else {
-        const { error } = await supabase
+        const { data: novo, error } = await supabase
           .from("icp_perfil")
-          .insert([{ id_empresa: empresaId, nome, descricao, regras }] as any);
+          .insert([{ id_empresa: empresaId, nome, descricao, regras }] as any)
+          .select("id")
+          .single();
         if (error) throw error;
+        icpId = (novo as any)?.id || null;
       }
+      // Auto-disparar match calculation em background
+      if (icpId) {
+        supabase.functions.invoke("calcular-icp-match", { body: { id_icp: icpId } }).catch(() => {});
+      }
+      return icpId;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["icp-perfis"] });
+      queryClient.invalidateQueries({ queryKey: ["icp-match-counts"] });
       resetForm();
-      toast.success(editingIcp ? "ICP atualizado!" : "ICP criado!");
+      toast.success(editingIcp ? "ICP atualizado! Calculando matches em background..." : "ICP criado! Calculando matches em background...");
     },
     onError: (e) => toast.error(e.message),
   });
