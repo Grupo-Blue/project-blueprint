@@ -178,8 +178,7 @@ Deno.serve(async (req) => {
       if (!empresaCode) return jsonResponse({ error: "id_empresa é obrigatório" }, 400);
       const result = await callMcpTool("list_cadences", {
         empresa: empresaCode,
-        ativo: true,
-        limit: 50,
+        limit: 100,
       });
       return jsonResponse({ success: true, cadences: Array.isArray(result) ? result : [] });
     }
