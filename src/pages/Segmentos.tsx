@@ -78,11 +78,13 @@ const Segmentos = () => {
     enabled: !!segmentos && segmentos.length > 0,
   });
 
-  const { data: membros } = useQuery({
-    queryKey: ["segmento-membros", selectedSegmento],
+  const { data: membrosResult } = useQuery({
+    queryKey: ["segmento-membros", selectedSegmento, paginaMembros],
     queryFn: async () => {
-      if (!selectedSegmento) return [];
-      const { data, error } = await supabase
+      if (!selectedSegmento) return { data: [], count: 0 };
+      const from = (paginaMembros - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
         .from("lead_segmento_membro")
         .select(`
           id_lead,
@@ -94,15 +96,20 @@ const Segmentos = () => {
             stage_atual,
             origem_canal
           )
-        `)
+        `, { count: "exact" })
         .eq("id_segmento", selectedSegmento)
         .is("removido_em", null)
-        .limit(100);
+        .order("adicionado_em", { ascending: false })
+        .range(from, to);
       if (error) throw error;
-      return data || [];
+      return { data: data || [], count: count || 0 };
     },
     enabled: !!selectedSegmento,
   });
+
+  const membros = membrosResult?.data;
+  const totalMembros = membrosResult?.count || 0;
+  const totalPaginas = Math.max(1, Math.ceil(totalMembros / PAGE_SIZE));
 
   const criarSegmento = useMutation({
     mutationFn: async () => {
