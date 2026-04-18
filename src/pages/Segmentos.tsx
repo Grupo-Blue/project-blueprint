@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
+import { AutomatizarCadenciaDialog } from "@/components/segmentos/AutomatizarCadenciaDialog";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { GlassCard } from "@/components/ui/GlassCard";
@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Fingerprint, Users, Plus, RefreshCw, Layers, MoreHorizontal, Send, Download, Facebook, MessageCircle } from "lucide-react";
+import { Fingerprint, Users, Plus, RefreshCw, Layers, MoreHorizontal, Send, Download, Facebook, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -38,6 +38,7 @@ const Segmentos = () => {
   const [novoNome, setNovoNome] = useState("");
   const [novoTipo, setNovoTipo] = useState("");
   const [novaDescricao, setNovaDescricao] = useState("");
+  const [cadenciaDialogSegId, setCadenciaDialogSegId] = useState<string | null>(null);
 
   const empresaId = empresaSelecionada && empresaSelecionada !== "todas" ? empresaSelecionada : null;
 
@@ -182,21 +183,7 @@ const Segmentos = () => {
     onError: (e) => toast.error(`Erro Meta: ${e.message}`),
   });
 
-  const disparoWhatsApp = useMutation({
-    mutationFn: async (id_segmento: string) => {
-      const seg = segmentos?.find(s => s.id === id_segmento);
-      const { data, error } = await supabase.functions.invoke("disparar-segmento-whatsapp", {
-        body: { id_segmento, nome_disparo: `Segmento: ${seg?.nome || id_segmento}` },
-      });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
-      return data;
-    },
-    onSuccess: (data) => {
-      toast.success(`Lista de disparo criada com ${data.leads_com_telefone} leads. Aguardando envio pelo sistema externo de mensageria.`);
-    },
-    onError: (e) => toast.error(`Erro WhatsApp: ${e.message}`),
-  });
+
 
   const exportCSV = async (id_segmento: string) => {
     try {
@@ -347,11 +334,10 @@ const Segmentos = () => {
                               Enviar Meta Ads
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => disparoWhatsApp.mutate(seg.id)}
-                              disabled={disparoWhatsApp.isPending}
+                              onClick={() => setCadenciaDialogSegId(seg.id)}
                             >
-                              <MessageCircle className="h-4 w-4 mr-2" />
-                              Preparar Disparo WhatsApp
+                              <Bot className="h-4 w-4 mr-2" />
+                              Automatizar Cadência
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => exportCSV(seg.id)}>
                               <Download className="h-4 w-4 mr-2" />
@@ -398,22 +384,12 @@ const Segmentos = () => {
                       >
                         <Facebook className="h-3 w-3 mr-1" /> Meta
                       </Button>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="outline" size="sm"
-                              onClick={() => disparoWhatsApp.mutate(selectedSegmento)}
-                              disabled={disparoWhatsApp.isPending}
-                            >
-                              <MessageCircle className="h-3 w-3 mr-1" /> Preparar WhatsApp
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p className="text-xs">Cria a lista na fila de disparo. O envio efetivo é feito pelo sistema externo de mensageria.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => setCadenciaDialogSegId(selectedSegmento)}
+                      >
+                        <Bot className="h-3 w-3 mr-1" /> Automatizar Cadência
+                      </Button>
                       <Button
                         variant="outline" size="sm"
                         onClick={() => exportCSV(selectedSegmento)}
@@ -496,6 +472,15 @@ const Segmentos = () => {
           </div>
         </div>
       )}
+
+      <AutomatizarCadenciaDialog
+        open={!!cadenciaDialogSegId}
+        onOpenChange={(o) => !o && setCadenciaDialogSegId(null)}
+        idSegmento={cadenciaDialogSegId}
+        nomeSegmento={segmentos?.find(s => s.id === cadenciaDialogSegId)?.nome || ""}
+        idEmpresa={empresaId}
+        totalLeads={cadenciaDialogSegId ? (membrosCount?.[cadenciaDialogSegId] || 0) : 0}
+      />
     </>
   );
 };
