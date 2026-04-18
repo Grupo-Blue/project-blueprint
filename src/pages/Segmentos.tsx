@@ -472,6 +472,15 @@ const Segmentos = () => {
           </div>
         </div>
       )}
+
+      <AutomatizarCadenciaDialog
+        open={!!cadenciaDialogSegId}
+        onOpenChange={(o) => !o && setCadenciaDialogSegId(null)}
+        idSegmento={cadenciaDialogSegId}
+        nomeSegmento={segmentos?.find(s => s.id === cadenciaDialogSegId)?.nome || ""}
+        idEmpresa={empresaId}
+        totalLeads={cadenciaDialogSegId ? (membrosCount?.[cadenciaDialogSegId] || 0) : 0}
+      />
     </>
   );
 };
