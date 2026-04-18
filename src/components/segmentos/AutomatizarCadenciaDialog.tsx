@@ -172,7 +172,10 @@ export function AutomatizarCadenciaDialog({
                           Nenhuma cadência ativa para esta empresa.
                         </p>
                       )}
-                      {(cadencias || []).map((c) => (
+                      {(cadencias || [])
+                        .slice()
+                        .sort((a, b) => Number(b.ativo) - Number(a.ativo) || a.nome.localeCompare(b.nome))
+                        .map((c) => (
                         <button
                           key={c.id}
                           onClick={() => setSelectedCadence(c.id)}
@@ -180,12 +183,21 @@ export function AutomatizarCadenciaDialog({
                             selectedCadence === c.id
                               ? "border-primary bg-primary/5 ring-1 ring-primary"
                               : "border-border hover:border-primary/50"
-                          }`}
+                          } ${!c.ativo ? "opacity-70" : ""}`}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-sm truncate">{c.nome}</p>
-                              <p className="text-xs text-muted-foreground truncate">{c.codigo}</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1 flex items-center gap-2">
+                              <span
+                                className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                                  c.ativo ? "bg-green-500" : "bg-red-500"
+                                }`}
+                                title={c.ativo ? "Cadência ativa" : "Cadência inativa"}
+                                aria-label={c.ativo ? "Ativa" : "Inativa"}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-sm truncate">{c.nome}</p>
+                                <p className="text-xs text-muted-foreground truncate">{c.codigo}</p>
+                              </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               <Badge variant="outline" className="text-[10px]">{c.canal_principal}</Badge>
