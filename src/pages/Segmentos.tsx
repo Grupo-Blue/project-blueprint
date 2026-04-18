@@ -348,11 +348,10 @@ const Segmentos = () => {
                               Enviar Meta Ads
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => disparoWhatsApp.mutate(seg.id)}
-                              disabled={disparoWhatsApp.isPending}
+                              onClick={() => setCadenciaDialogSegId(seg.id)}
                             >
-                              <MessageCircle className="h-4 w-4 mr-2" />
-                              Preparar Disparo WhatsApp
+                              <Bot className="h-4 w-4 mr-2" />
+                              Automatizar Cadência
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => exportCSV(seg.id)}>
                               <Download className="h-4 w-4 mr-2" />
