@@ -27,16 +27,23 @@ const TIPOS_SEGMENTO = [
   { value: "reativacao", label: "Reativação", desc: "MQL inativo há 30+ dias" },
 ];
 
+const PAGE_SIZE = 50;
+
 const Segmentos = () => {
   const { empresaSelecionada, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
   const queryClient = useQueryClient();
   const [selectedSegmento, setSelectedSegmento] = useState<string | null>(null);
+  const [paginaMembros, setPaginaMembros] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [novoNome, setNovoNome] = useState("");
   const [novoTipo, setNovoTipo] = useState("");
   const [novaDescricao, setNovaDescricao] = useState("");
 
   const empresaId = empresaSelecionada && empresaSelecionada !== "todas" ? empresaSelecionada : null;
+
+  useEffect(() => {
+    setPaginaMembros(1);
+  }, [selectedSegmento]);
 
   const { data: segmentos, isLoading } = useQuery({
     queryKey: ["segmentos", empresaId],
