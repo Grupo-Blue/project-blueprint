@@ -398,22 +398,12 @@ const Segmentos = () => {
                       >
                         <Facebook className="h-3 w-3 mr-1" /> Meta
                       </Button>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="outline" size="sm"
-                              onClick={() => disparoWhatsApp.mutate(selectedSegmento)}
-                              disabled={disparoWhatsApp.isPending}
-                            >
-                              <MessageCircle className="h-3 w-3 mr-1" /> Preparar WhatsApp
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p className="text-xs">Cria a lista na fila de disparo. O envio efetivo é feito pelo sistema externo de mensageria.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => setCadenciaDialogSegId(selectedSegmento)}
+                      >
+                        <Bot className="h-3 w-3 mr-1" /> Automatizar Cadência
+                      </Button>
                       <Button
                         variant="outline" size="sm"
                         onClick={() => exportCSV(selectedSegmento)}
