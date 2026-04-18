@@ -193,7 +193,7 @@ const Segmentos = () => {
       return data;
     },
     onSuccess: (data) => {
-      toast.success(`Disparo WhatsApp criado com ${data.leads_com_telefone} leads`);
+      toast.success(`Lista de disparo criada com ${data.leads_com_telefone} leads. Aguardando envio pelo sistema externo de mensageria.`);
     },
     onError: (e) => toast.error(`Erro WhatsApp: ${e.message}`),
   });
