@@ -1,77 +1,54 @@
 
 
-## Diagnóstico — `/inteligencia` está vazio
+## Plano — Paginação na lista de leads + esclarecer o "Disparar WhatsApp"
 
-### O que está no banco hoje
-| Tabela | Status |
-|---|---|
-| `icp_perfil` | **1** registro (Tokeniza, auto-gerado, com critérios incorretos) |
-| `icp_match` | **0** registros — função `calcular-icp-match` **nunca rodou** (sem logs) |
-| `lead_segmento` | 20 segmentos padrão criados, mas **só 3 têm membros** (72 leads) |
-| `lead_segmento_membro` | 72 (de 30k+ leads) |
+### 1. O que o "Disparar WhatsApp" faz hoje (resposta direta)
 
-### Causas raiz
+Olhando a edge function `disparar-segmento-whatsapp` que é chamada pelo botão:
 
-**1. Motor de Match nunca foi disparado**
-- A função `calcular-icp-match` existe, mas **não tem cron** e ninguém clicou para rodar manualmente. Por isso `icp_match` está vazia → página `/inteligencia/match` não tem o que mostrar.
+1. Pega o segmento e busca todos os membros com telefone válido (≥10 dígitos).
+2. Cria um registro na tabela **`disparo_whatsapp`** com `enviado: false`, contendo nome, empresa, qtd de leads e os filtros aplicados.
+3. Vincula os leads ao disparo na tabela **`disparo_whatsapp_lead`** (em lotes de 500).
+4. Retorna sucesso com a contagem de leads com telefone.
 
-**2. ICP auto-gerado tem critério quebrado**
-- O único ICP existente tem este critério: `{campo: "tokeniza_qtd_investimentos", operador: "is_true", valor: 38}`. Operador `is_true` num campo numérico nunca dá match — bug na lógica de `gerarICPAuto` em `InteligenciaICP.tsx`.
-- Também não usa os campos com **mais dados disponíveis**: `amelia_score` (724 leads), `amelia_icp` (724), `mautic_score` (4.981), `mautic_page_hits` (83 engajados).
+**Importante:** ele **NÃO envia mensagens** pelo WhatsApp. Apenas **cria a fila de disparo** (`enviado: false`) que precisa ser consumida por um sistema externo (a edge function `whatsapp-disparo-webhook` recebe o callback `campaign.dispatched` desse sistema externo quando ele de fato envia).
 
-**3. Segmentos padrão estão filtrando errado**
-- Os segmentos "Quase Cliente", "Cliente Quente" e "Reativação" usam `stage_atual IN ('proposta','negociacao','contrato')` → **0 leads** têm esses estágios na base. Os stages reais são outros.
-- "Alta Intenção" e "Cliente Quente" filtram por `stape_last_activity` / eventos Stape recentes — provavelmente sem dados na janela de 7 dias.
-- Resultado: cron roda 12x/dia com sucesso mas só popula "Aquecimento" (mautic_page_hits > 3).
+Ou seja, o botão hoje funciona como "preparar lista de disparo" e não como "enviar agora". Vou deixar isso claro na UI ajustando o texto do toast e o label do botão (ex: "Preparar disparo WhatsApp") para evitar confusão.
 
-**4. Página `/inteligencia/segmentos` sem membros para mostrar**
-- Como só 3 dos 20 segmentos têm membros, a página parece vazia para a maioria das empresas.
+### 2. Por que aparecem só 100 leads mesmo tendo 137
 
-**5. Falta integração visual entre as páginas**
-- `/inteligencia/icp` cria ICP mas não dispara match automaticamente.
-- `/inteligencia/match` exige clicar "recalcular" manualmente.
-- `/inteligencia/irpf` depende de leads com IRPF (só 84 na base, ~0,3%).
+Em `src/pages/Segmentos.tsx`, linha 91:
+```ts
+.eq("id_segmento", selectedSegmento)
+.is("removido_em", null)
+.limit(100);   // ← cap fixo
+```
 
----
+A query da lista de membros está fixa em 100. O badge "X leads" no card vem de uma query separada com `count: "exact"` (137), mas a tabela só recebe 100. Por isso o descasamento.
 
-## Plano de correção
+### 3. Adicionar paginação na lista de leads do segmento
 
-### Correção 1 — Consertar o gerador de ICP automático (`InteligenciaICP.tsx`)
-- Bug: critério `tokeniza_qtd_investimentos` está usando operador `is_true` com valor numérico. Trocar para `gte` com mediana.
-- Garantir que critérios numéricos sempre usem `gte`/`lte`/`between` e booleanos usem `is_true`/`is_false`.
-- Apagar o ICP existente quebrado (ou recriar via UI depois do fix).
+**Em `src/pages/Segmentos.tsx`:**
 
-### Correção 2 — Disparar `calcular-icp-match` automaticamente
-- Quando salvar/criar um ICP em `InteligenciaICP.tsx`, invocar `calcular-icp-match` em background.
-- Adicionar **cron diário** (1x/dia, após `calcular-segmentos`) chamando `calcular-icp-match` para todos os ICPs.
-- Adicionar registro em `cronjob_execucao` (já feito no código mas precisa ser disparado).
+- Adicionar estado `paginaMembros` (default 1) e constante `PAGE_SIZE = 50`.
+- Substituir `.limit(100)` por `.range((paginaMembros - 1) * PAGE_SIZE, paginaMembros * PAGE_SIZE - 1)`.
+- Mudar a query para retornar `{ data, count }` usando `select(..., { count: 'exact' })`.
+- Resetar `paginaMembros` para 1 sempre que `selectedSegmento` mudar.
+- Renderizar o componente `Pagination` (já existe em `src/components/ui/pagination.tsx`) abaixo da tabela com:
+  - Botões Anterior / Próxima
+  - Indicador "Página X de Y" e "Mostrando A–B de N"
+  - Desabilitar Anterior na página 1 e Próxima na última
+- Atualizar o badge no `CardTitle` para mostrar o total real (`count`) em vez de `membros?.length`.
 
-### Correção 3 — Ajustar regras dos segmentos padrão (`calcular-segmentos`)
-- "Quase Cliente": substituir `stage_atual IN ('proposta','negociacao','contrato')` pelos **stages reais** da base (preciso confirmar os valores em uso). Usar fallback inteligente: leads com `mautic_score > 70` ou `amelia_temperatura = 'quente'`.
-- "Cliente Quente" / "Alta Intenção": além de Stape, usar `mautic_last_active` ou `amelia_score` recente como sinal alternativo.
-- "Reativação": além dos stages, considerar leads sem atividade há 30+ dias com qualquer engajamento prévio.
+### 4. Esclarecer o fluxo do botão WhatsApp na UI
 
-### Correção 4 — Recriar segmentos padrão "novos" em vez de editar os existentes
-- Adicionar 2-3 segmentos novos baseados em campos com **dados reais**:
-  - "Investidores Tokeniza Ativos" → `tokeniza_investidor = true` (2.512 leads)
-  - "Alta Qualificação Amélia" → `amelia_score >= 70` (de 724 com score)
-  - "Engajados Mautic" → `mautic_page_hits > 3` (83 leads)
-- Disparar `calcular-segmentos` manualmente após criar.
+- Renomear o item no dropdown e botão de "Disparar WhatsApp" → **"Preparar Disparo WhatsApp"**.
+- Atualizar o toast de sucesso para: *"Lista de disparo criada com X leads. Aguardando envio pelo sistema externo."*
+- Adicionar um tooltip pequeno explicando: "Cria a lista na fila `disparo_whatsapp`. O envio efetivo é feito pelo sistema externo de mensageria."
 
-### Correção 5 — Melhorar UX da página `/inteligencia/match`
-- Quando não houver matches, mostrar CTA claro: "Nenhum match calculado. Clique em Recalcular ou crie um ICP em /inteligencia/icp".
-- Auto-disparar `calcular-icp-match` se a query retornar 0 e houver ICP selecionado (uma vez).
+### Arquivos alterados
+- `src/pages/Segmentos.tsx` — paginação + textos do botão WhatsApp
 
-### Correção 6 — Limpar dados inconsistentes
-- Deletar o `ICP Auto-gerado` atual (id `8d853b38…`) com critérios quebrados.
-- Após fix, usuário pode regerar.
-
-### Arquivos afetados
-- `src/pages/InteligenciaICP.tsx` — fix gerador + auto-trigger match
-- `src/pages/InteligenciaMatch.tsx` — auto-trigger + empty state melhor
-- `supabase/functions/calcular-segmentos/index.ts` — ajustar regras dos tipos `quase_cliente`, `cliente_quente`, `alta_intencao`, `reativacao` + adicionar 3 segmentos novos
-- **Migration** — novo cron para `calcular-icp-match` 1x/dia + DELETE do ICP quebrado + atualização das regras dos segmentos padrão
-
-### Confirmação necessária antes de executar
-Preciso **olhar os valores reais de `stage_atual`** na base para ajustar os filtros de segmentos sem chutar. Também vou verificar quais empresas devem receber os 3 segmentos novos sugeridos.
+### Não vai mudar
+- Edge functions (`disparar-segmento-whatsapp` e `whatsapp-disparo-webhook`) — o fluxo backend já está correto, é só a UI que estava ambígua.
 
