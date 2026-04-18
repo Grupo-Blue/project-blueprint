@@ -381,7 +381,7 @@ const Segmentos = () => {
                     <CardTitle className="text-base flex items-center gap-2">
                       <Users className="h-4 w-4" />
                       {selectedSeg?.nome || "Leads do Segmento"}
-                      <Badge variant="outline" className="ml-2">{membros?.length || 0} resultados</Badge>
+                      <Badge variant="outline" className="ml-2">{totalMembros} leads</Badge>
                     </CardTitle>
                     <div className="flex gap-1">
                       <Button
@@ -398,13 +398,22 @@ const Segmentos = () => {
                       >
                         <Facebook className="h-3 w-3 mr-1" /> Meta
                       </Button>
-                      <Button
-                        variant="outline" size="sm"
-                        onClick={() => disparoWhatsApp.mutate(selectedSegmento)}
-                        disabled={disparoWhatsApp.isPending}
-                      >
-                        <MessageCircle className="h-3 w-3 mr-1" /> WhatsApp
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline" size="sm"
+                              onClick={() => disparoWhatsApp.mutate(selectedSegmento)}
+                              disabled={disparoWhatsApp.isPending}
+                            >
+                              <MessageCircle className="h-3 w-3 mr-1" /> Preparar WhatsApp
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-xs">Cria a lista na fila de disparo. O envio efetivo é feito pelo sistema externo de mensageria.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <Button
                         variant="outline" size="sm"
                         onClick={() => exportCSV(selectedSegmento)}
