@@ -183,21 +183,7 @@ const Segmentos = () => {
     onError: (e) => toast.error(`Erro Meta: ${e.message}`),
   });
 
-  const disparoWhatsApp = useMutation({
-    mutationFn: async (id_segmento: string) => {
-      const seg = segmentos?.find(s => s.id === id_segmento);
-      const { data, error } = await supabase.functions.invoke("disparar-segmento-whatsapp", {
-        body: { id_segmento, nome_disparo: `Segmento: ${seg?.nome || id_segmento}` },
-      });
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
-      return data;
-    },
-    onSuccess: (data) => {
-      toast.success(`Lista de disparo criada com ${data.leads_com_telefone} leads. Aguardando envio pelo sistema externo de mensageria.`);
-    },
-    onError: (e) => toast.error(`Erro WhatsApp: ${e.message}`),
-  });
+
 
   const exportCSV = async (id_segmento: string) => {
     try {
