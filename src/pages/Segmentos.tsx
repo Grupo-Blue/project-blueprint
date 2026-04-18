@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
@@ -25,16 +27,23 @@ const TIPOS_SEGMENTO = [
   { value: "reativacao", label: "Reativação", desc: "MQL inativo há 30+ dias" },
 ];
 
+const PAGE_SIZE = 50;
+
 const Segmentos = () => {
   const { empresaSelecionada, isLoading: loadingEmpresas, hasAccess } = useEmpresa();
   const queryClient = useQueryClient();
   const [selectedSegmento, setSelectedSegmento] = useState<string | null>(null);
+  const [paginaMembros, setPaginaMembros] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [novoNome, setNovoNome] = useState("");
   const [novoTipo, setNovoTipo] = useState("");
   const [novaDescricao, setNovaDescricao] = useState("");
 
   const empresaId = empresaSelecionada && empresaSelecionada !== "todas" ? empresaSelecionada : null;
+
+  useEffect(() => {
+    setPaginaMembros(1);
+  }, [selectedSegmento]);
 
   const { data: segmentos, isLoading } = useQuery({
     queryKey: ["segmentos", empresaId],
@@ -69,11 +78,13 @@ const Segmentos = () => {
     enabled: !!segmentos && segmentos.length > 0,
   });
 
-  const { data: membros } = useQuery({
-    queryKey: ["segmento-membros", selectedSegmento],
+  const { data: membrosResult } = useQuery({
+    queryKey: ["segmento-membros", selectedSegmento, paginaMembros],
     queryFn: async () => {
-      if (!selectedSegmento) return [];
-      const { data, error } = await supabase
+      if (!selectedSegmento) return { data: [], count: 0 };
+      const from = (paginaMembros - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
         .from("lead_segmento_membro")
         .select(`
           id_lead,
@@ -85,15 +96,20 @@ const Segmentos = () => {
             stage_atual,
             origem_canal
           )
-        `)
+        `, { count: "exact" })
         .eq("id_segmento", selectedSegmento)
         .is("removido_em", null)
-        .limit(100);
+        .order("adicionado_em", { ascending: false })
+        .range(from, to);
       if (error) throw error;
-      return data || [];
+      return { data: data || [], count: count || 0 };
     },
     enabled: !!selectedSegmento,
   });
+
+  const membros = membrosResult?.data;
+  const totalMembros = membrosResult?.count || 0;
+  const totalPaginas = Math.max(1, Math.ceil(totalMembros / PAGE_SIZE));
 
   const criarSegmento = useMutation({
     mutationFn: async () => {
@@ -177,7 +193,7 @@ const Segmentos = () => {
       return data;
     },
     onSuccess: (data) => {
-      toast.success(`Disparo WhatsApp criado com ${data.leads_com_telefone} leads`);
+      toast.success(`Lista de disparo criada com ${data.leads_com_telefone} leads. Aguardando envio pelo sistema externo de mensageria.`);
     },
     onError: (e) => toast.error(`Erro WhatsApp: ${e.message}`),
   });
@@ -335,7 +351,7 @@ const Segmentos = () => {
                               disabled={disparoWhatsApp.isPending}
                             >
                               <MessageCircle className="h-4 w-4 mr-2" />
-                              Disparar WhatsApp
+                              Preparar Disparo WhatsApp
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => exportCSV(seg.id)}>
                               <Download className="h-4 w-4 mr-2" />
@@ -365,7 +381,7 @@ const Segmentos = () => {
                     <CardTitle className="text-base flex items-center gap-2">
                       <Users className="h-4 w-4" />
                       {selectedSeg?.nome || "Leads do Segmento"}
-                      <Badge variant="outline" className="ml-2">{membros?.length || 0} resultados</Badge>
+                      <Badge variant="outline" className="ml-2">{totalMembros} leads</Badge>
                     </CardTitle>
                     <div className="flex gap-1">
                       <Button
@@ -382,13 +398,22 @@ const Segmentos = () => {
                       >
                         <Facebook className="h-3 w-3 mr-1" /> Meta
                       </Button>
-                      <Button
-                        variant="outline" size="sm"
-                        onClick={() => disparoWhatsApp.mutate(selectedSegmento)}
-                        disabled={disparoWhatsApp.isPending}
-                      >
-                        <MessageCircle className="h-3 w-3 mr-1" /> WhatsApp
-                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline" size="sm"
+                              onClick={() => disparoWhatsApp.mutate(selectedSegmento)}
+                              disabled={disparoWhatsApp.isPending}
+                            >
+                              <MessageCircle className="h-3 w-3 mr-1" /> Preparar WhatsApp
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-xs">Cria a lista na fila de disparo. O envio efetivo é feito pelo sistema externo de mensageria.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <Button
                         variant="outline" size="sm"
                         onClick={() => exportCSV(selectedSegmento)}
@@ -432,6 +457,34 @@ const Segmentos = () => {
                       )}
                     </TableBody>
                   </Table>
+                  {totalMembros > PAGE_SIZE && (
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t">
+                      <p className="text-xs text-muted-foreground">
+                        Mostrando {(paginaMembros - 1) * PAGE_SIZE + 1}–{Math.min(paginaMembros * PAGE_SIZE, totalMembros)} de {totalMembros}
+                      </p>
+                      <Pagination className="mx-0 w-auto justify-end">
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={(e) => { e.preventDefault(); if (paginaMembros > 1) setPaginaMembros(p => p - 1); }}
+                              className={paginaMembros === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                          <PaginationItem>
+                            <PaginationLink isActive className="cursor-default">
+                              {paginaMembros} / {totalPaginas}
+                            </PaginationLink>
+                          </PaginationItem>
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={(e) => { e.preventDefault(); if (paginaMembros < totalPaginas) setPaginaMembros(p => p + 1); }}
+                              className={paginaMembros >= totalPaginas ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : (
