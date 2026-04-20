@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const DEFAULT_EMPRESA_TOKENIZA = "61b5ffeb-fbbc-47c1-8ced-152bb647ed20";
+const DEFAULT_EMPRESA_BLUE = "95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db";
 
 /**
  * Endpoint público (autenticado por API key) para envio de PDFs de IRPF.
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
 
     // Resolver empresa: prioridade body > header > empresa da API key > default Tokeniza
     if (!idEmpresa && apiKey.empresa) idEmpresa = apiKey.empresa;
-    if (!idEmpresa) idEmpresa = DEFAULT_EMPRESA_TOKENIZA;
+    if (!idEmpresa) idEmpresa = DEFAULT_EMPRESA_BLUE;
 
     if (!pdfBase64) {
       return json({ error: "PDF não enviado. Use pdfBase64 (JSON), file (form-data) ou body binário." }, 400);
