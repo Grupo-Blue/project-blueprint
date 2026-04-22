@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Upload, FileText, Eye, Users, Building2, Bitcoin, TrendingUp, AlertCircle, CheckCircle, Clock, Loader2, BarChart3, FolderUp, ChevronDown, ChevronRight, Package, XCircle, Ban } from "lucide-react";
+import { Upload, FileText, Eye, Users, Building2, Bitcoin, TrendingUp, AlertCircle, CheckCircle, Clock, Loader2, BarChart3, FolderUp, ChevronDown, ChevronRight, Package, XCircle, Ban, RefreshCw, Download, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { IRPFDashboardInsights } from "@/components/irpf/IRPFDashboardInsights";
@@ -119,18 +119,44 @@ export default function IRPFImportacoes() {
     enabled: !!selectedDeclaracao,
   });
 
-  // ── Lotes de importação ──
+  // ── Lotes de importação (apenas ativos OU com erros pendentes) ──
   const { data: lotes, refetch: refetchLotes } = useQuery({
-    queryKey: ['irpf-lotes', BLUE_EMPRESA_ID],
+    queryKey: ['irpf-lotes-visiveis', BLUE_EMPRESA_ID],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Buscar lotes recentes E em qualquer status; filtrar abaixo
+      const { data: lotesRaw, error } = await supabase
         .from('irpf_importacao_lote')
         .select('*')
         .eq('id_empresa', BLUE_EMPRESA_ID)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(100);
       if (error) throw error;
-      return data;
+      if (!lotesRaw || lotesRaw.length === 0) return [];
+
+      // Para cada lote, contar quantos arquivos ainda existem na fila (erros + pendentes + processando)
+      const ids = lotesRaw.map(l => l.id);
+      const { data: fila } = await supabase
+        .from('irpf_importacao_fila')
+        .select('id_lote, status')
+        .in('id_lote', ids);
+
+      const filaMap = new Map<string, { erros: number; pendentes: number; processando: number }>();
+      (fila || []).forEach(f => {
+        const cur = filaMap.get(f.id_lote) || { erros: 0, pendentes: 0, processando: 0 };
+        if (f.status === 'erro') cur.erros++;
+        else if (f.status === 'pendente') cur.pendentes++;
+        else if (f.status === 'processando') cur.processando++;
+        filaMap.set(f.id_lote, cur);
+      });
+
+      // Mostrar apenas: lote ativo (pendente/processando) OU lote com erros pendentes na fila
+      return lotesRaw
+        .map(l => ({ ...l, _filaInfo: filaMap.get(l.id) || { erros: 0, pendentes: 0, processando: 0 } }))
+        .filter(l => {
+          const isActive = l.status === 'processando' || l.status === 'pendente';
+          const hasErros = l._filaInfo.erros > 0;
+          return isActive || hasErros;
+        });
     },
   });
 
@@ -146,7 +172,7 @@ export default function IRPFImportacoes() {
     return () => clearInterval(interval);
   }, [hasActiveLote, refetchLotes, queryClient]);
 
-  // ── Upload handler ──
+  // ── Upload handler (paralelo, sem limite prático) ──
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -161,6 +187,10 @@ export default function IRPFImportacoes() {
 
     setIsUploading(true);
     setUploadProgress({ current: 0, total: pdfFiles.length });
+
+    if (pdfFiles.length > 100) {
+      toast.info(`Iniciando upload de ${pdfFiles.length} PDFs em paralelo. Não feche esta aba até terminar.`);
+    }
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -179,43 +209,60 @@ export default function IRPFImportacoes() {
 
       if (loteError || !lote) throw new Error('Erro ao criar lote: ' + loteError?.message);
 
-      // 2. Upload each file and create fila record
-      for (let i = 0; i < pdfFiles.length; i++) {
-        const file = pdfFiles[i];
+      // 2. Upload paralelo (concorrência 6) com contador atômico
+      const CONCURRENCY = 6;
+      let completed = 0;
+      let failed = 0;
+
+      const uploadOne = async (file: File) => {
         const safeName = file.name
           .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           .replace(/[^a-zA-Z0-9._-]/g, '_')
           .replace(/_+/g, '_');
         const storagePath = `${lote.id}/${crypto.randomUUID()}_${safeName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('irpf-uploads')
-          .upload(storagePath, file);
+        try {
+          const { error: uploadError } = await supabase.storage
+            .from('irpf-uploads')
+            .upload(storagePath, file);
 
-        if (uploadError) {
-          console.error(`Erro ao fazer upload de ${file.name}:`, uploadError);
-          // Create fila record with error
-          await supabase.from('irpf_importacao_fila').insert({
-            id_lote: lote.id,
-            nome_arquivo: file.name,
-            storage_path: storagePath,
-            status: 'erro',
-            erro_mensagem: `Erro no upload: ${uploadError.message}`,
-          });
-          continue;
+          if (uploadError) {
+            await supabase.from('irpf_importacao_fila').insert({
+              id_lote: lote.id,
+              nome_arquivo: file.name,
+              storage_path: storagePath,
+              status: 'erro',
+              erro_mensagem: `Erro no upload: ${uploadError.message}`,
+            });
+            failed++;
+          } else {
+            await supabase.from('irpf_importacao_fila').insert({
+              id_lote: lote.id,
+              nome_arquivo: file.name,
+              storage_path: storagePath,
+              status: 'pendente',
+            });
+          }
+        } catch (err) {
+          console.error(`Falha upload ${file.name}:`, err);
+          failed++;
+        } finally {
+          completed++;
+          setUploadProgress({ current: completed, total: pdfFiles.length });
         }
+      };
 
-        await supabase.from('irpf_importacao_fila').insert({
-          id_lote: lote.id,
-          nome_arquivo: file.name,
-          storage_path: storagePath,
-          status: 'pendente',
-        });
+      // Worker pool simples
+      const queue = [...pdfFiles];
+      const workers = Array.from({ length: Math.min(CONCURRENCY, pdfFiles.length) }, async () => {
+        while (queue.length > 0) {
+          const file = queue.shift();
+          if (file) await uploadOne(file);
+        }
+      });
+      await Promise.all(workers);
 
-        setUploadProgress({ current: i + 1, total: pdfFiles.length });
-      }
-
-      // 3. Trigger processing (self-chaining — one file per invocation)
+      // 3. Disparar processamento (self-chaining no backend)
       try {
         const resp = await supabase.functions.invoke('processar-irpf-lote', {
           body: { id_lote: lote.id },
@@ -225,7 +272,12 @@ export default function IRPFImportacoes() {
         console.error('Erro ao disparar processamento:', err);
       }
 
-      toast.success(`${pdfFiles.length} arquivo(s) enviados! O processamento continua em segundo plano.`);
+      const successCount = pdfFiles.length - failed;
+      if (failed > 0) {
+        toast.warning(`${successCount} enviados, ${failed} falharam no upload. Processamento iniciado.`);
+      } else {
+        toast.success(`${successCount} arquivo(s) na fila! Processamento em segundo plano.`);
+      }
       refetchLotes();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao enviar arquivos');
@@ -634,10 +686,14 @@ export default function IRPFImportacoes() {
 function LoteItem({ lote }: { lote: any }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [bulkAction, setBulkAction] = useState<'reprocess' | 'discard' | null>(null);
   const queryClient = useQueryClient();
 
   const isActive = lote.status === 'processando' || lote.status === 'pendente';
+  const filaInfo = lote._filaInfo || { erros: 0, pendentes: 0, processando: 0 };
 
+  // Buscar só erros + ativos (sucessos foram deletados)
   const { data: arquivos, refetch: refetchArquivos } = useQuery({
     queryKey: ['irpf-fila', lote.id],
     queryFn: async () => {
@@ -645,6 +701,8 @@ function LoteItem({ lote }: { lote: any }) {
         .from('irpf_importacao_fila')
         .select('*')
         .eq('id_lote', lote.id)
+        .in('status', ['erro', 'pendente', 'processando'])
+        .order('status') // erros primeiro
         .order('created_at');
       if (error) throw error;
       return data;
@@ -653,62 +711,49 @@ function LoteItem({ lote }: { lote: any }) {
     refetchInterval: isOpen && isActive ? 4000 : false,
   });
 
+  const refreshAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['irpf-lotes-visiveis'] });
+    queryClient.invalidateQueries({ queryKey: ['irpf-fila', lote.id] });
+    refetchArquivos();
+  };
+
   const handleCancelLote = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsCancelling(true);
     try {
-      const { data: pendingFiles, error: pendingFilesError } = await supabase
+      const { data: pendingFiles } = await supabase
         .from('irpf_importacao_fila')
         .select('id, storage_path')
         .eq('id_lote', lote.id)
         .eq('status', 'pendente');
 
-      if (pendingFilesError) throw pendingFilesError;
-
-      const { error: filaUpdateError } = await supabase
+      await supabase
         .from('irpf_importacao_fila')
         .update({ status: 'erro', erro_mensagem: 'Cancelado pelo usuário' })
         .eq('id_lote', lote.id)
         .eq('status', 'pendente');
 
-      if (filaUpdateError) throw filaUpdateError;
-
-      const { data: filaSnapshot, error: filaSnapshotError } = await supabase
-        .from('irpf_importacao_fila')
-        .select('status')
-        .eq('id_lote', lote.id);
-
-      if (filaSnapshotError) throw filaSnapshotError;
-
-      const processados = filaSnapshot?.filter((item) => item.status === 'sucesso').length ?? 0;
-      const erros = filaSnapshot?.filter((item) => item.status === 'erro').length ?? 0;
-
-      const { error: loteUpdateError } = await supabase
+      await supabase
         .from('irpf_importacao_lote')
-        .update({ status: 'cancelado', processados, erros })
+        .update({ status: 'cancelado' })
         .eq('id', lote.id);
 
-      if (loteUpdateError) throw loteUpdateError;
-
+      // Remove PDFs cancelados do storage (não vamos reprocessar)
       if (pendingFiles && pendingFiles.length > 0) {
-        const paths = pendingFiles
-          .map((file) => file.storage_path)
-          .filter(Boolean);
-
+        const paths = pendingFiles.map(f => f.storage_path).filter(Boolean);
         if (paths.length > 0) {
-          const { error: storageError } = await supabase.storage
-            .from('irpf-uploads')
-            .remove(paths);
-
-          if (storageError) {
-            console.error('Erro ao limpar arquivos cancelados:', storageError);
-          }
+          await supabase.storage.from('irpf-uploads').remove(paths);
         }
       }
+      // Marcar como erro com pdf indisponível
+      await supabase
+        .from('irpf_importacao_fila')
+        .update({ erro_mensagem: 'Cancelado pelo usuário (PDF descartado)' })
+        .eq('id_lote', lote.id)
+        .eq('erro_mensagem', 'Cancelado pelo usuário');
 
       toast.success('Importação cancelada');
-      queryClient.invalidateQueries({ queryKey: ['irpf-lotes'] });
-      queryClient.invalidateQueries({ queryKey: ['irpf-fila', lote.id] });
+      refreshAll();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao cancelar importação');
     } finally {
@@ -716,16 +761,140 @@ function LoteItem({ lote }: { lote: any }) {
     }
   };
 
+  const handleReprocessOne = async (arq: any) => {
+    setActioningId(arq.id);
+    try {
+      const { error } = await supabase
+        .from('irpf_importacao_fila')
+        .update({
+          status: 'pendente',
+          erro_mensagem: null,
+          processing_started_at: null,
+          tentativas: 0,
+        })
+        .eq('id', arq.id);
+      if (error) throw error;
+
+      // Re-mark lote as processing
+      await supabase
+        .from('irpf_importacao_lote')
+        .update({ status: 'processando' })
+        .eq('id', lote.id);
+
+      // Disparar processamento
+      await supabase.functions.invoke('processar-irpf-lote', { body: { id_lote: lote.id } });
+      toast.success(`${arq.nome_arquivo} re-enfileirado`);
+      refreshAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao reprocessar');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleDownload = async (arq: any) => {
+    setActioningId(arq.id);
+    try {
+      const { data, error } = await supabase.storage
+        .from('irpf-uploads')
+        .createSignedUrl(arq.storage_path, 60);
+      if (error || !data?.signedUrl) throw new Error(error?.message || 'PDF indisponível');
+      window.open(data.signedUrl, '_blank');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao baixar PDF');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleDiscardOne = async (arq: any) => {
+    setActioningId(arq.id);
+    try {
+      if (arq.storage_path) {
+        await supabase.storage.from('irpf-uploads').remove([arq.storage_path]);
+      }
+      await supabase.from('irpf_importacao_fila').delete().eq('id', arq.id);
+      toast.success(`${arq.nome_arquivo} descartado`);
+      refreshAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao descartar');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const handleReprocessAllErrors = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setBulkAction('reprocess');
+    try {
+      const { data: errosFila, error } = await supabase
+        .from('irpf_importacao_fila')
+        .select('id')
+        .eq('id_lote', lote.id)
+        .eq('status', 'erro');
+      if (error) throw error;
+      if (!errosFila || errosFila.length === 0) {
+        toast.info('Nenhum erro para reprocessar');
+        return;
+      }
+
+      await supabase
+        .from('irpf_importacao_fila')
+        .update({ status: 'pendente', erro_mensagem: null, processing_started_at: null, tentativas: 0 })
+        .eq('id_lote', lote.id)
+        .eq('status', 'erro');
+
+      await supabase
+        .from('irpf_importacao_lote')
+        .update({ status: 'processando' })
+        .eq('id', lote.id);
+
+      await supabase.functions.invoke('processar-irpf-lote', { body: { id_lote: lote.id } });
+      toast.success(`${errosFila.length} arquivo(s) re-enfileirados`);
+      refreshAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao reprocessar lote');
+    } finally {
+      setBulkAction(null);
+    }
+  };
+
+  const handleDiscardAllErrors = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Descartar todos os PDFs com erro deste lote? Os arquivos serão removidos do storage.')) return;
+    setBulkAction('discard');
+    try {
+      const { data: errosFila } = await supabase
+        .from('irpf_importacao_fila')
+        .select('id, storage_path')
+        .eq('id_lote', lote.id)
+        .eq('status', 'erro');
+
+      if (errosFila && errosFila.length > 0) {
+        const paths = errosFila.map(f => f.storage_path).filter(Boolean);
+        if (paths.length > 0) {
+          await supabase.storage.from('irpf-uploads').remove(paths);
+        }
+        const ids = errosFila.map(f => f.id);
+        await supabase.from('irpf_importacao_fila').delete().in('id', ids);
+        toast.success(`${errosFila.length} erro(s) descartado(s)`);
+      }
+      refreshAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao descartar');
+    } finally {
+      setBulkAction(null);
+    }
+  };
+
   const isCancelled = lote.status === 'cancelado';
-  const progress = lote.total_arquivos > 0
-    ? ((lote.processados + lote.erros) / lote.total_arquivos) * 100
-    : 0;
+  const totalAtivosOuErros = filaInfo.erros + filaInfo.pendentes + filaInfo.processando;
 
   const statusIcon = isActive
     ? <Loader2 className="w-4 h-4 animate-spin text-yellow-500" />
     : isCancelled
       ? <Ban className="w-4 h-4 text-muted-foreground" />
-      : lote.erros > 0
+      : filaInfo.erros > 0
         ? <AlertCircle className="w-4 h-4 text-destructive" />
         : <CheckCircle className="w-4 h-4 text-green-500" />;
 
@@ -736,23 +905,51 @@ function LoteItem({ lote }: { lote: any }) {
           {isOpen ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
           {statusIcon}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium">
                 {format(new Date(lote.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
               </span>
               <Badge variant="secondary" className="text-xs">
-                {lote.total_arquivos} arquivo(s)
+                {lote.total_arquivos} enviado(s)
               </Badge>
-              {isCancelled && <Badge variant="outline" className="text-xs text-muted-foreground">Cancelado</Badge>}
+              {filaInfo.erros > 0 && (
+                <Badge variant="destructive" className="text-xs">
+                  {filaInfo.erros} com erro
+                </Badge>
+              )}
+              {(filaInfo.pendentes + filaInfo.processando) > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  {filaInfo.pendentes + filaInfo.processando} na fila
+                </Badge>
+              )}
             </div>
-            {isActive && (
-              <Progress value={progress} className="h-1.5 mt-1" />
-            )}
           </div>
-          <div className="flex items-center gap-2 text-sm shrink-0">
-            {lote.processados > 0 && <span className="text-green-600">✓ {lote.processados}</span>}
-            {lote.erros > 0 && <span className="text-destructive">✗ {lote.erros}</span>}
-            {isActive && <span className="text-muted-foreground">{lote.total_arquivos - lote.processados - lote.erros} pendente(s)</span>}
+          <div className="flex items-center gap-2 text-sm shrink-0" onClick={(e) => e.stopPropagation()}>
+            {filaInfo.erros > 0 && !isActive && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={handleReprocessAllErrors}
+                  disabled={bulkAction !== null}
+                  title="Reprocessar todos os erros deste lote"
+                >
+                  {bulkAction === 'reprocess' ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  <span className="ml-1 text-xs">Reprocessar erros</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-muted-foreground"
+                  onClick={handleDiscardAllErrors}
+                  disabled={bulkAction !== null}
+                  title="Descartar todos os erros deste lote"
+                >
+                  {bulkAction === 'discard' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                </Button>
+              </>
+            )}
             {isActive && (
               <Button
                 variant="ghost"
@@ -774,23 +971,55 @@ function LoteItem({ lote }: { lote: any }) {
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
               <Loader2 className="w-3 h-3 animate-spin" /> Carregando arquivos...
             </div>
+          ) : arquivos.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-2 italic">
+              Todos os arquivos foram processados com sucesso ✓
+            </div>
           ) : (
             arquivos.map((arq) => (
-              <div key={arq.id} className="flex items-center gap-2 text-sm py-1 px-2 rounded">
+              <div key={arq.id} className="flex items-center gap-2 text-sm py-1 px-2 rounded hover:bg-muted/30">
                 {arq.status === 'pendente' && <Clock className="w-3 h-3 text-muted-foreground shrink-0" />}
                 {arq.status === 'processando' && <Loader2 className="w-3 h-3 animate-spin text-primary shrink-0" />}
-                {arq.status === 'sucesso' && <CheckCircle className="w-3 h-3 text-green-600 shrink-0" />}
                 {arq.status === 'erro' && <AlertCircle className="w-3 h-3 text-destructive shrink-0" />}
-                <span className="truncate flex-1">{arq.nome_arquivo}</span>
-                {arq.status === 'sucesso' && arq.resultado && (
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {(arq.resultado as any)?.nome} ({(arq.resultado as any)?.exercicio})
-                  </span>
-                )}
+                <span className="truncate flex-1" title={arq.nome_arquivo}>{arq.nome_arquivo}</span>
                 {arq.status === 'erro' && arq.erro_mensagem && (
-                  <span className="text-xs text-destructive shrink-0 max-w-[200px] truncate" title={arq.erro_mensagem}>
+                  <span className="text-xs text-destructive shrink-0 max-w-[260px] truncate" title={arq.erro_mensagem}>
                     {arq.erro_mensagem}
                   </span>
+                )}
+                {arq.status === 'erro' && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => handleReprocessOne(arq)}
+                      disabled={actioningId === arq.id}
+                      title="Reprocessar"
+                    >
+                      {actioningId === arq.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => handleDownload(arq)}
+                      disabled={actioningId === arq.id}
+                      title="Baixar PDF original"
+                    >
+                      <Download className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDiscardOne(arq)}
+                      disabled={actioningId === arq.id}
+                      title="Descartar (remove PDF e registro)"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
                 )}
               </div>
             ))

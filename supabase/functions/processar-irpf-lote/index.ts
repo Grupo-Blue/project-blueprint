@@ -184,26 +184,23 @@ serve(async (req) => {
         throw new Error(result?.error || result?.message || 'Resposta inválida');
       }
 
-      await supabase.from('irpf_importacao_fila').update({
-        status: 'sucesso',
-        resultado: { nome: result.nome, exercicio: result.exercicio },
-      }).eq('id', fileId);
+      // Sucesso → descarta o registro da fila E o PDF do storage
+      await supabase.storage.from('irpf-uploads').remove([claimed.storage_path]);
+      await supabase.from('irpf_importacao_fila').delete().eq('id', fileId);
 
       sucesso = true;
-      console.log(`[lote] ✅ ${claimed.nome_arquivo}`);
-
-      await supabase.storage.from('irpf-uploads').remove([claimed.storage_path]);
+      console.log(`[lote] ✅ ${claimed.nome_arquivo} (descartado da fila)`);
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
       console.error(`[lote] ❌ ${claimed.nome_arquivo}: ${errorMsg}`);
 
+      // Erro → mantém PDF no storage E registro na fila para reprocessar/baixar
       await supabase.from('irpf_importacao_fila').update({
         status: 'erro',
         erro_mensagem: errorMsg,
       }).eq('id', fileId);
-
-      await supabase.storage.from('irpf-uploads').remove([claimed.storage_path]);
+      // NÃO remover do storage — usuário pode querer baixar/reprocessar
     }
 
     // ── Update lote counters from actual fila data ──
