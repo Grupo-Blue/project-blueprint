@@ -6,8 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const MAX_TENTATIVAS = 3;
-const STUCK_THRESHOLD_MS = 10 * 60 * 1000; // 10 min — consider stuck
+const MAX_TENTATIVAS = 5;
+const STUCK_THRESHOLD_MS = 15 * 60 * 1000; // 15 min — consider stuck
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -159,24 +159,31 @@ serve(async (req) => {
           id_empresa: lote.id_empresa,
           arquivo_origem: claimed.nome_arquivo,
         }),
-        signal: AbortSignal.timeout(300000), // 5 min
+        signal: AbortSignal.timeout(480000), // 8 min
       });
 
       if (!processResponse.ok) {
         const status = processResponse.status;
         let errorMsg = `Status ${status}`;
-        if (status === 504) {
+        let isRetryable = false;
+        if (status === 504 || status === 408 || status === 502 || status === 503) {
           errorMsg = 'Timeout no processamento (PDF muito grande ou complexo)';
+          isRetryable = true;
         } else {
           const body = await processResponse.text().catch(() => '');
           try {
             const parsed = JSON.parse(body);
             errorMsg = parsed?.error || parsed?.message || errorMsg;
+            if (typeof errorMsg === 'string' && errorMsg.startsWith('TIMEOUT_AI')) {
+              isRetryable = true;
+            }
           } catch {
             if (body) errorMsg = body.substring(0, 500);
           }
         }
-        throw new Error(errorMsg);
+        const err: any = new Error(errorMsg);
+        err.retryable = isRetryable;
+        throw err;
       }
 
       const result = await processResponse.json().catch(() => null);
@@ -193,13 +200,26 @@ serve(async (req) => {
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
-      console.error(`[lote] ❌ ${claimed.nome_arquivo}: ${errorMsg}`);
+      const retryable = (err as any)?.retryable === true || /timeout/i.test(errorMsg);
+      const tentativasAtuais = (claimed.tentativas || 0) + 1;
+      const podeRetentar = retryable && tentativasAtuais < MAX_TENTATIVAS;
 
-      // Erro → mantém PDF no storage E registro na fila para reprocessar/baixar
-      await supabase.from('irpf_importacao_fila').update({
-        status: 'erro',
-        erro_mensagem: errorMsg,
-      }).eq('id', fileId);
+      console.error(`[lote] ${podeRetentar ? '⏳' : '❌'} ${claimed.nome_arquivo}: ${errorMsg} (tentativa ${tentativasAtuais}/${MAX_TENTATIVAS})`);
+
+      if (podeRetentar) {
+        // Volta para pendente — outra iteração tentará de novo
+        await supabase.from('irpf_importacao_fila').update({
+          status: 'pendente',
+          processing_started_at: null,
+          erro_mensagem: `[retry ${tentativasAtuais}] ${errorMsg}`,
+        }).eq('id', fileId);
+      } else {
+        // Erro definitivo — mantém PDF no storage E registro na fila para reprocessar/baixar
+        await supabase.from('irpf_importacao_fila').update({
+          status: 'erro',
+          erro_mensagem: errorMsg,
+        }).eq('id', fileId);
+      }
       // NÃO remover do storage — usuário pode querer baixar/reprocessar
     }
 

@@ -157,8 +157,15 @@ serve(async (req) => {
     console.log("[processar-irpf] Iniciando processamento com IA...");
 
     // Chamar Lovable AI para extrair dados do PDF
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Timeout interno generoso (240s) — antes do limite do Edge Runtime (~150-180s no gateway)
+    // Em caso de PDFs muito grandes, falha com mensagem clara para retry pelo lote.
+    const aiController = new AbortController();
+    const aiTimeout = setTimeout(() => aiController.abort(), 240_000);
+    let aiResponse: Response;
+    try {
+      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
+      signal: aiController.signal,
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
@@ -298,9 +305,17 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
             ]
           }
         ],
-        max_tokens: 32000,
+        max_tokens: 16000,
       }),
     });
+    } catch (e: any) {
+      clearTimeout(aiTimeout);
+      if (e?.name === 'AbortError') {
+        throw new Error('TIMEOUT_AI: Gemini não respondeu em 240s (PDF muito grande/complexo)');
+      }
+      throw e;
+    }
+    clearTimeout(aiTimeout);
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
