@@ -291,6 +291,9 @@ serve(async (req) => {
       });
     }
 
+    // Stages finais que NÃO devem disparar webhook (lead já fora do funil de aquisição)
+    const STAGES_EXCLUIDOS = ['Vendido', 'Cliente', 'Ativo', 'Implantação', 'Implantacao', 'Perdido', 'Descartado'];
+
     // Buscar leads pendentes de webhook
     let query = supabase
       .from('lead')
@@ -298,25 +301,24 @@ serve(async (req) => {
         *,
         empresa:id_empresa (nome)
       `)
-      .eq('merged', false);
+      .eq('merged', false)
+      .not('stage_atual', 'in', `(${STAGES_EXCLUIDOS.map(s => `"${s}"`).join(',')})`);
 
     if (body.lead_ids && body.lead_ids.length > 0) {
       query = query.in('id_lead', body.lead_ids);
     } else {
       const quinzeMinutosAtras = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      // Cooldown REAL por lead: só envia se nunca enviou OU se último envio foi há mais de 15min
       query = query
         .gte('score_temperatura', 70)
-        .or(`webhook_enviado_em.is.null,updated_at.gte.${quinzeMinutosAtras}`);
+        .or(`webhook_enviado_em.is.null,webhook_enviado_em.lt.${quinzeMinutosAtras}`);
     }
 
     const { data: leadsRaw, error: leadsError } = await query.limit(100);
 
     const leads = body.lead_ids?.length 
       ? leadsRaw 
-      : leadsRaw?.filter(lead => 
-          !lead.webhook_enviado_em || 
-          new Date(lead.updated_at) > new Date(lead.webhook_enviado_em)
-        ).slice(0, 50);
+      : leadsRaw?.slice(0, 50);
 
     if (leadsError) {
       throw new Error(`Erro ao buscar leads: ${leadsError.message}`);
@@ -375,6 +377,9 @@ serve(async (req) => {
         if (['LEAD_NOVO', 'ATUALIZACAO', 'CARRINHO_ABANDONADO', 'MQL', 'SCORE_ATUALIZADO', 'CLIQUE_OFERTA', 'FUNIL_ATUALIZADO'].includes(eventoUpper)) {
           evento = eventoUpper as SDRPayload['evento'];
         }
+      } else if (lead.data_venda) {
+        // Lead com venda fechada → sempre FUNIL_ATUALIZADO (nunca MQL/LEAD_NOVO)
+        evento = 'FUNIL_ATUALIZADO';
       } else if (!lead.webhook_enviado_em) {
         evento = 'LEAD_NOVO';
       } else if (lead.tokeniza_carrinho_abandonado) {
