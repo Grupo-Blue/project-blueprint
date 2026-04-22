@@ -119,18 +119,44 @@ export default function IRPFImportacoes() {
     enabled: !!selectedDeclaracao,
   });
 
-  // ── Lotes de importação ──
+  // ── Lotes de importação (apenas ativos OU com erros pendentes) ──
   const { data: lotes, refetch: refetchLotes } = useQuery({
-    queryKey: ['irpf-lotes', BLUE_EMPRESA_ID],
+    queryKey: ['irpf-lotes-visiveis', BLUE_EMPRESA_ID],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Buscar lotes recentes E em qualquer status; filtrar abaixo
+      const { data: lotesRaw, error } = await supabase
         .from('irpf_importacao_lote')
         .select('*')
         .eq('id_empresa', BLUE_EMPRESA_ID)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(100);
       if (error) throw error;
-      return data;
+      if (!lotesRaw || lotesRaw.length === 0) return [];
+
+      // Para cada lote, contar quantos arquivos ainda existem na fila (erros + pendentes + processando)
+      const ids = lotesRaw.map(l => l.id);
+      const { data: fila } = await supabase
+        .from('irpf_importacao_fila')
+        .select('id_lote, status')
+        .in('id_lote', ids);
+
+      const filaMap = new Map<string, { erros: number; pendentes: number; processando: number }>();
+      (fila || []).forEach(f => {
+        const cur = filaMap.get(f.id_lote) || { erros: 0, pendentes: 0, processando: 0 };
+        if (f.status === 'erro') cur.erros++;
+        else if (f.status === 'pendente') cur.pendentes++;
+        else if (f.status === 'processando') cur.processando++;
+        filaMap.set(f.id_lote, cur);
+      });
+
+      // Mostrar apenas: lote ativo (pendente/processando) OU lote com erros pendentes na fila
+      return lotesRaw
+        .map(l => ({ ...l, _filaInfo: filaMap.get(l.id) || { erros: 0, pendentes: 0, processando: 0 } }))
+        .filter(l => {
+          const isActive = l.status === 'processando' || l.status === 'pendente';
+          const hasErros = l._filaInfo.erros > 0;
+          return isActive || hasErros;
+        });
     },
   });
 
