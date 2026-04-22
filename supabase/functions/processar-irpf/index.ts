@@ -305,9 +305,17 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
             ]
           }
         ],
-        max_tokens: 32000,
+        max_tokens: 16000,
       }),
     });
+    } catch (e: any) {
+      clearTimeout(aiTimeout);
+      if (e?.name === 'AbortError') {
+        throw new Error('TIMEOUT_AI: Gemini não respondeu em 240s (PDF muito grande/complexo)');
+      }
+      throw e;
+    }
+    clearTimeout(aiTimeout);
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
