@@ -172,7 +172,7 @@ export default function IRPFImportacoes() {
     return () => clearInterval(interval);
   }, [hasActiveLote, refetchLotes, queryClient]);
 
-  // ── Upload handler ──
+  // ── Upload handler (paralelo, sem limite prático) ──
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -187,6 +187,10 @@ export default function IRPFImportacoes() {
 
     setIsUploading(true);
     setUploadProgress({ current: 0, total: pdfFiles.length });
+
+    if (pdfFiles.length > 100) {
+      toast.info(`Iniciando upload de ${pdfFiles.length} PDFs em paralelo. Não feche esta aba até terminar.`);
+    }
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -205,43 +209,60 @@ export default function IRPFImportacoes() {
 
       if (loteError || !lote) throw new Error('Erro ao criar lote: ' + loteError?.message);
 
-      // 2. Upload each file and create fila record
-      for (let i = 0; i < pdfFiles.length; i++) {
-        const file = pdfFiles[i];
+      // 2. Upload paralelo (concorrência 6) com contador atômico
+      const CONCURRENCY = 6;
+      let completed = 0;
+      let failed = 0;
+
+      const uploadOne = async (file: File) => {
         const safeName = file.name
           .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           .replace(/[^a-zA-Z0-9._-]/g, '_')
           .replace(/_+/g, '_');
         const storagePath = `${lote.id}/${crypto.randomUUID()}_${safeName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('irpf-uploads')
-          .upload(storagePath, file);
+        try {
+          const { error: uploadError } = await supabase.storage
+            .from('irpf-uploads')
+            .upload(storagePath, file);
 
-        if (uploadError) {
-          console.error(`Erro ao fazer upload de ${file.name}:`, uploadError);
-          // Create fila record with error
-          await supabase.from('irpf_importacao_fila').insert({
-            id_lote: lote.id,
-            nome_arquivo: file.name,
-            storage_path: storagePath,
-            status: 'erro',
-            erro_mensagem: `Erro no upload: ${uploadError.message}`,
-          });
-          continue;
+          if (uploadError) {
+            await supabase.from('irpf_importacao_fila').insert({
+              id_lote: lote.id,
+              nome_arquivo: file.name,
+              storage_path: storagePath,
+              status: 'erro',
+              erro_mensagem: `Erro no upload: ${uploadError.message}`,
+            });
+            failed++;
+          } else {
+            await supabase.from('irpf_importacao_fila').insert({
+              id_lote: lote.id,
+              nome_arquivo: file.name,
+              storage_path: storagePath,
+              status: 'pendente',
+            });
+          }
+        } catch (err) {
+          console.error(`Falha upload ${file.name}:`, err);
+          failed++;
+        } finally {
+          completed++;
+          setUploadProgress({ current: completed, total: pdfFiles.length });
         }
+      };
 
-        await supabase.from('irpf_importacao_fila').insert({
-          id_lote: lote.id,
-          nome_arquivo: file.name,
-          storage_path: storagePath,
-          status: 'pendente',
-        });
+      // Worker pool simples
+      const queue = [...pdfFiles];
+      const workers = Array.from({ length: Math.min(CONCURRENCY, pdfFiles.length) }, async () => {
+        while (queue.length > 0) {
+          const file = queue.shift();
+          if (file) await uploadOne(file);
+        }
+      });
+      await Promise.all(workers);
 
-        setUploadProgress({ current: i + 1, total: pdfFiles.length });
-      }
-
-      // 3. Trigger processing (self-chaining — one file per invocation)
+      // 3. Disparar processamento (self-chaining no backend)
       try {
         const resp = await supabase.functions.invoke('processar-irpf-lote', {
           body: { id_lote: lote.id },
@@ -251,7 +272,12 @@ export default function IRPFImportacoes() {
         console.error('Erro ao disparar processamento:', err);
       }
 
-      toast.success(`${pdfFiles.length} arquivo(s) enviados! O processamento continua em segundo plano.`);
+      const successCount = pdfFiles.length - failed;
+      if (failed > 0) {
+        toast.warning(`${successCount} enviados, ${failed} falharam no upload. Processamento iniciado.`);
+      } else {
+        toast.success(`${successCount} arquivo(s) na fila! Processamento em segundo plano.`);
+      }
       refetchLotes();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao enviar arquivos');
