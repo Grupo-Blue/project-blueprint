@@ -6,8 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const MAX_TENTATIVAS = 3;
-const STUCK_THRESHOLD_MS = 10 * 60 * 1000; // 10 min — consider stuck
+const MAX_TENTATIVAS = 5;
+const STUCK_THRESHOLD_MS = 15 * 60 * 1000; // 15 min — consider stuck
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
