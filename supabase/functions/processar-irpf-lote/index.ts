@@ -254,7 +254,13 @@ serve(async (req) => {
         .eq('status', 'pendente');
 
       if ((count || 0) > 0) {
-        console.log(`[lote] ${count} pendente(s), auto-invocando próximo`);
+        // Se acabamos de bater rate limit, aguardar antes de re-invocar para aliviar
+        if (hitRateLimit) {
+          console.log(`[lote] Rate limit detectado, aguardando 20s antes de re-invocar (${count} pendente(s))`);
+          await new Promise((r) => setTimeout(r, 20000));
+        } else {
+          console.log(`[lote] ${count} pendente(s), auto-invocando próximo`);
+        }
         await selfInvoke(supabaseUrl, serviceKey, id_lote);
       } else {
         await recalcAndFinalize(supabase, id_lote);
