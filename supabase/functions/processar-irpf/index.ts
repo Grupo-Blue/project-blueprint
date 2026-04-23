@@ -145,33 +145,32 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY não configurada");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY não configurada");
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log("[processar-irpf] Iniciando processamento com IA...");
+    console.log("[processar-irpf] Iniciando processamento com OpenAI gpt-4o-mini...");
 
-    // Chamar Lovable AI para extrair dados do PDF
-    // Timeout interno generoso (240s) — antes do limite do Edge Runtime (~150-180s no gateway)
-    // Em caso de PDFs muito grandes, falha com mensagem clara para retry pelo lote.
+    // Chamar OpenAI direto (API do usuário) para extrair dados do PDF
+    // Timeout interno generoso (240s)
     const aiController = new AbortController();
     const aiTimeout = setTimeout(() => aiController.abort(), 240_000);
     let aiResponse: Response;
     try {
-      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       signal: aiController.signal,
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -356,14 +355,14 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
       
       // Retry: enviar para IA rápida para normalizar o JSON
       try {
-        const normalizeResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const normalizeResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+            "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash-lite",
+            model: "gpt-4o-mini",
             messages: [
               {
                 role: "system",
@@ -374,7 +373,7 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
                 content: content
               }
             ],
-            max_tokens: 32000,
+            max_tokens: 16000,
           }),
         });
 
