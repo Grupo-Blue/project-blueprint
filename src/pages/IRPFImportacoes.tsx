@@ -79,13 +79,24 @@ export default function IRPFImportacoes() {
   const { data: declaracoes, isLoading } = useQuery({
     queryKey: ['irpf-declaracoes', BLUE_EMPRESA_ID],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('irpf_declaracao')
-        .select('*')
-        .eq('id_empresa', BLUE_EMPRESA_ID)
-        .order('data_importacao', { ascending: false });
-      if (error) throw error;
-      return data as IRPFDeclaracao[];
+      const PAGE_SIZE = 1000;
+      const todas: IRPFDeclaracao[] = [];
+      let from = 0;
+      // Pagina via .range() para contornar o limite default de 1000 linhas do Supabase
+      while (true) {
+        const { data, error } = await supabase
+          .from('irpf_declaracao')
+          .select('*')
+          .eq('id_empresa', BLUE_EMPRESA_ID)
+          .order('data_importacao', { ascending: false })
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        todas.push(...(data as IRPFDeclaracao[]));
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+      return todas;
     },
   });
 
