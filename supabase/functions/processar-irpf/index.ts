@@ -305,7 +305,7 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
             ]
           }
         ],
-        max_tokens: 16000,
+        max_completion_tokens: 16000,
       }),
     });
     } catch (e: any) {
