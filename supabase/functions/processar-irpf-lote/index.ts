@@ -205,9 +205,11 @@ serve(async (req) => {
       sucesso = true;
       console.log(`[lote] ✅ ${claimed.nome_arquivo} (descartado da fila)`);
 
+    let hitRateLimit = false;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
       const retryable = (err as any)?.retryable === true || /timeout/i.test(errorMsg);
+      hitRateLimit = (err as any)?.rateLimit === true || /rate.?limit|429/i.test(errorMsg);
       const tentativasAtuais = (claimed.tentativas || 0) + 1;
       const podeRetentar = retryable && tentativasAtuais < MAX_TENTATIVAS;
 
