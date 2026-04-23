@@ -131,6 +131,7 @@ serve(async (req) => {
 
     // ── Process the file ──
     let sucesso = false;
+    let hitRateLimit = false;
     try {
       const { data: fileData, error: downloadError } = await supabase.storage
         .from('irpf-uploads')
