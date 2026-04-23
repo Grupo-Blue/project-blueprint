@@ -320,6 +320,10 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error("[processar-irpf] Erro na API:", errorText);
+      // 429 = rate limit; 500/502/503 = erro temporário do provedor → marcar como retryable
+      if ([429, 500, 502, 503].includes(aiResponse.status)) {
+        throw new Error(`RATE_LIMIT_AI: status ${aiResponse.status} (retentar com backoff)`);
+      }
       throw new Error(`Erro na API de IA: ${aiResponse.status}`);
     }
 
