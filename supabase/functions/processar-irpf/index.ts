@@ -363,7 +363,7 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-5.4-nano",
+            model: "gpt-5.4-mini",
             messages: [
               {
                 role: "system",
