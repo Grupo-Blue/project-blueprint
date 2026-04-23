@@ -355,14 +355,14 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
       
       // Retry: enviar para IA rápida para normalizar o JSON
       try {
-        const normalizeResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const normalizeResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+            "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-2.5-flash-lite",
+            model: "gpt-4o-mini",
             messages: [
               {
                 role: "system",
@@ -373,7 +373,7 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
                 content: content
               }
             ],
-            max_tokens: 32000,
+            max_tokens: 16000,
           }),
         });
 
