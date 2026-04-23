@@ -166,16 +166,22 @@ serve(async (req) => {
         const status = processResponse.status;
         let errorMsg = `Status ${status}`;
         let isRetryable = false;
+        let isRateLimit = false;
         if (status === 504 || status === 408 || status === 502 || status === 503) {
           errorMsg = 'Timeout no processamento (PDF muito grande ou complexo)';
           isRetryable = true;
+        } else if (status === 429) {
+          errorMsg = 'Rate limit da IA (429) — aguardando para retentar';
+          isRetryable = true;
+          isRateLimit = true;
         } else {
           const body = await processResponse.text().catch(() => '');
           try {
             const parsed = JSON.parse(body);
             errorMsg = parsed?.error || parsed?.message || errorMsg;
-            if (typeof errorMsg === 'string' && errorMsg.startsWith('TIMEOUT_AI')) {
+            if (typeof errorMsg === 'string' && (errorMsg.startsWith('TIMEOUT_AI') || errorMsg.startsWith('RATE_LIMIT_AI'))) {
               isRetryable = true;
+              if (errorMsg.startsWith('RATE_LIMIT_AI')) isRateLimit = true;
             }
           } catch {
             if (body) errorMsg = body.substring(0, 500);
@@ -183,6 +189,7 @@ serve(async (req) => {
         }
         const err: any = new Error(errorMsg);
         err.retryable = isRetryable;
+        err.rateLimit = isRateLimit;
         throw err;
       }
 
