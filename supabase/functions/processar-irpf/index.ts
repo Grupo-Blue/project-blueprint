@@ -154,7 +154,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log("[processar-irpf] Iniciando processamento com OpenAI gpt-5.4-nano...");
+    console.log("[processar-irpf] Iniciando processamento com OpenAI gpt-5.4-mini...");
 
     // Chamar OpenAI direto (API do usuário) para extrair dados do PDF
     // Timeout interno generoso (240s)
