@@ -296,9 +296,10 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
 }`
               },
               {
-                type: "image_url",
-                image_url: {
-                  url: `data:application/pdf;base64,${pdfBase64}`
+                type: "file",
+                file: {
+                  filename: "declaracao.pdf",
+                  file_data: `data:application/pdf;base64,${pdfBase64}`
                 }
               }
             ]
