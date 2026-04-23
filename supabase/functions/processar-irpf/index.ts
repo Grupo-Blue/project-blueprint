@@ -154,7 +154,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log("[processar-irpf] Iniciando processamento com OpenAI gpt-5.4-nano...");
+    console.log("[processar-irpf] Iniciando processamento com OpenAI gpt-5.4-mini...");
 
     // Chamar OpenAI direto (API do usuário) para extrair dados do PDF
     // Timeout interno generoso (240s)
@@ -170,7 +170,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-5.4-nano",
+        model: "gpt-5.4-mini",
         messages: [
           {
             role: "system",
@@ -296,9 +296,10 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
 }`
               },
               {
-                type: "image_url",
-                image_url: {
-                  url: `data:application/pdf;base64,${pdfBase64}`
+                type: "file",
+                file: {
+                  filename: "declaracao.pdf",
+                  file_data: `data:application/pdf;base64,${pdfBase64}`
                 }
               }
             ]
@@ -362,7 +363,7 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-5.4-nano",
+            model: "gpt-5.4-mini",
             messages: [
               {
                 role: "system",
