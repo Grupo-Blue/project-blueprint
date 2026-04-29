@@ -249,8 +249,18 @@ const InteligenciaIRPF = () => {
               <p className="text-xl font-bold text-primary">{kpis.total_oportunidades.toLocaleString("pt-BR")}</p>
               <p className="text-[11px] text-muted-foreground">Oportunidades</p>
             </GlassCard>
-            <GlassCard className="p-4 text-center">
-              <p className="text-xl font-bold text-emerald-600">{formatCurrency(kpis.patrimonio_total)}</p>
+            <GlassCard className="p-4 text-center min-w-0">
+              <p
+                className="text-xl font-bold text-emerald-600 truncate"
+                title={formatCurrency(kpis.patrimonio_total)}
+              >
+                {new Intl.NumberFormat("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                  notation: "compact",
+                  maximumFractionDigits: 1,
+                }).format(kpis.patrimonio_total)}
+              </p>
               <p className="text-[11px] text-muted-foreground">Patrim. líquido total</p>
             </GlassCard>
             <GlassCard className="p-4 text-center">
