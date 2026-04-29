@@ -334,8 +334,9 @@ const InteligenciaIRPF = () => {
             className="w-[150px]"
           />
           <Select value={ordenacao} onValueChange={(v: any) => setOrdenacao(v)}>
-            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[210px]"><SelectValue /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="score">🎯 Maior score (recomendado)</SelectItem>
               <SelectItem value="patrimonio">Maior patrimônio líquido</SelectItem>
               <SelectItem value="investimentos">Maior em investimentos</SelectItem>
               <SelectItem value="variacao">Maior variação patrimonial</SelectItem>
