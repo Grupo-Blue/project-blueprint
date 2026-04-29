@@ -6779,12 +6779,15 @@ export type Database = {
           aplicacoes: number | null
           cpf: string | null
           cripto: number | null
+          data_nascimento: string | null
           depositos: number | null
+          email_declaracao: string | null
           exercicio: number | null
           fundos: number | null
           id: string | null
           id_empresa: string | null
           id_lead: string | null
+          idade: number | null
           imoveis: number | null
           lead_email: string | null
           lead_stage: string | null
@@ -6792,6 +6795,8 @@ export type Database = {
           lead_tokeniza_investidor: boolean | null
           lead_tokeniza_valor_investido: number | null
           lead_venda_realizada: boolean | null
+          motivos_score: string[] | null
+          municipio: string | null
           nome_contribuinte: string | null
           nome_lead: string | null
           ocupacao: string | null
@@ -6800,11 +6805,18 @@ export type Database = {
           patrimonio_liquido: number | null
           patrimonio_total: number | null
           possui_atividade_rural: boolean | null
+          possui_conjuge: boolean | null
+          proxima_acao: string | null
           qtd_cripto: number | null
+          qtd_dependentes: number | null
+          qtd_fontes_pagadoras: number | null
           qtd_imoveis: number | null
           qtd_participacoes: number | null
           qtd_veiculos: number | null
           resultado_atividade_rural: number | null
+          score: number | null
+          sem_lead_vinculado: boolean | null
+          telefone_declaracao: string | null
           total_dividas: number | null
           total_investimentos: number | null
           uf: string | null
@@ -6982,11 +6994,13 @@ export type Database = {
       irpf_inteligencia_kpis: {
         Args: { _id_empresa: string }
         Returns: {
+          com_lead: number
           cripto: number
           empresarial: number
           imobiliario: number
           investidor: number
           patrimonio_total: number
+          score_medio: number
           sem_lead: number
           total_decs: number
           total_oportunidades: number
@@ -7015,6 +7029,7 @@ export type Database = {
           fundos: number
           id: string
           id_lead: string
+          idade: number
           imoveis: number
           lead_email: string
           lead_stage: string
@@ -7022,6 +7037,8 @@ export type Database = {
           lead_tokeniza_investidor: boolean
           lead_tokeniza_valor_investido: number
           lead_venda_realizada: boolean
+          motivos_score: string[]
+          municipio: string
           nome_contribuinte: string
           nome_lead: string
           ocupacao: string
@@ -7030,11 +7047,17 @@ export type Database = {
           patrimonio_liquido: number
           patrimonio_total: number
           possui_atividade_rural: boolean
+          possui_conjuge: boolean
+          proxima_acao: string
           qtd_cripto: number
+          qtd_dependentes: number
+          qtd_fontes_pagadoras: number
           qtd_imoveis: number
           qtd_participacoes: number
           qtd_veiculos: number
           resultado_atividade_rural: number
+          score: number
+          sem_lead_vinculado: boolean
           total_count: number
           total_dividas: number
           total_investimentos: number

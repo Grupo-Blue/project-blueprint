@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Receipt, Building2, Bitcoin, TrendingUp, AlertTriangle, DollarSign,
   Home, Car, PiggyBank, Landmark, Briefcase, Search, ExternalLink, Users,
-  ChevronLeft, ChevronRight, Loader2, RefreshCw,
+  ChevronLeft, ChevronRight, Loader2, RefreshCw, Sparkles, Target, MessageCircle,
+  Mail, Phone, MapPin, UserPlus, Cake,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "react-router-dom";
@@ -21,7 +22,7 @@ const BLUE_EMPRESA_ID = "95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db";
 const PAGE_SIZE = 20;
 
 type TipoOportunidade = "todos" | "tributario" | "investidor" | "empresarial" | "cripto" | "imobiliario";
-type Ordenacao = "patrimonio" | "investimentos" | "variacao";
+type Ordenacao = "score" | "patrimonio" | "investimentos" | "variacao";
 
 const TIPO_LABELS: Record<TipoOportunidade, string> = {
   todos: "Todos os tipos",
@@ -49,8 +50,13 @@ interface DeclaracaoRow {
   id_lead: string | null;
   ocupacao: string | null;
   uf: string | null;
+  idade: number | null;
+  municipio: string | null;
   possui_atividade_rural: boolean | null;
   resultado_atividade_rural: number | null;
+  possui_conjuge: boolean | null;
+  qtd_dependentes: number;
+  qtd_fontes_pagadoras: number;
   patrimonio_total: number;
   patrimonio_anterior: number;
   variacao_patrimonio: number;
@@ -75,6 +81,10 @@ interface DeclaracaoRow {
   lead_venda_realizada: boolean | null;
   lead_tokeniza_investidor: boolean | null;
   lead_tokeniza_valor_investido: number | null;
+  score: number;
+  motivos_score: string[] | null;
+  proxima_acao: string | null;
+  sem_lead_vinculado: boolean;
 }
 
 function gerarInsights(d: DeclaracaoRow): Insight[] {
@@ -142,7 +152,7 @@ const InteligenciaIRPF = () => {
   const [uf, setUf] = useState<string>("todas");
   const [exercicio, setExercicio] = useState<string>("todos");
   const [patrimonioMin, setPatrimonioMin] = useState<string>("");
-  const [ordenacao, setOrdenacao] = useState<Ordenacao>("patrimonio");
+  const [ordenacao, setOrdenacao] = useState<Ordenacao>("score");
   const [pagina, setPagina] = useState(1);
 
   const buscaDeb = useDebounce(busca, 400);
@@ -172,6 +182,7 @@ const InteligenciaIRPF = () => {
         total_decs: number; patrimonio_total: number; sem_lead: number;
         imobiliario: number; investidor: number; empresarial: number;
         cripto: number; tributario: number; total_oportunidades: number;
+        score_medio: number; com_lead: number;
       };
     },
   });
@@ -236,9 +247,9 @@ const InteligenciaIRPF = () => {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-5">
         {loadingKpis || !kpis ? (
-          Array.from({ length: 7 }).map((_, i) => <div key={i} className="h-20 bg-muted rounded-2xl animate-pulse" />)
+          Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-20 bg-muted rounded-2xl animate-pulse" />)
         ) : (
           <>
             <GlassCard className="p-4 text-center">
@@ -248,6 +259,10 @@ const InteligenciaIRPF = () => {
             <GlassCard className="p-4 text-center">
               <p className="text-xl font-bold text-primary">{kpis.total_oportunidades.toLocaleString("pt-BR")}</p>
               <p className="text-[11px] text-muted-foreground">Oportunidades</p>
+            </GlassCard>
+            <GlassCard className="p-4 text-center">
+              <p className="text-xl font-bold text-violet-600">{kpis.score_medio?.toFixed(1) ?? "0"}</p>
+              <p className="text-[11px] text-muted-foreground">Score médio (0-100)</p>
             </GlassCard>
             <GlassCard className="p-4 text-center min-w-0">
               <p
@@ -323,8 +338,9 @@ const InteligenciaIRPF = () => {
             className="w-[150px]"
           />
           <Select value={ordenacao} onValueChange={(v: any) => setOrdenacao(v)}>
-            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[210px]"><SelectValue /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="score">🎯 Maior score (recomendado)</SelectItem>
               <SelectItem value="patrimonio">Maior patrimônio líquido</SelectItem>
               <SelectItem value="investimentos">Maior em investimentos</SelectItem>
               <SelectItem value="variacao">Maior variação patrimonial</SelectItem>
@@ -351,11 +367,26 @@ const InteligenciaIRPF = () => {
           <div className="space-y-3">
             {data.rows.map(d => {
               const insights = gerarInsights(d);
+              const scoreColor =
+                d.score >= 70 ? "bg-emerald-600" :
+                d.score >= 40 ? "bg-amber-500" :
+                "bg-muted-foreground";
+              const telefoneLimpo = d.lead_telefone?.replace(/\D/g, "");
+              const wppMsg = encodeURIComponent(
+                `Olá ${(d.nome_lead || d.nome_contribuinte || "").split(" ")[0]}, tudo bem? Sou da Blue Consult.`
+              );
               return (
                 <GlassCard key={d.id} className="p-4">
+                  {/* Header: nome + score + badges */}
                   <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <div
+                          className={`flex items-center justify-center min-w-[44px] h-10 px-2 rounded-xl text-white font-bold text-sm ${scoreColor}`}
+                          title="Score 0–100 (potencial comercial)"
+                        >
+                          {d.score ?? 0}
+                        </div>
                         <p className="font-bold text-foreground truncate">
                           {d.nome_lead || d.nome_contribuinte || "Sem nome"}
                         </p>
@@ -364,18 +395,51 @@ const InteligenciaIRPF = () => {
                         {d.lead_stage && <Badge variant="outline" className="text-[10px]">{d.lead_stage}</Badge>}
                         {d.lead_venda_realizada && <Badge className="text-[10px] bg-green-600">Cliente</Badge>}
                         {d.lead_tokeniza_investidor && <Badge className="text-[10px] bg-cyan-600">Tokeniza</Badge>}
-                        {!d.id_lead && <Badge variant="destructive" className="text-[10px]">Sem lead</Badge>}
+                        {d.sem_lead_vinculado && <Badge variant="destructive" className="text-[10px]">Sem lead</Badge>}
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                         <span>CPF: {d.cpf}</span>
-                        {d.ocupacao && <span>• {d.ocupacao}</span>}
-                        {d.lead_email && <span>• {d.lead_email}</span>}
+                        {d.idade && (
+                          <span className="flex items-center gap-1"><Cake className="h-3 w-3" />{d.idade} anos</span>
+                        )}
+                        {d.ocupacao ? (
+                          <span className="flex items-center gap-1"><Briefcase className="h-3 w-3" />{d.ocupacao}</span>
+                        ) : (
+                          <span className="text-muted-foreground/50 italic">ocupação não informada</span>
+                        )}
+                        {d.municipio && (
+                          <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{d.municipio}</span>
+                        )}
+                        {d.qtd_dependentes > 0 && (
+                          <span className="flex items-center gap-1"><Users className="h-3 w-3" />{d.qtd_dependentes} dep.</span>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {d.id_lead && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {telefoneLimpo && telefoneLimpo.length >= 10 && (
+                        <a
+                          href={`https://wa.me/55${telefoneLimpo}?text=${wppMsg}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="text-xs px-2 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700 flex items-center gap-1"
+                        >
+                          <MessageCircle className="h-3 w-3" /> WhatsApp
+                        </a>
+                      )}
+                      {d.lead_email && (
+                        <a
+                          href={`mailto:${d.lead_email}`}
+                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Mail className="h-3 w-3" /> Email
+                        </a>
+                      )}
+                      {d.id_lead ? (
                         <Link to={`/leads?id=${d.id_lead}`} className="text-xs text-primary hover:underline flex items-center gap-1">
                           <Users className="h-3 w-3" /> Ver lead
+                        </Link>
+                      ) : (
+                        <Link to={`/leads`} className="text-xs text-amber-600 hover:underline flex items-center gap-1">
+                          <UserPlus className="h-3 w-3" /> Vincular lead
                         </Link>
                       )}
                       <Link to="/irpf-importacoes" className="text-xs text-muted-foreground hover:underline flex items-center gap-1">
@@ -384,6 +448,30 @@ const InteligenciaIRPF = () => {
                     </div>
                   </div>
 
+                  {/* Próxima ação sugerida */}
+                  {d.proxima_acao && (
+                    <div className="mb-3 p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-start gap-2">
+                      <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">Próxima ação sugerida</p>
+                        <p className="text-sm text-foreground">{d.proxima_acao}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Motivos do score */}
+                  {d.motivos_score && d.motivos_score.length > 0 && (
+                    <div className="mb-3 flex items-start gap-2 flex-wrap">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 shrink-0 mt-1">
+                        <Sparkles className="h-3 w-3" /> Por que está aqui:
+                      </span>
+                      {d.motivos_score.map((motivo, i) => (
+                        <Badge key={i} variant="secondary" className="text-[10px]">{motivo}</Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Métricas patrimoniais */}
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-3 text-center">
                     <div className="p-2 rounded-lg bg-muted/40">
                       <p className="text-[10px] text-muted-foreground">Patrim. líquido</p>
@@ -433,21 +521,27 @@ const InteligenciaIRPF = () => {
                     )}
                   </div>
 
+                  {/* Insights detalhados (collapsable visual) */}
                   {insights.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {insights.map((insight, i) => {
-                        const Icon = insight.icone;
-                        return (
-                          <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-muted/30">
-                            <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${insight.cor}`} />
-                            <div>
-                              <p className="text-xs font-semibold text-foreground">{insight.titulo}</p>
-                              <p className="text-[11px] text-muted-foreground">{insight.descricao}</p>
+                    <details className="group">
+                      <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground select-none">
+                        Ver {insights.length} insight(s) detalhado(s) →
+                      </summary>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                        {insights.map((insight, i) => {
+                          const Icon = insight.icone;
+                          return (
+                            <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-muted/30">
+                              <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${insight.cor}`} />
+                              <div>
+                                <p className="text-xs font-semibold text-foreground">{insight.titulo}</p>
+                                <p className="text-[11px] text-muted-foreground">{insight.descricao}</p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    </details>
                   )}
                 </GlassCard>
               );
