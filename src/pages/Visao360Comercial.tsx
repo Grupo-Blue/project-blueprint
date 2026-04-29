@@ -97,7 +97,58 @@ function YearPill({ ano, status }: { ano: string; status: string }) {
   );
 }
 
-const Visao360Comercial = () => {
+function scoreBg(score: number) {
+  if (score >= 70) return "bg-emerald-600";
+  if (score >= 40) return "bg-amber-500";
+  return "bg-muted-foreground";
+}
+
+function diasAteVencimento(dataIso: string | null): number | null {
+  if (!dataIso) return null;
+  const d = new Date(dataIso).getTime();
+  if (isNaN(d)) return null;
+  return Math.ceil((d - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
+/** Deriva "motivos" (chips explicáveis) a partir dos dados do cliente. */
+function gerarMotivos(c: Cliente): string[] {
+  const motivos: string[] = [];
+  if (c.nivel != null && c.nivel >= 4) motivos.push(`Nível ${c.nivel} (alto)`);
+  if (c.prioridade) motivos.push(c.prioridade);
+  const dias = diasAteVencimento(c.vencimento_procuracao);
+  if (dias != null && dias >= 0 && dias <= 60) motivos.push(`Procuração vence em ${dias}d`);
+  if (dias != null && dias < 0) motivos.push(`Procuração vencida (${Math.abs(dias)}d)`);
+  if ((c.anos_pendentes ?? 0) > 0) motivos.push(`${c.anos_pendentes} ano(s) pendente(s)`);
+  if ((c.anos_finalizados ?? 0) >= 3) motivos.push(`Histórico ${c.anos_finalizados} entregas`);
+  if (c.filas?.includes("upsell")) motivos.push("Oportunidade de upsell");
+  if (c.filas?.includes("resgate")) motivos.push("Em risco — resgate");
+  if (c.filas?.includes("winback")) motivos.push("Win-back disponível");
+  if (c.cliente_ativo === false) motivos.push("Cliente inativo");
+  if (c.status_2026 && /aprov/i.test(c.status_2026)) motivos.push("Em aprovação 2026");
+  return motivos.slice(0, 5);
+}
+
+/** Próxima ação sugerida em linguagem natural. */
+function gerarProximaAcao(c: Cliente): string | null {
+  const dias = diasAteVencimento(c.vencimento_procuracao);
+  if (dias != null && dias < 0)
+    return "Renovar procuração imediatamente — vencida.";
+  if (dias != null && dias <= 30)
+    return `Solicitar renovação da procuração (vence em ${dias}d).`;
+  if (c.filas?.includes("resgate"))
+    return "Acionar cliente — sinal de risco / desengajamento detectado.";
+  if (c.filas?.includes("renovacao"))
+    return "Apresentar proposta de renovação para 2026.";
+  if (c.filas?.includes("upsell"))
+    return "Oferecer serviço adicional (upsell) compatível com perfil.";
+  if (c.filas?.includes("winback"))
+    return "Reativar conversa — cliente fora do funil ativo.";
+  if ((c.anos_pendentes ?? 0) > 0)
+    return `Cobrar entrega dos ${c.anos_pendentes} ano(s) pendente(s).`;
+  if (c.gatilho_principal)
+    return c.gatilho_principal;
+  return null;
+}
   const { isLoading: loadingEmpresas, hasAccess } = useEmpresa();
 
   // Filtros
