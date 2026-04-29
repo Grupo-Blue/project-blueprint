@@ -17,6 +17,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { DetalheDeclaracaoModal } from "@/components/irpf/DetalheDeclaracaoModal";
 
 const BLUE_EMPRESA_ID = "95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db";
 const PAGE_SIZE = 20;
