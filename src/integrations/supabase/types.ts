@@ -6273,6 +6273,77 @@ export type Database = {
         }
         Returns: boolean
       }
+      irpf_inteligencia_facetas: {
+        Args: { _id_empresa: string }
+        Returns: {
+          exercicios: number[]
+          ufs: string[]
+        }[]
+      }
+      irpf_inteligencia_kpis: {
+        Args: { _id_empresa: string }
+        Returns: {
+          cripto: number
+          empresarial: number
+          imobiliario: number
+          investidor: number
+          patrimonio_total: number
+          sem_lead: number
+          total_decs: number
+          total_oportunidades: number
+          tributario: number
+        }[]
+      }
+      irpf_inteligencia_listar: {
+        Args: {
+          _busca?: string
+          _exercicio?: number
+          _id_empresa: string
+          _limite?: number
+          _offset?: number
+          _ordenacao?: string
+          _patrimonio_min?: number
+          _tipo?: string
+          _uf?: string
+        }
+        Returns: {
+          ano_calendario: number
+          aplicacoes: number
+          cpf: string
+          cripto: number
+          depositos: number
+          exercicio: number
+          fundos: number
+          id: string
+          id_lead: string
+          imoveis: number
+          lead_email: string
+          lead_stage: string
+          lead_telefone: string
+          lead_tokeniza_investidor: boolean
+          lead_tokeniza_valor_investido: number
+          lead_venda_realizada: boolean
+          nome_contribuinte: string
+          nome_lead: string
+          ocupacao: string
+          participacoes: number
+          patrimonio_anterior: number
+          patrimonio_liquido: number
+          patrimonio_total: number
+          possui_atividade_rural: boolean
+          qtd_cripto: number
+          qtd_imoveis: number
+          qtd_participacoes: number
+          qtd_veiculos: number
+          resultado_atividade_rural: number
+          total_count: number
+          total_dividas: number
+          total_investimentos: number
+          uf: string
+          variacao_patrimonio: number
+          veiculos: number
+        }[]
+      }
       refresh_mv_irpf_inteligencia: { Args: never; Returns: undefined }
       user_has_irpf_atividade_rural_access: {
         Args: { _id_atividade_rural: string }
