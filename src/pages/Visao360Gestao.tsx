@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import {
   Crosshair, BarChart3, Settings2, Trophy, Loader2, Save, RefreshCw,
-  TrendingUp, TrendingDown, Clock, Target,
+  TrendingUp, TrendingDown, Clock, Target, Activity, AlertCircle, CheckCircle2,
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { useUserEmpresas } from "@/hooks/useUserEmpresas";
 import { formatCurrency, cn } from "@/lib/utils";
