@@ -407,24 +407,6 @@ export default function IRPFImportacoes() {
         </Card>
       )}
 
-      {/* Lotes de importação */}
-      {lotes && lotes.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="w-5 h-5" />
-              Lotes de Importação
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {lotes.map((lote) => (
-                <LoteItem key={lote.id} lote={lote} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Tabs principais */}
       <Tabs value={mainTab} onValueChange={setMainTab}>
