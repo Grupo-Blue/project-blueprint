@@ -29,12 +29,23 @@ function base64UrlEncode(data: Uint8Array | string): string {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+function sanitizeEmail(raw: string): string {
+  if (!raw) return raw;
+  // Remove markdown link wrapping like "[email](mailto:email)" -> "email"
+  const md = raw.match(/\[([^\]]+)\]\(mailto:[^)]+\)/i);
+  if (md) return md[1].trim();
+  const md2 = raw.match(/\[([^\]]+)\]\([^)]+\)/);
+  if (md2) return md2[1].trim();
+  return raw.trim();
+}
+
 async function getAccessTokenFromServiceAccount(saJson: string): Promise<string> {
   const sa = JSON.parse(saJson);
+  const clientEmail = sanitizeEmail(sa.client_email);
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'RS256', typ: 'JWT' };
   const payload = {
-    iss: sa.client_email,
+    iss: clientEmail,
     scope: 'https://www.googleapis.com/auth/drive',
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
