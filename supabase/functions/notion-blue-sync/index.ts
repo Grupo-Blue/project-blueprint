@@ -33,7 +33,13 @@ function pRich(p: any): string | null {
   return arr.map((x: any) => x.plain_text).join("").trim() || null;
 }
 function pSelect(p: any): string | null {
-  return p?.select?.name ?? null;
+  // Notion pode entregar a propriedade como `select` OU `status` (quando o
+  // usuário converte a coluna para o tipo Status). Tratamos os dois casos para
+  // que o sync continue funcionando independentemente do tipo escolhido.
+  return p?.select?.name ?? p?.status?.name ?? null;
+}
+function pStatus(p: any): string | null {
+  return p?.status?.name ?? p?.select?.name ?? null;
 }
 function pMultiSelect(p: any): string[] {
   return (p?.multi_select ?? []).map((x: any) => x.name);
