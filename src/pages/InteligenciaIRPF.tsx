@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Receipt, Building2, Bitcoin, TrendingUp, AlertTriangle, DollarSign,
   Home, Car, PiggyBank, Landmark, Briefcase, Search, ExternalLink, Users,
-  ChevronLeft, ChevronRight, Loader2, RefreshCw,
+  ChevronLeft, ChevronRight, Loader2, RefreshCw, Sparkles, Target, MessageCircle,
+  Mail, Phone, MapPin, UserPlus, Cake,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "react-router-dom";
