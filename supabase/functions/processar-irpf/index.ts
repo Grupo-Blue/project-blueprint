@@ -897,6 +897,11 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
           .eq('id_lead', leadId);
         console.log("[processar-irpf] Lead enriquecido via", metodoVinculacao, "(exercício", irpfData.identificacao.exercicio, "):", leadId);
       } else {
+        // Mesmo sem enriquecer métricas, garantir backfill de contato
+        if (Object.keys(contatoPatch).length > 0) {
+          await supabase.from('lead').update(contatoPatch).eq('id_lead', leadId);
+          console.log("[processar-irpf] Backfill de contato aplicado:", Object.keys(contatoPatch).join(','));
+        }
         console.log(`[processar-irpf] Lead já tem exercício mais recente (${anoAtualLead}), não sobrescrevendo com ${irpfData.identificacao.exercicio}`);
       }
 
@@ -914,6 +919,7 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
       const novoLead: Record<string, unknown> = {
         id_empresa,
         nome_lead: irpfData.identificacao.nome,
+        cpf: cpfFormatado,
         email: irpfData.endereco?.email || null,
         telefone: telefoneNormalizado,
         origem_tipo: 'IRPF',
