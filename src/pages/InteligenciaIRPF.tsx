@@ -17,6 +17,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { DetalheDeclaracaoModal } from "@/components/irpf/DetalheDeclaracaoModal";
 
 const BLUE_EMPRESA_ID = "95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db";
 const PAGE_SIZE = 20;
@@ -154,6 +155,7 @@ const InteligenciaIRPF = () => {
   const [patrimonioMin, setPatrimonioMin] = useState<string>("");
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("score");
   const [pagina, setPagina] = useState(1);
+  const [declaracaoAberta, setDeclaracaoAberta] = useState<DeclaracaoRow | null>(null);
 
   const buscaDeb = useDebounce(busca, 400);
   const patrimonioDeb = useDebounce(patrimonioMin, 500);
@@ -434,7 +436,7 @@ const InteligenciaIRPF = () => {
                         </a>
                       )}
                       {d.id_lead ? (
-                        <Link to={`/leads?id=${d.id_lead}`} className="text-xs text-primary hover:underline flex items-center gap-1">
+                        <Link to={`/leads?ids=${d.id_lead}`} className="text-xs text-primary hover:underline flex items-center gap-1">
                           <Users className="h-3 w-3" /> Ver lead
                         </Link>
                       ) : (
@@ -442,9 +444,13 @@ const InteligenciaIRPF = () => {
                           <UserPlus className="h-3 w-3" /> Vincular lead
                         </Link>
                       )}
-                      <Link to="/irpf-importacoes" className="text-xs text-muted-foreground hover:underline flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setDeclaracaoAberta(d)}
+                        className="text-xs text-muted-foreground hover:text-primary hover:underline flex items-center gap-1"
+                      >
                         <ExternalLink className="h-3 w-3" /> Declaração
-                      </Link>
+                      </button>
                     </div>
                   </div>
 
@@ -565,6 +571,12 @@ const InteligenciaIRPF = () => {
           </div>
         </>
       )}
+
+      <DetalheDeclaracaoModal
+        declaracao={declaracaoAberta}
+        empresaSelecionada={BLUE_EMPRESA_ID}
+        onOpenChange={(open) => { if (!open) setDeclaracaoAberta(null); }}
+      />
     </>
   );
 };
