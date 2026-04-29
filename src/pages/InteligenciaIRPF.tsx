@@ -295,7 +295,7 @@ const InteligenciaIRPF = () => {
             <SelectTrigger className="w-[110px]"><SelectValue placeholder="UF" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todas UFs</SelectItem>
-              {(facetas?.ufs || []).map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+              {(facetas?.ufs || []).filter(u => u && u.trim() !== "").map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={exercicio} onValueChange={setExercicio}>
