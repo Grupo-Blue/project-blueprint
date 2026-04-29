@@ -6789,6 +6789,71 @@ export type Database = {
     }
     Functions: {
       blue_client_key: { Args: { _raw: string }; Returns: string }
+      blue_visao360_detalhe: { Args: { _client_key: string }; Returns: Json }
+      blue_visao360_facetas: {
+        Args: never
+        Returns: {
+          niveis: number[]
+          perfis: string[]
+          responsaveis: string[]
+          ufs: string[]
+        }[]
+      }
+      blue_visao360_kpis: {
+        Args: never
+        Returns: {
+          ativos: number
+          em_aprovacao: number
+          inativos: number
+          procuracao_60d: number
+          renovacao: number
+          resgate: number
+          total: number
+          upsell: number
+          winback: number
+        }[]
+      }
+      blue_visao360_listar: {
+        Args: {
+          _busca?: string
+          _fila?: string
+          _limite?: number
+          _nivel_max?: number
+          _nivel_min?: number
+          _offset?: number
+          _ordenacao?: string
+          _perfil?: string
+          _responsavel?: string
+          _uf?: string
+        }
+        Returns: {
+          anos_finalizados: number
+          anos_pendentes: number
+          apuracao_b3_2026: string
+          client_key: string
+          cliente_ativo: boolean
+          contato_email: string
+          contato_whatsapp: string
+          cpf_cnpj: string
+          fase_macro: string
+          filas: string[]
+          gatilho_principal: string
+          historico_anos: Json
+          id: string
+          ir_geral_2026: string
+          nivel: number
+          nome_canonico: string
+          oportunidades: Json
+          perfil_psicografico: string[]
+          prioridade: string
+          responsavel_cs: string
+          score_priorizacao: number
+          status_2026: string
+          total_count: number
+          uf: string
+          vencimento_procuracao: string
+        }[]
+      }
       daitch_mokotoff: { Args: { "": string }; Returns: string[] }
       dmetaphone: { Args: { "": string }; Returns: string }
       dmetaphone_alt: { Args: { "": string }; Returns: string }
