@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import {
   Crosshair, BarChart3, Settings2, Trophy, Loader2, Save, RefreshCw,
-  TrendingUp, TrendingDown, Clock, Target,
+  TrendingUp, TrendingDown, Clock, Target, Activity, AlertCircle, CheckCircle2,
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { useUserEmpresas } from "@/hooks/useUserEmpresas";
 import { formatCurrency, cn } from "@/lib/utils";
@@ -79,6 +81,44 @@ const Visao360Gestao = () => {
       return data as unknown as ScoreCfg;
     },
   });
+
+  // Status do cron de sync
+  const { data: syncStatus, isLoading: loadingSync, refetch: refetchSync } = useQuery({
+    queryKey: ["blue-sync-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("blue_sync_status")
+        .select("*")
+        .order("ultimo_run_inicio", { ascending: false });
+      if (error) throw error;
+      return data as Array<{
+        fonte: string;
+        ultimo_run_inicio: string | null;
+        ultimo_run_fim: string | null;
+        ultimo_run_status: string | null;
+        registros_lidos: number | null;
+        registros_upserted: number | null;
+        ultimo_erro: string | null;
+      }>;
+    },
+    refetchInterval: 30000,
+  });
+
+  const [syncing, setSyncing] = useState(false);
+  const dispararSync = async () => {
+    setSyncing(true);
+    toast.info("Disparando sync Notion…");
+    try {
+      const { error } = await supabase.functions.invoke("notion-blue-sync", { body: {} });
+      if (error) throw error;
+      toast.success("Sync iniciado com sucesso");
+      setTimeout(() => refetchSync(), 1500);
+    } catch (e: any) {
+      toast.error("Falha: " + (e?.message || e));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const [form, setForm] = useState<ScoreCfg | null>(null);
   // sincroniza form quando cfg carrega
@@ -158,6 +198,7 @@ const Visao360Gestao = () => {
         <TabsList>
           <TabsTrigger value="kpis"><BarChart3 className="h-4 w-4 mr-2" /> KPIs</TabsTrigger>
           <TabsTrigger value="config"><Settings2 className="h-4 w-4 mr-2" /> Pesos do score</TabsTrigger>
+          <TabsTrigger value="sync"><Activity className="h-4 w-4 mr-2" /> Sync Notion</TabsTrigger>
         </TabsList>
 
         {/* KPIs */}
@@ -362,6 +403,84 @@ const Visao360Gestao = () => {
                   </Button>
                 </div>
               </>
+            )}
+          </GlassCard>
+        </TabsContent>
+
+        {/* Sync Notion */}
+        <TabsContent value="sync" className="mt-4 space-y-4">
+          <GlassCard className="p-5">
+            <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  Sincronização automática Notion → Visão 360
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Cron rodando a cada <strong>30 minutos</strong>, de <strong>segunda a sexta</strong>, das <strong>8h às 17h30 (BRT)</strong>.
+                  Em caso de falha, um alerta é enviado por email automaticamente.
+                </p>
+              </div>
+              <Button onClick={dispararSync} disabled={syncing}>
+                {syncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                Disparar sync agora
+              </Button>
+            </div>
+
+            {loadingSync ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !syncStatus || syncStatus.length === 0 ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                Nenhum sync registrado ainda. Clique em "Disparar sync agora".
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {syncStatus.map((s) => {
+                  const ok = s.ultimo_run_status === "ok";
+                  const erro = s.ultimo_run_status === "erro";
+                  const rodando = s.ultimo_run_status === "em_execucao";
+                  return (
+                    <div
+                      key={s.fonte}
+                      className={cn(
+                        "flex items-center justify-between gap-4 p-3 rounded-lg border",
+                        ok && "border-emerald-500/30 bg-emerald-500/5",
+                        erro && "border-destructive/40 bg-destructive/5",
+                        rodando && "border-amber-500/30 bg-amber-500/5",
+                      )}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {ok && <CheckCircle2 className="h-5 w-5 text-emerald-600 flex-shrink-0" />}
+                        {erro && <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />}
+                        {rodando && <Loader2 className="h-5 w-5 text-amber-600 animate-spin flex-shrink-0" />}
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm">
+                            {s.fonte === "_global" ? "Erro global" :
+                             s.fonte === "info" ? "Base Informações Cliente" :
+                             s.fonte === "crm" ? "Base CRM Histórico" :
+                             s.fonte === "2026" ? "Base 2026" : s.fonte}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {s.ultimo_run_inicio
+                              ? `Há ${formatDistanceToNow(new Date(s.ultimo_run_inicio), { locale: ptBR })}`
+                              : "Nunca executado"}
+                            {s.registros_lidos != null && ` • ${s.registros_lidos} lidos`}
+                            {s.registros_upserted != null && ` • ${s.registros_upserted} upserted`}
+                          </div>
+                          {erro && s.ultimo_erro && (
+                            <div className="text-xs text-destructive mt-1 break-words">{s.ultimo_erro}</div>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant={ok ? "default" : erro ? "destructive" : "secondary"}>
+                        {s.ultimo_run_status || "—"}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </GlassCard>
         </TabsContent>

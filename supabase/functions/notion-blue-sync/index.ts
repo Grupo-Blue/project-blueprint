@@ -265,6 +265,44 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    // Alerta por email em caso de falha
+    try {
+      const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+      const ALERT_EMAIL_TO = Deno.env.get("ALERT_EMAIL_TO");
+      if (RESEND_API_KEY && ALERT_EMAIL_TO) {
+        const recipients = ALERT_EMAIL_TO.split(",").map((s) => s.trim()).filter(Boolean);
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "SGT Alertas <alertas@grupoblue.com.br>",
+            to: recipients,
+            subject: "🚨 [SGT] Falha no sync Notion → Blue Visão 360",
+            html: `
+              <h2>Falha no sync Notion → Blue Consult</h2>
+              <p><strong>Erro:</strong> ${msg}</p>
+              <p><strong>Início:</strong> ${summary.started_at}</p>
+              <p><strong>Resumo parcial:</strong></p>
+              <pre style="background:#f4f4f4;padding:12px;border-radius:6px;font-size:12px">${JSON.stringify(summary, null, 2)}</pre>
+              <p style="color:#666;font-size:12px">Disparado automaticamente pelo cron de sync a cada 30 min (horário comercial).</p>
+            `,
+          }),
+        });
+      }
+      // Registra também em blue_sync_status como "erro_global"
+      await db.from("blue_sync_status").upsert({
+        fonte: "_global",
+        ultimo_run_inicio: startedAt.toISOString(),
+        ultimo_run_fim: new Date().toISOString(),
+        ultimo_run_status: "erro",
+        ultimo_erro: msg,
+      }, { onConflict: "fonte" });
+    } catch (alertErr) {
+      console.error("Falha ao enviar alerta:", alertErr);
+    }
     return new Response(JSON.stringify({ ok: false, error: msg, ...summary }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
