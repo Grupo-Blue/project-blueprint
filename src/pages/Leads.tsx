@@ -119,9 +119,10 @@ const Leads = () => {
   useEffect(() => {
     const alertaParam = searchParams.get("alerta");
     const idsParam = searchParams.get("ids");
-    if (alertaParam && idsParam) {
-      setAlertaTipo(alertaParam);
-      setAlertaLeadIds(idsParam.split(","));
+    if (idsParam) {
+      // Aceita ?ids=<uuid> (vindo da Inteligência IRPF) e também ?alerta=...&ids=...
+      setAlertaTipo(alertaParam || "selecionado");
+      setAlertaLeadIds(idsParam.split(",").filter(Boolean));
       // Limpar outros filtros
       setStatusFilter("all");
       setStageFilter([]);
