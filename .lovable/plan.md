@@ -1,74 +1,41 @@
+## Objetivo
+Expor as funcionalidades da página `/inteligencia/irpf` (Oportunidades IRPF) no MCP server, permitindo que LLMs consultem KPIs, listem oportunidades com filtros/paginação e detalhem declarações.
 
+## Novas tools no `supabase/functions/mcp-server/index.ts`
 
-## Plano — Botão "Automatizar Cadência" integrado à Amélia
+1. **`get_irpf_oportunidades_kpis`**
+   - Input: `id_empresa` (obrigatório)
+   - Chama RPC `irpf_inteligencia_kpis`
+   - Retorna: total de declarações, patrimônio total agregado, sem lead, e contagens por tipo (imobiliário, investidor, empresarial, cripto, tributário) e total de oportunidades.
 
-### O que muda na UI
+2. **`list_irpf_oportunidades`**
+   - Input: `id_empresa` (obrigatório), `busca`, `uf`, `exercicio`, `tipo` (todos|imobiliario|empresarial|investidor|cripto|tributario), `patrimonio_min`, `ordenacao` (patrimonio|investimentos|variacao), `limite` (default 20, max 100), `offset`
+   - Chama RPC `irpf_inteligencia_listar`
+   - Retorna lista paginada com `total_count` + registros (CPF, nome, patrimônio, distribuição de ativos, vínculo com lead, etc.).
 
-No `src/pages/Segmentos.tsx`:
-- Renomear o item do dropdown e o botão do header de **"Preparar Disparo WhatsApp"** → **"Automatizar Cadência"**.
-- Trocar o ícone `MessageCircle` por `Bot` (lucide-react).
-- Manter o botão "Preparar Disparo WhatsApp" antigo? **Não** — substituir totalmente, conforme o pedido. (A função `disparar-segmento-whatsapp` continua existindo no backend caso precise no futuro, mas some da UI.)
+3. **`get_irpf_oportunidades_facetas`**
+   - Input: `id_empresa`
+   - Chama RPC `irpf_inteligencia_facetas`
+   - Retorna UFs e exercícios disponíveis para popular filtros.
 
-### Novo fluxo ao clicar "Automatizar Cadência"
+4. **`get_irpf_declaracao`**
+   - Input: `id_declaracao`
+   - Retorna a declaração completa de `irpf_declaracao` + arrays de `irpf_bem_direito` e `irpf_divida_onus` associados, para drill-down de uma oportunidade específica.
 
-1. Identifica a empresa do segmento (via `lead_segmento.id_empresa` → mapeia nome para `BLUE` ou `TOKENIZA` usando `empresa-constants.ts`).
-2. Abre um **Dialog "Automatizar Cadência na Amélia"** que:
-   - Mostra contagem de leads elegíveis (com **nome E telefone** — filtra os demais).
-   - Lista as cadências existentes da empresa (chama MCP `list_cadences`).
-   - Permite selecionar uma cadência **OU** clicar em "Criar nova cadência" (abre sub-form com nome, código, canal — chama MCP `create_cadence`).
-3. Ao confirmar:
-   - Para cada lead elegível, garante que existe um contato na Amélia (`search_contacts` por telefone → se não achar, `create_contact` com nome/telefone/empresa).
-   - Coleta os IDs dos contatos da Amélia.
-   - Chama MCP `enroll_lead_cadence` com `cadence_id`, `lead_ids`, `empresa`.
-   - Mostra resumo: "X leads inscritos, Y já estavam inscritos, Z criados como novos contatos".
+5. **`refresh_irpf_oportunidades`**
+   - Sem input
+   - Chama RPC `refresh_mv_irpf_inteligencia` para atualizar a materialized view após novas importações.
 
-### Arquitetura técnica
+## Detalhes técnicos
+- Todas as tools usam o cliente service role (`getAdmin()`) já existente no arquivo, mantendo o padrão das outras tools.
+- Erros das RPCs propagados como `text` no `content`, igual padrão atual.
+- Sem mudanças de schema no banco — apenas consumo das RPCs/MV já existentes (`mv_irpf_inteligencia`, `irpf_inteligencia_*`, `refresh_mv_irpf_inteligencia`).
+- Sem mudanças no fluxo de autenticação por API key (já validado no middleware Hono).
 
-**Nova edge function: `amelia-cadencia-proxy`**
-- Recebe do frontend: `{ action: 'list_cadences' | 'create_cadence' | 'enroll_leads', empresa, ...args }`.
-- Para `enroll_leads`: recebe `id_segmento` + `cadence_id`, busca os leads do segmento no banco SGT, filtra por `nome IS NOT NULL AND telefone valido`, depois faz o ciclo search/create/enroll na Amélia via MCP.
-- Faz proxy para `https://xdjvlcelauvibznnbrzb.supabase.co/functions/v1/mcp-server` com header `Authorization: Bearer ${AMELIA_MCP_API_KEY}` e `Accept: application/json, text/event-stream`.
-- Valida JWT do usuário antes de qualquer ação.
+## Arquivos alterados
+- `supabase/functions/mcp-server/index.ts` (adicionar 5 tools)
 
-**Por que edge function e não chamar MCP direto do frontend:**
-- A API key da Amélia fica server-side (secret).
-- O ciclo search-or-create-then-enroll envolve N+1 chamadas — melhor server-side.
-- Permite logar a operação localmente.
-
-### Secret necessário
-
-- `AMELIA_MCP_API_KEY` (você vai me passar). Vou usar `add_secret` para configurá-lo.
-
-### Mapeamento empresa SGT → Amélia
-
-Vou ler `src/lib/empresa-constants.ts` para confirmar IDs, mas a lógica:
-- Empresa Tokeniza (`61b5ffeb-fbbc-47c1-8ced-152bb647ed20`) → `TOKENIZA`
-- Empresa Blue (Blue Consult) → `BLUE`
-- Outras → erro "empresa não suportada na Amélia ainda"
-
-### Filtro obrigatório (nome + telefone)
-
-No backend, antes de enviar para Amélia:
-```ts
-const elegiveis = leads.filter(l => 
-  l.nome_lead?.trim() && 
-  l.telefone?.replace(/\D/g, "").length >= 10
-);
-```
-Telefones são normalizados para E.164 com `55` como prefixo Brasil antes de enviar.
-
-### Arquivos afetados
-
-- **Novo**: `supabase/functions/amelia-cadencia-proxy/index.ts`
-- **Novo**: `src/components/segmentos/AutomatizarCadenciaDialog.tsx`
-- **Editado**: `src/pages/Segmentos.tsx` (substituir botão/item dropdown, abrir o dialog em vez de chamar `disparar-segmento-whatsapp`)
-- **Secret**: `AMELIA_MCP_API_KEY`
-
-### Ordem de implementação
-
-1. Pedir o secret `AMELIA_MCP_API_KEY` (`add_secret`).
-2. Criar edge function `amelia-cadencia-proxy` com 3 actions (list_cadences, create_cadence, enroll_leads).
-3. Criar componente `AutomatizarCadenciaDialog`.
-4. Atualizar `Segmentos.tsx` — botão + dropdown + estado do dialog.
-5. Testar end-to-end com um segmento real da Tokeniza.
-
+## Fora de escopo
+- Não altera UI da página `/inteligencia/irpf`.
+- Não cria novas tabelas, RPCs ou políticas RLS.
+- Não altera autenticação/permissões do MCP.
