@@ -191,3 +191,10 @@ verify_jwt = false
 
 [functions.mcp-server]
 verify_jwt = false
+
+[functions.notion-blue-sync]
+verify_jwt = false
+
+[functions.blue-cliente-360-build]
+verify_jwt = false
+

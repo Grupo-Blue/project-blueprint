@@ -516,6 +516,528 @@ export type Database = {
           },
         ]
       }
+      blue_cliente_360: {
+        Row: {
+          amelia_contact_id: string | null
+          anos_finalizados: number | null
+          anos_pendentes: number | null
+          apuracao_b3_2026: string | null
+          cidade: string | null
+          client_key: string
+          cliente_ativo: boolean | null
+          contato_email: string | null
+          contato_whatsapp: string | null
+          cpf_cnpj: string | null
+          created_at: string
+          data_cancelamento: string | null
+          fase_macro: string | null
+          filas: string[] | null
+          gatilho_principal: string | null
+          historico_anos: Json | null
+          id: string
+          id_lead: string | null
+          ir_geral_2026: string | null
+          motivo_cancelamento: string | null
+          nivel: number | null
+          nome_canonico: string | null
+          oportunidades: Json | null
+          perfil_psicografico: string[] | null
+          prioridade: string | null
+          produtos_contratados: string[] | null
+          raw_2026_id: string | null
+          raw_crm_id: string | null
+          raw_info_id: string | null
+          responsavel_cs: string | null
+          score_priorizacao: number | null
+          status_2026: string | null
+          tem_2026_ativo: boolean | null
+          uf: string | null
+          ultima_atualizacao: string
+          updated_at: string
+          vencimento_procuracao: string | null
+        }
+        Insert: {
+          amelia_contact_id?: string | null
+          anos_finalizados?: number | null
+          anos_pendentes?: number | null
+          apuracao_b3_2026?: string | null
+          cidade?: string | null
+          client_key: string
+          cliente_ativo?: boolean | null
+          contato_email?: string | null
+          contato_whatsapp?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          data_cancelamento?: string | null
+          fase_macro?: string | null
+          filas?: string[] | null
+          gatilho_principal?: string | null
+          historico_anos?: Json | null
+          id?: string
+          id_lead?: string | null
+          ir_geral_2026?: string | null
+          motivo_cancelamento?: string | null
+          nivel?: number | null
+          nome_canonico?: string | null
+          oportunidades?: Json | null
+          perfil_psicografico?: string[] | null
+          prioridade?: string | null
+          produtos_contratados?: string[] | null
+          raw_2026_id?: string | null
+          raw_crm_id?: string | null
+          raw_info_id?: string | null
+          responsavel_cs?: string | null
+          score_priorizacao?: number | null
+          status_2026?: string | null
+          tem_2026_ativo?: boolean | null
+          uf?: string | null
+          ultima_atualizacao?: string
+          updated_at?: string
+          vencimento_procuracao?: string | null
+        }
+        Update: {
+          amelia_contact_id?: string | null
+          anos_finalizados?: number | null
+          anos_pendentes?: number | null
+          apuracao_b3_2026?: string | null
+          cidade?: string | null
+          client_key?: string
+          cliente_ativo?: boolean | null
+          contato_email?: string | null
+          contato_whatsapp?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          data_cancelamento?: string | null
+          fase_macro?: string | null
+          filas?: string[] | null
+          gatilho_principal?: string | null
+          historico_anos?: Json | null
+          id?: string
+          id_lead?: string | null
+          ir_geral_2026?: string | null
+          motivo_cancelamento?: string | null
+          nivel?: number | null
+          nome_canonico?: string | null
+          oportunidades?: Json | null
+          perfil_psicografico?: string[] | null
+          prioridade?: string | null
+          produtos_contratados?: string[] | null
+          raw_2026_id?: string | null
+          raw_crm_id?: string | null
+          raw_info_id?: string | null
+          responsavel_cs?: string | null
+          score_priorizacao?: number | null
+          status_2026?: string | null
+          tem_2026_ativo?: boolean | null
+          uf?: string | null
+          ultima_atualizacao?: string
+          updated_at?: string
+          vencimento_procuracao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blue_cliente_360_raw_2026_id_fkey"
+            columns: ["raw_2026_id"]
+            isOneToOne: false
+            referencedRelation: "blue_cliente_raw_2026"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blue_cliente_360_raw_crm_id_fkey"
+            columns: ["raw_crm_id"]
+            isOneToOne: false
+            referencedRelation: "blue_cliente_raw_crm"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blue_cliente_360_raw_info_id_fkey"
+            columns: ["raw_info_id"]
+            isOneToOne: false
+            referencedRelation: "blue_cliente_raw_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blue_cliente_raw_2026: {
+        Row: {
+          apuracao_b3: string | null
+          card_2025_anteriores: string | null
+          card_informacoes_cliente: string | null
+          client_key: string | null
+          cliente: string | null
+          created_at: string
+          cronograma_fim: string | null
+          cronograma_inicio: string | null
+          id: string
+          ir_geral_2026: string | null
+          notion_last_edited: string | null
+          notion_page_id: string
+          raw_payload: Json | null
+          responsavel: string | null
+          status_2026: string | null
+          updated_at: string
+        }
+        Insert: {
+          apuracao_b3?: string | null
+          card_2025_anteriores?: string | null
+          card_informacoes_cliente?: string | null
+          client_key?: string | null
+          cliente?: string | null
+          created_at?: string
+          cronograma_fim?: string | null
+          cronograma_inicio?: string | null
+          id?: string
+          ir_geral_2026?: string | null
+          notion_last_edited?: string | null
+          notion_page_id: string
+          raw_payload?: Json | null
+          responsavel?: string | null
+          status_2026?: string | null
+          updated_at?: string
+        }
+        Update: {
+          apuracao_b3?: string | null
+          card_2025_anteriores?: string | null
+          card_informacoes_cliente?: string | null
+          client_key?: string | null
+          cliente?: string | null
+          created_at?: string
+          cronograma_fim?: string | null
+          cronograma_inicio?: string | null
+          id?: string
+          ir_geral_2026?: string | null
+          notion_last_edited?: string | null
+          notion_page_id?: string
+          raw_payload?: Json | null
+          responsavel?: string | null
+          status_2026?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      blue_cliente_raw_crm: {
+        Row: {
+          apuracao_b3: string | null
+          client_key: string | null
+          cliente: string | null
+          created_at: string
+          cronograma_fim: string | null
+          cronograma_inicio: string | null
+          fim: boolean | null
+          formalizou_sol_docs: boolean | null
+          id: string
+          irpf_cripto_preenchido: boolean | null
+          nivel: number | null
+          notion_last_edited: string | null
+          notion_page_id: string
+          preenchimento_ir_geral_2026: string | null
+          prioridade: string | null
+          raw_payload: Json | null
+          responsavel: string | null
+          status_2021: string | null
+          status_2022: string | null
+          status_2023: string | null
+          status_2024: string | null
+          status_2025: string | null
+          updated_at: string
+          validou_dez_2025: boolean | null
+        }
+        Insert: {
+          apuracao_b3?: string | null
+          client_key?: string | null
+          cliente?: string | null
+          created_at?: string
+          cronograma_fim?: string | null
+          cronograma_inicio?: string | null
+          fim?: boolean | null
+          formalizou_sol_docs?: boolean | null
+          id?: string
+          irpf_cripto_preenchido?: boolean | null
+          nivel?: number | null
+          notion_last_edited?: string | null
+          notion_page_id: string
+          preenchimento_ir_geral_2026?: string | null
+          prioridade?: string | null
+          raw_payload?: Json | null
+          responsavel?: string | null
+          status_2021?: string | null
+          status_2022?: string | null
+          status_2023?: string | null
+          status_2024?: string | null
+          status_2025?: string | null
+          updated_at?: string
+          validou_dez_2025?: boolean | null
+        }
+        Update: {
+          apuracao_b3?: string | null
+          client_key?: string | null
+          cliente?: string | null
+          created_at?: string
+          cronograma_fim?: string | null
+          cronograma_inicio?: string | null
+          fim?: boolean | null
+          formalizou_sol_docs?: boolean | null
+          id?: string
+          irpf_cripto_preenchido?: boolean | null
+          nivel?: number | null
+          notion_last_edited?: string | null
+          notion_page_id?: string
+          preenchimento_ir_geral_2026?: string | null
+          prioridade?: string | null
+          raw_payload?: Json | null
+          responsavel?: string | null
+          status_2021?: string | null
+          status_2022?: string | null
+          status_2023?: string | null
+          status_2024?: string | null
+          status_2025?: string | null
+          updated_at?: string
+          validou_dez_2025?: boolean | null
+        }
+        Relationships: []
+      }
+      blue_cliente_raw_info: {
+        Row: {
+          apuracao_b3: string | null
+          cep: string | null
+          cidade: string | null
+          client_key: string | null
+          cliente_inativo: boolean | null
+          cpf_cnpj: string | null
+          created_at: string
+          data_cancelamento: string | null
+          data_nascimento: string | null
+          email_principal: string | null
+          email_secundario: string | null
+          endereco: string | null
+          historico_acessorias: string | null
+          historico_pier: string | null
+          id: string
+          motivo_cancelamento: string | null
+          nome_cliente: string | null
+          notion_last_edited: string | null
+          notion_page_id: string
+          perfil_cliente: string[] | null
+          preenchimento_ir_geral: string | null
+          produtos: string[] | null
+          raw_payload: Json | null
+          telefone_1: string | null
+          telefone_2: string | null
+          uf: string | null
+          updated_at: string
+          vencimento_procuracao: string | null
+        }
+        Insert: {
+          apuracao_b3?: string | null
+          cep?: string | null
+          cidade?: string | null
+          client_key?: string | null
+          cliente_inativo?: boolean | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          data_cancelamento?: string | null
+          data_nascimento?: string | null
+          email_principal?: string | null
+          email_secundario?: string | null
+          endereco?: string | null
+          historico_acessorias?: string | null
+          historico_pier?: string | null
+          id?: string
+          motivo_cancelamento?: string | null
+          nome_cliente?: string | null
+          notion_last_edited?: string | null
+          notion_page_id: string
+          perfil_cliente?: string[] | null
+          preenchimento_ir_geral?: string | null
+          produtos?: string[] | null
+          raw_payload?: Json | null
+          telefone_1?: string | null
+          telefone_2?: string | null
+          uf?: string | null
+          updated_at?: string
+          vencimento_procuracao?: string | null
+        }
+        Update: {
+          apuracao_b3?: string | null
+          cep?: string | null
+          cidade?: string | null
+          client_key?: string | null
+          cliente_inativo?: boolean | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          data_cancelamento?: string | null
+          data_nascimento?: string | null
+          email_principal?: string | null
+          email_secundario?: string | null
+          endereco?: string | null
+          historico_acessorias?: string | null
+          historico_pier?: string | null
+          id?: string
+          motivo_cancelamento?: string | null
+          nome_cliente?: string | null
+          notion_last_edited?: string | null
+          notion_page_id?: string
+          perfil_cliente?: string[] | null
+          preenchimento_ir_geral?: string | null
+          produtos?: string[] | null
+          raw_payload?: Json | null
+          telefone_1?: string | null
+          telefone_2?: string | null
+          uf?: string | null
+          updated_at?: string
+          vencimento_procuracao?: string | null
+        }
+        Relationships: []
+      }
+      blue_match_revisao: {
+        Row: {
+          base_origem: string
+          candidato_360_id: string | null
+          candidato_client_key: string | null
+          candidato_nome: string | null
+          created_at: string
+          id: string
+          observacao: string | null
+          raw_client_key: string
+          raw_id: string
+          raw_nome: string
+          resolvido_em: string | null
+          resolvido_por: string | null
+          similaridade: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          base_origem: string
+          candidato_360_id?: string | null
+          candidato_client_key?: string | null
+          candidato_nome?: string | null
+          created_at?: string
+          id?: string
+          observacao?: string | null
+          raw_client_key: string
+          raw_id: string
+          raw_nome: string
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          similaridade: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          base_origem?: string
+          candidato_360_id?: string | null
+          candidato_client_key?: string | null
+          candidato_nome?: string | null
+          created_at?: string
+          id?: string
+          observacao?: string | null
+          raw_client_key?: string
+          raw_id?: string
+          raw_nome?: string
+          resolvido_em?: string | null
+          resolvido_por?: string | null
+          similaridade?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blue_match_revisao_candidato_360_id_fkey"
+            columns: ["candidato_360_id"]
+            isOneToOne: false
+            referencedRelation: "blue_cliente_360"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blue_score_config: {
+        Row: {
+          bonus_aprovacao: number
+          bonus_fidelidade_max: number
+          bonus_fidelidade_por_ano: number
+          bonus_procuracao_30d: number
+          bonus_procuracao_60d: number
+          created_at: string
+          id: string
+          id_empresa: string
+          penalty_inatividade_por_mes: number
+          peso_nivel: number
+          peso_prioridade: number
+          updated_at: string
+        }
+        Insert: {
+          bonus_aprovacao?: number
+          bonus_fidelidade_max?: number
+          bonus_fidelidade_por_ano?: number
+          bonus_procuracao_30d?: number
+          bonus_procuracao_60d?: number
+          created_at?: string
+          id?: string
+          id_empresa: string
+          penalty_inatividade_por_mes?: number
+          peso_nivel?: number
+          peso_prioridade?: number
+          updated_at?: string
+        }
+        Update: {
+          bonus_aprovacao?: number
+          bonus_fidelidade_max?: number
+          bonus_fidelidade_por_ano?: number
+          bonus_procuracao_30d?: number
+          bonus_procuracao_60d?: number
+          created_at?: string
+          id?: string
+          id_empresa?: string
+          penalty_inatividade_por_mes?: number
+          peso_nivel?: number
+          peso_prioridade?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      blue_sync_status: {
+        Row: {
+          fonte: string
+          id: string
+          metadata: Json | null
+          registros_em_revisao: number | null
+          registros_lidos: number | null
+          registros_upserted: number | null
+          ultimo_erro: string | null
+          ultimo_run_fim: string | null
+          ultimo_run_inicio: string | null
+          ultimo_run_status: string | null
+          updated_at: string
+        }
+        Insert: {
+          fonte: string
+          id?: string
+          metadata?: Json | null
+          registros_em_revisao?: number | null
+          registros_lidos?: number | null
+          registros_upserted?: number | null
+          ultimo_erro?: string | null
+          ultimo_run_fim?: string | null
+          ultimo_run_inicio?: string | null
+          ultimo_run_status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          fonte?: string
+          id?: string
+          metadata?: Json | null
+          registros_em_revisao?: number | null
+          registros_lidos?: number | null
+          registros_upserted?: number | null
+          ultimo_erro?: string | null
+          ultimo_run_fim?: string | null
+          ultimo_run_inicio?: string | null
+          ultimo_run_status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       campanha: {
         Row: {
           ativa: boolean
@@ -6266,6 +6788,75 @@ export type Database = {
       }
     }
     Functions: {
+      blue_client_key: { Args: { _raw: string }; Returns: string }
+      blue_visao360_detalhe: { Args: { _client_key: string }; Returns: Json }
+      blue_visao360_facetas: {
+        Args: never
+        Returns: {
+          niveis: number[]
+          perfis: string[]
+          responsaveis: string[]
+          ufs: string[]
+        }[]
+      }
+      blue_visao360_kpis: {
+        Args: never
+        Returns: {
+          ativos: number
+          em_aprovacao: number
+          inativos: number
+          procuracao_60d: number
+          renovacao: number
+          resgate: number
+          total: number
+          upsell: number
+          winback: number
+        }[]
+      }
+      blue_visao360_listar: {
+        Args: {
+          _busca?: string
+          _fila?: string
+          _limite?: number
+          _nivel_max?: number
+          _nivel_min?: number
+          _offset?: number
+          _ordenacao?: string
+          _perfil?: string
+          _responsavel?: string
+          _uf?: string
+        }
+        Returns: {
+          anos_finalizados: number
+          anos_pendentes: number
+          apuracao_b3_2026: string
+          client_key: string
+          cliente_ativo: boolean
+          contato_email: string
+          contato_whatsapp: string
+          cpf_cnpj: string
+          fase_macro: string
+          filas: string[]
+          gatilho_principal: string
+          historico_anos: Json
+          id: string
+          ir_geral_2026: string
+          nivel: number
+          nome_canonico: string
+          oportunidades: Json
+          perfil_psicografico: string[]
+          prioridade: string
+          responsavel_cs: string
+          score_priorizacao: number
+          status_2026: string
+          total_count: number
+          uf: string
+          vencimento_procuracao: string
+        }[]
+      }
+      daitch_mokotoff: { Args: { "": string }; Returns: string[] }
+      dmetaphone: { Args: { "": string }; Returns: string }
+      dmetaphone_alt: { Args: { "": string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -6345,6 +6936,12 @@ export type Database = {
         }[]
       }
       refresh_mv_irpf_inteligencia: { Args: never; Returns: undefined }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      soundex: { Args: { "": string }; Returns: string }
+      text_soundex: { Args: { "": string }; Returns: string }
+      unaccent: { Args: { "": string }; Returns: string }
+      user_has_blue_visao360_access: { Args: never; Returns: boolean }
       user_has_irpf_atividade_rural_access: {
         Args: { _id_atividade_rural: string }
         Returns: boolean
