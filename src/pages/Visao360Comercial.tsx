@@ -390,110 +390,174 @@ const Visao360Comercial = () => {
             </div>
           )}
           <div className="space-y-3">
-            {data.rows.map(c => (
-              <button key={c.id} onClick={() => setSelecionado(c)} className="w-full text-left">
-                <GlassCard className="p-4 hover:ring-2 hover:ring-primary/40 transition-all">
-                  <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <p className="font-bold text-foreground truncate">{c.nome_canonico}</p>
-                        {c.nivel != null && (
-                          <Badge variant="outline" className="text-[10px]">Nível {c.nivel}</Badge>
-                        )}
-                        {c.prioridade && (
-                          <Badge variant="outline" className="text-[10px]">{c.prioridade}</Badge>
-                        )}
-                        {c.cliente_ativo === false && (
-                          <Badge variant="destructive" className="text-[10px]">Inativo</Badge>
-                        )}
-                        {(c.filas || []).map(f => (
-                          <Badge key={f} className={cn("text-[10px] capitalize",
-                            f === "renovacao" && "bg-emerald-600",
-                            f === "upsell" && "bg-blue-600",
-                            f === "resgate" && "bg-amber-600",
-                            f === "winback" && "bg-purple-600",
-                          )}>{f}</Badge>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                        {c.cpf_cnpj && <span>{c.cpf_cnpj}</span>}
-                        {c.uf && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{c.uf}</span>}
-                        {c.responsavel_cs && <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{c.responsavel_cs}</span>}
-                        {c.contato_email && <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{c.contato_email}</span>}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Score</p>
-                      <p className="text-2xl font-extrabold text-primary">{Math.round(c.score_priorizacao || 0)}</p>
-                    </div>
-                  </div>
-
-                  {c.gatilho_principal && (
-                    <div className="rounded-lg bg-primary/5 border border-primary/15 px-3 py-2 mb-3">
-                      <p className="text-xs font-medium text-primary">⚡ {c.gatilho_principal}</p>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 text-center">
-                    <div className="p-2 rounded-lg bg-muted/40">
-                      <p className="text-[10px] text-muted-foreground">Anos finalizados</p>
-                      <p className="text-sm font-bold text-emerald-700">{c.anos_finalizados ?? 0}</p>
-                    </div>
-                    <div className="p-2 rounded-lg bg-muted/40">
-                      <p className="text-[10px] text-muted-foreground">Anos pendentes</p>
-                      <p className="text-sm font-bold text-amber-700">{c.anos_pendentes ?? 0}</p>
-                    </div>
-                    <div className="p-2 rounded-lg bg-muted/40">
-                      <p className="text-[10px] text-muted-foreground">Status 2026</p>
-                      <p className="text-sm font-bold truncate">{c.status_2026 || "—"}</p>
-                    </div>
-                    <div className="p-2 rounded-lg bg-muted/40">
-                      <p className="text-[10px] text-muted-foreground">Procuração</p>
-                      <p className="text-sm font-bold">{formatDate(c.vencimento_procuracao) || "—"}</p>
-                    </div>
-                  </div>
-
-                  {c.historico_anos && Object.keys(c.historico_anos).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {Object.entries(c.historico_anos)
-                        .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([ano, status]) => (
-                          <YearPill key={ano} ano={ano} status={String(status)} />
-                        ))}
-                    </div>
-                  )}
-
-                  {c.oportunidades && c.oportunidades.length > 0 && (
-                    <div className="space-y-1">
-                      {c.oportunidades.slice(0, 3).map((o, i) => (
-                        <div key={i} className="text-xs text-muted-foreground flex items-start gap-2">
-                          <span className="text-primary mt-0.5">→</span>
-                          <span><strong className="text-foreground capitalize">{o.tipo}:</strong> {o.descricao}</span>
+            {data.rows.map(c => {
+              const score = Math.round(c.score_priorizacao || 0);
+              const motivos = gerarMotivos(c);
+              const proximaAcao = gerarProximaAcao(c);
+              const wppDigits = (c.contato_whatsapp || "").replace(/\D/g, "");
+              const primeiroNome = (c.nome_canonico || "").split(" ")[0] || "";
+              const wppMsg = encodeURIComponent(
+                `Olá ${primeiroNome}, tudo bem? Sou da Blue Consult.`
+              );
+              const stop = (e: React.MouseEvent) => e.stopPropagation();
+              return (
+                <div
+                  key={c.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelecionado(c)}
+                  onKeyDown={(e) => { if (e.key === "Enter") setSelecionado(c); }}
+                  className="w-full text-left cursor-pointer"
+                >
+                  <GlassCard className="p-4 hover:ring-2 hover:ring-primary/40 transition-all">
+                    <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <div
+                            className={cn(
+                              "flex items-center justify-center min-w-[44px] h-10 px-2 rounded-xl text-white font-bold text-sm",
+                              scoreBg(score)
+                            )}
+                            title="Score 0–100 (priorização comercial)"
+                          >
+                            {score}
+                          </div>
+                          <p className="font-bold text-foreground truncate">{c.nome_canonico}</p>
+                          {c.nivel != null && (
+                            <Badge variant="outline" className="text-[10px]">Nível {c.nivel}</Badge>
+                          )}
+                          {c.prioridade && (
+                            <Badge variant="outline" className="text-[10px]">{c.prioridade}</Badge>
+                          )}
+                          {c.cliente_ativo === false && (
+                            <Badge variant="destructive" className="text-[10px]">Inativo</Badge>
+                          )}
+                          {(c.filas || []).map(f => (
+                            <Badge key={f} className={cn("text-[10px] capitalize",
+                              f === "renovacao" && "bg-emerald-600",
+                              f === "upsell" && "bg-blue-600",
+                              f === "resgate" && "bg-amber-600",
+                              f === "winback" && "bg-purple-600",
+                            )}>{f}</Badge>
+                          ))}
+                          {!c.contato_email && (
+                            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/40">
+                              <MailX className="h-3 w-3 mr-1" /> Sem email
+                            </Badge>
+                          )}
+                          {!c.contato_whatsapp && (
+                            <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/40">
+                              <PhoneOff className="h-3 w-3 mr-1" /> Sem WhatsApp
+                            </Badge>
+                          )}
                         </div>
-                      ))}
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                          {c.cpf_cnpj && <span>{c.cpf_cnpj}</span>}
+                          {c.uf && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{c.uf}</span>}
+                          {c.responsavel_cs && <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{c.responsavel_cs}</span>}
+                          {c.contato_email && <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{c.contato_email}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap shrink-0">
+                        {wppDigits.length >= 10 && (
+                          <a
+                            href={`https://wa.me/${wppDigits}?text=${wppMsg}`}
+                            target="_blank" rel="noopener noreferrer"
+                            onClick={stop}
+                            className="text-xs px-2 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700 inline-flex items-center gap-1"
+                          >
+                            <MessageCircle className="h-3 w-3" /> WhatsApp
+                          </a>
+                        )}
+                        {c.contato_email && (
+                          <a
+                            href={`mailto:${c.contato_email}`}
+                            onClick={stop}
+                            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                          >
+                            <Mail className="h-3 w-3" /> Email
+                          </a>
+                        )}
+                      </div>
                     </div>
-                  )}
 
-                  {(c.contato_whatsapp || c.perfil_psicografico?.length) && (
-                    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border/50 text-xs flex-wrap">
-                      {c.contato_whatsapp && (
-                        <a
-                          href={`https://wa.me/${(c.contato_whatsapp || "").replace(/\D/g, "")}`}
-                          target="_blank" rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-emerald-600 hover:underline"
-                        >
-                          <MessageCircle className="h-3 w-3" /> {c.contato_whatsapp}
-                        </a>
-                      )}
-                      {(c.perfil_psicografico || []).map(p => (
-                        <Badge key={p} variant="secondary" className="text-[10px]">{p}</Badge>
-                      ))}
+                    {proximaAcao && (
+                      <div className="mb-3 p-3 rounded-xl bg-primary/5 border border-primary/20 flex items-start gap-2">
+                        <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[10px] uppercase tracking-wide text-primary font-semibold">Próxima ação sugerida</p>
+                          <p className="text-sm text-foreground">{proximaAcao}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {motivos.length > 0 && (
+                      <div className="mb-3 flex items-start gap-2 flex-wrap">
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold flex items-center gap-1 shrink-0 mt-1">
+                          <Sparkles className="h-3 w-3" /> Por que está aqui:
+                        </span>
+                        {motivos.map((m, i) => (
+                          <Badge key={i} variant="secondary" className="text-[10px]">{m}</Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 text-center">
+                      <div className="p-2 rounded-lg bg-muted/40">
+                        <p className="text-[10px] text-muted-foreground">Anos finalizados</p>
+                        <p className="text-sm font-bold text-emerald-700">{c.anos_finalizados ?? 0}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-muted/40">
+                        <p className="text-[10px] text-muted-foreground">Anos pendentes</p>
+                        <p className="text-sm font-bold text-amber-700">{c.anos_pendentes ?? 0}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-muted/40">
+                        <p className="text-[10px] text-muted-foreground">Status 2026</p>
+                        <p className="text-sm font-bold truncate">{c.status_2026 || "—"}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-muted/40">
+                        <p className="text-[10px] text-muted-foreground">Procuração</p>
+                        <p className="text-sm font-bold">{formatDate(c.vencimento_procuracao) || "—"}</p>
+                      </div>
                     </div>
-                  )}
-                </GlassCard>
-              </button>
-            ))}
+
+                    {c.historico_anos && Object.keys(c.historico_anos).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {Object.entries(c.historico_anos)
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([ano, status]) => (
+                            <YearPill key={ano} ano={ano} status={String(status)} />
+                          ))}
+                      </div>
+                    )}
+
+                    {c.oportunidades && c.oportunidades.length > 0 && (
+                      <details className="group" onClick={stop}>
+                        <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground select-none">
+                          Ver {c.oportunidades.length} oportunidade(s) detalhada(s) →
+                        </summary>
+                        <div className="space-y-1 mt-2">
+                          {c.oportunidades.slice(0, 5).map((o, i) => (
+                            <div key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                              <span className="text-primary mt-0.5">→</span>
+                              <span><strong className="text-foreground capitalize">{o.tipo}:</strong> {o.descricao}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+
+                    {(c.perfil_psicografico?.length ?? 0) > 0 && (
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/50 flex-wrap">
+                        {(c.perfil_psicografico || []).map(p => (
+                          <Badge key={p} variant="secondary" className="text-[10px]">{p}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </GlassCard>
+                </div>
+              );
+            })}
           </div>
 
           {/* Paginação */}
