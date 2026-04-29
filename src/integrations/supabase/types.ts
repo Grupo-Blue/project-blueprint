@@ -658,6 +658,48 @@ export type Database = {
           },
         ]
       }
+      blue_cliente_acao: {
+        Row: {
+          client_key: string
+          created_at: string
+          data_acao: string
+          fila: string | null
+          id: string
+          observacao: string | null
+          tipo: string
+          updated_at: string
+          valor_estimado: number | null
+          vendedor_id: string | null
+          vendedor_nome: string | null
+        }
+        Insert: {
+          client_key: string
+          created_at?: string
+          data_acao?: string
+          fila?: string | null
+          id?: string
+          observacao?: string | null
+          tipo: string
+          updated_at?: string
+          valor_estimado?: number | null
+          vendedor_id?: string | null
+          vendedor_nome?: string | null
+        }
+        Update: {
+          client_key?: string
+          created_at?: string
+          data_acao?: string
+          fila?: string | null
+          id?: string
+          observacao?: string | null
+          tipo?: string
+          updated_at?: string
+          valor_estimado?: number | null
+          vendedor_id?: string | null
+          vendedor_nome?: string | null
+        }
+        Relationships: []
+      }
       blue_cliente_raw_2026: {
         Row: {
           apuracao_b3: string | null
@@ -6789,6 +6831,21 @@ export type Database = {
     }
     Functions: {
       blue_client_key: { Args: { _raw: string }; Returns: string }
+      blue_cliente_acao_listar: {
+        Args: { _client_key: string }
+        Returns: {
+          client_key: string
+          created_at: string
+          data_acao: string
+          fila: string
+          id: string
+          observacao: string
+          tipo: string
+          valor_estimado: number
+          vendedor_id: string
+          vendedor_nome: string
+        }[]
+      }
       blue_match_revisao_kpis: {
         Args: never
         Returns: {
@@ -6825,6 +6882,20 @@ export type Database = {
         Args: { _decisao: string; _id: string; _observacao?: string }
         Returns: Json
       }
+      blue_score_config_get: { Args: never; Returns: Json }
+      blue_score_config_save: {
+        Args: {
+          _bonus_aprovacao: number
+          _bonus_fidelidade_max: number
+          _bonus_fidelidade_por_ano: number
+          _bonus_procuracao_30d: number
+          _bonus_procuracao_60d: number
+          _penalty_inatividade_por_mes: number
+          _peso_nivel: number
+          _peso_prioridade: number
+        }
+        Returns: Json
+      }
       blue_visao360_detalhe: { Args: { _client_key: string }; Returns: Json }
       blue_visao360_facetas: {
         Args: never
@@ -6835,6 +6906,7 @@ export type Database = {
           ufs: string[]
         }[]
       }
+      blue_visao360_gestao_kpis: { Args: { _dias?: number }; Returns: Json }
       blue_visao360_kpis: {
         Args: never
         Returns: {

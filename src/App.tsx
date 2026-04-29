@@ -43,6 +43,7 @@ import InteligenciaMatch from "./pages/InteligenciaMatch";
 import InteligenciaIRPF from "./pages/InteligenciaIRPF";
 import Visao360Comercial from "./pages/Visao360Comercial";
 import Visao360Matches from "./pages/Visao360Matches";
+import Visao360Gestao from "./pages/Visao360Gestao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -94,6 +95,7 @@ const App = () => (
             <Route path="/inteligencia/irpf" element={<AppLayout><InteligenciaIRPF /></AppLayout>} />
             <Route path="/comercial/visao-360" element={<AppLayout><Visao360Comercial /></AppLayout>} />
             <Route path="/comercial/visao-360/matches" element={<AppLayout><Visao360Matches /></AppLayout>} />
+            <Route path="/comercial/visao-360/gestao" element={<AppLayout><Visao360Gestao /></AppLayout>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

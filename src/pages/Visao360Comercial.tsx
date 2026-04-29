@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ClienteAcoesPanel } from "@/components/visao360/ClienteAcoesPanel";
 
 const BLUE_EMPRESA_ID = "95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db";
 const PAGE_SIZE = 20;
@@ -548,9 +549,12 @@ const Visao360Comercial = () => {
                   </a>
                 )}
 
-                <p className="text-[10px] text-muted-foreground italic pt-2 border-t border-border">
-                  Registro de ações comerciais será habilitado na Fase 3.
-                </p>
+                <div className="pt-3 border-t border-border">
+                  <ClienteAcoesPanel
+                    clientKey={selecionado.client_key}
+                    filasCliente={selecionado.filas || []}
+                  />
+                </div>
               </div>
             </>
           )}
