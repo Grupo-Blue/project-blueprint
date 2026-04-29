@@ -375,6 +375,109 @@ mcpServer.tool("list_pipedrive_deals", {
   },
 });
 
+// === IRPF OPORTUNIDADES ===
+mcpServer.tool("get_irpf_oportunidades_kpis", {
+  description: "Get aggregated KPIs for IRPF Opportunities of a company: total declarations, aggregate net worth, leads missing, and counts per opportunity type (real estate, investor, business, crypto, tax).",
+  inputSchema: {
+    type: "object",
+    properties: { id_empresa: { type: "string", description: "Company UUID (required)" } },
+    required: ["id_empresa"],
+  },
+  handler: async (args: any) => {
+    const db = getAdmin();
+    const { data, error } = await db.rpc("irpf_inteligencia_kpis", { _id_empresa: args.id_empresa });
+    if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+    return { content: [{ type: "text" as const, text: JSON.stringify(data?.[0] || {}, null, 2) }] };
+  },
+});
+
+mcpServer.tool("list_irpf_oportunidades", {
+  description: "List IRPF Opportunities with server-side filtering, sorting and pagination. Returns total_count + records (CPF, name, net worth, asset distribution, lead linkage).",
+  inputSchema: {
+    type: "object",
+    properties: {
+      id_empresa: { type: "string", description: "Company UUID (required)" },
+      busca: { type: "string", description: "Search by name, CPF, lead name or lead email" },
+      uf: { type: "string", description: "Filter by UF (state)" },
+      exercicio: { type: "number", description: "Filter by fiscal year (exercicio)" },
+      tipo: { type: "string", description: "Opportunity type: todos | imobiliario | empresarial | investidor | cripto | tributario" },
+      patrimonio_min: { type: "number", description: "Minimum net worth filter" },
+      ordenacao: { type: "string", description: "Sort by: patrimonio | investimentos | variacao (default patrimonio)" },
+      limite: { type: "number", description: "Page size (default 20, max 100)" },
+      offset: { type: "number", description: "Pagination offset (default 0)" },
+    },
+    required: ["id_empresa"],
+  },
+  handler: async (args: any) => {
+    const db = getAdmin();
+    const limite = Math.min(args.limite || 20, 100);
+    const { data, error } = await db.rpc("irpf_inteligencia_listar", {
+      _id_empresa: args.id_empresa,
+      _busca: args.busca ?? null,
+      _uf: args.uf ?? null,
+      _exercicio: args.exercicio ?? null,
+      _tipo: args.tipo ?? null,
+      _patrimonio_min: args.patrimonio_min ?? null,
+      _ordenacao: args.ordenacao || "patrimonio",
+      _limite: limite,
+      _offset: args.offset || 0,
+    });
+    if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+    const total = data?.[0]?.total_count ?? 0;
+    return { content: [{ type: "text" as const, text: JSON.stringify({ total_count: Number(total), registros: data || [] }, null, 2) }] };
+  },
+});
+
+mcpServer.tool("get_irpf_oportunidades_facetas", {
+  description: "Get available facets (UFs and exercicios) for filtering IRPF Opportunities of a company.",
+  inputSchema: {
+    type: "object",
+    properties: { id_empresa: { type: "string", description: "Company UUID (required)" } },
+    required: ["id_empresa"],
+  },
+  handler: async (args: any) => {
+    const db = getAdmin();
+    const { data, error } = await db.rpc("irpf_inteligencia_facetas", { _id_empresa: args.id_empresa });
+    if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+    return { content: [{ type: "text" as const, text: JSON.stringify(data?.[0] || {}, null, 2) }] };
+  },
+});
+
+mcpServer.tool("get_irpf_declaracao", {
+  description: "Get a single IRPF declaration with full details, including all assets (irpf_bem_direito) and debts (irpf_divida_onus).",
+  inputSchema: {
+    type: "object",
+    properties: { id_declaracao: { type: "string", description: "Declaration UUID (required)" } },
+    required: ["id_declaracao"],
+  },
+  handler: async (args: any) => {
+    const db = getAdmin();
+    const [decRes, bensRes, dividasRes] = await Promise.all([
+      db.from("irpf_declaracao").select("*").eq("id", args.id_declaracao).maybeSingle(),
+      db.from("irpf_bem_direito").select("*").eq("id_declaracao", args.id_declaracao),
+      db.from("irpf_divida_onus").select("*").eq("id_declaracao", args.id_declaracao),
+    ]);
+    if (decRes.error) return { content: [{ type: "text" as const, text: `Error: ${decRes.error.message}` }] };
+    if (!decRes.data) return { content: [{ type: "text" as const, text: "Declaration not found." }] };
+    return { content: [{ type: "text" as const, text: JSON.stringify({
+      declaracao: decRes.data,
+      bens: bensRes.data || [],
+      dividas: dividasRes.data || [],
+    }, null, 2) }] };
+  },
+});
+
+mcpServer.tool("refresh_irpf_oportunidades", {
+  description: "Refresh the IRPF Opportunities materialized view. Run this after importing new declarations to update KPIs and listings.",
+  inputSchema: { type: "object", properties: {} },
+  handler: async () => {
+    const db = getAdmin();
+    const { error } = await db.rpc("refresh_mv_irpf_inteligencia");
+    if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
+    return { content: [{ type: "text" as const, text: "IRPF Opportunities view refreshed successfully." }] };
+  },
+});
+
 // === QUERY GENÉRICA ===
 mcpServer.tool("query_table", {
   description: "Run a generic query on any table. Use with caution. Supports filters, ordering, and limits.",
