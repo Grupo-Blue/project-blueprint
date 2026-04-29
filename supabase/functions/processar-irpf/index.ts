@@ -854,17 +854,24 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
       // Verificar se este exercício é mais recente que o atual do lead
       const { data: leadAtual } = await supabase
         .from('lead')
-        .select('irpf_ano_mais_recente')
+        .select('irpf_ano_mais_recente, cpf, email, telefone')
         .eq('id_lead', leadId)
         .single();
 
       const anoAtualLead = leadAtual?.irpf_ano_mais_recente || 0;
       const deveEnriquecer = irpfData.identificacao.exercicio >= anoAtualLead;
 
+      // Backfill de contato: preencher CPF/email/telefone se estiverem vazios no lead
+      const contatoPatch: Record<string, unknown> = {};
+      if (!leadAtual?.cpf && cpfFormatado) contatoPatch.cpf = cpfFormatado;
+      if (!leadAtual?.email && irpfData.endereco?.email) contatoPatch.email = irpfData.endereco.email;
+      if (!leadAtual?.telefone && telefoneNormalizado) contatoPatch.telefone = telefoneNormalizado;
+
       if (deveEnriquecer) {
         await supabase
           .from('lead')
           .update({
+            ...contatoPatch,
             id_irpf_declaracao: declaracao.id,
             irpf_ano_mais_recente: irpfData.identificacao.exercicio,
             irpf_renda_anual: rendaAnual,
@@ -890,6 +897,11 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
           .eq('id_lead', leadId);
         console.log("[processar-irpf] Lead enriquecido via", metodoVinculacao, "(exercício", irpfData.identificacao.exercicio, "):", leadId);
       } else {
+        // Mesmo sem enriquecer métricas, garantir backfill de contato
+        if (Object.keys(contatoPatch).length > 0) {
+          await supabase.from('lead').update(contatoPatch).eq('id_lead', leadId);
+          console.log("[processar-irpf] Backfill de contato aplicado:", Object.keys(contatoPatch).join(','));
+        }
         console.log(`[processar-irpf] Lead já tem exercício mais recente (${anoAtualLead}), não sobrescrevendo com ${irpfData.identificacao.exercicio}`);
       }
 
@@ -907,6 +919,7 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
       const novoLead: Record<string, unknown> = {
         id_empresa,
         nome_lead: irpfData.identificacao.nome,
+        cpf: cpfFormatado,
         email: irpfData.endereco?.email || null,
         telefone: telefoneNormalizado,
         origem_tipo: 'IRPF',
