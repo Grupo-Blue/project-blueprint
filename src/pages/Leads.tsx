@@ -205,7 +205,7 @@ const Leads = () => {
   }, [searchTerm]);
 
   const { data: leads, isLoading, isError: leadsError } = useQuery({
-    queryKey: ["leads", empresaSelecionada, debouncedSearch],
+    queryKey: ["leads", empresaSelecionada, debouncedSearch, alertaLeadIds?.join(",") || ""],
     queryFn: async () => {
       const selectFields = `
         *,
@@ -224,6 +224,18 @@ const Leads = () => {
           anos_fiscais
         )
       `;
+
+      // Se há filtro por IDs específicos (vindo de Inteligência IRPF, alertas, etc),
+      // buscar EXATAMENTE esses leads — sem filtro de empresa/limite/merged,
+      // garantindo que o lead alvo sempre apareça mesmo se for antigo ou de outra empresa.
+      if (alertaLeadIds && alertaLeadIds.length > 0) {
+        const { data, error } = await supabase
+          .from("lead")
+          .select(selectFields)
+          .in("id_lead", alertaLeadIds);
+        if (error) throw error;
+        return data;
+      }
 
       // Se há termo de busca, fazer busca server-side sem limit restritivo
       if (debouncedSearch.length >= 2) {
