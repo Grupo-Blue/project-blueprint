@@ -2105,6 +2105,13 @@ export type Database = {
             referencedRelation: "irpf_declaracao"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "irpf_alimentando_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
+            referencedColumns: ["id"]
+          },
         ]
       }
       irpf_atividade_rural: {
@@ -2192,6 +2199,13 @@ export type Database = {
             columns: ["id_declaracao"]
             isOneToOne: false
             referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_atividade_rural_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
             referencedColumns: ["id"]
           },
         ]
@@ -2477,6 +2491,13 @@ export type Database = {
             referencedRelation: "irpf_declaracao"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "irpf_bem_direito_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
+            referencedColumns: ["id"]
+          },
         ]
       }
       irpf_declaracao: {
@@ -2691,6 +2712,13 @@ export type Database = {
             referencedRelation: "irpf_declaracao"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "irpf_demonstrativo_lei_14754_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
+            referencedColumns: ["id"]
+          },
         ]
       }
       irpf_dependente: {
@@ -2730,6 +2758,13 @@ export type Database = {
             columns: ["id_declaracao"]
             isOneToOne: false
             referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_dependente_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
             referencedColumns: ["id"]
           },
         ]
@@ -2816,6 +2851,13 @@ export type Database = {
             referencedRelation: "irpf_declaracao"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "irpf_divida_onus_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
+            referencedColumns: ["id"]
+          },
         ]
       }
       irpf_doacao: {
@@ -2864,6 +2906,13 @@ export type Database = {
             columns: ["id_declaracao"]
             isOneToOne: false
             referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_doacao_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
             referencedColumns: ["id"]
           },
         ]
@@ -2919,6 +2968,13 @@ export type Database = {
             referencedRelation: "irpf_declaracao"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "irpf_evolucao_patrimonial_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
+            referencedColumns: ["id"]
+          },
         ]
       }
       irpf_fundo_imobiliario: {
@@ -2961,6 +3017,13 @@ export type Database = {
             columns: ["id_declaracao"]
             isOneToOne: false
             referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_fundo_imobiliario_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
             referencedColumns: ["id"]
           },
         ]
@@ -3029,6 +3092,13 @@ export type Database = {
             columns: ["id_declaracao"]
             isOneToOne: false
             referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_ganho_capital_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
             referencedColumns: ["id"]
           },
         ]
@@ -3169,6 +3239,13 @@ export type Database = {
             referencedRelation: "irpf_declaracao"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "irpf_imposto_pago_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
+            referencedColumns: ["id"]
+          },
         ]
       }
       irpf_outras_informacoes: {
@@ -3237,6 +3314,13 @@ export type Database = {
             referencedRelation: "irpf_declaracao"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "irpf_outras_informacoes_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
+            referencedColumns: ["id"]
+          },
         ]
       }
       irpf_pagamento_deducao: {
@@ -3282,6 +3366,13 @@ export type Database = {
             columns: ["id_declaracao"]
             isOneToOne: false
             referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_pagamento_deducao_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
             referencedColumns: ["id"]
           },
         ]
@@ -3370,6 +3461,13 @@ export type Database = {
             referencedRelation: "irpf_declaracao"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "irpf_renda_variavel_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
+            referencedColumns: ["id"]
+          },
         ]
       }
       irpf_rendimento: {
@@ -3436,6 +3534,13 @@ export type Database = {
             columns: ["id_declaracao"]
             isOneToOne: false
             referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_rendimento_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
             referencedColumns: ["id"]
           },
         ]
@@ -3594,6 +3699,13 @@ export type Database = {
             columns: ["id_declaracao"]
             isOneToOne: false
             referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irpf_resumo_tributario_id_declaracao_fkey"
+            columns: ["id_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
             referencedColumns: ["id"]
           },
         ]
@@ -4301,6 +4413,13 @@ export type Database = {
             columns: ["id_irpf_declaracao"]
             isOneToOne: false
             referencedRelation: "irpf_declaracao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_id_irpf_declaracao_fkey"
+            columns: ["id_irpf_declaracao"]
+            isOneToOne: false
+            referencedRelation: "mv_irpf_inteligencia"
             referencedColumns: ["id"]
           },
           {
@@ -6090,7 +6209,61 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      mv_irpf_inteligencia: {
+        Row: {
+          ano_calendario: number | null
+          aplicacoes: number | null
+          cpf: string | null
+          cripto: number | null
+          depositos: number | null
+          exercicio: number | null
+          fundos: number | null
+          id: string | null
+          id_empresa: string | null
+          id_lead: string | null
+          imoveis: number | null
+          lead_email: string | null
+          lead_stage: string | null
+          lead_telefone: string | null
+          lead_tokeniza_investidor: boolean | null
+          lead_tokeniza_valor_investido: number | null
+          lead_venda_realizada: boolean | null
+          nome_contribuinte: string | null
+          nome_lead: string | null
+          ocupacao: string | null
+          participacoes: number | null
+          patrimonio_anterior: number | null
+          patrimonio_liquido: number | null
+          patrimonio_total: number | null
+          possui_atividade_rural: boolean | null
+          qtd_cripto: number | null
+          qtd_imoveis: number | null
+          qtd_participacoes: number | null
+          qtd_veiculos: number | null
+          resultado_atividade_rural: number | null
+          total_dividas: number | null
+          total_investimentos: number | null
+          uf: string | null
+          variacao_patrimonio: number | null
+          veiculos: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irpf_declaracao_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+          {
+            foreignKeyName: "irpf_declaracao_id_lead_fkey"
+            columns: ["id_lead"]
+            isOneToOne: false
+            referencedRelation: "lead"
+            referencedColumns: ["id_lead"]
+          },
+        ]
+      }
     }
     Functions: {
       has_role: {
@@ -6100,6 +6273,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      refresh_mv_irpf_inteligencia: { Args: never; Returns: undefined }
       user_has_irpf_atividade_rural_access: {
         Args: { _id_atividade_rural: string }
         Returns: boolean
