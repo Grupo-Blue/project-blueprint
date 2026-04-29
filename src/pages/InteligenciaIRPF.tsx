@@ -401,16 +401,18 @@ const InteligenciaIRPF = () => {
 
   // KPIs
   const kpis = useMemo(() => {
-    const totalDecs = agregadas.length;
-    const totalOport = comInsights.length;
-    const tipos: Record<string, number> = { tributario: 0, investidor: 0, empresarial: 0, cripto: 0, imobiliario: 0 };
+    const tipos = { tributario: 0, investidor: 0, empresarial: 0, cripto: 0, imobiliario: 0 };
     comInsights.forEach(d => {
       const setT = new Set(d.insights.map(i => i.tipo));
-      setT.forEach(t => { if (t in tipos) tipos[t]++; });
+      setT.forEach(t => { if (t !== "todos" && t in tipos) (tipos as any)[t]++; });
     });
-    const patrimonioTotal = agregadas.reduce((s, d) => s + d.patrimonio_liquido, 0);
-    const semLead = agregadas.filter(d => !d.id_lead).length;
-    return { totalDecs, totalOport, ...tipos, patrimonioTotal, semLead };
+    return {
+      totalDecs: agregadas.length,
+      totalOport: comInsights.length,
+      patrimonioTotal: agregadas.reduce((s, d) => s + d.patrimonio_liquido, 0),
+      semLead: agregadas.filter(d => !d.id_lead).length,
+      ...tipos,
+    };
   }, [agregadas, comInsights]);
 
   if (loadingEmpresas) {
