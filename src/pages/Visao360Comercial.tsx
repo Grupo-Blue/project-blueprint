@@ -17,6 +17,7 @@ import {
   Crosshair, Search, RefreshCw, Loader2, ChevronLeft, ChevronRight,
   TrendingUp, RotateCcw, ArrowUpRight, AlertTriangle, MessageCircle,
   CalendarClock, Award, User, Mail, MapPin, ShieldAlert,
+  Target, Sparkles, MailX, PhoneOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
