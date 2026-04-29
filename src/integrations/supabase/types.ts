@@ -6789,6 +6789,42 @@ export type Database = {
     }
     Functions: {
       blue_client_key: { Args: { _raw: string }; Returns: string }
+      blue_match_revisao_kpis: {
+        Args: never
+        Returns: {
+          confirmados: number
+          pendentes: number
+          rejeitados: number
+          total: number
+        }[]
+      }
+      blue_match_revisao_listar: {
+        Args: {
+          _busca?: string
+          _limite?: number
+          _offset?: number
+          _status?: string
+        }
+        Returns: {
+          base_origem: string
+          candidato_client_key: string
+          candidato_nome: string
+          created_at: string
+          id: string
+          observacao: string
+          raw_client_key: string
+          raw_id: string
+          raw_nome: string
+          resolvido_em: string
+          similaridade: number
+          status: string
+          total_count: number
+        }[]
+      }
+      blue_match_revisao_resolver: {
+        Args: { _decisao: string; _id: string; _observacao?: string }
+        Returns: Json
+      }
       blue_visao360_detalhe: { Args: { _client_key: string }; Returns: Json }
       blue_visao360_facetas: {
         Args: never
