@@ -46,6 +46,7 @@ const navItems: NavItem[] = [
   { label: "Match Leads", to: "/inteligencia/match", icon: Crosshair, group: "Inteligência" },
   { label: "Segmentos", to: "/inteligencia/segmentos", icon: Fingerprint, group: "Inteligência" },
   { label: "Oport. IRPF", to: "/inteligencia/irpf", icon: Receipt, group: "Inteligência" },
+  { label: "Visão 360 Blue", to: "/comercial/visao-360", icon: Crosshair, group: "Inteligência" },
   // Admin
   { label: "IRPF", to: "/irpf-importacoes", icon: Receipt, group: "Admin", requiredRole: ["DIRECAO", "ADMIN"] },
   { label: "Contas Anúncio", to: "/contas-anuncio", icon: Building2, group: "Admin", requiredRole: ["TRAFEGO", "ADMIN"] },
