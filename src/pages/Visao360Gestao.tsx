@@ -82,6 +82,44 @@ const Visao360Gestao = () => {
     },
   });
 
+  // Status do cron de sync
+  const { data: syncStatus, isLoading: loadingSync, refetch: refetchSync } = useQuery({
+    queryKey: ["blue-sync-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("blue_sync_status")
+        .select("*")
+        .order("ultimo_run_inicio", { ascending: false });
+      if (error) throw error;
+      return data as Array<{
+        fonte: string;
+        ultimo_run_inicio: string | null;
+        ultimo_run_fim: string | null;
+        ultimo_run_status: string | null;
+        registros_lidos: number | null;
+        registros_upserted: number | null;
+        ultimo_erro: string | null;
+      }>;
+    },
+    refetchInterval: 30000,
+  });
+
+  const [syncing, setSyncing] = useState(false);
+  const dispararSync = async () => {
+    setSyncing(true);
+    toast.info("Disparando sync Notion…");
+    try {
+      const { error } = await supabase.functions.invoke("notion-blue-sync", { body: {} });
+      if (error) throw error;
+      toast.success("Sync iniciado com sucesso");
+      setTimeout(() => refetchSync(), 1500);
+    } catch (e: any) {
+      toast.error("Falha: " + (e?.message || e));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const [form, setForm] = useState<ScoreCfg | null>(null);
   // sincroniza form quando cfg carrega
   if (cfg && !form) setForm(cfg);
