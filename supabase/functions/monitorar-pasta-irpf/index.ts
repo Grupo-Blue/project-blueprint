@@ -6,8 +6,74 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BATCH_SIZE = 5; // Processar 5 arquivos por invocação para evitar timeout
-const MAX_EXECUTION_MS = 50000; // 50s safety limit (edge function timeout ~60s)
+const BATCH_SIZE = 5;
+const MAX_EXECUTION_MS = 50000;
+const ID_EMPRESA_BLUE = '95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db';
+
+// ===== Service Account JWT -> Access Token =====
+function pemToBinary(pem: string): Uint8Array {
+  const b64 = pem
+    .replace(/-----BEGIN [^-]+-----/g, '')
+    .replace(/-----END [^-]+-----/g, '')
+    .replace(/\s+/g, '');
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function base64UrlEncode(data: Uint8Array | string): string {
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function getAccessTokenFromServiceAccount(saJson: string): Promise<string> {
+  const sa = JSON.parse(saJson);
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/drive',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now,
+  };
+  const headerB64 = base64UrlEncode(JSON.stringify(header));
+  const payloadB64 = base64UrlEncode(JSON.stringify(payload));
+  const toSign = `${headerB64}.${payloadB64}`;
+
+  const keyBytes = pemToBinary(sa.private_key);
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    keyBytes,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sigBuffer = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(toSign));
+  const signature = base64UrlEncode(new Uint8Array(sigBuffer));
+  const jwt = `${toSign}.${signature}`;
+
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Falha ao obter access token (Service Account): ${err}`);
+  }
+  const { access_token } = await resp.json();
+  return access_token;
+}
+
+// Service Accounts precisam de supportsAllDrives quando a pasta está em Shared Drive ou compartilhada
+const DRIVE_COMMON_QS = 'supportsAllDrives=true&includeItemsFromAllDrives=true';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,87 +86,42 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
-    // Aceitar batch_size customizado via body
     let customBatchSize = BATCH_SIZE;
     try {
       const body = await req.json();
       if (body?.batch_size && typeof body.batch_size === 'number') {
-        customBatchSize = Math.min(body.batch_size, 10); // Max 10 por segurança
+        customBatchSize = Math.min(body.batch_size, 10);
       }
-    } catch { /* sem body, usar default */ }
+    } catch { /* sem body */ }
 
-    console.log(`[monitorar-pasta-irpf] Iniciando (batch_size=${customBatchSize})...`);
-
-    // Buscar configuração de integração Google Drive
-    const { data: integracao, error: intError } = await supabase
-      .from('integracao')
-      .select('*')
-      .eq('tipo', 'GOOGLE_DRIVE')
-      .eq('ativo', true)
-      .single();
-
-    if (intError || !integracao) {
-      console.log('[monitorar-pasta-irpf] Integração Google Drive não configurada');
-      return new Response(JSON.stringify({ 
-        success: false, 
-        message: 'Integração Google Drive não configurada' 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const saJson = Deno.env.get('GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON');
+    const folderId = Deno.env.get('GOOGLE_DRIVE_IRPF_FOLDER_ID');
+    if (!saJson || !folderId) {
+      throw new Error('Secrets GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON / GOOGLE_DRIVE_IRPF_FOLDER_ID não configurados');
     }
 
-    const config = integracao.config_json as {
-      client_id: string;
-      client_secret: string;
-      refresh_token: string;
-      folder_id: string;
-      id_empresa: string;
-    };
+    console.log(`[monitorar-pasta-irpf] Iniciando (batch_size=${customBatchSize}, folder=${folderId})`);
 
-    // Obter access token via refresh token
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: config.client_id,
-        client_secret: config.client_secret,
-        refresh_token: config.refresh_token,
-        grant_type: 'refresh_token',
-      }),
-    });
+    const accessToken = await getAccessTokenFromServiceAccount(saJson);
 
-    if (!tokenResponse.ok) {
-      const tokenError = await tokenResponse.text();
-      console.error('[monitorar-pasta-irpf] Erro ao obter access token:', tokenError);
-      throw new Error('Falha na autenticação Google Drive');
-    }
-
-    const { access_token } = await tokenResponse.json();
-
-    // Listar PDFs com paginação - pegar apenas batch_size arquivos
-    const listUrl = `https://www.googleapis.com/drive/v3/files?q='${config.folder_id}'+in+parents+and+mimeType='application/pdf'+and+trashed=false&fields=files(id,name,createdTime),nextPageToken&pageSize=${customBatchSize}&orderBy=createdTime`;
-    
-    const listResponse = await fetch(listUrl, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
+    // Listar PDFs
+    const listUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType='application/pdf'+and+trashed=false&fields=files(id,name,createdTime),nextPageToken&pageSize=${customBatchSize}&orderBy=createdTime&${DRIVE_COMMON_QS}`;
+    const listResponse = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
 
     if (!listResponse.ok) {
       const listError = await listResponse.text();
-      console.error('[monitorar-pasta-irpf] Erro ao listar arquivos:', listError);
-      throw new Error('Falha ao listar arquivos');
+      console.error('[monitorar-pasta-irpf] Erro ao listar:', listError);
+      throw new Error(`Falha ao listar arquivos: ${listError}`);
     }
 
     const listData = await listResponse.json();
     const files = listData.files || [];
     const hasMore = !!listData.nextPageToken;
 
-    // Contar total de PDFs na pasta (query separada, sem baixar)
     let totalPendentes = files.length;
     if (hasMore) {
-      const countUrl = `https://www.googleapis.com/drive/v3/files?q='${config.folder_id}'+in+parents+and+mimeType='application/pdf'+and+trashed=false&fields=files(id)&pageSize=1000`;
-      const countResponse = await fetch(countUrl, {
-        headers: { Authorization: `Bearer ${access_token}` },
-      });
+      const countUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType='application/pdf'+and+trashed=false&fields=files(id)&pageSize=1000&${DRIVE_COMMON_QS}`;
+      const countResponse = await fetch(countUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
       if (countResponse.ok) {
         const countData = await countResponse.json();
         totalPendentes = countData.files?.length || files.length;
@@ -109,37 +130,31 @@ serve(async (req) => {
 
     console.log(`[monitorar-pasta-irpf] ${files.length} PDFs neste lote, ${totalPendentes} total pendentes`);
 
-    let processados = 0;
-    let erros = 0;
-
-    // Garantir pasta "processados" existe (uma vez por invocação)
+    // Garantir pasta "processados"
     let processadosFolderId: string | null = null;
-    const checkFolderUrl = `https://www.googleapis.com/drive/v3/files?q='${config.folder_id}'+in+parents+and+name='processados'+and+mimeType='application/vnd.google-apps.folder'+and+trashed=false`;
-    const checkFolderResponse = await fetch(checkFolderUrl, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-    const { files: existingFolders } = await checkFolderResponse.json();
-    processadosFolderId = existingFolders?.[0]?.id || null;
+    const checkFolderUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+name='processados'+and+mimeType='application/vnd.google-apps.folder'+and+trashed=false&${DRIVE_COMMON_QS}`;
+    const checkFolderResponse = await fetch(checkFolderUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const checkData = await checkFolderResponse.json();
+    processadosFolderId = checkData.files?.[0]?.id || null;
 
     if (!processadosFolderId) {
-      const createFolderResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+      const createFolderResponse = await fetch(`https://www.googleapis.com/drive/v3/files?${DRIVE_COMMON_QS}`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: 'processados',
           mimeType: 'application/vnd.google-apps.folder',
-          parents: [config.folder_id],
+          parents: [folderId],
         }),
       });
       const newFolder = await createFolderResponse.json();
       processadosFolderId = newFolder.id;
     }
 
+    let processados = 0;
+    let erros = 0;
+
     for (const file of files) {
-      // Verificar se estamos próximos do timeout
       if (Date.now() - startTime > MAX_EXECUTION_MS) {
         console.log('[monitorar-pasta-irpf] Próximo do timeout, parando lote');
         break;
@@ -148,26 +163,28 @@ serve(async (req) => {
       try {
         console.log(`[monitorar-pasta-irpf] Processando: ${file.name}`);
 
-        // Download do arquivo
-        const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
-        const downloadResponse = await fetch(downloadUrl, {
-          headers: { Authorization: `Bearer ${access_token}` },
-        });
-
+        const downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&${DRIVE_COMMON_QS}`;
+        const downloadResponse = await fetch(downloadUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
         if (!downloadResponse.ok) {
-          console.error(`[monitorar-pasta-irpf] Erro ao baixar ${file.name}`);
+          console.error(`[monitorar-pasta-irpf] Erro ao baixar ${file.name}: ${await downloadResponse.text()}`);
           erros++;
           continue;
         }
 
         const pdfBuffer = await downloadResponse.arrayBuffer();
-        const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)));
+        // Conversão segura para base64 (evita stack overflow em arquivos grandes)
+        const bytes = new Uint8Array(pdfBuffer);
+        let binary = '';
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        }
+        const pdfBase64 = btoa(binary);
 
-        // Processar via edge function
         const { data: processResult, error: processError } = await supabase.functions.invoke('processar-irpf', {
           body: {
             pdfBase64,
-            id_empresa: config.id_empresa,
+            id_empresa: ID_EMPRESA_BLUE,
             arquivo_origem: `gdrive:${file.name}`,
           },
         });
@@ -178,10 +195,9 @@ serve(async (req) => {
           continue;
         }
 
-        // Mover arquivo para pasta "processados"
-        await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?addParents=${processadosFolderId}&removeParents=${config.folder_id}`, {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?addParents=${processadosFolderId}&removeParents=${folderId}&${DRIVE_COMMON_QS}`, {
           method: 'PATCH',
-          headers: { Authorization: `Bearer ${access_token}` },
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         processados++;
@@ -195,7 +211,6 @@ serve(async (req) => {
     const duracao = Date.now() - startTime;
     const restantes = totalPendentes - processados;
 
-    // Registrar execução
     await supabase.from('cronjob_execucao').insert({
       nome_cronjob: 'monitorar-pasta-irpf',
       status: erros === 0 ? 'sucesso' : 'parcial',
@@ -220,9 +235,7 @@ serve(async (req) => {
       erros,
       restantes,
       has_more: restantes > 0,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error) {
     console.error('[monitorar-pasta-irpf] Erro:', error);
 
@@ -234,12 +247,9 @@ serve(async (req) => {
       mensagem_erro: error instanceof Error ? error.message : 'Erro desconhecido',
     });
 
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Erro desconhecido' 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erro desconhecido',
+    }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
