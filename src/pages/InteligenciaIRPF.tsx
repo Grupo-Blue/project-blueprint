@@ -22,7 +22,7 @@ const BLUE_EMPRESA_ID = "95e7adaf-a89a-4bb5-a2bb-7a7af89ce2db";
 const PAGE_SIZE = 20;
 
 type TipoOportunidade = "todos" | "tributario" | "investidor" | "empresarial" | "cripto" | "imobiliario";
-type Ordenacao = "patrimonio" | "investimentos" | "variacao";
+type Ordenacao = "score" | "patrimonio" | "investimentos" | "variacao";
 
 const TIPO_LABELS: Record<TipoOportunidade, string> = {
   todos: "Todos os tipos",
@@ -50,8 +50,13 @@ interface DeclaracaoRow {
   id_lead: string | null;
   ocupacao: string | null;
   uf: string | null;
+  idade: number | null;
+  municipio: string | null;
   possui_atividade_rural: boolean | null;
   resultado_atividade_rural: number | null;
+  possui_conjuge: boolean | null;
+  qtd_dependentes: number;
+  qtd_fontes_pagadoras: number;
   patrimonio_total: number;
   patrimonio_anterior: number;
   variacao_patrimonio: number;
@@ -76,6 +81,10 @@ interface DeclaracaoRow {
   lead_venda_realizada: boolean | null;
   lead_tokeniza_investidor: boolean | null;
   lead_tokeniza_valor_investido: number | null;
+  score: number;
+  motivos_score: string[] | null;
+  proxima_acao: string | null;
+  sem_lead_vinculado: boolean;
 }
 
 function gerarInsights(d: DeclaracaoRow): Insight[] {
