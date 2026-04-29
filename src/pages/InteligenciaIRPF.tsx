@@ -247,9 +247,9 @@ const InteligenciaIRPF = () => {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-5">
         {loadingKpis || !kpis ? (
-          Array.from({ length: 7 }).map((_, i) => <div key={i} className="h-20 bg-muted rounded-2xl animate-pulse" />)
+          Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-20 bg-muted rounded-2xl animate-pulse" />)
         ) : (
           <>
             <GlassCard className="p-4 text-center">
@@ -259,6 +259,10 @@ const InteligenciaIRPF = () => {
             <GlassCard className="p-4 text-center">
               <p className="text-xl font-bold text-primary">{kpis.total_oportunidades.toLocaleString("pt-BR")}</p>
               <p className="text-[11px] text-muted-foreground">Oportunidades</p>
+            </GlassCard>
+            <GlassCard className="p-4 text-center">
+              <p className="text-xl font-bold text-violet-600">{kpis.score_medio?.toFixed(1) ?? "0"}</p>
+              <p className="text-[11px] text-muted-foreground">Score médio (0-100)</p>
             </GlassCard>
             <GlassCard className="p-4 text-center min-w-0">
               <p
