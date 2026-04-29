@@ -149,6 +149,8 @@ function gerarProximaAcao(c: Cliente): string | null {
     return c.gatilho_principal;
   return null;
 }
+
+const Visao360Comercial = () => {
   const { isLoading: loadingEmpresas, hasAccess } = useEmpresa();
 
   // Filtros
