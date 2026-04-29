@@ -571,6 +571,12 @@ const InteligenciaIRPF = () => {
           </div>
         </>
       )}
+
+      <DetalheDeclaracaoModal
+        declaracao={declaracaoAberta}
+        empresaSelecionada={BLUE_EMPRESA_ID}
+        onOpenChange={(open) => { if (!open) setDeclaracaoAberta(null); }}
+      />
     </>
   );
 };
