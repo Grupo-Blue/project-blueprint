@@ -13,9 +13,9 @@ const corsHeaders = {
 const NOTION_VERSION = "2022-06-28";
 const NOTION_API = "https://api.notion.com/v1";
 
-const DS_INFO = "4dacdfcc-44cb-4775-b6d6-e4bd21bcfd60";
-const DS_CRM = "1a52e840-ab4f-815e-a7be-000b06b47b88";
-const DS_2026 = "2a22e840-ab4f-81f6-b62d-000bd29e26f2";
+const DS_INFO = "1d52e840-ab4f-80ee-ac8a-d56aed5b5b6e";
+const DS_CRM = "1a52e840-ab4f-81f1-b2e5-ffa0784e5f75";
+const DS_2026 = "2a22e840-ab4f-8086-b4bf-c7d1859a30b1";
 
 interface NotionPage {
   id: string;
