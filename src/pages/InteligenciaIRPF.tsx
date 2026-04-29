@@ -152,7 +152,7 @@ const InteligenciaIRPF = () => {
   const [uf, setUf] = useState<string>("todas");
   const [exercicio, setExercicio] = useState<string>("todos");
   const [patrimonioMin, setPatrimonioMin] = useState<string>("");
-  const [ordenacao, setOrdenacao] = useState<Ordenacao>("patrimonio");
+  const [ordenacao, setOrdenacao] = useState<Ordenacao>("score");
   const [pagina, setPagina] = useState(1);
 
   const buscaDeb = useDebounce(busca, 400);
@@ -182,6 +182,7 @@ const InteligenciaIRPF = () => {
         total_decs: number; patrimonio_total: number; sem_lead: number;
         imobiliario: number; investidor: number; empresarial: number;
         cripto: number; tributario: number; total_oportunidades: number;
+        score_medio: number; com_lead: number;
       };
     },
   });
