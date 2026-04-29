@@ -436,7 +436,7 @@ const InteligenciaIRPF = () => {
                         </a>
                       )}
                       {d.id_lead ? (
-                        <Link to={`/leads?id=${d.id_lead}`} className="text-xs text-primary hover:underline flex items-center gap-1">
+                        <Link to={`/leads?ids=${d.id_lead}`} className="text-xs text-primary hover:underline flex items-center gap-1">
                           <Users className="h-3 w-3" /> Ver lead
                         </Link>
                       ) : (
@@ -444,9 +444,13 @@ const InteligenciaIRPF = () => {
                           <UserPlus className="h-3 w-3" /> Vincular lead
                         </Link>
                       )}
-                      <Link to="/irpf-importacoes" className="text-xs text-muted-foreground hover:underline flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setDeclaracaoAberta(d)}
+                        className="text-xs text-muted-foreground hover:text-primary hover:underline flex items-center gap-1"
+                      >
                         <ExternalLink className="h-3 w-3" /> Declaração
-                      </Link>
+                      </button>
                     </div>
                   </div>
 
