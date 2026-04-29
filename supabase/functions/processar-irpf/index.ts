@@ -854,17 +854,24 @@ Retorne APENAS um JSON válido com a estrutura especificada, sem texto adicional
       // Verificar se este exercício é mais recente que o atual do lead
       const { data: leadAtual } = await supabase
         .from('lead')
-        .select('irpf_ano_mais_recente')
+        .select('irpf_ano_mais_recente, cpf, email, telefone')
         .eq('id_lead', leadId)
         .single();
 
       const anoAtualLead = leadAtual?.irpf_ano_mais_recente || 0;
       const deveEnriquecer = irpfData.identificacao.exercicio >= anoAtualLead;
 
+      // Backfill de contato: preencher CPF/email/telefone se estiverem vazios no lead
+      const contatoPatch: Record<string, unknown> = {};
+      if (!leadAtual?.cpf && cpfFormatado) contatoPatch.cpf = cpfFormatado;
+      if (!leadAtual?.email && irpfData.endereco?.email) contatoPatch.email = irpfData.endereco.email;
+      if (!leadAtual?.telefone && telefoneNormalizado) contatoPatch.telefone = telefoneNormalizado;
+
       if (deveEnriquecer) {
         await supabase
           .from('lead')
           .update({
+            ...contatoPatch,
             id_irpf_declaracao: declaracao.id,
             irpf_ano_mais_recente: irpfData.identificacao.exercicio,
             irpf_renda_anual: rendaAnual,
