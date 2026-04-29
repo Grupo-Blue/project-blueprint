@@ -155,6 +155,7 @@ const InteligenciaIRPF = () => {
   const [patrimonioMin, setPatrimonioMin] = useState<string>("");
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("score");
   const [pagina, setPagina] = useState(1);
+  const [declaracaoAberta, setDeclaracaoAberta] = useState<DeclaracaoRow | null>(null);
 
   const buscaDeb = useDebounce(busca, 400);
   const patrimonioDeb = useDebounce(patrimonioMin, 500);
