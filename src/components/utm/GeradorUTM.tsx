@@ -133,8 +133,8 @@ export const GeradorUTM = () => {
     return {
       ...atual,
       canal,
-      utm_source: atual.utm_source || sourceSugerido,
-      utm_medium: atual.utm_medium || mediumSugerido,
+      utm_source: sourceSugerido,
+      utm_medium: mediumSugerido,
       utm_campaign: atual.utm_campaign || (atual.nome_interno ? slug(atual.nome_interno) : ""),
     };
   };
