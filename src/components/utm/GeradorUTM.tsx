@@ -372,11 +372,9 @@ export const GeradorUTM = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleAplicarSugestoes}>
-              Sugerir UTMs pelo canal
-            </Button>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Sugestões de UTM são preenchidas automaticamente ao escolher o canal.
+          </p>
 
           <Alert>
             <AlertDescription className="space-y-2">
