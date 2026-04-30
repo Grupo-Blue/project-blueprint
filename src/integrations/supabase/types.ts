@@ -6724,6 +6724,69 @@ export type Database = {
         }
         Relationships: []
       }
+      utm_link: {
+        Row: {
+          ativo: boolean
+          canal: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          id_campanha: string | null
+          id_criativo: string | null
+          id_empresa: string
+          nome_interno: string
+          observacoes: string | null
+          tags: string[] | null
+          updated_at: string
+          url_base: string
+          utm_campaign: string
+          utm_content: string | null
+          utm_medium: string
+          utm_source: string
+          utm_term: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          canal?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          id_campanha?: string | null
+          id_criativo?: string | null
+          id_empresa: string
+          nome_interno: string
+          observacoes?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          url_base: string
+          utm_campaign: string
+          utm_content?: string | null
+          utm_medium: string
+          utm_source: string
+          utm_term?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          canal?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          id_campanha?: string | null
+          id_criativo?: string | null
+          id_empresa?: string
+          nome_interno?: string
+          observacoes?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          url_base?: string
+          utm_campaign?: string
+          utm_content?: string | null
+          utm_medium?: string
+          utm_source?: string
+          utm_term?: string | null
+        }
+        Relationships: []
+      }
       webhook_destino: {
         Row: {
           ativo: boolean | null
@@ -7084,6 +7147,31 @@ export type Database = {
       user_has_irpf_empresa_access: {
         Args: { _id_empresa: string }
         Returns: boolean
+      }
+      utm_link_com_contagem: {
+        Args: { _id_empresa: string }
+        Returns: {
+          ativo: boolean
+          canal: string
+          created_at: string
+          created_by: string
+          id: string
+          id_campanha: string
+          id_criativo: string
+          id_empresa: string
+          nome_interno: string
+          observacoes: string
+          tags: string[]
+          total_leads: number
+          ultimo_lead_em: string
+          updated_at: string
+          url_base: string
+          utm_campaign: string
+          utm_content: string
+          utm_medium: string
+          utm_source: string
+          utm_term: string
+        }[]
       }
     }
     Enums: {
