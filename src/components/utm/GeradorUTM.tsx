@@ -118,15 +118,44 @@ export const GeradorUTM = () => {
     toast.success("Copiado!");
   };
 
-  const handleAplicarSugestoes = () => {
-    setForm((f) => ({
-      ...f,
-      utm_source: f.utm_source || (f.canal === "google" ? "google" : f.canal === "meta" ? "facebook" : f.canal),
-      utm_medium:
-        f.utm_medium ||
-        (f.canal === "meta" || f.canal === "google" ? "cpc" : f.canal === "email" ? "email" : f.canal === "organico" ? "social" : ""),
-      utm_campaign: f.utm_campaign || (f.nome_interno ? slug(f.nome_interno) : ""),
-    }));
+  const handleAplicarSugestoes = (canal: string, atual = form) => {
+    const sourceSugerido =
+      canal === "google" ? "google" :
+      canal === "meta" ? "facebook" :
+      canal === "organico" ? "instagram" :
+      canal === "email" ? "newsletter" :
+      canal === "whatsapp" ? "whatsapp" : canal;
+    const mediumSugerido =
+      canal === "meta" || canal === "google" ? "cpc" :
+      canal === "email" ? "email" :
+      canal === "organico" ? "social" :
+      canal === "whatsapp" ? "whatsapp" : "";
+    return {
+      ...atual,
+      canal,
+      utm_source: atual.utm_source || sourceSugerido,
+      utm_medium: atual.utm_medium || mediumSugerido,
+      utm_campaign: atual.utm_campaign || (atual.nome_interno ? slug(atual.nome_interno) : ""),
+    };
+  };
+
+  const handleCanalChange = (v: string) => {
+    setForm((f) => handleAplicarSugestoes(v, f));
+  };
+
+  const baixarQrCode = async (url: string, nome: string) => {
+    try {
+      const dataUrl = await QRCode.toDataURL(url, { width: 1024, margin: 2, errorCorrectionLevel: "M" });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `qr_${slug(nome) || "utm"}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success("QR Code baixado!");
+    } catch (e: any) {
+      toast.error("Falha ao gerar QR Code");
+    }
   };
 
   const salvar = async () => {
