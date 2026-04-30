@@ -874,6 +874,30 @@ const Leads = () => {
                   <SelectItem value="nao_investidor">Não Investidor</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Select
+                value={utmLinkFiltro}
+                onValueChange={(v) => {
+                  setUtmLinkFiltro(v);
+                  if (v === "all") {
+                    limparFiltroUtmLink();
+                  } else {
+                    aplicarFiltroPorUtmLink(v);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Link UTM" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="all">Todos os links</SelectItem>
+                  {(utmLinksDisponiveis ?? []).map((l: any) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.nome_interno}{l.canal ? ` · ${l.canal}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               
               {/* Filtro Multi-Select de Stage */}
               <Popover>
