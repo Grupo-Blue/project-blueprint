@@ -291,7 +291,7 @@ export const GeradorUTM = () => {
             </div>
             <div className="space-y-2">
               <Label>Canal</Label>
-              <Select value={form.canal} onValueChange={(v) => setForm({ ...form, canal: v })}>
+              <Select value={form.canal} onValueChange={handleCanalChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
