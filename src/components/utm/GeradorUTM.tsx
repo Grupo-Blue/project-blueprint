@@ -489,6 +489,9 @@ export const GeradorUTM = () => {
                         <ExternalLink className="h-3 w-3 mr-1" /> Abrir
                       </a>
                     </Button>
+                    <Button size="sm" variant="outline" onClick={() => baixarQrCode(url, l.nome_interno)}>
+                      <QrCode className="h-3 w-3 mr-1" /> QR Code
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
