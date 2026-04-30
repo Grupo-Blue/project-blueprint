@@ -14,9 +14,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Copy, ExternalLink, Save, Search, Power, PowerOff, Users } from "lucide-react";
+import { Copy, ExternalLink, Save, Search, Power, PowerOff, Users, QrCode } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import QRCode from "qrcode";
 
 const CANAIS = [
   { value: "meta", label: "Meta (Facebook/Instagram)" },
