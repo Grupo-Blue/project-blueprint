@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookOpen, AlertTriangle, CheckCircle2, Copy, ExternalLink, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { GeradorUTM } from "@/components/utm/GeradorUTM";
 
 const GuiaUTM = () => {
   const { toast } = useToast();
@@ -34,14 +35,19 @@ const GuiaUTM = () => {
         </AlertDescription>
       </Alert>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs defaultValue="gerador" className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="gerador">Gerador</TabsTrigger>
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="meta">Meta Ads</TabsTrigger>
           <TabsTrigger value="google">Google Ads</TabsTrigger>
           <TabsTrigger value="pipedrive">Pipedrive</TabsTrigger>
           <TabsTrigger value="validation">Validação</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="gerador" className="space-y-4">
+          <GeradorUTM />
+        </TabsContent>
 
         {/* Overview */}
         <TabsContent value="overview" className="space-y-4">

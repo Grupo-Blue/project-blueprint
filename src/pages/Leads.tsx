@@ -115,10 +115,14 @@ const Leads = () => {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
 
+  const [utmLinkNome, setUtmLinkNome] = useState<string | null>(null);
+
   // Ler filtro de alerta da URL
   useEffect(() => {
     const alertaParam = searchParams.get("alerta");
     const idsParam = searchParams.get("ids");
+    const utmLinkId = searchParams.get("utm_link_id");
+
     if (idsParam) {
       // Aceita ?ids=<uuid> (vindo da Inteligência IRPF) e também ?alerta=...&ids=...
       setAlertaTipo(alertaParam || "selecionado");
@@ -133,6 +137,43 @@ const Leads = () => {
       setParados7DiasFilter(false);
       setSearchTerm("");
       setCurrentPage(1);
+      return;
+    }
+
+    // Filtro por link UTM salvo
+    if (utmLinkId) {
+      (async () => {
+        const { data: link } = await supabase
+          .from("utm_link")
+          .select("id, nome_interno, id_empresa, utm_source, utm_campaign, utm_content")
+          .eq("id", utmLinkId)
+          .maybeSingle();
+        if (!link) return;
+
+        let q = supabase
+          .from("lead")
+          .select("id_lead")
+          .eq("id_empresa", link.id_empresa)
+          .eq("utm_campaign", link.utm_campaign);
+        if (link.utm_content) q = q.eq("utm_content", link.utm_content);
+        if (link.utm_source) q = q.eq("utm_source", link.utm_source);
+
+        const { data: leadsRes } = await q.limit(5000);
+        const ids = (leadsRes || []).map((l: any) => l.id_lead);
+
+        setAlertaTipo("utm_link");
+        setUtmLinkNome(link.nome_interno);
+        setAlertaLeadIds(ids.length > 0 ? ids : ["__nenhum__"]);
+        setStatusFilter("all");
+        setStageFilter([]);
+        setScoreMinimo("");
+        setClienteStatusFilter("all");
+        setInvestidorFilter("all");
+        setOrigemFilter("all");
+        setParados7DiasFilter(false);
+        setSearchTerm("");
+        setCurrentPage(1);
+      })();
     }
   }, [searchParams]);
 
@@ -597,7 +638,9 @@ const Leads = () => {
               Exibindo {alertaLeadIds.length} lead(s) do alerta: {
                 alertaTipo === "sla" ? "Sem primeira resposta" :
                 alertaTipo === "orfao" ? "Sem proprietário" :
-                alertaTipo === "levantada" ? "Levantou mão sem reunião" : alertaTipo
+                alertaTipo === "levantada" ? "Levantou mão sem reunião" :
+                alertaTipo === "utm_link" ? `Link UTM: ${utmLinkNome ?? ""}` :
+                alertaTipo
               }
             </p>
           </div>
@@ -607,6 +650,7 @@ const Leads = () => {
             onClick={() => {
               setAlertaTipo(null);
               setAlertaLeadIds(null);
+              setUtmLinkNome(null);
               setSearchParams({});
             }}
           >
