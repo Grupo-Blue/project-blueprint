@@ -650,6 +650,7 @@ const Leads = () => {
             onClick={() => {
               setAlertaTipo(null);
               setAlertaLeadIds(null);
+              setUtmLinkNome(null);
               setSearchParams({});
             }}
           >
