@@ -116,6 +116,50 @@ const Leads = () => {
   const [importModalOpen, setImportModalOpen] = useState(false);
 
   const [utmLinkNome, setUtmLinkNome] = useState<string | null>(null);
+  const [utmLinkFiltro, setUtmLinkFiltro] = useState<string>("all");
+
+  // Aplica filtro por link UTM (carrega ids dos leads que casam com os UTMs do link)
+  const aplicarFiltroPorUtmLink = async (utmLinkId: string) => {
+    const { data: link } = await supabase
+      .from("utm_link")
+      .select("id, nome_interno, id_empresa, utm_source, utm_campaign, utm_content")
+      .eq("id", utmLinkId)
+      .maybeSingle();
+    if (!link) return;
+
+    let q = supabase
+      .from("lead")
+      .select("id_lead")
+      .eq("id_empresa", link.id_empresa)
+      .eq("utm_campaign", link.utm_campaign);
+    if (link.utm_content) q = q.eq("utm_content", link.utm_content);
+    if (link.utm_source) q = q.eq("utm_source", link.utm_source);
+
+    const { data: leadsRes } = await q.limit(5000);
+    const ids = (leadsRes || []).map((l: any) => l.id_lead);
+
+    setAlertaTipo("utm_link");
+    setUtmLinkNome(link.nome_interno);
+    setAlertaLeadIds(ids.length > 0 ? ids : ["__nenhum__"]);
+    setStatusFilter("all");
+    setStageFilter([]);
+    setScoreMinimo("");
+    setClienteStatusFilter("all");
+    setInvestidorFilter("all");
+    setOrigemFilter("all");
+    setParados7DiasFilter(false);
+    setSearchTerm("");
+    setCurrentPage(1);
+  };
+
+  const limparFiltroUtmLink = () => {
+    setUtmLinkFiltro("all");
+    setUtmLinkNome(null);
+    if (alertaTipo === "utm_link") {
+      setAlertaTipo(null);
+      setAlertaLeadIds(null);
+    }
+  };
 
   // Ler filtro de alerta da URL
   useEffect(() => {
@@ -142,40 +186,29 @@ const Leads = () => {
 
     // Filtro por link UTM salvo
     if (utmLinkId) {
-      (async () => {
-        const { data: link } = await supabase
-          .from("utm_link")
-          .select("id, nome_interno, id_empresa, utm_source, utm_campaign, utm_content")
-          .eq("id", utmLinkId)
-          .maybeSingle();
-        if (!link) return;
-
-        let q = supabase
-          .from("lead")
-          .select("id_lead")
-          .eq("id_empresa", link.id_empresa)
-          .eq("utm_campaign", link.utm_campaign);
-        if (link.utm_content) q = q.eq("utm_content", link.utm_content);
-        if (link.utm_source) q = q.eq("utm_source", link.utm_source);
-
-        const { data: leadsRes } = await q.limit(5000);
-        const ids = (leadsRes || []).map((l: any) => l.id_lead);
-
-        setAlertaTipo("utm_link");
-        setUtmLinkNome(link.nome_interno);
-        setAlertaLeadIds(ids.length > 0 ? ids : ["__nenhum__"]);
-        setStatusFilter("all");
-        setStageFilter([]);
-        setScoreMinimo("");
-        setClienteStatusFilter("all");
-        setInvestidorFilter("all");
-        setOrigemFilter("all");
-        setParados7DiasFilter(false);
-        setSearchTerm("");
-        setCurrentPage(1);
-      })();
+      setUtmLinkFiltro(utmLinkId);
+      aplicarFiltroPorUtmLink(utmLinkId);
     }
   }, [searchParams]);
+
+  // Lista de links UTM disponíveis para o filtro nativo
+  const { data: utmLinksDisponiveis } = useQuery({
+    queryKey: ["utm-links-filtro", empresaSelecionada],
+    queryFn: async () => {
+      let q = supabase
+        .from("utm_link")
+        .select("id, nome_interno, canal, id_empresa, ativo")
+        .eq("ativo", true)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (empresaSelecionada && empresaSelecionada !== "todas") {
+        q = q.eq("id_empresa", empresaSelecionada);
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
   const ITEMS_PER_PAGE = 15;
 
@@ -839,6 +872,30 @@ const Leads = () => {
                   <SelectItem value="investidor">Investidores</SelectItem>
                   <SelectItem value="carrinho">Carrinho Aband.</SelectItem>
                   <SelectItem value="nao_investidor">Não Investidor</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={utmLinkFiltro}
+                onValueChange={(v) => {
+                  setUtmLinkFiltro(v);
+                  if (v === "all") {
+                    limparFiltroUtmLink();
+                  } else {
+                    aplicarFiltroPorUtmLink(v);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Link UTM" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="all">Todos os links</SelectItem>
+                  {(utmLinksDisponiveis ?? []).map((l: any) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.nome_interno}{l.canal ? ` · ${l.canal}` : ""}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               

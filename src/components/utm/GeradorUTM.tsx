@@ -14,9 +14,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Copy, ExternalLink, Save, Search, Power, PowerOff, Users } from "lucide-react";
+import { Copy, ExternalLink, Save, Search, Power, PowerOff, Users, QrCode } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import QRCode from "qrcode";
 
 const CANAIS = [
   { value: "meta", label: "Meta (Facebook/Instagram)" },
@@ -117,15 +118,44 @@ export const GeradorUTM = () => {
     toast.success("Copiado!");
   };
 
-  const handleAplicarSugestoes = () => {
-    setForm((f) => ({
-      ...f,
-      utm_source: f.utm_source || (f.canal === "google" ? "google" : f.canal === "meta" ? "facebook" : f.canal),
-      utm_medium:
-        f.utm_medium ||
-        (f.canal === "meta" || f.canal === "google" ? "cpc" : f.canal === "email" ? "email" : f.canal === "organico" ? "social" : ""),
-      utm_campaign: f.utm_campaign || (f.nome_interno ? slug(f.nome_interno) : ""),
-    }));
+  const handleAplicarSugestoes = (canal: string, atual = form) => {
+    const sourceSugerido =
+      canal === "google" ? "google" :
+      canal === "meta" ? "facebook" :
+      canal === "organico" ? "instagram" :
+      canal === "email" ? "newsletter" :
+      canal === "whatsapp" ? "whatsapp" : canal;
+    const mediumSugerido =
+      canal === "meta" || canal === "google" ? "cpc" :
+      canal === "email" ? "email" :
+      canal === "organico" ? "social" :
+      canal === "whatsapp" ? "whatsapp" : "";
+    return {
+      ...atual,
+      canal,
+      utm_source: atual.utm_source || sourceSugerido,
+      utm_medium: atual.utm_medium || mediumSugerido,
+      utm_campaign: atual.utm_campaign || (atual.nome_interno ? slug(atual.nome_interno) : ""),
+    };
+  };
+
+  const handleCanalChange = (v: string) => {
+    setForm((f) => handleAplicarSugestoes(v, f));
+  };
+
+  const baixarQrCode = async (url: string, nome: string) => {
+    try {
+      const dataUrl = await QRCode.toDataURL(url, { width: 1024, margin: 2, errorCorrectionLevel: "M" });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `qr_${slug(nome) || "utm"}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success("QR Code baixado!");
+    } catch (e: any) {
+      toast.error("Falha ao gerar QR Code");
+    }
   };
 
   const salvar = async () => {
@@ -261,7 +291,7 @@ export const GeradorUTM = () => {
             </div>
             <div className="space-y-2">
               <Label>Canal</Label>
-              <Select value={form.canal} onValueChange={(v) => setForm({ ...form, canal: v })}>
+              <Select value={form.canal} onValueChange={handleCanalChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -342,11 +372,9 @@ export const GeradorUTM = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleAplicarSugestoes}>
-              Sugerir UTMs pelo canal
-            </Button>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Sugestões de UTM são preenchidas automaticamente ao escolher o canal.
+          </p>
 
           <Alert>
             <AlertDescription className="space-y-2">
@@ -460,6 +488,9 @@ export const GeradorUTM = () => {
                       <a href={url} target="_blank" rel="noreferrer">
                         <ExternalLink className="h-3 w-3 mr-1" /> Abrir
                       </a>
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => baixarQrCode(url, l.nome_interno)}>
+                      <QrCode className="h-3 w-3 mr-1" /> QR Code
                     </Button>
                     <Button
                       size="sm"
