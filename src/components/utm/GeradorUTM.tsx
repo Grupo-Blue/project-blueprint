@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Copy, ExternalLink, Save, Search, Power, PowerOff, Users, QrCode } from "lucide-react";
+import { Copy, ExternalLink, Save, Search, Power, PowerOff, Users, QrCode, RefreshCw, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import QRCode from "qrcode";
@@ -101,7 +101,7 @@ export const GeradorUTM = () => {
     [form]
   );
 
-  const { data: links, refetch } = useQuery({
+  const { data: links, refetch, isFetching, isLoading } = useQuery({
     queryKey: ["utm-links-com-contagem", empresaIdParaListar],
     enabled: !!empresaIdParaListar,
     queryFn: async () => {
@@ -112,6 +112,12 @@ export const GeradorUTM = () => {
       return data ?? [];
     },
   });
+
+  const handleRefresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["utm-links-com-contagem"] });
+    await refetch();
+    toast.success("Lista atualizada");
+  };
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -210,8 +216,8 @@ export const GeradorUTM = () => {
         observacoes: "",
         tags: "",
       });
-      queryClient.invalidateQueries({ queryKey: ["utm-links-com-contagem"] });
-      refetch();
+      await queryClient.invalidateQueries({ queryKey: ["utm-links-com-contagem"] });
+      await refetch();
     } finally {
       setSalvando(false);
     }
@@ -404,7 +410,10 @@ export const GeradorUTM = () => {
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
-              <CardTitle>Links salvos</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Links salvos
+                {isFetching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              </CardTitle>
               <CardDescription>
                 Cada link mostra quantos leads chegaram com esses UTMs.
               </CardDescription>
@@ -423,6 +432,16 @@ export const GeradorUTM = () => {
                 <Switch checked={mostrarInativos} onCheckedChange={setMostrarInativos} id="inativos" />
                 <Label htmlFor="inativos" className="text-xs">Mostrar arquivados</Label>
               </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={isFetching}
+                className="h-8"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${isFetching ? "animate-spin" : ""}`} />
+                Atualizar
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -430,7 +449,12 @@ export const GeradorUTM = () => {
           {!empresaIdParaListar && (
             <p className="text-sm text-muted-foreground">Selecione uma empresa para ver os links.</p>
           )}
-          {empresaIdParaListar && linksFiltrados.length === 0 && (
+          {empresaIdParaListar && isLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando links...
+            </div>
+          )}
+          {empresaIdParaListar && !isLoading && linksFiltrados.length === 0 && (
             <p className="text-sm text-muted-foreground">Nenhum link salvo ainda.</p>
           )}
           <div className="space-y-3">
