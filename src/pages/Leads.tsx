@@ -638,7 +638,9 @@ const Leads = () => {
               Exibindo {alertaLeadIds.length} lead(s) do alerta: {
                 alertaTipo === "sla" ? "Sem primeira resposta" :
                 alertaTipo === "orfao" ? "Sem proprietário" :
-                alertaTipo === "levantada" ? "Levantou mão sem reunião" : alertaTipo
+                alertaTipo === "levantada" ? "Levantou mão sem reunião" :
+                alertaTipo === "utm_link" ? `Link UTM: ${utmLinkNome ?? ""}` :
+                alertaTipo
               }
             </p>
           </div>
