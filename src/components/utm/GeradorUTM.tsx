@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -88,6 +88,24 @@ export const GeradorUTM = () => {
     empresaSelecionada && empresaSelecionada !== "todas"
       ? empresaSelecionada
       : form.id_empresa;
+
+  // Sincroniza form.id_empresa com o contexto/empresas permitidas.
+  // Sem isso, quando empresasPermitidas carrega depois do mount, o form
+  // fica preso em "" e a lista de links nunca é carregada.
+  useEffect(() => {
+    if (empresaSelecionada && empresaSelecionada !== "todas") {
+      if (form.id_empresa !== empresaSelecionada) {
+        setForm((f) => ({ ...f, id_empresa: empresaSelecionada }));
+      }
+      return;
+    }
+    if (!form.id_empresa && empresasPermitidas.length > 0) {
+      setForm((f) => ({ ...f, id_empresa: empresasPermitidas[0].id_empresa }));
+    }
+  }, [empresaSelecionada, empresasPermitidas]);
+
+  const nomeEmpresaListada =
+    empresasPermitidas.find((e) => e.id_empresa === empresaIdParaListar)?.nome || null;
 
   const urlPreview = useMemo(
     () =>
@@ -412,10 +430,16 @@ export const GeradorUTM = () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Links salvos
+                {nomeEmpresaListada && (
+                  <Badge variant="secondary" className="text-xs">{nomeEmpresaListada}</Badge>
+                )}
                 {isFetching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
               </CardTitle>
               <CardDescription>
                 Cada link mostra quantos leads chegaram com esses UTMs.
+                {empresaSelecionada === "todas" && (
+                  <> Mostrando os links da empresa selecionada no formulário acima.</>
+                )}
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
