@@ -136,10 +136,72 @@ export const GeradorUTM = () => {
     },
   });
 
+  const distintos = (campo: string) =>
+    Array.from(
+      new Set(
+        (links ?? [])
+          .map((l: any) => l[campo])
+          .filter((v: any) => typeof v === "string" && v.trim() !== "")
+      )
+    ).sort() as string[];
+
+  const opcoes = useMemo(
+    () => ({
+      utm_source: distintos("utm_source"),
+      utm_medium: distintos("utm_medium"),
+      utm_campaign: distintos("utm_campaign"),
+      utm_content: distintos("utm_content"),
+      utm_term: distintos("utm_term"),
+    }),
+    [links]
+  );
+
   const handleRefresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ["utm-links-com-contagem"] });
     await refetch();
     toast.success("Lista atualizada");
+  };
+
+  const sugerirComIA = async () => {
+    if (!form.id_empresa) {
+      toast.error("Selecione uma empresa.");
+      return;
+    }
+    if (!iaDescricao.trim()) {
+      toast.error("Descreva o link para a IA.");
+      return;
+    }
+    setIaLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sugerir-utm", {
+        body: {
+          id_empresa: form.id_empresa,
+          url: iaUrl || form.url_base,
+          descricao: iaDescricao,
+        },
+      });
+      if (error) throw error;
+      const s = data?.sugestao;
+      if (!s) throw new Error("Sem sugestão");
+      setForm((f) => ({
+        ...f,
+        url_base: s.url_base || iaUrl || f.url_base,
+        canal: s.canal || f.canal,
+        utm_source: s.utm_source ?? f.utm_source,
+        utm_medium: s.utm_medium ?? f.utm_medium,
+        utm_campaign: s.utm_campaign ?? f.utm_campaign,
+        utm_content: s.utm_content ?? f.utm_content,
+        utm_term: s.utm_term ?? f.utm_term,
+        nome_interno: s.nome_interno || f.nome_interno,
+        observacoes: s.observacoes || f.observacoes,
+      }));
+      setReaproveitados(s.reaproveitados || {});
+      toast.success("Sugestão aplicada — revise antes de salvar");
+    } catch (e: any) {
+      toast.error(e.message || "Falha ao chamar IA");
+    } finally {
+      setIaLoading(false);
+    }
   };
 
   const handleCopy = (text: string) => {
