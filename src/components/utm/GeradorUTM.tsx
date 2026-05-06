@@ -399,26 +399,38 @@ export const GeradorUTM = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>utm_source *</Label>
-              <Input
+              <Label className="flex items-center gap-2">
+                utm_source *
+                {reaproveitados.utm_source && <Badge variant="outline" className="text-[10px]">reaproveitado</Badge>}
+              </Label>
+              <UtmAutocompleteInput
                 value={form.utm_source}
-                onChange={(e) => setForm({ ...form, utm_source: e.target.value })}
+                onChange={(v) => setForm({ ...form, utm_source: v })}
+                options={opcoes.utm_source}
                 placeholder="facebook, google, instagram..."
               />
             </div>
             <div className="space-y-2">
-              <Label>utm_medium *</Label>
-              <Input
+              <Label className="flex items-center gap-2">
+                utm_medium *
+                {reaproveitados.utm_medium && <Badge variant="outline" className="text-[10px]">reaproveitado</Badge>}
+              </Label>
+              <UtmAutocompleteInput
                 value={form.utm_medium}
-                onChange={(e) => setForm({ ...form, utm_medium: e.target.value })}
+                onChange={(v) => setForm({ ...form, utm_medium: v })}
+                options={opcoes.utm_medium}
                 placeholder="cpc, social, email..."
               />
             </div>
             <div className="space-y-2">
-              <Label>utm_campaign *</Label>
-              <Input
+              <Label className="flex items-center gap-2">
+                utm_campaign *
+                {reaproveitados.utm_campaign && <Badge variant="outline" className="text-[10px]">reaproveitado</Badge>}
+              </Label>
+              <UtmAutocompleteInput
                 value={form.utm_campaign}
-                onChange={(e) => setForm({ ...form, utm_campaign: e.target.value })}
+                onChange={(v) => setForm({ ...form, utm_campaign: v })}
+                options={opcoes.utm_campaign}
                 placeholder="lancamento_abril"
               />
             </div>
@@ -426,22 +438,31 @@ export const GeradorUTM = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>utm_content (opcional)</Label>
-              <Input
+              <Label className="flex items-center gap-2">
+                utm_content (opcional)
+                {reaproveitados.utm_content && <Badge variant="outline" className="text-[10px]">reaproveitado</Badge>}
+              </Label>
+              <UtmAutocompleteInput
                 value={form.utm_content}
-                onChange={(e) => setForm({ ...form, utm_content: e.target.value })}
+                onChange={(v) => setForm({ ...form, utm_content: v })}
+                options={opcoes.utm_content}
                 placeholder="banner_topo, video_30s..."
               />
             </div>
             <div className="space-y-2">
-              <Label>utm_term (opcional)</Label>
-              <Input
+              <Label className="flex items-center gap-2">
+                utm_term (opcional)
+                {reaproveitados.utm_term && <Badge variant="outline" className="text-[10px]">reaproveitado</Badge>}
+              </Label>
+              <UtmAutocompleteInput
                 value={form.utm_term}
-                onChange={(e) => setForm({ ...form, utm_term: e.target.value })}
+                onChange={(v) => setForm({ ...form, utm_term: v })}
+                options={opcoes.utm_term}
                 placeholder="palavra_chave"
               />
             </div>
           </div>
+
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
