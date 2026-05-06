@@ -14,10 +14,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Copy, ExternalLink, Save, Search, Power, PowerOff, Users, QrCode, RefreshCw, Loader2 } from "lucide-react";
+import { Copy, ExternalLink, Save, Search, Power, PowerOff, Users, QrCode, RefreshCw, Loader2, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import QRCode from "qrcode";
+import { UtmAutocompleteInput } from "./UtmAutocompleteInput";
 
 const CANAIS = [
   { value: "meta", label: "Meta (Facebook/Instagram)" },
@@ -83,6 +84,10 @@ export const GeradorUTM = () => {
   const [salvando, setSalvando] = useState(false);
   const [busca, setBusca] = useState("");
   const [mostrarInativos, setMostrarInativos] = useState(false);
+  const [iaDescricao, setIaDescricao] = useState("");
+  const [iaUrl, setIaUrl] = useState("");
+  const [iaLoading, setIaLoading] = useState(false);
+  const [reaproveitados, setReaproveitados] = useState<Record<string, boolean>>({});
 
   const empresaIdParaListar =
     empresaSelecionada && empresaSelecionada !== "todas"
@@ -131,10 +136,72 @@ export const GeradorUTM = () => {
     },
   });
 
+  const distintos = (campo: string) =>
+    Array.from(
+      new Set(
+        (links ?? [])
+          .map((l: any) => l[campo])
+          .filter((v: any) => typeof v === "string" && v.trim() !== "")
+      )
+    ).sort() as string[];
+
+  const opcoes = useMemo(
+    () => ({
+      utm_source: distintos("utm_source"),
+      utm_medium: distintos("utm_medium"),
+      utm_campaign: distintos("utm_campaign"),
+      utm_content: distintos("utm_content"),
+      utm_term: distintos("utm_term"),
+    }),
+    [links]
+  );
+
   const handleRefresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ["utm-links-com-contagem"] });
     await refetch();
     toast.success("Lista atualizada");
+  };
+
+  const sugerirComIA = async () => {
+    if (!form.id_empresa) {
+      toast.error("Selecione uma empresa.");
+      return;
+    }
+    if (!iaDescricao.trim()) {
+      toast.error("Descreva o link para a IA.");
+      return;
+    }
+    setIaLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sugerir-utm", {
+        body: {
+          id_empresa: form.id_empresa,
+          url: iaUrl || form.url_base,
+          descricao: iaDescricao,
+        },
+      });
+      if (error) throw error;
+      const s = data?.sugestao;
+      if (!s) throw new Error("Sem sugestão");
+      setForm((f) => ({
+        ...f,
+        url_base: s.url_base || iaUrl || f.url_base,
+        canal: s.canal || f.canal,
+        utm_source: s.utm_source ?? f.utm_source,
+        utm_medium: s.utm_medium ?? f.utm_medium,
+        utm_campaign: s.utm_campaign ?? f.utm_campaign,
+        utm_content: s.utm_content ?? f.utm_content,
+        utm_term: s.utm_term ?? f.utm_term,
+        nome_interno: s.nome_interno || f.nome_interno,
+        observacoes: s.observacoes || f.observacoes,
+      }));
+      setReaproveitados(s.reaproveitados || {});
+      toast.success("Sugestão aplicada — revise antes de salvar");
+    } catch (e: any) {
+      toast.error(e.message || "Falha ao chamar IA");
+    } finally {
+      setIaLoading(false);
+    }
   };
 
   const handleCopy = (text: string) => {
@@ -275,6 +342,38 @@ export const GeradorUTM = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="font-medium text-sm">Preencher com IA</span>
+              <Badge variant="secondary" className="text-[10px]">beta</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cole o link e descreva de onde ele será usado. A IA sugere os UTMs reaproveitando padrões já usados nesta empresa.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Input
+                value={iaUrl}
+                onChange={(e) => setIaUrl(e.target.value)}
+                placeholder="URL (opcional, usa a do form se vazio)"
+                className="md:col-span-1"
+              />
+              <Textarea
+                rows={2}
+                value={iaDescricao}
+                onChange={(e) => setIaDescricao(e.target.value)}
+                placeholder="Ex: anúncio do Instagram para a campanha de abril, criativo do banner topo"
+                className="md:col-span-2"
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" onClick={sugerirComIA} disabled={iaLoading}>
+                {iaLoading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                Sugerir com IA
+              </Button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Nome interno *</Label>
@@ -332,26 +431,38 @@ export const GeradorUTM = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>utm_source *</Label>
-              <Input
+              <Label className="flex items-center gap-2">
+                utm_source *
+                {reaproveitados.utm_source && <Badge variant="outline" className="text-[10px]">reaproveitado</Badge>}
+              </Label>
+              <UtmAutocompleteInput
                 value={form.utm_source}
-                onChange={(e) => setForm({ ...form, utm_source: e.target.value })}
+                onChange={(v) => setForm({ ...form, utm_source: v })}
+                options={opcoes.utm_source}
                 placeholder="facebook, google, instagram..."
               />
             </div>
             <div className="space-y-2">
-              <Label>utm_medium *</Label>
-              <Input
+              <Label className="flex items-center gap-2">
+                utm_medium *
+                {reaproveitados.utm_medium && <Badge variant="outline" className="text-[10px]">reaproveitado</Badge>}
+              </Label>
+              <UtmAutocompleteInput
                 value={form.utm_medium}
-                onChange={(e) => setForm({ ...form, utm_medium: e.target.value })}
+                onChange={(v) => setForm({ ...form, utm_medium: v })}
+                options={opcoes.utm_medium}
                 placeholder="cpc, social, email..."
               />
             </div>
             <div className="space-y-2">
-              <Label>utm_campaign *</Label>
-              <Input
+              <Label className="flex items-center gap-2">
+                utm_campaign *
+                {reaproveitados.utm_campaign && <Badge variant="outline" className="text-[10px]">reaproveitado</Badge>}
+              </Label>
+              <UtmAutocompleteInput
                 value={form.utm_campaign}
-                onChange={(e) => setForm({ ...form, utm_campaign: e.target.value })}
+                onChange={(v) => setForm({ ...form, utm_campaign: v })}
+                options={opcoes.utm_campaign}
                 placeholder="lancamento_abril"
               />
             </div>
@@ -359,22 +470,31 @@ export const GeradorUTM = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>utm_content (opcional)</Label>
-              <Input
+              <Label className="flex items-center gap-2">
+                utm_content (opcional)
+                {reaproveitados.utm_content && <Badge variant="outline" className="text-[10px]">reaproveitado</Badge>}
+              </Label>
+              <UtmAutocompleteInput
                 value={form.utm_content}
-                onChange={(e) => setForm({ ...form, utm_content: e.target.value })}
+                onChange={(v) => setForm({ ...form, utm_content: v })}
+                options={opcoes.utm_content}
                 placeholder="banner_topo, video_30s..."
               />
             </div>
             <div className="space-y-2">
-              <Label>utm_term (opcional)</Label>
-              <Input
+              <Label className="flex items-center gap-2">
+                utm_term (opcional)
+                {reaproveitados.utm_term && <Badge variant="outline" className="text-[10px]">reaproveitado</Badge>}
+              </Label>
+              <UtmAutocompleteInput
                 value={form.utm_term}
-                onChange={(e) => setForm({ ...form, utm_term: e.target.value })}
+                onChange={(v) => setForm({ ...form, utm_term: v })}
+                options={opcoes.utm_term}
                 placeholder="palavra_chave"
               />
             </div>
           </div>
+
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">

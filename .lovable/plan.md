@@ -1,32 +1,47 @@
-## Problema
+## Objetivo
 
-Em produção, mesmo após salvar um link UTM, a lista "Links salvos" não mostra. Causa raiz identificada:
+Adicionar IA ao Gerador de UTMs em `/guia-utm` para autopreencher o formulário a partir de um link + descrição livre, e oferecer **autocomplete por empresa** com base nos UTMs já usados (histórico de `utm_link` da empresa).
 
-1. `form.id_empresa` é inicializado uma única vez no `useState`, quando `empresasPermitidas` ainda está vazio (React Query carregando). Fica como `""` permanentemente.
-2. Quando o usuário admin tem `empresaSelecionada = "todas"`, o código cai no fallback `form.id_empresa` — que é `""`. A query fica `enabled: false` e nunca lista nada.
-3. Mesmo quando o usuário troca a empresa no Select do form, a lista passa a mostrar os links daquela empresa, mas se ele salvou um link em outra empresa antes, parece que "sumiu".
-4. Adicionalmente, salvar com `form.id_empresa = ""` deve estar bloqueado pelo toast "Selecione uma empresa", mas em produção (com a empresa global selecionada como "todas") o usuário pode confundir qual empresa está ativa.
+## Mudanças
 
-## Correção
+### 1. Edge function `sugerir-utm` (nova)
+- Path: `supabase/functions/sugerir-utm/index.ts`
+- Auth: JWT obrigatório (padrão), valida `id_empresa` contra `user_empresa` / role admin.
+- Input: `{ id_empresa, url, descricao }`.
+- Carrega histórico daquela empresa (últimos ~100 `utm_link`: source/medium/campaign/content/term/canal) para passar como contexto.
+- Chama Lovable AI (`google/gemini-3-flash-preview`) via tool calling estruturado, retornando:
+  ```
+  { url_base, canal, utm_source, utm_medium, utm_campaign,
+    utm_content, utm_term, nome_interno, observacoes,
+    reaproveitados: { source?: bool, medium?: bool, campaign?: bool, ... } }
+  ```
+- Prompt instrui a IA a **reutilizar valores já existentes no histórico** quando fizer sentido (mesma campanha, mesmo canal etc.) e só inventar novos quando necessário, mantendo padrão snake_case.
 
-### `src/components/utm/GeradorUTM.tsx`
+### 2. Componente `GeradorUTM.tsx`
+- Novo bloco "Preencher com IA" no topo do card de geração:
+  - Campo `Input` para URL (opcional — se vazio, usa `url_base` do form).
+  - `Textarea` "Descreva o link (canal, campanha, criativo, contexto…)".
+  - Botão "Sugerir com IA" (loading state).
+  - Ao receber resposta: aplica os campos no `form` e mostra toast "Sugestão aplicada — revise antes de salvar". Campos preenchidos via histórico ganham um pequeno badge "reaproveitado".
+- Hook `useUtmHistorico(id_empresa)`:
+  - Query `["utm-historico", id_empresa]` que extrai valores **distintos** de `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `canal` da tabela `utm_link` filtrada por `id_empresa` (já isolada por RLS).
+- Trocar os `<Input>` de `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term` por um **Combobox** (usando `Command` + `Popover` do shadcn já instalados) que:
+  - Mostra a lista de valores já usados na empresa ao focar.
+  - Permite digitar valor novo livremente.
+  - Filtra conforme digitação.
+- Manter validação Zod existente.
 
-1. **Sincronizar `form.id_empresa` com o contexto** via `useEffect`:
-   - Quando `empresaSelecionada` mudar e for diferente de `"todas"`, atualizar `form.id_empresa`.
-   - Quando `empresasPermitidas` carregar e `form.id_empresa` ainda estiver vazio, escolher a primeira automaticamente.
+### 3. Config
+- Adicionar bloco `[functions.sugerir-utm]` em `supabase/config.toml` (mantém `verify_jwt` padrão = true, então não precisa de bloco; só adiciono se necessário). **Não** desativar JWT.
 
-2. **Adicionar uma 3ª opção na resolução de `empresaIdParaListar`**: se `empresaSelecionada === "todas"`, listar pela empresa do form; se vazio, mostrar mensagem clara "Selecione uma empresa no seletor global ou no formulário acima".
+## Notas técnicas
 
-3. **Mostrar badge da empresa atual no header dos "Links salvos"** (ex.: "Mostrando: Blue") para deixar claro de qual empresa são os links exibidos — evita confusão quando o usuário tem várias empresas.
+- A função roda dentro do contexto autenticado: inicializa `supabase` com header `Authorization` do request (padrão já usado no projeto) para que RLS de `utm_link` funcione na leitura de histórico.
+- IA usa tool calling (`response_format` via `tools` + `tool_choice`) para garantir JSON válido. Tratamento de 429/402 com toast amigável.
+- Não cria tabela nova: o "banco de UTMs já usadas" é a própria `utm_link` (já isolada por empresa).
+- Sem alteração de schema, sem alteração de RLS.
 
-4. **Após salvar**, forçar `empresaIdParaListar = form.id_empresa` (já é o caso) e invalidar **todas** as queries `["utm-links-com-contagem"]` (já feito) — isso resolve o caso onde o link salvo vai para a empresa correta mas a lista estava apontando para outra.
+## Fora de escopo
 
-### Resultado esperado
-
-- Lista sempre exibe links da empresa relevante (global se selecionada, senão a do form).
-- Após salvar, link aparece imediatamente na lista (já estava ok no preview, vai funcionar igual em produção).
-- Header indica qual empresa está sendo listada, evitando confusão.
-
-## Arquivos modificados
-
-- `src/components/utm/GeradorUTM.tsx` (sincronização de empresa + badge informativo)
+- Não adiciono página separada de "biblioteca de UTMs" — o autocomplete já cobre a necessidade.
+- Não persisto a descrição/prompt do usuário.
