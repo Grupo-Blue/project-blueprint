@@ -84,6 +84,10 @@ export const GeradorUTM = () => {
   const [salvando, setSalvando] = useState(false);
   const [busca, setBusca] = useState("");
   const [mostrarInativos, setMostrarInativos] = useState(false);
+  const [iaDescricao, setIaDescricao] = useState("");
+  const [iaUrl, setIaUrl] = useState("");
+  const [iaLoading, setIaLoading] = useState(false);
+  const [reaproveitados, setReaproveitados] = useState<Record<string, boolean>>({});
 
   const empresaIdParaListar =
     empresaSelecionada && empresaSelecionada !== "todas"
