@@ -342,6 +342,38 @@ export const GeradorUTM = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="font-medium text-sm">Preencher com IA</span>
+              <Badge variant="secondary" className="text-[10px]">beta</Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cole o link e descreva de onde ele será usado. A IA sugere os UTMs reaproveitando padrões já usados nesta empresa.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Input
+                value={iaUrl}
+                onChange={(e) => setIaUrl(e.target.value)}
+                placeholder="URL (opcional, usa a do form se vazio)"
+                className="md:col-span-1"
+              />
+              <Textarea
+                rows={2}
+                value={iaDescricao}
+                onChange={(e) => setIaDescricao(e.target.value)}
+                placeholder="Ex: anúncio do Instagram para a campanha de abril, criativo do banner topo"
+                className="md:col-span-2"
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" onClick={sugerirComIA} disabled={iaLoading}>
+                {iaLoading ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                Sugerir com IA
+              </Button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Nome interno *</Label>
