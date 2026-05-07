@@ -1,47 +1,38 @@
-## Objetivo
+# Diagnóstico de IRPF não importados
 
-Adicionar IA ao Gerador de UTMs em `/guia-utm` para autopreencher o formulário a partir de um link + descrição livre, e oferecer **autocomplete por empresa** com base nos UTMs já usados (histórico de `utm_link` da empresa).
+## Confirmado
+- Folder ID configurado: `1pmMUVlfiLl2KXfByjmIG82TlpYCN5D1r` (bate com a URL enviada).
+- Service Account: `blue-cripto-ir-upload@sound-datum-391213.iam.gserviceaccount.com`.
+- A função `monitorar-pasta-irpf` roda OK, mas a listagem retorna 0 PDFs — ou seja, **a Service Account não enxerga os arquivos** que aparecem no navegador.
 
-## Mudanças
+A causa quase certa é uma das três:
+1. Os PDFs novos foram enviados por outro usuário e **não foram compartilhados individualmente** com a SA (no "Meu Drive" o compartilhamento da pasta nem sempre se propaga para arquivos colocados depois, dependendo de quem é o owner).
+2. A pasta foi recriada/movida e a SA perdeu acesso.
+3. Os arquivos estão em **subpastas** dentro da pasta principal (a função só lista a raiz).
 
-### 1. Edge function `sugerir-utm` (nova)
-- Path: `supabase/functions/sugerir-utm/index.ts`
-- Auth: JWT obrigatório (padrão), valida `id_empresa` contra `user_empresa` / role admin.
-- Input: `{ id_empresa, url, descricao }`.
-- Carrega histórico daquela empresa (últimos ~100 `utm_link`: source/medium/campaign/content/term/canal) para passar como contexto.
-- Chama Lovable AI (`google/gemini-3-flash-preview`) via tool calling estruturado, retornando:
-  ```
-  { url_base, canal, utm_source, utm_medium, utm_campaign,
-    utm_content, utm_term, nome_interno, observacoes,
-    reaproveitados: { source?: bool, medium?: bool, campaign?: bool, ... } }
-  ```
-- Prompt instrui a IA a **reutilizar valores já existentes no histórico** quando fizer sentido (mesma campanha, mesmo canal etc.) e só inventar novos quando necessário, mantendo padrão snake_case.
+## Passos do plano
 
-### 2. Componente `GeradorUTM.tsx`
-- Novo bloco "Preencher com IA" no topo do card de geração:
-  - Campo `Input` para URL (opcional — se vazio, usa `url_base` do form).
-  - `Textarea` "Descreva o link (canal, campanha, criativo, contexto…)".
-  - Botão "Sugerir com IA" (loading state).
-  - Ao receber resposta: aplica os campos no `form` e mostra toast "Sugestão aplicada — revise antes de salvar". Campos preenchidos via histórico ganham um pequeno badge "reaproveitado".
-- Hook `useUtmHistorico(id_empresa)`:
-  - Query `["utm-historico", id_empresa]` que extrai valores **distintos** de `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `canal` da tabela `utm_link` filtrada por `id_empresa` (já isolada por RLS).
-- Trocar os `<Input>` de `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term` por um **Combobox** (usando `Command` + `Popover` do shadcn já instalados) que:
-  - Mostra a lista de valores já usados na empresa ao focar.
-  - Permite digitar valor novo livremente.
-  - Filtra conforme digitação.
-- Manter validação Zod existente.
+### 1. Criar função `debug-listar-pasta-irpf` (temporária)
+Lista TUDO que a SA vê na pasta, sem filtros — incluindo subpastas, Google Docs, qualquer mimeType, com `owners` e `permissions`. Isso identifica imediatamente o caso real:
+- Se vier vazio → problema de permissão (SA não foi adicionada / foi removida).
+- Se vier subpastas com PDFs dentro → ajustar `monitorar-pasta-irpf` para recursão.
+- Se vierem arquivos com mimeType ≠ `application/pdf` → ampliar filtro.
 
-### 3. Config
-- Adicionar bloco `[functions.sugerir-utm]` em `supabase/config.toml` (mantém `verify_jwt` padrão = true, então não precisa de bloco; só adiciono se necessário). **Não** desativar JWT.
+Output JSON com: `total`, `lista[{id,name,mimeType,owners,createdTime,parents}]`, `subpastas[]`.
 
-## Notas técnicas
+### 2. Rodar a função e diagnosticar
+Executo o curl, leio a resposta e te mostro o que está acontecendo na pasta do ponto de vista da SA, comparando com o que você vê no navegador.
 
-- A função roda dentro do contexto autenticado: inicializa `supabase` com header `Authorization` do request (padrão já usado no projeto) para que RLS de `utm_link` funcione na leitura de histórico.
-- IA usa tool calling (`response_format` via `tools` + `tool_choice`) para garantir JSON válido. Tratamento de 429/402 com toast amigável.
-- Não cria tabela nova: o "banco de UTMs já usadas" é a própria `utm_link` (já isolada por empresa).
-- Sem alteração de schema, sem alteração de RLS.
+### 3. Aplicar a correção apropriada
+Conforme o resultado:
+- **Permissão**: te peço para reabrir a pasta no Drive → "Compartilhar" → adicionar `blue-cripto-ir-upload@sound-datum-391213.iam.gserviceaccount.com` como **Editor**, e marcar "Notificar pessoas = não". Alternativa robusta: mover a pasta para um **Shared Drive** com a SA como membro (resolve definitivamente).
+- **Subpastas**: ajustar `monitorar-pasta-irpf` para varrer recursivamente (BFS simples até X níveis, mantendo o batch_size).
+- **MimeType**: ampliar filtro para aceitar `application/pdf` + heurística por extensão `.pdf` no `name`.
 
-## Fora de escopo
+### 4. Remover a função de debug
+Após confirmar que está importando, deleto `debug-listar-pasta-irpf` para manter a base limpa.
 
-- Não adiciono página separada de "biblioteca de UTMs" — o autocomplete já cobre a necessidade.
-- Não persisto a descrição/prompt do usuário.
+## Por que não basta "olhar o Drive"
+A view do navegador usa o seu usuário Google; a SA é uma identidade independente. Um arquivo pode estar visível pra você e invisível pra ela — daí a necessidade de listar pelo lado da SA.
+
+Posso seguir?
