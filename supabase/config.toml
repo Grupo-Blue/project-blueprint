@@ -3,6 +3,9 @@ project_id = "unsznbmmqhihwctguvvr"
 [functions.monitorar-pasta-irpf]
 verify_jwt = false
 
+[functions.debug-listar-pasta-irpf]
+verify_jwt = false
+
 [functions.coletar-metricas-meta]
 verify_jwt = false
 
