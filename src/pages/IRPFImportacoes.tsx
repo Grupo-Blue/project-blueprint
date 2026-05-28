@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Progress } from "@/components/ui/progress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Upload, FileText, Eye, Users, Building2, Bitcoin, TrendingUp, AlertCircle, CheckCircle, Clock, Loader2, BarChart3, FolderUp, ChevronDown, ChevronRight, Package, XCircle, Ban, RefreshCw, Download, Trash2 } from "lucide-react";
+import { Upload, FileText, Eye, Users, Building2, Bitcoin, TrendingUp, AlertCircle, CheckCircle, Clock, Loader2, BarChart3, FolderUp, ChevronDown, ChevronRight, Package, XCircle, Ban, RefreshCw, Download, Trash2, TestTube2 } from "lucide-react";
+import { ConsultaIRPFTester } from "@/components/ConsultaIRPFTester";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { IRPFDashboardInsights } from "@/components/irpf/IRPFDashboardInsights";
@@ -419,6 +420,10 @@ export default function IRPFImportacoes() {
             <BarChart3 className="w-4 h-4 mr-2" />
             Insights Financeiros
           </TabsTrigger>
+          <TabsTrigger value="diagnostico">
+            <TestTube2 className="w-4 h-4 mr-2" />
+            Diagnóstico
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="declaracoes" className="space-y-6 mt-6">
@@ -669,6 +674,10 @@ export default function IRPFImportacoes() {
 
         <TabsContent value="insights" className="mt-6">
           <IRPFDashboardInsights empresaSelecionada={BLUE_EMPRESA_ID} />
+        </TabsContent>
+
+        <TabsContent value="diagnostico" className="mt-6 space-y-4">
+          <ConsultaIRPFTester />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,24 +1,23 @@
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from '@supabase/supabase-js';
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2, TestTube2, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Plus } from "lucide-react";
 import { ValidacaoUTM } from "@/components/ValidacaoUTM";
-import { ImportarCampanhas } from "@/components/ImportarCampanhas";
 import { CronjobsMonitor } from "@/components/CronjobsMonitor";
-import { TokenizaProjetosManager } from "@/components/TokenizaProjetosManager";
 import { WebhookDestinosManager } from "@/components/WebhookDestinosManager";
-import { ConsultaIRPFTester } from "@/components/ConsultaIRPFTester";
-import { StapeIntegracaoManager } from "@/components/StapeIntegracaoManager";
+import { SaudeIntegracoes } from "@/components/dashboard/SaudeIntegracoes";
+import { ConexoesGrid } from "@/components/integracoes/ConexoesGrid";
+import {
+  MetaAdsForm, GoogleAdsForm, PipedriveForm, TokenizaForm, MauticForm, NotionForm,
+  MetricoolForm, ChatwootForm, GA4Form, GSCForm, WordpressForm,
+} from "@/components/integracoes/IntegracaoForms";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -26,107 +25,59 @@ type Integracao = Database["public"]["Tables"]["integracao"]["Row"];
 type TipoIntegracao = Database["public"]["Enums"]["tipo_integracao"];
 type Empresa = Database["public"]["Tables"]["empresa"]["Row"];
 
+const TIPO_LABEL: Record<TipoIntegracao, string> = {
+  META_ADS: "Meta Ads",
+  GOOGLE_ADS: "Google Ads",
+  PIPEDRIVE: "Pipedrive",
+  TOKENIZA: "Tokeniza",
+  MAUTIC: "Mautic",
+  NOTION: "Notion",
+  METRICOOL: "Metricool",
+  CHATWOOT: "Chatblue",
+  GA4: "Google Analytics 4",
+  GSC: "Google Search Console",
+  WORDPRESS: "WordPress (Blog)",
+};
+
+const TIPOS_ORDENADOS: TipoIntegracao[] = [
+  "META_ADS", "GOOGLE_ADS", "GA4", "GSC", "METRICOOL", "WORDPRESS",
+  "MAUTIC", "PIPEDRIVE", "TOKENIZA", "CHATWOOT", "NOTION",
+];
+
 export default function Integracoes() {
   const { empresaSelecionada: empresaFiltro } = useEmpresa();
-  
+
   const [integracoes, setIntegracoes] = useState<Integracao[]>([]);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [testingIntegracoes, setTestingIntegracoes] = useState<Set<string>>(new Set());
+  const [testingIds, setTestingIds] = useState<Set<string>>(new Set());
 
-  // Form state
+  // Form: estado consolidado num único objeto + helper setField
   const [tipoIntegracao, setTipoIntegracao] = useState<TipoIntegracao>("META_ADS");
   const [empresaForm, setEmpresaForm] = useState<string>("");
   const [ativo, setAtivo] = useState(true);
-  
-  // Filter integrations based on global company filter
-  const integracoesFiltradas = useMemo(() => {
-    if (!empresaFiltro || empresaFiltro === "todas") {
-      return integracoes;
-    }
-    return integracoes.filter(i => i.id_empresa === empresaFiltro);
-  }, [integracoes, empresaFiltro]);
-  
-  // Meta Ads credentials
-  const [metaAccessToken, setMetaAccessToken] = useState("");
-  const [metaAdAccountId, setMetaAdAccountId] = useState("");
-
-  // Composio fallback (reutilizado entre META_ADS e GOOGLE_ADS)
-  const [composioConnectedAccountId, setComposioConnectedAccountId] = useState("");
-
-  // Google Ads credentials
-  const [googleDeveloperToken, setGoogleDeveloperToken] = useState("");
-  const [googleClientId, setGoogleClientId] = useState("");
-  const [googleClientSecret, setGoogleClientSecret] = useState("");
-  const [googleRefreshToken, setGoogleRefreshToken] = useState("");
-  const [googleCustomerId, setGoogleCustomerId] = useState("");
-  const [googleLoginCustomerId, setGoogleLoginCustomerId] = useState("");
-  
-  // Pipedrive credentials
-  const [pipedriveApiToken, setPipedriveApiToken] = useState("");
-  const [pipedriveDomain, setPipedriveDomain] = useState("");
-  const [pipedrivePipelineId, setPipedrivePipelineId] = useState("");
-  
-  // Tokeniza credentials
-  const [tokenizaApiToken, setTokenizaApiToken] = useState("");
-  const [tokenizaBaseUrl, setTokenizaBaseUrl] = useState("https://api.tokeniza.com.br");
-  
-  // Mautic credentials
-  const [mauticUrlBase, setMauticUrlBase] = useState("");
-  const [mauticLogin, setMauticLogin] = useState("");
-  const [mauticSenha, setMauticSenha] = useState("");
-
-  // Notion credentials
-  const [notionApiToken, setNotionApiToken] = useState("");
-  const [notionDatabaseId, setNotionDatabaseId] = useState("1d52e840ab4f80eeac8ad56aed5b5b6e");
-
-  // Metricool credentials
-  const [metricoolUserToken, setMetricoolUserToken] = useState("");
-  const [metricoolUserId, setMetricoolUserId] = useState("");
-  const [metricoolBlogId, setMetricoolBlogId] = useState("");
-
-  // Chatwoot credentials
-  const [chatwootUrlBase, setChatwootUrlBase] = useState("");
-  const [chatwootApiToken, setChatwootApiToken] = useState("");
-  const [chatwootAccountId, setChatwootAccountId] = useState("");
-  const [chatwootEmpresasInboxes, setChatwootEmpresasInboxes] = useState<{id_empresa: string; inboxes: string}[]>([]);
-
-  // GA4 credentials
-  const [ga4Nome, setGa4Nome] = useState("");
-  const [ga4PropertyId, setGa4PropertyId] = useState("");
-  const [ga4ClientId, setGa4ClientId] = useState("");
-  const [ga4ClientSecret, setGa4ClientSecret] = useState("");
-  const [ga4RefreshToken, setGa4RefreshToken] = useState("");
-  const [ga4SiteUrl, setGa4SiteUrl] = useState("");
-
-  // GSC credentials (usa Composio como fonte; valida-se via composio_connected_account_id)
-  const [gscSiteUrl, setGscSiteUrl] = useState("");
-
-  // WordPress credentials
-  const [wpUrlBase, setWpUrlBase] = useState("");
-  const [wpUsuario, setWpUsuario] = useState("");
-  const [wpAppPassword, setWpAppPassword] = useState("");
+  const [form, setForm] = useState<Record<string, any>>({});
+  const setField = (key: string, val: any) => setForm((prev) => ({ ...prev, [key]: val }));
 
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const [intResponse, empResponse] = await Promise.all([
+      const [intRes, empRes] = await Promise.all([
         supabase.from("integracao").select("*").order("created_at", { ascending: false }),
-        supabase.from("empresa").select("*").order("nome")
+        supabase.from("empresa").select("*").order("nome"),
       ]);
-
-      if (intResponse.error) throw intResponse.error;
-      if (empResponse.error) throw empResponse.error;
-
-      setIntegracoes(intResponse.data || []);
-      setEmpresas(empResponse.data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar integrações: " + error.message);
+      if (intRes.error) throw intRes.error;
+      if (empRes.error) throw empRes.error;
+      setIntegracoes(intRes.data ?? []);
+      setEmpresas(empRes.data ?? []);
+    } catch (e: any) {
+      toast.error("Erro ao carregar integrações: " + e.message);
     } finally {
       setLoading(false);
     }
@@ -136,42 +87,7 @@ export default function Integracoes() {
     setTipoIntegracao("META_ADS");
     setEmpresaForm("");
     setAtivo(true);
-    setMetaAccessToken("");
-    setMetaAdAccountId("");
-    setComposioConnectedAccountId("");
-    setGoogleDeveloperToken("");
-    setGoogleClientId("");
-    setGoogleClientSecret("");
-    setGoogleRefreshToken("");
-    setGoogleCustomerId("");
-    setGoogleLoginCustomerId("");
-    setPipedriveApiToken("");
-    setPipedriveDomain("");
-    setPipedrivePipelineId("");
-    setTokenizaApiToken("");
-    setTokenizaBaseUrl("https://api.tokeniza.com.br");
-    setMauticUrlBase("");
-    setMauticLogin("");
-    setMauticSenha("");
-    setNotionApiToken("");
-    setNotionDatabaseId("1d52e840ab4f80eeac8ad56aed5b5b6e");
-    setMetricoolUserToken("");
-    setMetricoolUserId("");
-    setMetricoolBlogId("");
-    setChatwootUrlBase("");
-    setChatwootApiToken("");
-    setChatwootAccountId("");
-    setChatwootEmpresasInboxes([]);
-    setGa4Nome("");
-    setGa4PropertyId("");
-    setGa4ClientId("");
-    setGa4ClientSecret("");
-    setGa4RefreshToken("");
-    setGa4SiteUrl("");
-    setGscSiteUrl("");
-    setWpUrlBase("");
-    setWpUsuario("");
-    setWpAppPassword("");
+    setForm({});
     setEditingId(null);
   };
 
@@ -179,282 +95,211 @@ export default function Integracoes() {
     setEditingId(integracao.id_integracao);
     setTipoIntegracao(integracao.tipo);
     setAtivo(integracao.ativo);
-    
-    const config = integracao.config_json as any;
-    
+    const config = (integracao.config_json ?? {}) as any;
+    const next: Record<string, any> = {};
+    const composio = integracao.composio_connected_account_id || "";
+
     if (integracao.tipo === "META_ADS") {
-      setMetaAccessToken(config.access_token || "");
-      setMetaAdAccountId(config.ad_account_id || "");
-      setComposioConnectedAccountId(integracao.composio_connected_account_id || "");
+      next.metaAccessToken = config.access_token || "";
+      next.metaAdAccountId = config.ad_account_id || "";
+      next.composioConnectedAccountId = composio;
     } else if (integracao.tipo === "GOOGLE_ADS") {
-      setGoogleDeveloperToken(config.developer_token || "");
-      setGoogleClientId(config.client_id || "");
-      setGoogleClientSecret(config.client_secret || "");
-      setGoogleRefreshToken(config.refresh_token || "");
-      setGoogleCustomerId(config.customer_id || "");
-      setGoogleLoginCustomerId(config.login_customer_id || "");
-      setComposioConnectedAccountId(integracao.composio_connected_account_id || "");
+      next.googleDeveloperToken = config.developer_token || "";
+      next.googleClientId = config.client_id || "";
+      next.googleClientSecret = config.client_secret || "";
+      next.googleRefreshToken = config.refresh_token || "";
+      next.googleCustomerId = config.customer_id || "";
+      next.googleLoginCustomerId = config.login_customer_id || "";
+      next.composioConnectedAccountId = composio;
     } else if (integracao.tipo === "PIPEDRIVE") {
-      setPipedriveApiToken(config.api_token || "");
-      setPipedriveDomain(config.domain || "");
-      setPipedrivePipelineId(config.pipeline_id || "");
+      next.pipedriveApiToken = config.api_token || "";
+      next.pipedriveDomain = config.domain || "";
+      next.pipedrivePipelineId = config.pipeline_id || "";
     } else if (integracao.tipo === "TOKENIZA") {
-      setTokenizaApiToken(config.api_token || "");
-      setTokenizaBaseUrl(config.base_url || "https://api.tokeniza.com.br");
+      next.tokenizaApiToken = config.api_token || "";
+      next.tokenizaBaseUrl = config.base_url || "https://api.tokeniza.com.br";
     } else if (integracao.tipo === "MAUTIC") {
-      setMauticUrlBase(config.url_base || "");
-      setMauticLogin(config.login || "");
-      setMauticSenha(config.senha || "");
+      next.mauticUrlBase = config.url_base || "";
+      next.mauticLogin = config.login || "";
+      next.mauticSenha = config.senha || "";
     } else if (integracao.tipo === "NOTION") {
-      setNotionApiToken(config.api_token || "");
-      setNotionDatabaseId(config.database_id || "1d52e840ab4f80eeac8ad56aed5b5b6e");
+      next.notionApiToken = config.api_token || "";
+      next.notionDatabaseId = config.database_id || "1d52e840ab4f80eeac8ad56aed5b5b6e";
     } else if (integracao.tipo === "METRICOOL") {
-      setMetricoolUserToken(config.user_token || "");
-      setMetricoolUserId(config.user_id || "");
-      setMetricoolBlogId(config.blog_id || "");
+      next.metricoolUserToken = config.user_token || "";
+      next.metricoolUserId = config.user_id || "";
+      next.metricoolBlogId = config.blog_id || "";
     } else if (integracao.tipo === "CHATWOOT") {
-      setChatwootUrlBase(config.api_url || config.url_base || "");
-      setChatwootApiToken(config.api_token || "");
-      setChatwootAccountId(config.webhook_secret || config.account_id || "");
-      // Carregar e consolidar mapeamento de inboxes por empresa
-      if (config.empresas && Array.isArray(config.empresas)) {
+      next.chatwootUrlBase = config.api_url || config.url_base || "";
+      next.chatwootApiToken = config.api_token || "";
+      next.chatwootAccountId = config.webhook_secret || config.account_id || "";
+      if (Array.isArray(config.empresas)) {
         const consolidatedMap = new Map<string, string[]>();
-        config.empresas.forEach((e: any) => {
-          const inboxList = Array.isArray(e.inboxes) ? e.inboxes : [];
-          const existing = consolidatedMap.get(e.id_empresa) || [];
-          consolidatedMap.set(e.id_empresa, [...existing, ...inboxList]);
-        });
-        
-        const consolidated = Array.from(consolidatedMap.entries()).map(([id_empresa, inboxes]) => ({
+        for (const e of config.empresas) {
+          const arr = Array.isArray(e.inboxes) ? e.inboxes : [];
+          const existing = consolidatedMap.get(e.id_empresa) ?? [];
+          consolidatedMap.set(e.id_empresa, [...existing, ...arr]);
+        }
+        next.chatwootEmpresasInboxes = Array.from(consolidatedMap.entries()).map(([id_empresa, inboxes]) => ({
           id_empresa,
-          inboxes: [...new Set(inboxes)].join(', ')
+          inboxes: [...new Set(inboxes)].join(", "),
         }));
-        
-        setChatwootEmpresasInboxes(consolidated);
       } else {
-        setChatwootEmpresasInboxes([]);
+        next.chatwootEmpresasInboxes = [];
       }
     } else if (integracao.tipo === "GA4") {
-      setGa4Nome(config.nome || "");
-      setGa4PropertyId(config.property_id || "");
-      setGa4ClientId(config.client_id || "");
-      setGa4ClientSecret(config.client_secret || "");
-      setGa4RefreshToken(config.refresh_token || "");
-      setGa4SiteUrl(config.site_url || "");
+      next.ga4Nome = config.nome || "";
+      next.ga4PropertyId = config.property_id || "";
+      next.ga4ClientId = config.client_id || "";
+      next.ga4ClientSecret = config.client_secret || "";
+      next.ga4RefreshToken = config.refresh_token || "";
+      next.ga4SiteUrl = config.site_url || "";
     } else if (integracao.tipo === "GSC") {
-      setGscSiteUrl(config.site_url || "");
-      setComposioConnectedAccountId(integracao.composio_connected_account_id || "");
+      next.gscSiteUrl = config.site_url || "";
+      next.composioConnectedAccountId = composio;
     } else if (integracao.tipo === "WORDPRESS") {
-      setWpUrlBase(config.url_base || "");
-      setWpUsuario(config.usuario || "");
-      setWpAppPassword(config.app_password || "");
+      next.wpUrlBase = config.url_base || "";
+      next.wpUsuario = config.usuario || "";
+      next.wpAppPassword = config.app_password || "";
     }
-
+    setForm(next);
     setEmpresaForm(integracao.id_empresa || "");
+    setDialogOpen(true);
+  };
+
+  const handleNovo = (tipo?: string) => {
+    resetForm();
+    if (tipo && (TIPOS_ORDENADOS as string[]).includes(tipo)) setTipoIntegracao(tipo as TipoIntegracao);
     setDialogOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir esta integração?")) return;
-
     try {
       const { error } = await supabase.from("integracao").delete().eq("id_integracao", id);
       if (error) throw error;
-      toast.success("Integração excluída com sucesso");
+      toast.success("Integração excluída");
       fetchData();
-    } catch (error: any) {
-      toast.error("Erro ao excluir integração: " + error.message);
+    } catch (e: any) {
+      toast.error("Erro ao excluir: " + e.message);
     }
   };
 
-  const handleTestIntegration = async (integracao: Integracao) => {
-    const integracaoId = integracao.id_integracao;
-    
-    // Chatblue agora suporta validação via API
-    
-    setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
-    
+  const handleTest = async (integracao: Integracao) => {
+    const id = integracao.id_integracao;
+    setTestingIds((prev) => new Set(prev).add(id));
     try {
-      const { data, error } = await supabase.functions.invoke('validar-integracao', {
-        body: { integracao_id: integracaoId }
-      });
-      
+      const { data, error } = await supabase.functions.invoke("validar-integracao", { body: { integracao_id: id } });
       if (error) {
-        let errorMessage = 'Erro ao validar integração';
+        let msg = "Erro ao validar";
         if (error instanceof FunctionsHttpError) {
-          const errorData = await error.context.json();
-          errorMessage = errorData.error || errorData.message || errorMessage;
-        } else {
-          errorMessage = error.message;
-        }
-        toast.error(errorMessage);
+          const errData = await error.context.json();
+          msg = errData.error || errData.message || msg;
+        } else msg = error.message;
+        toast.error(msg);
         return;
       }
-      
       const result = data as any;
       if (!result.success) {
-        toast.error(result.error || 'Falha na validação');
+        toast.error(result.error || "Falha na validação");
         return;
       }
-      
-      toast.success(result.message || 'Integração validada com sucesso!');
-      if (result.details) {
-        console.log('Detalhes da validação:', result.details);
-      }
-    } catch (error: any) {
-      console.error('Erro ao testar integração:', error);
-      toast.error(`Erro inesperado: ${error.message}`);
+      toast.success(result.message || "Integração válida");
+    } catch (e: any) {
+      toast.error("Erro inesperado: " + e.message);
     } finally {
-      setTestingIntegracoes(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(integracaoId);
-        return newSet;
+      setTestingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
       });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!empresaForm) {
       toast.error("Selecione uma empresa");
       return;
     }
 
-    let configJson: any = {};
+    const cfg: Record<string, any> = {};
+    const setReq = (cond: boolean, msg: string) => {
+      if (!cond) { toast.error(msg); throw new Error("validation"); }
+    };
 
-    if (tipoIntegracao === "META_ADS") {
-      if (!metaAccessToken || !metaAdAccountId) {
-        toast.error("Preencha todos os campos obrigatórios");
-        return;
-      }
-      configJson = {
-        ...configJson,
-        access_token: metaAccessToken,
-        ad_account_id: metaAdAccountId,
-      };
-    } else if (tipoIntegracao === "GOOGLE_ADS") {
-      if (!googleDeveloperToken || !googleClientId || !googleClientSecret || !googleRefreshToken || !googleCustomerId) {
-        toast.error("Preencha todos os campos obrigatórios");
-        return;
-      }
-      configJson = {
-        ...configJson,
-        developer_token: googleDeveloperToken,
-        client_id: googleClientId,
-        client_secret: googleClientSecret,
-        refresh_token: googleRefreshToken,
-        customer_id: googleCustomerId,
-        login_customer_id: googleLoginCustomerId || null,
-      };
-    } else if (tipoIntegracao === "PIPEDRIVE") {
-      if (!pipedriveApiToken || !pipedriveDomain) {
-        toast.error("Preencha todos os campos obrigatórios");
-        return;
-      }
-      configJson = {
-        ...configJson,
-        api_token: pipedriveApiToken,
-        domain: pipedriveDomain,
-        pipeline_id: pipedrivePipelineId || null
-      };
+    try {
+      if (tipoIntegracao === "META_ADS") {
+        setReq(!!form.metaAccessToken && !!form.metaAdAccountId, "Preencha todos os campos obrigatórios");
+        cfg.access_token = form.metaAccessToken;
+        cfg.ad_account_id = form.metaAdAccountId;
+      } else if (tipoIntegracao === "GOOGLE_ADS") {
+        setReq(!!form.googleDeveloperToken && !!form.googleClientId && !!form.googleClientSecret && !!form.googleRefreshToken && !!form.googleCustomerId, "Preencha todos os campos obrigatórios");
+        cfg.developer_token = form.googleDeveloperToken;
+        cfg.client_id = form.googleClientId;
+        cfg.client_secret = form.googleClientSecret;
+        cfg.refresh_token = form.googleRefreshToken;
+        cfg.customer_id = form.googleCustomerId;
+        cfg.login_customer_id = form.googleLoginCustomerId || null;
+      } else if (tipoIntegracao === "PIPEDRIVE") {
+        setReq(!!form.pipedriveApiToken && !!form.pipedriveDomain, "Preencha API Token e Domain");
+        cfg.api_token = form.pipedriveApiToken;
+        cfg.domain = form.pipedriveDomain;
+        cfg.pipeline_id = form.pipedrivePipelineId || null;
       } else if (tipoIntegracao === "TOKENIZA") {
-      if (!tokenizaApiToken || !tokenizaBaseUrl) {
-        toast.error("Preencha todos os campos obrigatórios");
-        return;
+        setReq(!!form.tokenizaApiToken && !!form.tokenizaBaseUrl, "Preencha todos os campos");
+        cfg.api_token = form.tokenizaApiToken;
+        cfg.base_url = form.tokenizaBaseUrl;
+      } else if (tipoIntegracao === "MAUTIC") {
+        setReq(!!form.mauticUrlBase && !!form.mauticLogin && !!form.mauticSenha, "Preencha URL, login e senha");
+        cfg.url_base = form.mauticUrlBase;
+        cfg.login = form.mauticLogin;
+        cfg.senha = form.mauticSenha;
+      } else if (tipoIntegracao === "NOTION") {
+        setReq(!!form.notionApiToken && !!form.notionDatabaseId, "Preencha API Token e Database ID");
+        cfg.api_token = form.notionApiToken;
+        cfg.database_id = form.notionDatabaseId;
+      } else if (tipoIntegracao === "METRICOOL") {
+        setReq(!!form.metricoolUserToken && !!form.metricoolUserId && !!form.metricoolBlogId, "Preencha todos os campos");
+        cfg.user_token = form.metricoolUserToken;
+        cfg.user_id = form.metricoolUserId;
+        cfg.blog_id = form.metricoolBlogId;
+      } else if (tipoIntegracao === "CHATWOOT") {
+        setReq(!!form.chatwootUrlBase && !!form.chatwootApiToken, "Preencha URL e API Token");
+        const empresasConfig = ((form.chatwootEmpresasInboxes ?? []) as { id_empresa: string; inboxes: string }[])
+          .filter((e) => e.id_empresa && e.inboxes.trim())
+          .map((e) => ({
+            id_empresa: e.id_empresa,
+            company_id: form.chatwootAccountId || null,
+            inboxes: e.inboxes.split(",").map((s) => s.trim()).filter(Boolean),
+          }));
+        cfg.api_url = form.chatwootUrlBase;
+        cfg.api_token = form.chatwootApiToken;
+        cfg.webhook_secret = form.chatwootAccountId || null;
+        cfg.empresas = empresasConfig;
+      } else if (tipoIntegracao === "GA4") {
+        setReq(!!form.ga4Nome && !!form.ga4PropertyId && !!form.ga4ClientId && !!form.ga4ClientSecret && !!form.ga4RefreshToken, "Preencha todos os campos obrigatórios");
+        cfg.nome = form.ga4Nome;
+        cfg.property_id = form.ga4PropertyId;
+        cfg.client_id = form.ga4ClientId;
+        cfg.client_secret = form.ga4ClientSecret;
+        cfg.refresh_token = form.ga4RefreshToken;
+        cfg.site_url = form.ga4SiteUrl || null;
+      } else if (tipoIntegracao === "GSC") {
+        setReq(!!form.gscSiteUrl && !!form.composioConnectedAccountId, "Preencha site_url e Composio ID");
+        cfg.site_url = form.gscSiteUrl;
+      } else if (tipoIntegracao === "WORDPRESS") {
+        setReq(!!form.wpUrlBase && !!form.wpUsuario && !!form.wpAppPassword, "Preencha URL, usuário e Application Password");
+        cfg.url_base = (form.wpUrlBase as string).replace(/\/$/, "");
+        cfg.usuario = form.wpUsuario;
+        cfg.app_password = form.wpAppPassword;
       }
-      configJson = {
-        ...configJson,
-        api_token: tokenizaApiToken,
-        base_url: tokenizaBaseUrl
-      };
-    } else if (tipoIntegracao === "MAUTIC") {
-      if (!mauticUrlBase || !mauticLogin || !mauticSenha) {
-        toast.error("Preencha todos os campos obrigatórios");
-        return;
-      }
-      configJson = {
-        ...configJson,
-        url_base: mauticUrlBase,
-        login: mauticLogin,
-        senha: mauticSenha
-      };
-    } else if (tipoIntegracao === "NOTION") {
-      if (!notionApiToken || !notionDatabaseId) {
-        toast.error("Preencha todos os campos obrigatórios");
-        return;
-      }
-      configJson = {
-        ...configJson,
-        api_token: notionApiToken,
-        database_id: notionDatabaseId
-      };
-    } else if (tipoIntegracao === "METRICOOL") {
-      if (!metricoolUserToken || !metricoolUserId || !metricoolBlogId) {
-        toast.error("Preencha todos os campos obrigatórios");
-        return;
-      }
-      configJson = {
-        ...configJson,
-        user_token: metricoolUserToken,
-        user_id: metricoolUserId,
-        blog_id: metricoolBlogId
-      };
-    } else if (tipoIntegracao === "CHATWOOT") {
-      if (!chatwootUrlBase || !chatwootApiToken) {
-        toast.error("Preencha URL da API e API Token");
-        return;
-      }
-      // Transformar mapeamento de inboxes por empresa
-      const empresasConfig = chatwootEmpresasInboxes
-        .filter(e => e.id_empresa && e.inboxes.trim())
-        .map(e => ({
-          id_empresa: e.id_empresa,
-          company_id: chatwootAccountId || null,
-          inboxes: e.inboxes.split(',').map(i => i.trim()).filter(Boolean)
-        }));
-      
-      configJson = {
-        api_url: chatwootUrlBase,
-        api_token: chatwootApiToken,
-        webhook_secret: chatwootAccountId || null,
-        empresas: empresasConfig
-      };
-    } else if (tipoIntegracao === "GA4") {
-      if (!ga4Nome || !ga4PropertyId || !ga4ClientId || !ga4ClientSecret || !ga4RefreshToken) {
-        toast.error("Preencha todos os campos obrigatórios (nome, property ID, credenciais)");
-        return;
-      }
-      configJson = {
-        ...configJson,
-        nome: ga4Nome,
-        property_id: ga4PropertyId,
-        client_id: ga4ClientId,
-        client_secret: ga4ClientSecret,
-        refresh_token: ga4RefreshToken,
-        site_url: ga4SiteUrl || null
-      };
-    } else if (tipoIntegracao === "GSC") {
-      if (!gscSiteUrl || !composioConnectedAccountId) {
-        toast.error("Preencha o site_url e o ID de conexão Composio (Search Console)");
-        return;
-      }
-      configJson = { ...configJson, site_url: gscSiteUrl };
-    } else if (tipoIntegracao === "WORDPRESS") {
-      if (!wpUrlBase || !wpUsuario || !wpAppPassword) {
-        toast.error("Preencha URL base, usuário e Application Password do WordPress");
-        return;
-      }
-      configJson = {
-        ...configJson,
-        url_base: wpUrlBase.replace(/\/$/, ""),
-        usuario: wpUsuario,
-        app_password: wpAppPassword,
-      };
+    } catch {
+      return; // validação já notificou
     }
 
     const composioId = (tipoIntegracao === "META_ADS" || tipoIntegracao === "GOOGLE_ADS" || tipoIntegracao === "GSC")
-      ? (composioConnectedAccountId || null)
+      ? (form.composioConnectedAccountId || null)
       : null;
 
     try {
@@ -463,52 +308,77 @@ export default function Integracoes() {
           .from("integracao")
           .update({
             tipo: tipoIntegracao,
-            config_json: configJson,
+            config_json: cfg,
             ativo,
             id_empresa: empresaForm,
             composio_connected_account_id: composioId,
           })
           .eq("id_integracao", editingId);
         if (error) throw error;
-        toast.success("Integração atualizada com sucesso");
+        toast.success("Integração atualizada");
       } else {
         const { error } = await supabase
           .from("integracao")
           .insert({
             tipo: tipoIntegracao,
-            config_json: configJson,
+            config_json: cfg,
             ativo,
             id_empresa: empresaForm,
             composio_connected_account_id: composioId,
           });
         if (error) throw error;
-        toast.success("Integração criada com sucesso");
+        toast.success("Integração criada");
       }
-      
       setDialogOpen(false);
       resetForm();
       fetchData();
-    } catch (error: any) {
-      toast.error("Erro ao salvar integração: " + error.message);
+    } catch (e: any) {
+      toast.error("Erro ao salvar: " + e.message);
     }
   };
 
-  if (loading) {
-    return <div className="p-8">Carregando...</div>;
-  }
+  const renderForm = () => {
+    switch (tipoIntegracao) {
+      case "META_ADS": return <MetaAdsForm state={form} setField={setField} />;
+      case "GOOGLE_ADS": return <GoogleAdsForm state={form} setField={setField} />;
+      case "PIPEDRIVE": return <PipedriveForm state={form} setField={setField} />;
+      case "TOKENIZA": return <TokenizaForm state={form} setField={setField} />;
+      case "MAUTIC": return <MauticForm state={form} setField={setField} />;
+      case "NOTION": return <NotionForm state={form} setField={setField} />;
+      case "METRICOOL": return <MetricoolForm state={form} setField={setField} />;
+      case "CHATWOOT": return <ChatwootForm state={form} setField={setField} empresas={empresas} />;
+      case "GA4": return <GA4Form state={form} setField={setField} />;
+      case "GSC": return <GSCForm state={form} setField={setField} />;
+      case "WORDPRESS": return <WordpressForm state={form} setField={setField} />;
+      default: return null;
+    }
+  };
+
+  // Estatísticas rápidas
+  const stats = useMemo(() => {
+    const arr = empresaFiltro && empresaFiltro !== "todas"
+      ? integracoes.filter((i) => i.id_empresa === empresaFiltro)
+      : integracoes;
+    const total = arr.length;
+    const ativasOk = arr.filter((i) => i.ativo && !i.ultimo_erro).length;
+    const comErro = arr.filter((i) => i.ativo && i.ultimo_erro).length;
+    const desativadas = arr.filter((i) => !i.ativo).length;
+    return { total, ativasOk, comErro, desativadas };
+  }, [integracoes, empresaFiltro]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Integrações</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Gerencie as integrações com APIs externas</p>
+          <p className="text-sm text-muted-foreground">
+            {stats.total} integraç{stats.total === 1 ? "ão" : "ões"} · {stats.ativasOk} OK · {stats.comErro} com erro · {stats.desativadas} desativadas
+          </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto">
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Integração
+            <Button onClick={() => handleNovo()}>
+              <Plus className="w-4 h-4 mr-2" />Nova Integração
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -520,9 +390,7 @@ export default function Integracoes() {
               <div className="space-y-2">
                 <Label>Empresa</Label>
                 <Select value={empresaForm} onValueChange={setEmpresaForm}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a empresa" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Selecione a empresa" /></SelectTrigger>
                   <SelectContent>
                     {empresas.map((emp) => (
                       <SelectItem key={emp.id_empresa} value={emp.id_empresa}>{emp.nome}</SelectItem>
@@ -530,1330 +398,62 @@ export default function Integracoes() {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label>Tipo de Integração</Label>
-                <Select value={tipoIntegracao} onValueChange={(v) => setTipoIntegracao(v as TipoIntegracao)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={tipoIntegracao} onValueChange={(v) => { setTipoIntegracao(v as TipoIntegracao); setForm({}); }} disabled={!!editingId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="META_ADS">Meta Ads</SelectItem>
-                    <SelectItem value="GOOGLE_ADS">Google Ads</SelectItem>
-                    <SelectItem value="PIPEDRIVE">Pipedrive</SelectItem>
-                    <SelectItem value="TOKENIZA">Tokeniza</SelectItem>
-                    <SelectItem value="MAUTIC">Mautic</SelectItem>
-                    <SelectItem value="NOTION">Notion</SelectItem>
-                    <SelectItem value="METRICOOL">Metricool</SelectItem>
-                    <SelectItem value="CHATWOOT">Chatblue</SelectItem>
-                    <SelectItem value="GA4">Google Analytics 4</SelectItem>
-                    <SelectItem value="GSC">Google Search Console</SelectItem>
-                    <SelectItem value="WORDPRESS">WordPress (Blog)</SelectItem>
+                    {TIPOS_ORDENADOS.map((t) => (
+                      <SelectItem key={t} value={t}>{TIPO_LABEL[t]}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              {tipoIntegracao === "META_ADS" && (
-                <>
-                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertTitle className="text-blue-900 dark:text-blue-100">Token Permanente Recomendado</AlertTitle>
-                    <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm space-y-2">
-                      <p><strong>Use System User Token para evitar expirações!</strong></p>
-                      <ol className="list-decimal ml-4 space-y-1">
-                        <li>Acesse <strong>Meta Business Manager</strong> (business.facebook.com)</li>
-                        <li>Vá em <strong>Configurações → Usuários → Usuários do Sistema</strong></li>
-                        <li>Clique em <strong>Adicionar</strong> e configure permissões (ads_read, ads_management)</li>
-                        <li>Gere o <strong>Access Token</strong> - ele nunca expira!</li>
-                        <li>Cole o token no campo abaixo</li>
-                      </ol>
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="space-y-2">
-                    <Label>Access Token (System User Token) *</Label>
-                    <Input
-                      type="password"
-                      value={metaAccessToken}
-                      onChange={(e) => setMetaAccessToken(e.target.value)}
-                      placeholder="EAAxxxxxxxxxx"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Use um System User Token para integração permanente sem expirações
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Ad Account ID *</Label>
-                    <Input
-                      value={metaAdAccountId}
-                      onChange={(e) => setMetaAdAccountId(e.target.value)}
-                      placeholder="act_123456789"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Composio Connected Account ID (fallback)</Label>
-                    <Input
-                      value={composioConnectedAccountId}
-                      onChange={(e) => setComposioConnectedAccountId(e.target.value)}
-                      placeholder="ca_xxxxxxxxxxxx (opcional)"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Quando preenchido, a coleta tenta o Composio se a API direta falhar (token expirado, 5xx). Requer COMPOSIO_API_KEY no Supabase.
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {tipoIntegracao === "GOOGLE_ADS" && (
-                <>
-                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertTitle className="text-blue-900 dark:text-blue-100">Conta de Gerente (MCC)</AlertTitle>
-                    <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm space-y-2">
-                      <p><strong>Se você acessa contas via Manager Account (MCC):</strong></p>
-                      <p>Preencha o campo "Manager Customer ID" com o ID da sua conta de gerente (sem hífens). Isso é necessário quando você gerencia várias contas através de uma MCC.</p>
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="space-y-2">
-                    <Label>Developer Token *</Label>
-                    <Input
-                      type="password"
-                      value={googleDeveloperToken}
-                      onChange={(e) => setGoogleDeveloperToken(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Client ID *</Label>
-                    <Input
-                      value={googleClientId}
-                      onChange={(e) => setGoogleClientId(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Client Secret *</Label>
-                    <Input
-                      type="password"
-                      value={googleClientSecret}
-                      onChange={(e) => setGoogleClientSecret(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Refresh Token *</Label>
-                    <Input
-                      type="password"
-                      value={googleRefreshToken}
-                      onChange={(e) => setGoogleRefreshToken(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Customer ID (conta alvo) *</Label>
-                    <Input
-                      value={googleCustomerId}
-                      onChange={(e) => setGoogleCustomerId(e.target.value)}
-                      placeholder="123-456-7890"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Login Customer ID (conta gerente - opcional)</Label>
-                    <Input
-                      value={googleLoginCustomerId}
-                      onChange={(e) => setGoogleLoginCustomerId(e.target.value)}
-                      placeholder="ID da conta gerente (MCC), se houver"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Composio Connected Account ID (fallback)</Label>
-                    <Input
-                      value={composioConnectedAccountId}
-                      onChange={(e) => setComposioConnectedAccountId(e.target.value)}
-                      placeholder="ca_xxxxxxxxxxxx (opcional)"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Quando preenchido, a coleta tenta o Composio se a API direta falhar (refresh_token expirado, 5xx). Requer COMPOSIO_API_KEY no Supabase.
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {tipoIntegracao === "PIPEDRIVE" && (
-                <>
-                  <div className="space-y-2">
-                    <Label>API Token *</Label>
-                    <Input
-                      type="password"
-                      value={pipedriveApiToken}
-                      onChange={(e) => setPipedriveApiToken(e.target.value)}
-                      placeholder="Seu token de API do Pipedrive"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Company Domain *</Label>
-                    <Input
-                      value={pipedriveDomain}
-                      onChange={(e) => setPipedriveDomain(e.target.value)}
-                      placeholder="suaempresa (de suaempresa.pipedrive.com)"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Pipeline ID (opcional)</Label>
-                    <Input
-                      value={pipedrivePipelineId}
-                      onChange={(e) => setPipedrivePipelineId(e.target.value)}
-                      placeholder="Ex: 123 (deixe vazio para sincronizar todas)"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      ID da pipeline específica do Pipedrive (ex: "Blue - Pipeline de Vendas"). Se não preenchido, sincroniza todos os deals.
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {tipoIntegracao === "TOKENIZA" && (
-                <>
-                  <div className="space-y-2">
-                    <Label>API Token (x-auth-token) *</Label>
-                    <Input
-                      type="password"
-                      value={tokenizaApiToken}
-                      onChange={(e) => setTokenizaApiToken(e.target.value)}
-                      placeholder="Seu token de autenticação da Tokeniza"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Base URL *</Label>
-                    <Input
-                      value={tokenizaBaseUrl}
-                      onChange={(e) => setTokenizaBaseUrl(e.target.value)}
-                      placeholder="https://api.tokeniza.com.br"
-                    />
-                    <p className="text-xs text-muted-foreground">URL base da API Tokeniza</p>
-                  </div>
-                </>
-              )}
-
-              {tipoIntegracao === "MAUTIC" && (
-                <>
-                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertTitle className="text-blue-900 dark:text-blue-100">Autenticação Mautic</AlertTitle>
-                    <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm">
-                      <p>O Mautic será usado para enriquecer leads do Pipedrive com dados comportamentais, score, tags e localização.</p>
-                      <p className="mt-2"><strong>Autenticação:</strong> Basic Auth (Login + Senha)</p>
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="space-y-2">
-                    <Label>URL Base *</Label>
-                    <Input
-                      value={mauticUrlBase}
-                      onChange={(e) => setMauticUrlBase(e.target.value)}
-                      placeholder="https://seu-mautic.com"
-                    />
-                    <p className="text-xs text-muted-foreground">URL base da sua instância Mautic (sem /api)</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Login (Username) *</Label>
-                    <Input
-                      value={mauticLogin}
-                      onChange={(e) => setMauticLogin(e.target.value)}
-                      placeholder="seu_usuario"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Senha (Password) *</Label>
-                    <Input
-                      type="password"
-                      value={mauticSenha}
-                      onChange={(e) => setMauticSenha(e.target.value)}
-                      placeholder="sua_senha"
-                    />
-                  </div>
-                </>
-              )}
-
-              {tipoIntegracao === "NOTION" && (
-                <>
-                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertTitle className="text-blue-900 dark:text-blue-100">Configuração Notion</AlertTitle>
-                    <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm space-y-2">
-                      <p><strong>Como configurar a integração:</strong></p>
-                      <ol className="list-decimal ml-4 space-y-1">
-                        <li>Acesse <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="underline">notion.so/my-integrations</a></li>
-                        <li>Crie uma nova integração (ex: "SGT")</li>
-                        <li>Copie o <strong>Internal Integration Secret</strong></li>
-                        <li>Compartilhe o database "Clientes" com a integração</li>
-                        <li>Cole o token no campo abaixo</li>
-                      </ol>
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="space-y-2">
-                    <Label>API Token (Integration Secret) *</Label>
-                    <Input
-                      type="password"
-                      value={notionApiToken}
-                      onChange={(e) => setNotionApiToken(e.target.value)}
-                      placeholder="secret_xxxxxxxxxxxxx"
-                    />
-                    <p className="text-xs text-muted-foreground">Internal Integration Secret do Notion</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Database ID *</Label>
-                    <Input
-                      value={notionDatabaseId}
-                      onChange={(e) => setNotionDatabaseId(e.target.value)}
-                      placeholder="1d52e840ab4f80eeac8ad56aed5b5b6e"
-                    />
-                    <p className="text-xs text-muted-foreground">ID do database de clientes no Notion</p>
-                  </div>
-                </>
-              )}
-
-              {tipoIntegracao === "METRICOOL" && (
-                <>
-                  <Alert className="bg-pink-50 dark:bg-pink-950 border-pink-200 dark:border-pink-800">
-                    <AlertCircle className="h-4 w-4 text-pink-600" />
-                    <AlertTitle className="text-pink-900 dark:text-pink-100">Configuração Metricool</AlertTitle>
-                    <AlertDescription className="text-pink-800 dark:text-pink-200 text-sm space-y-2">
-                      <p><strong>Métricas de Instagram para campanhas de awareness</strong></p>
-                      <p>Acesse app.metricool.com → Configurações → API para obter suas credenciais.</p>
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="space-y-2">
-                    <Label>User Token *</Label>
-                    <Input
-                      type="password"
-                      value={metricoolUserToken}
-                      onChange={(e) => setMetricoolUserToken(e.target.value)}
-                      placeholder="Seu token de autenticação"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>User ID *</Label>
-                    <Input
-                      value={metricoolUserId}
-                      onChange={(e) => setMetricoolUserId(e.target.value)}
-                      placeholder="ID do usuário Metricool"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Blog ID *</Label>
-                    <Input
-                      value={metricoolBlogId}
-                      onChange={(e) => setMetricoolBlogId(e.target.value)}
-                      placeholder="ID do blog/marca no Metricool"
-                    />
-                  </div>
-                </>
-              )}
-
-              {tipoIntegracao === "CHATWOOT" && (
-                <>
-                  <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
-                    <AlertCircle className="h-4 w-4 text-green-600" />
-                    <AlertTitle className="text-green-900 dark:text-green-100">Configuração Chatblue</AlertTitle>
-                    <AlertDescription className="text-green-800 dark:text-green-200 text-sm space-y-2">
-                      <p><strong>Integração de atendimento WhatsApp via Chatblue</strong></p>
-                      <p>Configure o webhook no Chatblue para receber eventos em tempo real.</p>
-                      <p className="mt-2"><strong>URL do Webhook:</strong></p>
-                      <code className="block bg-green-100 dark:bg-green-900 p-2 rounded text-xs break-all">
-                        {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatblue-webhook`}
-                      </code>
-                      <p className="mt-2"><strong>Eventos:</strong> ticket.created, ticket.updated, message.created</p>
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="space-y-2">
-                    <Label>URL da API do Chatblue *</Label>
-                    <Input
-                      value={chatwootUrlBase}
-                      onChange={(e) => setChatwootUrlBase(e.target.value)}
-                      placeholder="https://chatblue.suaempresa.com/api"
-                    />
-                    <p className="text-xs text-muted-foreground">URL base da API do Chatblue (ex: https://chatblue.suaempresa.com/api)</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>API Token *</Label>
-                    <Input
-                      type="password"
-                      value={chatwootApiToken}
-                      onChange={(e) => setChatwootApiToken(e.target.value)}
-                      placeholder="Token de acesso à API"
-                    />
-                    <p className="text-xs text-muted-foreground">Token para autenticar chamadas à API do Chatblue</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Webhook Secret (opcional)</Label>
-                    <Input
-                      type="password"
-                      value={chatwootAccountId}
-                      onChange={(e) => setChatwootAccountId(e.target.value)}
-                      placeholder="Secret para validar webhooks recebidos"
-                    />
-                    <p className="text-xs text-muted-foreground">Se configurado, o Chatblue deve enviar este valor no header X-Webhook-Secret</p>
-                  </div>
-
-                  {/* Mapeamento de Inboxes por Empresa */}
-                  <div className="space-y-3 pt-4 border-t">
-                    <div className="flex justify-between items-center">
-                      <Label className="text-base font-semibold">Mapeamento Inbox → Empresa</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setChatwootEmpresasInboxes([...chatwootEmpresasInboxes, { id_empresa: '', inboxes: '' }])}
-                      >
-                        <Plus className="w-4 h-4 mr-1" />
-                        Adicionar
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Configure quais inboxes/conexões do Chatblue pertencem a cada empresa.
-                    </p>
-                    
-                    {chatwootEmpresasInboxes.length === 0 ? (
-                      <p className="text-sm text-muted-foreground italic py-2">
-                        Nenhum mapeamento configurado. Clique em "Adicionar" para mapear inboxes.
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        {chatwootEmpresasInboxes.map((mapping, index) => (
-                          <div key={index} className="flex gap-2 items-start p-3 bg-muted/30 rounded-lg">
-                            <div className="flex-1 space-y-2">
-                              <Select
-                                value={mapping.id_empresa}
-                                onValueChange={(value) => {
-                                  const updated = [...chatwootEmpresasInboxes];
-                                  updated[index].id_empresa = value;
-                                  setChatwootEmpresasInboxes(updated);
-                                }}
-                              >
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Selecione a empresa" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {empresas.map((emp) => (
-                                    <SelectItem key={emp.id_empresa} value={emp.id_empresa}>{emp.nome}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Input
-                                value={mapping.inboxes}
-                                onChange={(e) => {
-                                  const updated = [...chatwootEmpresasInboxes];
-                                  updated[index].inboxes = e.target.value;
-                                  setChatwootEmpresasInboxes(updated);
-                                }}
-                                placeholder="Ex: Blue Suporte, Blue Vendas, Blue WhatsApp"
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Lista de nomes de inboxes separados por vírgula
-                              </p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => {
-                                setChatwootEmpresasInboxes(chatwootEmpresasInboxes.filter((_, i) => i !== index));
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {tipoIntegracao === "GA4" && (
-                <>
-                  <Alert className="bg-orange-50 dark:bg-orange-950 border-orange-200 dark:border-orange-800">
-                    <AlertCircle className="h-4 w-4 text-orange-600" />
-                    <AlertTitle className="text-orange-900 dark:text-orange-100">Google Analytics 4 (Múltiplas Propriedades)</AlertTitle>
-                    <AlertDescription className="text-orange-800 dark:text-orange-200 text-sm space-y-2">
-                      <p><strong>Você pode adicionar várias propriedades GA4 para a mesma empresa!</strong></p>
-                      <p>Use nomes descritivos como "GA4 Site Principal", "GA4 Landing Pages", "GA4 Blog".</p>
-                      <ol className="list-decimal ml-4 space-y-1 mt-2">
-                        <li>Acesse <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">Google Cloud Console</a></li>
-                        <li>Ative a <strong>Google Analytics Data API</strong></li>
-                        <li>Crie um OAuth 2.0 Client ID (Web Application)</li>
-                        <li>
-                          Acesse <a href="https://developers.google.com/oauthplayground" target="_blank" rel="noopener noreferrer" className="underline font-medium">OAuth 2.0 Playground</a>
-                        </li>
-                        <li>
-                          <strong className="text-orange-900 dark:text-orange-100">IMPORTANTE:</strong> Selecione o escopo <code className="bg-orange-100 dark:bg-orange-900 px-1 rounded">https://www.googleapis.com/auth/analytics.readonly</code>
-                        </li>
-                        <li>Autorize e troque o código pelo Refresh Token</li>
-                        <li>O Property ID está em <strong>Admin → Property Settings</strong></li>
-                      </ol>
-                      <p className="mt-2 text-orange-900 dark:text-orange-100 font-medium">
-                        ⚠️ Sem o escopo analytics.readonly, a coleta retornará erro de permissão!
-                      </p>
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="space-y-2">
-                    <Label>Nome da Integração *</Label>
-                    <Input
-                      value={ga4Nome}
-                      onChange={(e) => setGa4Nome(e.target.value)}
-                      placeholder="Ex: GA4 Site Principal, GA4 Landing Pages, GA4 Blog"
-                    />
-                    <p className="text-xs text-muted-foreground">Nome para identificar esta integração (você pode ter múltiplas GA4 por empresa)</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Property ID *</Label>
-                    <Input
-                      value={ga4PropertyId}
-                      onChange={(e) => setGa4PropertyId(e.target.value)}
-                      placeholder="123456789"
-                    />
-                    <p className="text-xs text-muted-foreground">ID da propriedade GA4 (apenas números)</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Client ID *</Label>
-                    <Input
-                      value={ga4ClientId}
-                      onChange={(e) => setGa4ClientId(e.target.value)}
-                      placeholder="xxxxx.apps.googleusercontent.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Client Secret *</Label>
-                    <Input
-                      type="password"
-                      value={ga4ClientSecret}
-                      onChange={(e) => setGa4ClientSecret(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Refresh Token *</Label>
-                    <Input
-                      type="password"
-                      value={ga4RefreshToken}
-                      onChange={(e) => setGa4RefreshToken(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">Obtenha via OAuth Playground com scope analytics.readonly</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Site URL (opcional)</Label>
-                    <Input
-                      value={ga4SiteUrl}
-                      onChange={(e) => setGa4SiteUrl(e.target.value)}
-                      placeholder="https://seusite.com.br"
-                    />
-                    <p className="text-xs text-muted-foreground">URL base do site para construir URLs completas</p>
-                  </div>
-                </>
-              )}
-
-              {tipoIntegracao === "GSC" && (
-                <>
-                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertTitle>Google Search Console via Composio</AlertTitle>
-                    <AlertDescription className="text-sm space-y-2">
-                      <p>Conecte a propriedade do Search Console no Composio Dashboard e cole o Connected Account ID aqui.</p>
-                      <p>Sem isso, a coleta de dados orgânicos não inicia.</p>
-                    </AlertDescription>
-                  </Alert>
-                  <div className="space-y-2">
-                    <Label>Site URL *</Label>
-                    <Input
-                      value={gscSiteUrl}
-                      onChange={(e) => setGscSiteUrl(e.target.value)}
-                      placeholder="https://www.tayara.com.br/"
-                    />
-                    <p className="text-xs text-muted-foreground">Propriedade exatamente como aparece no Search Console (URL com ou sem barra final).</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Composio Connected Account ID *</Label>
-                    <Input
-                      value={composioConnectedAccountId}
-                      onChange={(e) => setComposioConnectedAccountId(e.target.value)}
-                      placeholder="ca_xxxxxxxxxxxx"
-                    />
-                  </div>
-                </>
-              )}
-
-              {tipoIntegracao === "WORDPRESS" && (
-                <>
-                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertTitle>WordPress (Blog)</AlertTitle>
-                    <AlertDescription className="text-sm space-y-2">
-                      <p>Gere uma Application Password em <strong>wp-admin → Usuários → seu usuário → Application Passwords</strong>.</p>
-                      <p>O usuário precisa ter permissão de leitura em posts publicados.</p>
-                    </AlertDescription>
-                  </Alert>
-                  <div className="space-y-2">
-                    <Label>URL Base *</Label>
-                    <Input
-                      value={wpUrlBase}
-                      onChange={(e) => setWpUrlBase(e.target.value)}
-                      placeholder="https://www.tayara.com.br"
-                    />
-                    <p className="text-xs text-muted-foreground">Sem /wp-json no final.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Usuário *</Label>
-                    <Input
-                      value={wpUsuario}
-                      onChange={(e) => setWpUsuario(e.target.value)}
-                      placeholder="admin"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Application Password *</Label>
-                    <Input
-                      type="password"
-                      value={wpAppPassword}
-                      onChange={(e) => setWpAppPassword(e.target.value)}
-                      placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
-                    />
-                  </div>
-                </>
-              )}
-
+              {renderForm()}
               <div className="flex items-center space-x-2">
                 <Switch checked={ativo} onCheckedChange={setAtivo} id="ativo" />
                 <Label htmlFor="ativo">Integração Ativa</Label>
               </div>
-
               <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  {editingId ? "Atualizar" : "Criar"}
-                </Button>
+                <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancelar</Button>
+                <Button type="submit">{editingId ? "Atualizar" : "Criar"}</Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="mb-6">
-        <ValidacaoUTM />
-      </div>
+      <SaudeIntegracoes />
 
-      <Tabs defaultValue="meta" className="space-y-4">
-        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-          <TabsTrigger value="meta" className="text-xs md:text-sm">Meta</TabsTrigger>
-          <TabsTrigger value="google" className="text-xs md:text-sm">Google</TabsTrigger>
-          <TabsTrigger value="pipedrive" className="text-xs md:text-sm">Pipedrive</TabsTrigger>
-          <TabsTrigger value="tokeniza" className="text-xs md:text-sm">Tokeniza</TabsTrigger>
-          <TabsTrigger value="mautic" className="text-xs md:text-sm">Mautic</TabsTrigger>
-          <TabsTrigger value="notion" className="text-xs md:text-sm">Notion</TabsTrigger>
-          <TabsTrigger value="metricool" className="text-xs md:text-sm">Metricool</TabsTrigger>
-          <TabsTrigger value="chatwoot" className="text-xs md:text-sm">Chatblue</TabsTrigger>
-          <TabsTrigger value="ga4" className="text-xs md:text-sm">GA4</TabsTrigger>
-          <TabsTrigger value="stape" className="text-xs md:text-sm">Stape</TabsTrigger>
+      <Tabs defaultValue="conexoes" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="conexoes">Conexões</TabsTrigger>
+          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+          <TabsTrigger value="atividade">Atividade</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="meta" className="space-y-4">
-          {integracoesFiltradas.filter(i => i.tipo === "META_ADS").length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhuma integração Meta Ads configurada
-              </CardContent>
-            </Card>
-          ) : (
-            integracoesFiltradas.filter(i => i.tipo === "META_ADS").map((integracao) => {
-              const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
-              
-              return (
-                <div key={integracao.id_integracao} className="space-y-4">
-                  <Card>
-                    <CardHeader className="p-4 md:p-6">
-                      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                          <CardDescription className="text-xs md:text-sm truncate">
-                            Ad Account: {config.ad_account_id}
-                          </CardDescription>
-                        </div>
-                        <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
-                          <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                            {integracao.ativo ? 'Ativo' : 'Inativo'}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleTestIntegration(integracao)}
-                              disabled={testingIntegracoes.has(integracao.id_integracao)}
-                              className="h-8 px-2 md:px-3"
-                            >
-                              <TestTube2 className="w-4 h-4 md:mr-2" />
-                              <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                  
-                  <ImportarCampanhas 
-                    plataforma="META"
-                    integracaoId={integracao.id_integracao}
-                    empresaNome={empresa?.nome || "Empresa não encontrada"}
-                  />
-                </div>
-              );
-            })
-          )}
+        <TabsContent value="conexoes">
+          <ConexoesGrid
+            integracoes={integracoes}
+            empresas={empresas}
+            empresaFiltro={empresaFiltro}
+            testingIds={testingIds}
+            onNovo={handleNovo}
+            onEditar={handleEdit}
+            onExcluir={handleDelete}
+            onTestar={handleTest}
+          />
         </TabsContent>
 
-        <TabsContent value="google" className="space-y-4">
-          {integracoesFiltradas.filter(i => i.tipo === "GOOGLE_ADS").length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhuma integração Google Ads configurada
-              </CardContent>
-            </Card>
-          ) : (
-            integracoesFiltradas.filter(i => i.tipo === "GOOGLE_ADS").map((integracao) => {
-              const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
-              
-              return (
-                <div key={integracao.id_integracao} className="space-y-4">
-                  <Card>
-                    <CardHeader className="p-4 md:p-6">
-                      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                          <CardDescription className="text-xs md:text-sm truncate">
-                            Customer ID: {config.customer_id}
-                          </CardDescription>
-                        </div>
-                        <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
-                          <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                            {integracao.ativo ? 'Ativo' : 'Inativo'}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleTestIntegration(integracao)}
-                              disabled={testingIntegracoes.has(integracao.id_integracao)}
-                              className="h-8 px-2 md:px-3"
-                            >
-                              <TestTube2 className="w-4 h-4 md:mr-2" />
-                              <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                  
-                  <ImportarCampanhas 
-                    plataforma="GOOGLE"
-                    integracaoId={integracao.id_integracao}
-                    empresaNome={empresa?.nome || "Empresa não encontrada"}
-                  />
-                </div>
-              );
-            })
-          )}
+        <TabsContent value="webhooks" className="space-y-4">
+          <WebhookDestinosManager />
         </TabsContent>
 
-        <TabsContent value="pipedrive" className="space-y-4">
-          {integracoesFiltradas.filter(i => i.tipo === "PIPEDRIVE").length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhuma integração Pipedrive configurada
-              </CardContent>
-            </Card>
-          ) : (
-            integracoesFiltradas.filter(i => i.tipo === "PIPEDRIVE").map((integracao) => {
-              const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
-              
-              return (
-                <Card key={integracao.id_integracao}>
-                  <CardHeader className="p-4 md:p-6">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription className="text-xs md:text-sm">
-                          <span className="truncate block">{config.domain}.pipedrive.com</span>
-                          {config.pipeline_id && (
-                            <span className="text-xs">Pipeline: {config.pipeline_id}</span>
-                          )}
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                          {integracao.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleTestIntegration(integracao)}
-                            disabled={testingIntegracoes.has(integracao.id_integracao)}
-                            className="h-8 px-2 md:px-3"
-                          >
-                            <TestTube2 className="w-4 h-4 md:mr-2" />
-                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      Sincronize emails dos leads existentes que ainda não têm email cadastrado.
-                    </p>
-                    <Button 
-                      variant="secondary" 
-                      className="w-full"
-                      onClick={async () => {
-                        if (!window.confirm("Deseja buscar emails no Pipedrive para todos os leads que não têm email? Isso pode levar alguns minutos.")) {
-                          return;
-                        }
-
-                        const integracaoId = integracao.id_integracao;
-                        setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
-                        
-                        try {
-                          toast.info("Sincronizando emails do Pipedrive... Isso pode levar alguns minutos.");
-                          
-                          const { data, error } = await supabase.functions.invoke('sincronizar-emails-pipedrive', {
-                            body: { 
-                              id_empresa: integracao.id_empresa
-                            }
-                          });
-
-                          // Se deu timeout (comum em processamento batch), assumir sucesso
-                          if (error && error.message?.includes('FunctionsRelayError')) {
-                            toast.success("Sincronização em andamento. O processamento está completo. Verifique a página de Leads.");
-                          } else if (error) {
-                            throw error;
-                          } else if (data?.success) {
-                            toast.success(`Sincronização concluída! ${data.atualizados} de ${data.processados} leads atualizados com email.`);
-                          } else {
-                            toast.error(data?.message || "Erro ao sincronizar emails");
-                          }
-                        } catch (error: any) {
-                          console.error('Erro ao sincronizar emails:', error);
-                          toast.error(error.message || "Erro ao processar sincronização de emails");
-                        } finally {
-                          setTestingIntegracoes(prev => {
-                            const newSet = new Set(prev);
-                            newSet.delete(integracaoId);
-                            return newSet;
-                          });
-                        }
-                      }}
-                      disabled={testingIntegracoes.has(integracao.id_integracao)}
-                    >
-                      {testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar Emails Pipedrive'}
-                    </Button>
-                  </div>
-                </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </TabsContent>
-
-        <TabsContent value="tokeniza" className="space-y-4">
-          {integracoesFiltradas.filter(i => i.tipo === "TOKENIZA").length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhuma integração Tokeniza configurada
-              </CardContent>
-            </Card>
-          ) : (
-            integracoesFiltradas.filter(i => i.tipo === "TOKENIZA").map((integracao) => {
-              const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
-              
-              return (
-                <Card key={integracao.id_integracao}>
-                  <CardHeader className="p-4 md:p-6">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription className="text-xs md:text-sm truncate">
-                          Base URL: {config.base_url}
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                          {integracao.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleTestIntegration(integracao)}
-                            disabled={testingIntegracoes.has(integracao.id_integracao)}
-                            className="h-8 px-2 md:px-3"
-                          >
-                            <TestTube2 className="w-4 h-4 md:mr-2" />
-                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              );
-            })
-          )}
-
-          {/* Gerenciador de Projetos Tokeniza */}
-          {integracoesFiltradas.filter(i => i.tipo === "TOKENIZA").length > 0 && (
-            <TokenizaProjetosManager />
-          )}
-        </TabsContent>
-
-        <TabsContent value="mautic" className="space-y-4">
-          {integracoesFiltradas.filter(i => i.tipo === "MAUTIC").length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhuma integração Mautic configurada
-              </CardContent>
-            </Card>
-          ) : (
-            integracoesFiltradas.filter(i => i.tipo === "MAUTIC").map((integracao) => {
-              const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
-              
-              return (
-                <Card key={integracao.id_integracao}>
-                  <CardHeader className="p-4 md:p-6">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription className="text-xs md:text-sm">
-                          <span className="truncate block">URL: {config.url_base}</span>
-                          <span className="text-xs">Login: {config.login}</span>
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                          {integracao.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleTestIntegration(integracao)}
-                            disabled={testingIntegracoes.has(integracao.id_integracao)}
-                            className="h-8 px-2 md:px-3"
-                          >
-                            <TestTube2 className="w-4 h-4 md:mr-2" />
-                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Enriqueça todos os leads existentes com dados comportamentais do Mautic (score, engajamento, tags, localização).
-                      </p>
-                      <Button 
-                        variant="secondary" 
-                        className="w-full"
-                        onClick={async () => {
-                          if (!window.confirm("Deseja enriquecer todos os leads com dados do Mautic? Isso pode levar alguns minutos.")) {
-                            return;
-                          }
-
-                          const integracaoId = integracao.id_integracao;
-                          setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
-                          
-                          try {
-                            toast.info("Processando enriquecimento em lote... Isso pode levar alguns minutos. Você pode verificar os resultados na página de Leads.");
-                            
-                            const { data, error } = await supabase.functions.invoke('enriquecer-leads-lote', {
-                              body: { 
-                                id_empresa: integracao.id_empresa
-                              }
-                            });
-
-                            // Se deu timeout (comum em processamento batch), assumir sucesso
-                            if (error && error.message?.includes('FunctionsRelayError')) {
-                              toast.success("Enriquecimento completo! O processamento terminou. Verifique a página de Leads para ver os dados do Mautic.");
-                            } else if (error) {
-                              throw error;
-                            } else if (data?.success) {
-                              toast.success(`Enriquecimento concluído! ${data.enriquecidos} de ${data.processados} leads enriquecidos. ${data.erros} erros.`);
-                            } else {
-                              toast.error(data?.message || "Erro ao enriquecer leads em lote");
-                            }
-                          } catch (error: any) {
-                            console.error('Erro ao enriquecer leads em lote:', error);
-                            toast.error(error.message || "Erro ao processar enriquecimento em lote");
-                          } finally {
-                            setTestingIntegracoes(prev => {
-                              const newSet = new Set(prev);
-                              newSet.delete(integracaoId);
-                              return newSet;
-                            });
-                          }
-                        }}
-                        disabled={testingIntegracoes.has(integracao.id_integracao)}
-                      >
-                        {testingIntegracoes.has(integracao.id_integracao) ? 'Processando...' : 'Enriquecer Todos os Leads'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </TabsContent>
-
-        <TabsContent value="notion" className="space-y-4">
-          {integracoesFiltradas.filter(i => i.tipo === "NOTION").length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhuma integração Notion configurada
-              </CardContent>
-            </Card>
-          ) : (
-            integracoesFiltradas.filter(i => i.tipo === "NOTION").map((integracao) => {
-              const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
-              
-              return (
-                <Card key={integracao.id_integracao}>
-                  <CardHeader className="p-4 md:p-6">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription className="text-xs md:text-sm truncate">
-                          Database ID: {config.database_id}
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                          {integracao.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleTestIntegration(integracao)}
-                            disabled={testingIntegracoes.has(integracao.id_integracao)}
-                            className="h-8 px-2 md:px-3"
-                          >
-                            <TestTube2 className="w-4 h-4 md:mr-2" />
-                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar'}</span>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              );
-            })
-          )}
-        </TabsContent>
-
-        <TabsContent value="metricool" className="space-y-4">
-          {integracoesFiltradas.filter(i => i.tipo === "METRICOOL").length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhuma integração Metricool configurada
-              </CardContent>
-            </Card>
-          ) : (
-            integracoesFiltradas.filter(i => i.tipo === "METRICOOL").map((integracao) => {
-              const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
-              
-              return (
-                <Card key={integracao.id_integracao}>
-                  <CardHeader className="p-4 md:p-6">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base md:text-lg truncate">{empresa?.nome || "Empresa não encontrada"}</CardTitle>
-                        <CardDescription className="text-xs md:text-sm truncate">
-                          User: {config.user_id} | Blog: {config.blog_id}
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                          {integracao.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleTestIntegration(integracao)}
-                            disabled={testingIntegracoes.has(integracao.id_integracao)}
-                            className="h-8 px-2 md:px-3"
-                          >
-                            <TestTube2 className="w-4 h-4 md:mr-2" />
-                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Sincronizando...' : 'Sincronizar'}</span>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              );
-            })
-          )}
-        </TabsContent>
-
-        <TabsContent value="chatwoot" className="space-y-4">
-          {integracoesFiltradas.filter(i => i.tipo === "CHATWOOT").length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhuma integração Chatblue configurada
-              </CardContent>
-            </Card>
-          ) : (
-            integracoesFiltradas.filter(i => i.tipo === "CHATWOOT").map((integracao) => {
-              const config = integracao.config_json as any;
-              
-              const consolidatedEmpresas = (() => {
-                if (!config.empresas || !Array.isArray(config.empresas)) return [];
-                const map = new Map<string, string[]>();
-                config.empresas.forEach((emp: any) => {
-                  const inboxList = Array.isArray(emp.inboxes) ? emp.inboxes : [];
-                  const existing = map.get(emp.id_empresa) || [];
-                  map.set(emp.id_empresa, [...existing, ...inboxList]);
-                });
-                return Array.from(map.entries()).map(([id_empresa, inboxes]) => {
-                  const empresa = empresas.find(e => e.id_empresa === id_empresa);
-                  return {
-                    nome: empresa?.nome || id_empresa,
-                    inboxes: [...new Set(inboxes)]
-                  };
-                });
-              })();
-              
-              return (
-                <Card key={integracao.id_integracao}>
-                  <CardHeader className="p-4 md:p-6">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base md:text-lg">Chatblue</CardTitle>
-                        <CardDescription className="text-xs md:text-sm">
-                          <span className="truncate block">API: {config.api_url || config.url_base}</span>
-                        </CardDescription>
-                        <div className="mt-2 space-y-1">
-                          {consolidatedEmpresas.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">Nenhuma empresa mapeada</p>
-                          ) : (
-                            consolidatedEmpresas.map((emp, idx) => (
-                              <div key={idx} className="text-xs">
-                                <span className="font-medium text-foreground">{emp.nome}:</span>{' '}
-                                <span className="text-muted-foreground">{emp.inboxes.join(', ')}</span>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                          {integracao.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleTestIntegration(integracao)}
-                            disabled={testingIntegracoes.has(integracao.id_integracao)}
-                            className="h-8 px-2 md:px-3"
-                          >
-                            <TestTube2 className="w-4 h-4 md:mr-2" />
-                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Testando...' : 'Testar'}</span>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              );
-            })
-          )}
-        </TabsContent>
-
-        <TabsContent value="ga4" className="space-y-4">
-          {integracoesFiltradas.filter(i => i.tipo === "GA4").length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhuma integração GA4 configurada
-              </CardContent>
-            </Card>
-          ) : (
-            integracoesFiltradas.filter(i => i.tipo === "GA4").map((integracao) => {
-              const config = integracao.config_json as any;
-              const empresa = empresas.find(e => e.id_empresa === integracao.id_empresa);
-              
-              return (
-                <Card key={integracao.id_integracao}>
-                  <CardHeader className="p-4 md:p-6">
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base md:text-lg flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
-                          <span className="truncate">{config.nome || `GA4 ${config.property_id}`}</span>
-                          <span className="text-xs font-normal text-muted-foreground">
-                            ({empresa?.nome || "Empresa não encontrada"})
-                          </span>
-                        </CardTitle>
-                        <CardDescription className="text-xs md:text-sm">
-                          <span className="block truncate">Property: {config.property_id}</span>
-                          {config.site_url && (
-                            <span className="text-xs truncate block">Site: {config.site_url}</span>
-                          )}
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center justify-between md:justify-end gap-2 flex-wrap">
-                        <span className={`text-xs px-2 py-1 rounded whitespace-nowrap ${integracao.ativo ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
-                          {integracao.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={async () => {
-                              const integracaoId = integracao.id_integracao;
-                              setTestingIntegracoes(prev => new Set(prev).add(integracaoId));
-                              
-                              try {
-                                const { data, error } = await supabase.functions.invoke('coletar-metricas-ga4', {
-                                  body: { id_empresa: integracao.id_empresa }
-                                });
-                                
-                                if (error) throw error;
-                                
-                                if (data?.success) {
-                                  const totalRegistros = data.resultados?.reduce((acc: number, r: any) => 
-                                    acc + (r.metricas_inseridas || 0), 0) || 0;
-                                  
-                                  if (totalRegistros > 0) {
-                                    toast.success(`Métricas GA4 coletadas! ${totalRegistros} registros.`);
-                                  } else {
-                                    toast.warning('Conexão OK, mas nenhum dado novo.');
-                                  }
-                                } else {
-                                  const errorMsg = data?.error || '';
-                                  if (errorMsg.includes('SCOPE_INSUFFICIENT')) {
-                                    toast.error('Refresh Token sem escopo analytics.readonly.');
-                                  } else {
-                                    toast.error(errorMsg || 'Erro ao coletar métricas GA4');
-                                  }
-                                }
-                              } catch (error: any) {
-                                console.error('Erro ao testar GA4:', error);
-                                toast.error(error.message || 'Erro ao coletar métricas GA4');
-                              } finally {
-                                setTestingIntegracoes(prev => {
-                                  const newSet = new Set(prev);
-                                  newSet.delete(integracaoId);
-                                  return newSet;
-                                });
-                              }
-                            }}
-                            disabled={testingIntegracoes.has(integracao.id_integracao)}
-                            className="h-8 px-2 md:px-3"
-                          >
-                            <TestTube2 className="w-4 h-4 md:mr-2" />
-                            <span className="hidden md:inline">{testingIntegracoes.has(integracao.id_integracao) ? 'Coletando...' : 'Coletar'}</span>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(integracao)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(integracao.id_integracao)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-              );
-            })
-          )}
-        </TabsContent>
-
-        <TabsContent value="stape" className="space-y-4">
-          <StapeIntegracaoManager />
+        <TabsContent value="atividade" className="space-y-4">
+          <ValidacaoUTM />
+          <CronjobsMonitor />
         </TabsContent>
       </Tabs>
-
-      <div className="mt-8">
-        <WebhookDestinosManager />
-      </div>
-
-      <ConsultaIRPFTester />
-
-      <div className="mt-8">
-        <CronjobsMonitor />
-      </div>
     </div>
   );
 }
