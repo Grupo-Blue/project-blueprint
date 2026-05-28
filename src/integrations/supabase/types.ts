@@ -6924,6 +6924,47 @@ export type Database = {
           },
         ]
       }
+      vw_auditoria_coleta: {
+        Row: {
+          actions_json: Json | null
+          campanha_action_types: string[] | null
+          cliques: number | null
+          data: string | null
+          empresa_action_types_default: string[] | null
+          expira_em: string | null
+          fonte_conversoes: string | null
+          id_campanha: string | null
+          id_empresa: string | null
+          id_integracao: string | null
+          id_metricas_dia: string | null
+          impressoes: number | null
+          integracao_ativa: boolean | null
+          leads: number | null
+          nome_campanha: string | null
+          nome_empresa: string | null
+          plataforma: Database["public"]["Enums"]["plataforma_midia"] | null
+          tipo_integracao: Database["public"]["Enums"]["tipo_integracao"] | null
+          ultima_validacao: string | null
+          ultimo_erro: string | null
+          verba_investida: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campanha_metricas_dia_id_campanha_fkey"
+            columns: ["id_campanha"]
+            isOneToOne: false
+            referencedRelation: "campanha"
+            referencedColumns: ["id_campanha"]
+          },
+          {
+            foreignKeyName: "conta_anuncio_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
     }
     Functions: {
       blue_client_key: { Args: { _raw: string }; Returns: string }
