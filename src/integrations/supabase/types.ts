@@ -1082,6 +1082,7 @@ export type Database = {
       }
       campanha: {
         Row: {
+          action_types_conversao: string[] | null
           ativa: boolean
           created_at: string
           data_criacao: string
@@ -1095,6 +1096,7 @@ export type Database = {
           url_esperada: string | null
         }
         Insert: {
+          action_types_conversao?: string[] | null
           ativa?: boolean
           created_at?: string
           data_criacao?: string
@@ -1108,6 +1110,7 @@ export type Database = {
           url_esperada?: string | null
         }
         Update: {
+          action_types_conversao?: string[] | null
           ativa?: boolean
           created_at?: string
           data_criacao?: string
@@ -1132,6 +1135,7 @@ export type Database = {
       }
       campanha_metricas_dia: {
         Row: {
+          actions_json: Json | null
           alcance: number | null
           cliques: number
           conversoes: number | null
@@ -1152,6 +1156,7 @@ export type Database = {
           video_views: number | null
         }
         Insert: {
+          actions_json?: Json | null
           alcance?: number | null
           cliques?: number
           conversoes?: number | null
@@ -1172,6 +1177,7 @@ export type Database = {
           video_views?: number | null
         }
         Update: {
+          actions_json?: Json | null
           alcance?: number | null
           cliques?: number
           conversoes?: number | null
@@ -1971,6 +1977,7 @@ export type Database = {
       }
       empresa: {
         Row: {
+          action_types_conversao_default: string[] | null
           cac_maximo: number
           cpl_maximo: number
           created_at: string
@@ -1986,6 +1993,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          action_types_conversao_default?: string[] | null
           cac_maximo: number
           cpl_maximo: number
           created_at?: string
@@ -2001,6 +2009,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          action_types_conversao_default?: string[] | null
           cac_maximo?: number
           cpl_maximo?: number
           created_at?: string
@@ -2598,29 +2607,41 @@ export type Database = {
       integracao: {
         Row: {
           ativo: boolean
+          composio_connected_account_id: string | null
           config_json: Json
           created_at: string
+          expira_em: string | null
           id_empresa: string
           id_integracao: string
           tipo: Database["public"]["Enums"]["tipo_integracao"]
+          ultima_validacao: string | null
+          ultimo_erro: string | null
           updated_at: string
         }
         Insert: {
           ativo?: boolean
+          composio_connected_account_id?: string | null
           config_json: Json
           created_at?: string
+          expira_em?: string | null
           id_empresa: string
           id_integracao?: string
           tipo: Database["public"]["Enums"]["tipo_integracao"]
+          ultima_validacao?: string | null
+          ultimo_erro?: string | null
           updated_at?: string
         }
         Update: {
           ativo?: boolean
+          composio_connected_account_id?: string | null
           config_json?: Json
           created_at?: string
+          expira_em?: string | null
           id_empresa?: string
           id_integracao?: string
           tipo?: Database["public"]["Enums"]["tipo_integracao"]
+          ultima_validacao?: string | null
+          ultimo_erro?: string | null
           updated_at?: string
         }
         Relationships: [

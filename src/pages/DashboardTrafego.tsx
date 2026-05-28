@@ -47,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CampanhaFluxoDiagram } from "@/components/CampanhaFluxoDiagram";
 import { MetricasAwareness } from "@/components/dashboard/MetricasAwareness";
 import { UTMHealthWidget } from "@/components/dashboard/UTMHealthWidget";
+import { SaudeIntegracoes } from "@/components/dashboard/SaudeIntegracoes";
 import { SemAcessoEmpresas } from "@/components/SemAcessoEmpresas";
 import { CampanhaCardMobile } from "@/components/dashboard/CampanhaCardMobile";
 import { CriativoItemMobile } from "@/components/dashboard/CriativoItemMobile";
@@ -1313,6 +1314,9 @@ export default function DashboardTrafego() {
             erro={erro}
           />
         ) : null}
+
+        {/* Saúde das integrações de tráfego */}
+        <SaudeIntegracoes />
 
         {/* KPIs Topo - Grid responsivo */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2 sm:gap-4">

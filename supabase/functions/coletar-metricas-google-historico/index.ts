@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { obterAccessTokenGoogle } from "../_shared/validar.ts";
+import { registrarFalha, registrarSucesso } from "../_shared/saude_integracao.ts";
+import { composioEnabled, fetchGoogleAdsMetricsViaComposio } from "../_shared/composio.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,7 +31,7 @@ serve(async (req) => {
     // Buscar integrações Google Ads ativas
     let query = supabase
       .from("integracao")
-      .select("*")
+      .select("*, empresa:id_empresa(nome)")
       .eq("tipo", "GOOGLE_ADS")
       .eq("ativo", true);
 
@@ -52,33 +55,28 @@ serve(async (req) => {
 
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
-      const idEmpresa = integracao.id_empresa; // PHASE 2: usar coluna direta
+      const idEmpresa = integracao.id_empresa;
+      const nomeEmpresa = integracao.empresa?.nome;
       const customerId = config.customer_id?.replace(/-/g, "");
       const loginCustomerId = config.login_customer_id?.replace(/-/g, "");
 
       console.log(`[coletar-metricas-google-historico] Processando empresa ${idEmpresa}`);
 
       try {
-        // Obter access token
-        const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: config.client_id,
-            client_secret: config.client_secret,
-            refresh_token: config.refresh_token,
-            grant_type: "refresh_token",
-          }),
-        });
-
-        if (!tokenResponse.ok) {
-          const errorText = await tokenResponse.text();
-          console.error(`[coletar-metricas-google-historico] Erro ao obter token: ${errorText}`);
-          resultados.push({ integracao: integracao.id_integracao, status: "error", error: errorText });
+        const tokenResult = await obterAccessTokenGoogle(config);
+        if (!tokenResult.access_token) {
+          await registrarFalha({
+            supabase,
+            idIntegracao: integracao.id_integracao,
+            tipo: "GOOGLE_ADS",
+            nomeEmpresa,
+            errorKind: tokenResult.errorKind,
+            errorMsg: tokenResult.error || "Falha no refresh token",
+          });
+          resultados.push({ integracao: integracao.id_integracao, status: "error", error: tokenResult.error });
           continue;
         }
-
-        const { access_token } = await tokenResponse.json();
+        const access_token = tokenResult.access_token;
 
         // Buscar TODAS as campanhas da empresa (ativas e inativas)
         const { data: campanhas, error: campError } = await supabase
@@ -135,37 +133,82 @@ serve(async (req) => {
           body: JSON.stringify({ query: gaqlQuery }),
         });
 
-        if (!response.ok) {
+        let results: any[] = [];
+        let fonteFallback = false;
+
+        if (response.ok) {
+          const apiData = await response.json();
+          results = apiData.results || [];
+        } else {
           const errorText = await response.text();
           console.error(`[coletar-metricas-google-historico] Erro na API Google Ads: ${response.status} - ${errorText}`);
-          resultados.push({ integracao: integracao.id_integracao, status: "error", error: errorText });
-          continue;
+
+          const connectedAccountId = integracao.composio_connected_account_id;
+          if (composioEnabled(connectedAccountId)) {
+            const fb = await fetchGoogleAdsMetricsViaComposio({
+              connectedAccountId,
+              customerId,
+              loginCustomerId,
+              campaignIds,
+              since: dataInicio,
+              until: dataFim,
+            });
+            if (fb.ok && fb.rows) {
+              fonteFallback = true;
+              results = fb.rows.map(r => ({
+                campaign: { id: r.campaign_id },
+                segments: { date: r.date },
+                metrics: {
+                  impressions: r.impressions ?? 0,
+                  clicks: r.clicks ?? 0,
+                  costMicros: (r.spend ?? 0) * 1_000_000,
+                  conversions: Number(r.actions?.find(a => a.action_type === "conversions")?.value ?? 0),
+                },
+              }));
+            }
+          }
+
+          if (!fonteFallback) {
+            await registrarFalha({
+              supabase,
+              idIntegracao: integracao.id_integracao,
+              tipo: "GOOGLE_ADS",
+              nomeEmpresa,
+              errorKind: "OTHER",
+              errorMsg: `Google Ads API ${response.status}: ${errorText.slice(0, 200)}`,
+            });
+            resultados.push({ integracao: integracao.id_integracao, status: "error", error: errorText });
+            continue;
+          }
         }
 
-        const apiData = await response.json();
-        const results = apiData.results || [];
-        
         console.log(`[coletar-metricas-google-historico] Encontrados ${results.length} registros de métricas`);
 
         let metricasSalvas = 0;
+        let metricasComErro = 0;
         let gastoTotal = 0;
 
-        // Processar resultados
         for (const result of results) {
-          const campanha = campanhas.find(c => c.id_campanha_externo === String(result.campaign.id));
+          const campIdRaw = result.campaign?.id;
+          if (campIdRaw == null) continue;
+          const campanha = campanhas.find(c => c.id_campanha_externo === String(campIdRaw));
           if (!campanha) continue;
 
-          const gasto = parseFloat(result.metrics.costMicros || "0") / 1000000;
+          const metrics = result.metrics ?? {};
+          const dataMetrica = result.segments?.date;
+          if (!dataMetrica) continue;
+
+          const gasto = parseFloat(metrics.costMicros || "0") / 1000000;
           gastoTotal += gasto;
 
           const metricasDia = {
             id_campanha: campanha.id_campanha,
-            data: result.segments.date,
-            impressoes: parseInt(result.metrics.impressions || "0"),
-            cliques: parseInt(result.metrics.clicks || "0"),
+            data: dataMetrica,
+            impressoes: parseInt(metrics.impressions || "0"),
+            cliques: parseInt(metrics.clicks || "0"),
             verba_investida: gasto,
-            leads: parseInt(result.metrics.conversions || "0"),
-            fonte_conversoes: 'GOOGLE_API_DAILY',
+            leads: Math.round(parseFloat(metrics.conversions || "0")),
+            fonte_conversoes: fonteFallback ? "GOOGLE_API_FALLBACK_COMPOSIO" : "GOOGLE_API_DAILY",
           };
 
           const { error: upsertError } = await supabase
@@ -174,19 +217,23 @@ serve(async (req) => {
 
           if (upsertError) {
             console.error(`[coletar-metricas-google-historico] Erro ao salvar:`, upsertError);
+            metricasComErro++;
           } else {
             metricasSalvas++;
           }
         }
 
+        await registrarSucesso({ supabase, idIntegracao: integracao.id_integracao, tipo: "GOOGLE_ADS", nomeEmpresa });
         console.log(`[coletar-metricas-google-historico] Salvas ${metricasSalvas} métricas, gasto total: R$ ${gastoTotal.toFixed(2)}`);
-        
-        resultados.push({ 
-          integracao: integracao.id_integracao, 
+
+        resultados.push({
+          integracao: integracao.id_integracao,
           empresa: idEmpresa,
-          status: "success", 
+          status: metricasComErro > 0 && metricasSalvas === 0 ? "error" : metricasComErro > 0 ? "parcial" : "success",
           metricas_salvas: metricasSalvas,
-          gasto_total: gastoTotal
+          metricas_com_erro: metricasComErro,
+          gasto_total: gastoTotal,
+          fallback: fonteFallback,
         });
 
       } catch (error) {

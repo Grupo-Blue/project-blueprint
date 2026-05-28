@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { registrarFalha, registrarSucesso } from "../_shared/saude_integracao.ts";
+import { calcularLeadsDeActions, hojeNoTimezone, resolveTimezoneConta } from "../_shared/meta_helpers.ts";
+import { composioEnabled, fetchMetaInsightsViaComposio } from "../_shared/composio.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +16,7 @@ serve(async (req) => {
 
   const startTime = Date.now();
   const nomeCronjob = "coletar-metricas-meta";
-  
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -21,48 +24,40 @@ serve(async (req) => {
 
     console.log("Iniciando coleta de métricas Meta Ads...");
 
-    // Verificar se foi passado um ID de integração específico
     const body = await req.json().catch(() => ({}));
     const integracaoIdFiltro = body.integracao_id;
 
-    // Buscar todas as integrações Meta Ads ativas
     let query = supabase
       .from("integracao")
-      .select("*")
+      .select("*, empresa:id_empresa(nome, action_types_conversao_default)")
       .eq("tipo", "META_ADS")
       .eq("ativo", true);
 
-    // Se foi passado um ID específico, filtrar por ele
     if (integracaoIdFiltro) {
       query = query.eq("id_integracao", integracaoIdFiltro);
-      console.log(`Filtrando por integração: ${integracaoIdFiltro}`);
     }
 
     const { data: integracoes, error: intError } = await query;
-
     if (intError) throw intError;
 
     if (!integracoes || integracoes.length === 0) {
-      console.log("Nenhuma integração Meta Ads ativa encontrada");
       return new Response(
         JSON.stringify({ message: "Nenhuma integração ativa" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const hoje = new Date().toISOString().split("T")[0];
-    const resultados = [];
+    const resultados: any[] = [];
 
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
       const accessToken = config.access_token;
       const adAccountId = config.ad_account_id;
       const idEmpresa = integracao.id_empresa;
-
-      console.log(`Processando integração para empresa ${idEmpresa}, ad account ${adAccountId}`);
+      const nomeEmpresa = integracao.empresa?.nome;
+      const actionTypesEmpresaDefault: string[] | null = integracao.empresa?.action_types_conversao_default ?? null;
 
       try {
-        // Buscar a conta_anuncio específica desta integração pelo id_externo
         const { data: contaAnuncio } = await supabase
           .from("conta_anuncio")
           .select("id_conta")
@@ -75,28 +70,26 @@ serve(async (req) => {
           continue;
         }
 
-        // Buscar campanhas apenas desta conta específica
+        // Removido filtro `.eq("ativa", true)`: precisamos coletar até de campanhas
+        // pausadas hoje, pois Meta ainda retorna spend parcial do dia.
         const { data: campanhas, error: campError } = await supabase
           .from("campanha")
-          .select("id_campanha, id_campanha_externo, id_conta")
-          .eq("ativa", true)
+          .select("id_campanha, id_campanha_externo, id_conta, action_types_conversao")
           .eq("id_conta", contaAnuncio.id_conta);
 
         if (campError) throw campError;
         if (!campanhas || campanhas.length === 0) continue;
 
-        // Buscar informações atualizadas das campanhas da API
-        const campanhIdsStr = campanhas.map(c => c.id_campanha_externo).join(",");
-        const campaignsUrl = `https://graph.facebook.com/v22.0/${adAccountId}/campaigns?fields=id,name,status,objective&ids=${campanhIdsStr}&access_token=${accessToken}`;
-        
+        const campanhIdsStr = campanhas.map((c) => c.id_campanha_externo).join(",");
+
+        // Refresh metadados das campanhas (nome/status/objetivo).
         try {
+          const campaignsUrl = `https://graph.facebook.com/v22.0/${adAccountId}/campaigns?fields=id,name,status,objective&ids=${campanhIdsStr}&access_token=${accessToken}`;
           const campaignsResponse = await fetch(campaignsUrl);
           if (campaignsResponse.ok) {
             const campaignsData = await campaignsResponse.json();
-            
-            // Atualizar dados das campanhas
             for (const campData of campaignsData.data || []) {
-              const campanhaLocal = campanhas.find(c => c.id_campanha_externo === campData.id);
+              const campanhaLocal = campanhas.find((c) => c.id_campanha_externo === campData.id);
               if (campanhaLocal) {
                 await supabase
                   .from("campanha")
@@ -110,53 +103,96 @@ serve(async (req) => {
             }
           }
         } catch (err) {
-          console.error("Erro ao atualizar campanhas:", err);
+          console.error("Erro ao atualizar metadados de campanha:", err);
         }
 
-        // Buscar métricas da API do Meta (PHASE 2: upgrade v18 → v22 com campos adicionais)
+        // Timezone da conta (cacheado em config_json.timezone_cache).
+        const tz = await resolveTimezoneConta({ supabase, integracao, adAccountId, accessToken });
+        const hoje = hojeNoTimezone(tz);
+        const timeRange = JSON.stringify({ since: hoje, until: hoje });
+
+        // Fields agora inclui actions completas + use_unified_attribution_setting=true.
         const fields = "campaign_id,impressions,clicks,spend,actions,reach,frequency,video_play_actions,video_avg_time_watched_actions,website_ctr,inline_link_clicks";
-        const url = `https://graph.facebook.com/v22.0/${adAccountId}/insights?fields=${fields}&level=campaign&date_preset=today&access_token=${accessToken}&filtering=[{"field":"campaign.id","operator":"IN","value":["${campanhIdsStr.replace(/,/g, '","')}"]}]`;
+        const filtering = `[{"field":"campaign.id","operator":"IN","value":["${campanhIdsStr.replace(/,/g, '","')}"]}]`;
+        const url =
+          `https://graph.facebook.com/v22.0/${adAccountId}/insights` +
+          `?fields=${fields}` +
+          `&level=campaign` +
+          `&time_range=${encodeURIComponent(timeRange)}` +
+          `&use_unified_attribution_setting=true` +
+          `&access_token=${accessToken}` +
+          `&filtering=${encodeURIComponent(filtering)}`;
+
+        let apiData: any = null;
+        let fonteFallback = false;
 
         const response = await fetch(url);
-        if (!response.ok) {
+        if (response.ok) {
+          apiData = await response.json();
+        } else {
           const errorText = await response.text();
-          console.error(`Erro na API Meta: ${response.status} - ${errorText}`);
-          
-          // Parse error message from Meta API
-          let errorMessage = "Erro ao conectar com Meta Ads";
-          try {
-            const errorData = JSON.parse(errorText);
-            if (errorData.error?.message) {
-              if (errorData.error.code === 190) {
-                errorMessage = "Access Token inválido ou expirado. Gere um novo System User Token no Meta Business Manager.";
-              } else if (errorData.error.code === 200 && errorData.error.message.includes("API access blocked")) {
-                errorMessage = "API Access Blocked: Verifique se o System User Token tem as permissões corretas (ads_read, ads_management) e se o App Meta está em modo Produção. Verifique também se o token tem acesso à conta de anúncios no Business Manager.";
-              } else {
-                errorMessage = errorData.error.message;
-              }
+          console.error(`Erro na API Meta direta: ${response.status} - ${errorText}`);
+          const errorData = (() => { try { return JSON.parse(errorText); } catch { return {}; } })();
+          const code = errorData?.error?.code;
+          const isTokenExpired = code === 190;
+          const isPermission = code === 200 && /API access blocked|ads_management|ads_read/i.test(errorData?.error?.message || "");
+
+          // Fallback Composio se habilitado.
+          const connectedAccountId = integracao.composio_connected_account_id;
+          if (composioEnabled(connectedAccountId)) {
+            console.log(`Tentando fallback Composio para integração ${integracao.id_integracao}...`);
+            const fb = await fetchMetaInsightsViaComposio({
+              connectedAccountId,
+              adAccountId,
+              campaignIds: campanhas.map((c) => c.id_campanha_externo),
+              since: hoje,
+              until: hoje,
+            });
+            if (fb.ok && fb.rows) {
+              apiData = { data: fb.rows.map((r) => ({ ...r.raw, campaign_id: r.campaign_id })) };
+              fonteFallback = true;
+              console.log(`Fallback Composio bem-sucedido: ${fb.rows.length} linhas`);
+            } else {
+              console.error(`Fallback Composio falhou: ${fb.error}`);
             }
-          } catch {
-            errorMessage = `Erro ${response.status}: Verifique suas credenciais do Meta Ads`;
           }
-          
-          resultados.push({ 
-            integracao: integracao.id_integracao, 
-            status: "error", 
-            error: errorMessage
-          });
-          continue;
+
+          if (!apiData) {
+            const errorMessage = isTokenExpired
+              ? "Access Token inválido ou expirado. Gere um novo System User Token no Meta Business Manager."
+              : isPermission
+                ? "API Access Blocked: System User sem permissão (ads_read/ads_management) ou app fora de modo Produção."
+                : (errorData?.error?.message || `Erro ${response.status}: Verifique suas credenciais do Meta Ads`);
+
+            await registrarFalha({
+              supabase,
+              idIntegracao: integracao.id_integracao,
+              tipo: "META_ADS",
+              nomeEmpresa,
+              errorKind: isTokenExpired ? "TOKEN_EXPIRED" : isPermission ? "PERMISSION" : "OTHER",
+              errorMsg: errorMessage,
+            });
+
+            resultados.push({
+              integracao: integracao.id_integracao,
+              status: "error",
+              error: errorMessage,
+            });
+            continue;
+          }
         }
 
-        const apiData = await response.json();
-
-        // Processar cada campanha
+        // Processar resultados.
         for (const metrica of apiData.data || []) {
-          const campanha = campanhas.find(c => c.id_campanha_externo === metrica.campaign_id);
+          const campanha = campanhas.find((c) => c.id_campanha_externo === metrica.campaign_id);
           if (!campanha) continue;
 
-          const leads = metrica.actions?.find((a: any) => a.action_type === "lead")?.value || 0;
+          const { leads, actionTypesUsados } = calcularLeadsDeActions(
+            metrica.actions,
+            campanha.action_types_conversao as string[] | null,
+            actionTypesEmpresaDefault,
+          );
 
-          // Extrair métricas avançadas
           const videoViews = metrica.video_play_actions?.find((a: any) => a.action_type === "video_view")?.value || 0;
           const videoAvgWatch = metrica.video_avg_time_watched_actions?.find((a: any) => a.action_type === "video_view")?.value || 0;
           const inlineLinkClicks = parseInt(metrica.inline_link_clicks || "0");
@@ -171,86 +207,100 @@ serve(async (req) => {
             impressoes: parseInt(metrica.impressions || "0"),
             cliques: clicks,
             verba_investida: spend,
-            leads: parseInt(leads),
+            leads,
             alcance: reach,
             frequencia: frequency,
             cpc_medio: clicks > 0 ? spend / clicks : 0,
             video_views: parseInt(videoViews),
             video_avg_watch_time: parseFloat(videoAvgWatch),
             inline_link_clicks: inlineLinkClicks,
-            fonte_conversoes: 'META_API_DAILY',
+            actions_json: {
+              actions: metrica.actions || [],
+              action_types_usados: actionTypesUsados,
+              tz,
+            },
+            fonte_conversoes: fonteFallback ? "META_API_FALLBACK_COMPOSIO" : "META_API_DAILY",
           };
 
-          // Inserir ou atualizar métricas do dia
           const { error: upsertError } = await supabase
             .from("campanha_metricas_dia")
             .upsert(metricasDia, { onConflict: "id_campanha,data" });
 
           if (upsertError) {
             console.error(`Erro ao salvar métricas da campanha ${campanha.id_campanha}:`, upsertError);
+            resultados.push({
+              campanha: campanha.id_campanha,
+              status: "error",
+              error: upsertError.message,
+            });
           } else {
-            resultados.push({ campanha: campanha.id_campanha, status: "success" });
+            resultados.push({
+              campanha: campanha.id_campanha,
+              status: "success",
+              fallback: fonteFallback,
+            });
           }
         }
+
+        await registrarSucesso({ supabase, idIntegracao: integracao.id_integracao, tipo: "META_ADS", nomeEmpresa });
       } catch (error) {
         console.error(`Erro ao processar integração ${integracao.id_integracao}:`, error);
         resultados.push({ integracao: integracao.id_integracao, status: "error", error: String(error) });
       }
     }
 
-    console.log("Coleta de métricas Meta Ads concluída");
-    
-    const erros = resultados.filter(r => r.status === "error");
-    const sucessos = resultados.filter(r => r.status === "success");
-    
+    const erros = resultados.filter((r) => r.status === "error");
+    const sucessos = resultados.filter((r) => r.status === "success");
+    const fallbacks = resultados.filter((r) => r.fallback).length;
+
     if (erros.length > 0 && sucessos.length === 0) {
+      await supabase.from("cronjob_execucao").insert({
+        nome_cronjob: nomeCronjob,
+        status: "erro",
+        duracao_ms: Date.now() - startTime,
+        mensagem_erro: erros[0].error || "Todos os processamentos falharam",
+        detalhes_execucao: { erros: erros.length, resultados },
+      });
       return new Response(
-        JSON.stringify({ 
-          error: erros[0].error || "Erro ao coletar métricas do Meta Ads",
-          resultados 
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: erros[0].error || "Erro ao coletar métricas do Meta Ads", resultados }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-    
-    // Registrar execução bem-sucedida
-    const duracao = Date.now() - startTime;
+
     await supabase.from("cronjob_execucao").insert({
       nome_cronjob: nomeCronjob,
-      status: "sucesso",
-      duracao_ms: duracao,
-      detalhes_execucao: { 
-        sucessos: sucessos.length, 
+      status: erros.length > 0 ? "parcial" : "sucesso",
+      duracao_ms: Date.now() - startTime,
+      detalhes_execucao: {
+        sucessos: sucessos.length,
         erros: erros.length,
-        resultados 
-      }
+        fallbacks_composio: fallbacks,
+        resultados,
+      },
     });
-    
+
     return new Response(
-      JSON.stringify({ 
-        message: `Coleta concluída: ${sucessos.length} sucesso(s), ${erros.length} erro(s)`, 
-        resultados 
+      JSON.stringify({
+        message: `Coleta concluída: ${sucessos.length} sucesso(s), ${erros.length} erro(s), ${fallbacks} via Composio`,
+        resultados,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
     console.error("Erro na função:", error);
-    
-    // Registrar execução com erro
-    const duracao = Date.now() - startTime;
     await createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     ).from("cronjob_execucao").insert({
       nome_cronjob: nomeCronjob,
       status: "erro",
-      duracao_ms: duracao,
-      mensagem_erro: error instanceof Error ? error.message : String(error)
+      duracao_ms: Date.now() - startTime,
+      mensagem_erro: error instanceof Error ? error.message : String(error),
     });
-    
+
     return new Response(
       JSON.stringify({ error: String(error) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
