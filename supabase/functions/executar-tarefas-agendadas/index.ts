@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
@@ -267,18 +267,18 @@ A tarefa foi agendada pelo usuário e deve ser executada agora. Use as ferrament
 
 Responda em português brasileiro, com formatação Markdown clara, usando tabelas e métricas quando apropriado.`;
 
-  const model = "gemini-2.5-pro";
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const tools = readingToolDeclarations.map((tool) => ({
+    type: "function",
+    function: tool,
+  }));
 
-  let geminiBody: any = {
-    contents: [
-      { role: "user", parts: [{ text: systemPrompt }] },
-      { role: "model", parts: [{ text: "Entendido, vou executar a tarefa agendada." }] },
-      { role: "user", parts: [{ text: `Execute a seguinte análise agendada:\n\n${tarefa.instrucao}` }] },
-    ],
-    tools: [{ functionDeclarations: readingToolDeclarations }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
-  };
+  const aiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
+  const model = "google/gemini-2.5-flash";
+
+  let aiMessages: any[] = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: `Execute a seguinte análise agendada:\n\n${tarefa.instrucao}` },
+  ];
 
   let finalResponse = "";
   let iterations = 0;
@@ -286,45 +286,69 @@ Responda em português brasileiro, com formatação Markdown clara, usando tabel
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
-    const geminiResp = await fetch(geminiUrl, {
+    const aiResp = await fetch(aiUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(geminiBody),
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: aiMessages,
+        tools,
+        tool_choice: "auto",
+        temperature: 0.7,
+      }),
     });
 
-    if (!geminiResp.ok) {
-      const errText = await geminiResp.text();
-      throw new Error(`Gemini error: ${geminiResp.status} - ${errText}`);
+    if (!aiResp.ok) {
+      const errText = await aiResp.text();
+      throw new Error(`Lovable AI error: ${aiResp.status} - ${errText}`);
     }
 
-    const geminiData = await geminiResp.json();
-    const candidate = geminiData.candidates?.[0];
-    if (!candidate?.content?.parts) {
+    const aiData = await aiResp.json();
+    const message = aiData.choices?.[0]?.message;
+    if (!message) {
       finalResponse = "Não foi possível gerar a análise.";
       break;
     }
 
-    const parts = candidate.content.parts;
-    const functionCalls = parts.filter((p: any) => p.functionCall);
-    const textParts = parts.filter((p: any) => p.text);
+    const functionCalls = message.tool_calls || [];
+    const textContent = Array.isArray(message.content)
+      ? message.content.map((part: any) => part?.text || "").join("")
+      : (message.content || "");
 
     if (functionCalls.length === 0) {
-      finalResponse = textParts.map((p: any) => p.text).join("");
+      finalResponse = textContent;
       break;
     }
 
-    const functionResponses: any[] = [];
-    for (const fc of functionCalls) {
-      const result = await executeTool(fc.functionCall.name, fc.functionCall.args || {});
-      functionResponses.push({
-        functionResponse: { name: fc.functionCall.name, response: { result: JSON.stringify(result) } },
+    const toolResponses: any[] = [];
+    for (const toolCall of functionCalls) {
+      let args: Record<string, any> = {};
+      try {
+        args = JSON.parse(toolCall.function?.arguments || "{}");
+      } catch {
+        args = {};
+      }
+
+      const result = await executeTool(toolCall.function.name, args);
+      toolResponses.push({
+        role: "tool",
+        tool_call_id: toolCall.id,
+        name: toolCall.function.name,
+        content: JSON.stringify(result),
       });
     }
 
-    geminiBody.contents = [
-      ...geminiBody.contents,
-      { role: "model", parts },
-      { role: "user", parts: functionResponses },
+    aiMessages = [
+      ...aiMessages,
+      {
+        role: "assistant",
+        content: textContent || null,
+        tool_calls: functionCalls,
+      },
+      ...toolResponses,
     ];
   }
 
