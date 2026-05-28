@@ -151,3 +151,66 @@ export async function obterAccessTokenGoogle(config: any): Promise<{ access_toke
   const tokenData = await tokenResponse.json();
   return { access_token: tokenData.access_token };
 }
+
+// Mautic com permissão de e-mails. Diferente do validarMautic genérico, este testa /api/emails.
+export async function validarMauticEmails(config: any): Promise<ValidacaoResultado> {
+  const { url_base, login, senha } = config;
+  if (!url_base || !login || !senha) {
+    return { success: false, error: "url_base, login e senha são obrigatórios", errorKind: "OTHER" };
+  }
+  try {
+    const auth = "Basic " + btoa(`${login}:${senha}`);
+    const res = await fetch(`${url_base.replace(/\/$/, "")}/api/emails?limit=1`, {
+      headers: { Authorization: auth, Accept: "application/json" },
+    });
+    if (res.status === 401) return { success: false, error: "Credenciais Mautic inválidas", errorKind: "UNAUTHENTICATED" };
+    if (res.status === 403) return { success: false, error: "Usuário Mautic sem permissão para visualizar e-mails", errorKind: "PERMISSION" };
+    if (!res.ok) return { success: false, error: `Mautic /api/emails -> ${res.status}`, errorKind: "OTHER" };
+    const data = await res.json().catch(() => ({}));
+    return { success: true, message: `Acesso confirmado (${data.total ?? 0} e-mails na conta)` };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err), errorKind: "OTHER" };
+  }
+}
+
+// WordPress REST API com Application Password (Basic Auth com user:app_password).
+// Pode ser configurado também com Bearer token (JWT plugin); tentamos Basic primeiro, depois Bearer.
+export async function validarWordPress(config: any): Promise<ValidacaoResultado> {
+  const { url_base, usuario, app_password, bearer_token } = config;
+  if (!url_base) return { success: false, error: "url_base é obrigatório", errorKind: "OTHER" };
+
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (usuario && app_password) {
+    headers["Authorization"] = "Basic " + btoa(`${usuario}:${app_password}`);
+  } else if (bearer_token) {
+    headers["Authorization"] = `Bearer ${bearer_token}`;
+  } else {
+    return { success: false, error: "Informe usuario+app_password ou bearer_token", errorKind: "OTHER" };
+  }
+
+  try {
+    const res = await fetch(`${url_base.replace(/\/$/, "")}/wp-json/wp/v2/posts?per_page=1`, { headers });
+    if (res.status === 401) return { success: false, error: "Credenciais WordPress inválidas", errorKind: "UNAUTHENTICATED" };
+    if (res.status === 403) return { success: false, error: "Usuário sem permissão para leitura de posts", errorKind: "PERMISSION" };
+    if (res.status === 404) return { success: false, error: "REST API não encontrada — verifique se /wp-json está habilitado", errorKind: "NOT_FOUND" };
+    if (!res.ok) return { success: false, error: `WordPress /wp-json -> ${res.status}`, errorKind: "OTHER" };
+    const total = res.headers.get("x-wp-total") || "?";
+    return { success: true, message: `Conexão OK. Total de posts publicados: ${total}` };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err), errorKind: "OTHER" };
+  }
+}
+
+// GSC via Composio: valida apenas que existe connected_account_id + site_url configurados.
+// O teste real depende do slug Composio e roda na coleta.
+export async function validarGSC(config: any): Promise<ValidacaoResultado> {
+  const { site_url, composio_connected_account_id } = config;
+  if (!site_url) return { success: false, error: "site_url é obrigatório (ex: https://www.tayara.com.br/)", errorKind: "OTHER" };
+  if (!composio_connected_account_id) {
+    return { success: false, error: "composio_connected_account_id é obrigatório (configure a conexão Search Console no Composio)", errorKind: "OTHER" };
+  }
+  if (!Deno.env.get("COMPOSIO_API_KEY")) {
+    return { success: false, error: "COMPOSIO_API_KEY ausente no ambiente Supabase", errorKind: "OTHER" };
+  }
+  return { success: true, message: `Configuração presente para ${site_url}. Validação real ocorrerá na primeira coleta.` };
+}

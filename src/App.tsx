@@ -35,6 +35,7 @@ import AnaliseLandingPages from "./pages/AnaliseLandingPages";
 import AnaliseCompetitiva from "./pages/AnaliseCompetitiva";
 import IRPFImportacoes from "./pages/IRPFImportacoes";
 import DashboardComercial from "./pages/DashboardComercial";
+import DashboardMarketing from "./pages/DashboardMarketing";
 import MetasComerciais from "./pages/MetasComerciais";
 import ExtracaoLeads from "./pages/ExtracaoLeads";
 import Segmentos from "./pages/Segmentos";
@@ -86,6 +87,7 @@ const App = () => (
             <Route path="/irpf-importacoes" element={<AppLayout><IRPFImportacoes /></AppLayout>} />
             <Route path="/analise-competitiva" element={<AppLayout><AnaliseCompetitiva /></AppLayout>} />
             <Route path="/dashboard-comercial" element={<AppLayout><DashboardComercial /></AppLayout>} />
+            <Route path="/dashboard-marketing" element={<AppLayout><DashboardMarketing /></AppLayout>} />
             <Route path="/metas-comerciais" element={<AppLayout><MetasComerciais /></AppLayout>} />
             <Route path="/extracao-leads" element={<AppLayout><ExtracaoLeads /></AppLayout>} />
             <Route path="/segmentos" element={<AppLayout><Segmentos /></AppLayout>} />

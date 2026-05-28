@@ -83,6 +83,19 @@ serve(async (req) => {
           config.refresh_token
         );
 
+        // Carregar config de LPs (evento_conversao por url_pattern)
+        const { data: lpConfigs } = await supabase
+          .from('landingpage_config')
+          .select('url_pattern, evento_conversao')
+          .eq('id_empresa', empresaId);
+        const eventosDistintos = Array.from(
+          new Set(
+            (lpConfigs ?? [])
+              .map((c: any) => c.evento_conversao)
+              .filter((e: string | null) => !!e)
+          )
+        ) as string[];
+
         // Calcular datas
         const endDate = new Date();
         endDate.setDate(endDate.getDate() - 1); // Ontem
@@ -152,6 +165,63 @@ serve(async (req) => {
 
         console.log(`GA4: ${rows.length} linhas encontradas para empresa ${empresaId}`);
 
+        // 2ª chamada: eventCount por (landingPage, date, eventName) filtrado pelos eventos
+        // configurados em landingpage_config. Resultado: map[`${url}|${data}|${evento}`] = eventCount.
+        const eventoCountMap = new Map<string, number>();
+        if (eventosDistintos.length > 0) {
+          const evResponse = await fetch(
+            `https://analyticsdata.googleapis.com/v1beta/properties/${config.property_id}:runReport`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                dateRanges: [{ startDate: formatDate(startDate), endDate: formatDate(endDate) }],
+                dimensions: [
+                  { name: 'landingPage' },
+                  { name: 'date' },
+                  { name: 'eventName' }
+                ],
+                metrics: [{ name: 'eventCount' }],
+                dimensionFilter: {
+                  andGroup: {
+                    expressions: [
+                      { filter: { fieldName: 'landingPage', stringFilter: { matchType: 'BEGINS_WITH', value: '/' } } },
+                      { filter: { fieldName: 'eventName', inListFilter: { values: eventosDistintos } } }
+                    ]
+                  }
+                },
+                limit: 100000
+              })
+            }
+          );
+          if (evResponse.ok) {
+            const evData = await evResponse.json();
+            for (const r of evData.rows ?? []) {
+              const lp = r.dimensionValues[0].value;
+              const d = r.dimensionValues[1].value;
+              const ev = r.dimensionValues[2].value;
+              const k = `${lp}|${d}|${ev}`;
+              eventoCountMap.set(k, (eventoCountMap.get(k) ?? 0) + (parseInt(r.metricValues[0].value) || 0));
+            }
+          } else {
+            console.error('[GA4] Falha na 2ª chamada (eventCount):', await evResponse.text().catch(() => ''));
+          }
+        }
+
+        // Helper: encontra evento configurado para uma landingPage (1º match de url_pattern)
+        const eventoParaLP = (landingPage: string): string | null => {
+          for (const c of lpConfigs ?? []) {
+            const pattern = (c.url_pattern as string) || '';
+            if (matchesPattern(landingPage, pattern) && c.evento_conversao) {
+              return c.evento_conversao as string;
+            }
+          }
+          return null;
+        };
+
         // Processar e inserir métricas
         let insertedCount = 0;
         for (const row of rows) {
@@ -160,9 +230,14 @@ serve(async (req) => {
           const formattedDate = `${dateStr.slice(0,4)}-${dateStr.slice(4,6)}-${dateStr.slice(6,8)}`;
 
           // Construir URL completa
-          const fullUrl = config.site_url 
+          const fullUrl = config.site_url
             ? `${config.site_url.replace(/\/$/, '')}${landingPage}`
             : landingPage;
+
+          const eventoEsperado = eventoParaLP(landingPage);
+          const conversoesEvento = eventoEsperado
+            ? (eventoCountMap.get(`${landingPage}|${dateStr}|${eventoEsperado}`) ?? 0)
+            : null;
 
           const metricas = {
             id_empresa: empresaId,
@@ -173,21 +248,23 @@ serve(async (req) => {
             bounce_rate: parseFloat(row.metricValues[2].value) || null,
             tempo_medio_segundos: parseFloat(row.metricValues[3].value) || null,
             conversoes: parseInt(row.metricValues[4].value) || 0,
+            conversoes_evento: conversoesEvento,
             pageviews: parseInt(row.metricValues[5].value) || 0,
             taxa_conversao: null as number | null
           };
 
-          // Calcular taxa de conversão
+          // Taxa: prefere conversoes_evento quando configurado
+          const numerador = conversoesEvento != null ? conversoesEvento : metricas.conversoes;
           if (metricas.sessoes > 0) {
-            metricas.taxa_conversao = (metricas.conversoes / metricas.sessoes) * 100;
+            metricas.taxa_conversao = (numerador / metricas.sessoes) * 100;
           }
 
           // Upsert
           const { error: upsertError } = await supabase
             .from('landingpage_metricas')
-            .upsert(metricas, { 
+            .upsert(metricas, {
               onConflict: 'id_empresa,url,data',
-              ignoreDuplicates: false 
+              ignoreDuplicates: false
             });
 
           if (upsertError) {
@@ -251,3 +328,14 @@ serve(async (req) => {
     });
   }
 });
+
+// Match estilo glob: '/lp/*' casa '/lp/qualquer', '/lp/x/y'.
+// Sem '*' = match exato. Com '*' = converte em regex (escapa especiais).
+function matchesPattern(landingPage: string, pattern: string): boolean {
+  if (!pattern) return false;
+  if (!pattern.includes('*')) return landingPage === pattern;
+  const re = new RegExp(
+    '^' + pattern.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$'
+  );
+  return re.test(landingPage);
+}

@@ -210,6 +210,71 @@ serve(async (req) => {
       console.log(`✅ Lead criado: ${leadId}`);
     }
 
+    // 6c. Gravar touchpoints (atribuição multi-toque) se vierem no payload
+    try {
+      const touchpoints: any[] = Array.isArray(fields.touchpoints)
+        ? fields.touchpoints
+        : (typeof fields.touchpoints === "string" ? safeJson(fields.touchpoints) : []);
+
+      const firstTouch = (fields.first_touch_utm_source || fields.first_touch_utm_medium)
+        ? {
+            utm_source: fields.first_touch_utm_source,
+            utm_medium: fields.first_touch_utm_medium,
+            utm_campaign: fields.first_touch_utm_campaign,
+            utm_content: fields.first_touch_utm_content,
+            utm_term: fields.first_touch_utm_term,
+            capturado_em: fields.first_touch_em || null,
+            fonte: "cookie_first_touch",
+          }
+        : null;
+
+      // Touchpoint atual (form submit)
+      const currentTouch = {
+        utm_source: fields.utm_source || null,
+        utm_medium: fields.utm_medium || null,
+        utm_campaign: fields.utm_campaign || null,
+        utm_content: fields.utm_content || null,
+        utm_term: fields.utm_term || null,
+        url_origem: fields.page_url || fields.url || null,
+        referrer: fields.referrer || null,
+        fonte: "form_submit",
+      };
+
+      // Combina: first (se houver), histórico cookie, current
+      const toInsert: any[] = [];
+      if (firstTouch && isNovo) toInsert.push({ ...firstTouch, ordem: 1 });
+      let ordem = toInsert.length;
+      for (const t of touchpoints) {
+        if (!t || typeof t !== "object") continue;
+        ordem++;
+        toInsert.push({
+          utm_source: t.utm_source || null,
+          utm_medium: t.utm_medium || null,
+          utm_campaign: t.utm_campaign || null,
+          utm_content: t.utm_content || null,
+          utm_term: t.utm_term || null,
+          url_origem: t.url || null,
+          referrer: t.referrer || null,
+          fonte: "cookie_history",
+          ordem,
+        });
+      }
+      ordem++;
+      toInsert.push({ ...currentTouch, ordem });
+
+      const rows = toInsert.map((t) => ({ ...t, id_lead: leadId }));
+      if (rows.length > 0) {
+        const { error: tpErr } = await supabase.from("lead_touchpoint").insert(rows);
+        if (tpErr) console.warn("Falha gravando touchpoints:", tpErr.message);
+        else {
+          supabase.functions.invoke("calcular-atribuicao", { body: { id_lead: leadId } })
+            .catch((err: unknown) => console.warn("calcular-atribuicao falhou:", err));
+        }
+      }
+    } catch (tpErr) {
+      console.warn("Erro inesperado ao gravar touchpoints:", tpErr);
+    }
+
     // 7. Trigger SDR webhook (fire-and-forget — don't block the response)
     supabase.functions.invoke("disparar-webhook-leads", {
       body: { id_lead: leadId },
@@ -230,4 +295,13 @@ serve(async (req) => {
     return json({ error: error instanceof Error ? error.message : "Erro desconhecido" }, 500);
   }
 });
+
+function safeJson(s: string): any[] {
+  try {
+    const parsed = JSON.parse(s);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
