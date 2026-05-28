@@ -4653,16 +4653,6 @@ export type Database = {
           valor_venda: number | null
           venda_realizada: boolean
           webhook_enviado_em: string | null
-          first_touch_utm_source: string | null
-          first_touch_utm_medium: string | null
-          first_touch_utm_campaign: string | null
-          first_touch_utm_content: string | null
-          first_touch_canal: string | null
-          first_touch_em: string | null
-          last_touch_canal: string | null
-          total_toques: number | null
-          atribuicao_linear: Json | null
-          id_artigo: string | null
         }
         Insert: {
           amelia_disc?: string | null
@@ -7248,7 +7238,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "direcao" | "trafego" | "sdr"
-      canal_origem: "META" | "GOOGLE" | "ORGANICO" | "OUTRO" | "WHATSAPP" | "EMAIL" | "SOCIAL_ORGANICO" | "DIRETO"
+      canal_origem: "META" | "GOOGLE" | "ORGANICO" | "OUTRO" | "WHATSAPP"
       categoria_acao: "A" | "B" | "C"
       event_category:
         | "page_view"
@@ -7327,8 +7317,6 @@ export type Database = {
         | "METRICOOL"
         | "CHATWOOT"
         | "GA4"
-        | "GSC"
-        | "WORDPRESS"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -7457,7 +7445,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "direcao", "trafego", "sdr"],
-      canal_origem: ["META", "GOOGLE", "ORGANICO", "OUTRO", "WHATSAPP", "EMAIL", "SOCIAL_ORGANICO", "DIRETO"],
+      canal_origem: ["META", "GOOGLE", "ORGANICO", "OUTRO", "WHATSAPP"],
       categoria_acao: ["A", "B", "C"],
       event_category: [
         "page_view",
@@ -7536,8 +7524,6 @@ export const Constants = {
         "METRICOOL",
         "CHATWOOT",
         "GA4",
-        "GSC",
-        "WORDPRESS",
       ],
     },
   },
