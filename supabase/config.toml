@@ -201,3 +201,27 @@ verify_jwt = false
 [functions.blue-cliente-360-build]
 verify_jwt = false
 
+
+[functions.coletar-emails-mautic]
+verify_jwt = false
+
+[functions.coletar-fluxos-mautic]
+verify_jwt = false
+
+[functions.coletar-metricas-gsc]
+verify_jwt = false
+
+[functions.sincronizar-artigos-wordpress]
+verify_jwt = false
+
+[functions.coletar-metricas-artigo]
+verify_jwt = false
+
+[functions.calcular-atribuicao]
+verify_jwt = false
+
+[functions.auditar-eventos-ga4]
+verify_jwt = false
+
+[functions.redirect-link-curto]
+verify_jwt = false
