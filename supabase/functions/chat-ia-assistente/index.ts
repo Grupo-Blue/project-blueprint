@@ -7,13 +7,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Tool definitions for Gemini function calling
+// Tool definitions for AI function calling
 const toolDeclarations = [
   // === EXISTING TOOLS (6) ===
   {
@@ -1112,33 +1112,21 @@ serve(async (req) => {
       if (emp) empresaContext = `\n\nA empresa atualmente selecionada é: "${emp.nome}" (ID: ${id_empresa}). Use este ID nas consultas.`;
     }
 
-    // Build Gemini request
-    const geminiMessages = [
-      {
-        role: "user",
-        parts: [{ text: SYSTEM_PROMPT + empresaContext }],
-      },
-      {
-        role: "model",
-        parts: [{ text: "Entendido! Sou o assistente IA do SGT com acesso completo ao sistema. Posso consultar métricas, campanhas, leads, alertas, concorrentes, funil de conversão e muito mais. Também posso criar demandas, alertas, hipóteses e aprendizados mediante sua confirmação. Como posso ajudar?" }],
-      },
+    const tools = toolDeclarations.map((tool) => ({
+      type: "function",
+      function: tool,
+    }));
+
+    const aiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
+    const model = "google/gemini-2.5-flash";
+
+    let aiMessages: any[] = [
+      { role: "system", content: SYSTEM_PROMPT + empresaContext },
       ...messages.map((m: any) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: m.content,
       })),
     ];
-
-    const model = "gemini-2.5-pro";
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-
-    let geminiBody: any = {
-      contents: geminiMessages,
-      tools: [{ functionDeclarations: toolDeclarations }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 4096,
-      },
-    };
 
     let finalResponse = "";
     let iterations = 0;
@@ -1147,54 +1135,80 @@ serve(async (req) => {
     while (iterations < MAX_ITERATIONS) {
       iterations++;
 
-      const geminiResp = await fetch(geminiUrl, {
+      const aiResp = await fetch(aiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(geminiBody),
+        headers: {
+          "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: aiMessages,
+          tools,
+          tool_choice: "auto",
+          temperature: 0.7,
+        }),
       });
 
-      if (!geminiResp.ok) {
-        const errText = await geminiResp.text();
-        console.error("Gemini error:", geminiResp.status, errText);
-        return new Response(JSON.stringify({ error: "Erro ao chamar IA", details: errText }), {
-          status: 500,
+      if (!aiResp.ok) {
+        const errText = await aiResp.text();
+        console.error("Lovable AI error:", aiResp.status, errText);
+
+        const fallbackMessage = aiResp.status === 402
+          ? "A IA está indisponível no momento por falta de créditos do workspace."
+          : aiResp.status === 429
+            ? "A IA está temporariamente sobrecarregada. Tente novamente em instantes."
+            : "A IA está temporariamente indisponível. Tente novamente em alguns instantes.";
+
+        return new Response(JSON.stringify({ response: fallbackMessage, fallback: true, error: "Erro ao chamar IA" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const geminiData = await geminiResp.json();
-      const candidate = geminiData.candidates?.[0];
+      const aiData = await aiResp.json();
+      const message = aiData.choices?.[0]?.message;
 
-      if (!candidate?.content?.parts) {
+      if (!message) {
         finalResponse = "Desculpe, não consegui gerar uma resposta. Tente reformular sua pergunta.";
         break;
       }
 
-      const parts = candidate.content.parts;
-      const functionCalls = parts.filter((p: any) => p.functionCall);
-      const textParts = parts.filter((p: any) => p.text);
+      const functionCalls = message.tool_calls || [];
+      const textContent = Array.isArray(message.content)
+        ? message.content.map((part: any) => part?.text || "").join("")
+        : (message.content || "");
 
       if (functionCalls.length === 0) {
-        finalResponse = textParts.map((p: any) => p.text).join("");
+        finalResponse = textContent;
         break;
       }
 
-      // Execute function calls (pass userId for write operations)
-      const functionResponses: any[] = [];
-      for (const fc of functionCalls) {
-        const result = await executeTool(fc.functionCall.name, fc.functionCall.args || {}, user.id);
-        functionResponses.push({
-          functionResponse: {
-            name: fc.functionCall.name,
-            response: { result: JSON.stringify(result) },
-          },
+      const toolResponses: any[] = [];
+      for (const toolCall of functionCalls) {
+        let args: Record<string, any> = {};
+        try {
+          args = JSON.parse(toolCall.function?.arguments || "{}");
+        } catch {
+          args = {};
+        }
+
+        const result = await executeTool(toolCall.function.name, args, user.id);
+        toolResponses.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          name: toolCall.function.name,
+          content: JSON.stringify(result),
         });
       }
 
-      geminiBody.contents = [
-        ...geminiBody.contents,
-        { role: "model", parts },
-        { role: "user", parts: functionResponses },
+      aiMessages = [
+        ...aiMessages,
+        {
+          role: "assistant",
+          content: textContent || null,
+          tool_calls: functionCalls,
+        },
+        ...toolResponses,
       ];
     }
 
