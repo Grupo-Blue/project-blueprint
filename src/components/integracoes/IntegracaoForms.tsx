@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { Database } from "@/integrations/supabase/types";
 
+type TipoIntegracao = Database["public"]["Enums"]["tipo_integracao"];
 type Empresa = Database["public"]["Tables"]["empresa"]["Row"];
 type State = Record<string, any>;
 type SetField = (key: string, value: any) => void;
@@ -17,6 +18,19 @@ interface FormProps {
 
 interface ChatwootFormProps extends FormProps {
   empresas: Empresa[];
+}
+
+// Defaults reais no state (evita o anti-padrão `value={state.X ?? "default"}` que mostra um
+// default na UI mas nunca persiste no state se o usuário não interagir).
+export function defaultStateFor(tipo: TipoIntegracao): Record<string, any> {
+  switch (tipo) {
+    case "TOKENIZA":
+      return { tokenizaBaseUrl: "https://api.tokeniza.com.br" };
+    case "NOTION":
+      return { notionDatabaseId: "1d52e840ab4f80eeac8ad56aed5b5b6e" };
+    default:
+      return {};
+  }
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -102,7 +116,7 @@ export function TokenizaForm({ state, setField }: FormProps) {
   return (
     <>
       <Field label="API Token (x-auth-token) *"><Input type="password" value={state.tokenizaApiToken ?? ""} onChange={(e) => setField("tokenizaApiToken", e.target.value)} placeholder="Seu token de autenticação" /></Field>
-      <Field label="Base URL *" hint="URL base da API Tokeniza"><Input value={state.tokenizaBaseUrl ?? "https://api.tokeniza.com.br"} onChange={(e) => setField("tokenizaBaseUrl", e.target.value)} placeholder="https://api.tokeniza.com.br" /></Field>
+      <Field label="Base URL *" hint="URL base da API Tokeniza"><Input value={state.tokenizaBaseUrl ?? ""} onChange={(e) => setField("tokenizaBaseUrl", e.target.value)} placeholder="https://api.tokeniza.com.br" /></Field>
     </>
   );
 }
@@ -131,7 +145,7 @@ export function NotionForm({ state, setField }: FormProps) {
         </ol>
       </Box>
       <Field label="API Token (Integration Secret) *" hint="Internal Integration Secret do Notion"><Input type="password" value={state.notionApiToken ?? ""} onChange={(e) => setField("notionApiToken", e.target.value)} placeholder="secret_xxxxxxxxxxxxx" /></Field>
-      <Field label="Database ID *" hint="ID do database de clientes no Notion"><Input value={state.notionDatabaseId ?? "1d52e840ab4f80eeac8ad56aed5b5b6e"} onChange={(e) => setField("notionDatabaseId", e.target.value)} /></Field>
+      <Field label="Database ID *" hint="ID do database de clientes no Notion"><Input value={state.notionDatabaseId ?? ""} onChange={(e) => setField("notionDatabaseId", e.target.value)} placeholder="1d52e840ab4f80eeac8ad56aed5b5b6e" /></Field>
     </>
   );
 }
@@ -150,8 +164,10 @@ export function MetricoolForm({ state, setField }: FormProps) {
 }
 
 export function ChatwootForm({ state, setField, empresas }: ChatwootFormProps) {
-  const mapping: { id_empresa: string; inboxes: string }[] = state.chatwootEmpresasInboxes ?? [];
-  const setMapping = (next: typeof mapping) => setField("chatwootEmpresasInboxes", next);
+  type InboxMapping = { id_empresa: string; inboxes: string; _uid: string };
+  // Itens vêm com _uid: handleEdit gera ao carregar do banco; botão Adicionar gera no clique.
+  const mapping: InboxMapping[] = state.chatwootEmpresasInboxes ?? [];
+  const setMapping = (next: InboxMapping[]) => setField("chatwootEmpresasInboxes", next);
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chatblue-webhook`;
   return (
     <>
@@ -168,7 +184,7 @@ export function ChatwootForm({ state, setField, empresas }: ChatwootFormProps) {
       <div className="space-y-3 pt-4 border-t">
         <div className="flex justify-between items-center">
           <Label className="text-base font-semibold">Mapeamento Inbox → Empresa</Label>
-          <Button type="button" variant="outline" size="sm" onClick={() => setMapping([...mapping, { id_empresa: "", inboxes: "" }])}>
+          <Button type="button" variant="outline" size="sm" onClick={() => setMapping([...mapping, { id_empresa: "", inboxes: "", _uid: crypto.randomUUID() }])}>
             <Plus className="w-4 h-4 mr-1" />Adicionar
           </Button>
         </div>
@@ -177,17 +193,17 @@ export function ChatwootForm({ state, setField, empresas }: ChatwootFormProps) {
           <p className="text-sm text-muted-foreground italic py-2">Nenhum mapeamento. Clique em "Adicionar".</p>
         ) : (
           <div className="space-y-3">
-            {mapping.map((m, i) => (
-              <div key={i} className="flex gap-2 items-start p-3 bg-muted/30 rounded-lg">
+            {mapping.map((m) => (
+              <div key={m._uid} className="flex gap-2 items-start p-3 bg-muted/30 rounded-lg">
                 <div className="flex-1 space-y-2">
-                  <Select value={m.id_empresa} onValueChange={(v) => { const next = [...mapping]; next[i].id_empresa = v; setMapping(next); }}>
+                  <Select value={m.id_empresa} onValueChange={(v) => setMapping(mapping.map((x) => x._uid === m._uid ? { ...x, id_empresa: v } : x))}>
                     <SelectTrigger><SelectValue placeholder="Selecione a empresa" /></SelectTrigger>
                     <SelectContent>{empresas.map((e) => <SelectItem key={e.id_empresa} value={e.id_empresa}>{e.nome}</SelectItem>)}</SelectContent>
                   </Select>
-                  <Input value={m.inboxes} onChange={(e) => { const next = [...mapping]; next[i].inboxes = e.target.value; setMapping(next); }} placeholder="Ex: Blue Suporte, Blue Vendas" />
+                  <Input value={m.inboxes} onChange={(e) => setMapping(mapping.map((x) => x._uid === m._uid ? { ...x, inboxes: e.target.value } : x))} placeholder="Ex: Blue Suporte, Blue Vendas" />
                   <p className="text-xs text-muted-foreground">Lista de inboxes separados por vírgula</p>
                 </div>
-                <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => setMapping(mapping.filter((_, k) => k !== i))}>
+                <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => setMapping(mapping.filter((x) => x._uid !== m._uid))}>
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>

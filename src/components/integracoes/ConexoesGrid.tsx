@@ -59,6 +59,11 @@ export function ConexoesGrid({ integracoes, empresas, empresaFiltro, testingIds,
   const [categoria, setCategoria] = useState<Categoria>("todas");
   const [busca, setBusca] = useState("");
 
+  const empresasMap = useMemo(
+    () => new Map(empresas.map((e) => [e.id_empresa, e])),
+    [empresas],
+  );
+
   const filtradas = useMemo(() => {
     let arr = integracoes;
     if (empresaFiltro && empresaFiltro !== "todas") {
@@ -71,7 +76,7 @@ export function ConexoesGrid({ integracoes, empresas, empresaFiltro, testingIds,
     if (busca.trim()) {
       const q = busca.toLowerCase();
       arr = arr.filter((i) => {
-        const empresa = empresas.find((e) => e.id_empresa === i.id_empresa)?.nome?.toLowerCase() ?? "";
+        const empresa = empresasMap.get(i.id_empresa)?.nome?.toLowerCase() ?? "";
         return (
           empresa.includes(q)
           || i.tipo.toLowerCase().includes(q)
@@ -80,7 +85,7 @@ export function ConexoesGrid({ integracoes, empresas, empresaFiltro, testingIds,
       });
     }
     return arr;
-  }, [integracoes, empresaFiltro, categoria, busca, empresas]);
+  }, [integracoes, empresaFiltro, categoria, busca, empresasMap]);
 
   // Agrupa por tipo
   const porTipo = useMemo(() => {
@@ -137,7 +142,7 @@ export function ConexoesGrid({ integracoes, empresas, empresaFiltro, testingIds,
                   <IntegracaoCard
                     key={integracao.id_integracao}
                     integracao={integracao}
-                    empresa={empresas.find((e) => e.id_empresa === integracao.id_empresa)}
+                    empresa={empresasMap.get(integracao.id_empresa)}
                     testing={testingIds.has(integracao.id_integracao)}
                     onEditar={onEditar}
                     onExcluir={onExcluir}

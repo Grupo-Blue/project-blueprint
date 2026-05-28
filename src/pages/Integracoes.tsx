@@ -16,7 +16,7 @@ import { SaudeIntegracoes } from "@/components/dashboard/SaudeIntegracoes";
 import { ConexoesGrid } from "@/components/integracoes/ConexoesGrid";
 import {
   MetaAdsForm, GoogleAdsForm, PipedriveForm, TokenizaForm, MauticForm, NotionForm,
-  MetricoolForm, ChatwootForm, GA4Form, GSCForm, WordpressForm,
+  MetricoolForm, ChatwootForm, GA4Form, GSCForm, WordpressForm, defaultStateFor,
 } from "@/components/integracoes/IntegracaoForms";
 import { useEmpresa } from "@/contexts/EmpresaContext";
 import type { Database } from "@/integrations/supabase/types";
@@ -87,7 +87,7 @@ export default function Integracoes() {
     setTipoIntegracao("META_ADS");
     setEmpresaForm("");
     setAtivo(true);
-    setForm({});
+    setForm(defaultStateFor("META_ADS"));
     setEditingId(null);
   };
 
@@ -143,6 +143,7 @@ export default function Integracoes() {
         next.chatwootEmpresasInboxes = Array.from(consolidatedMap.entries()).map(([id_empresa, inboxes]) => ({
           id_empresa,
           inboxes: [...new Set(inboxes)].join(", "),
+          _uid: crypto.randomUUID(),
         }));
       } else {
         next.chatwootEmpresasInboxes = [];
@@ -168,8 +169,14 @@ export default function Integracoes() {
   };
 
   const handleNovo = (tipo?: string) => {
-    resetForm();
-    if (tipo && (TIPOS_ORDENADOS as string[]).includes(tipo)) setTipoIntegracao(tipo as TipoIntegracao);
+    const inicial = tipo && (TIPOS_ORDENADOS as string[]).includes(tipo)
+      ? (tipo as TipoIntegracao)
+      : "META_ADS";
+    setEditingId(null);
+    setEmpresaForm("");
+    setAtivo(true);
+    setTipoIntegracao(inicial);
+    setForm(defaultStateFor(inicial));
     setDialogOpen(true);
   };
 
@@ -400,7 +407,7 @@ export default function Integracoes() {
               </div>
               <div className="space-y-2">
                 <Label>Tipo de Integração</Label>
-                <Select value={tipoIntegracao} onValueChange={(v) => { setTipoIntegracao(v as TipoIntegracao); setForm({}); }} disabled={!!editingId}>
+                <Select value={tipoIntegracao} onValueChange={(v) => { const t = v as TipoIntegracao; setTipoIntegracao(t); setForm(defaultStateFor(t)); }} disabled={!!editingId}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {TIPOS_ORDENADOS.map((t) => (
