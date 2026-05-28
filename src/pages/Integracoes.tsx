@@ -101,6 +101,14 @@ export default function Integracoes() {
   const [ga4RefreshToken, setGa4RefreshToken] = useState("");
   const [ga4SiteUrl, setGa4SiteUrl] = useState("");
 
+  // GSC credentials (usa Composio como fonte; valida-se via composio_connected_account_id)
+  const [gscSiteUrl, setGscSiteUrl] = useState("");
+
+  // WordPress credentials
+  const [wpUrlBase, setWpUrlBase] = useState("");
+  const [wpUsuario, setWpUsuario] = useState("");
+  const [wpAppPassword, setWpAppPassword] = useState("");
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -160,6 +168,10 @@ export default function Integracoes() {
     setGa4ClientSecret("");
     setGa4RefreshToken("");
     setGa4SiteUrl("");
+    setGscSiteUrl("");
+    setWpUrlBase("");
+    setWpUsuario("");
+    setWpAppPassword("");
     setEditingId(null);
   };
 
@@ -229,8 +241,15 @@ export default function Integracoes() {
       setGa4ClientSecret(config.client_secret || "");
       setGa4RefreshToken(config.refresh_token || "");
       setGa4SiteUrl(config.site_url || "");
+    } else if (integracao.tipo === "GSC") {
+      setGscSiteUrl(config.site_url || "");
+      setComposioConnectedAccountId(integracao.composio_connected_account_id || "");
+    } else if (integracao.tipo === "WORDPRESS") {
+      setWpUrlBase(config.url_base || "");
+      setWpUsuario(config.usuario || "");
+      setWpAppPassword(config.app_password || "");
     }
-    
+
     setEmpresaForm(integracao.id_empresa || "");
     setDialogOpen(true);
   };
@@ -415,9 +434,26 @@ export default function Integracoes() {
         refresh_token: ga4RefreshToken,
         site_url: ga4SiteUrl || null
       };
+    } else if (tipoIntegracao === "GSC") {
+      if (!gscSiteUrl || !composioConnectedAccountId) {
+        toast.error("Preencha o site_url e o ID de conexão Composio (Search Console)");
+        return;
+      }
+      configJson = { ...configJson, site_url: gscSiteUrl };
+    } else if (tipoIntegracao === "WORDPRESS") {
+      if (!wpUrlBase || !wpUsuario || !wpAppPassword) {
+        toast.error("Preencha URL base, usuário e Application Password do WordPress");
+        return;
+      }
+      configJson = {
+        ...configJson,
+        url_base: wpUrlBase.replace(/\/$/, ""),
+        usuario: wpUsuario,
+        app_password: wpAppPassword,
+      };
     }
 
-    const composioId = (tipoIntegracao === "META_ADS" || tipoIntegracao === "GOOGLE_ADS")
+    const composioId = (tipoIntegracao === "META_ADS" || tipoIntegracao === "GOOGLE_ADS" || tipoIntegracao === "GSC")
       ? (composioConnectedAccountId || null)
       : null;
 
@@ -511,6 +547,8 @@ export default function Integracoes() {
                     <SelectItem value="METRICOOL">Metricool</SelectItem>
                     <SelectItem value="CHATWOOT">Chatblue</SelectItem>
                     <SelectItem value="GA4">Google Analytics 4</SelectItem>
+                    <SelectItem value="GSC">Google Search Console</SelectItem>
+                    <SelectItem value="WORDPRESS">WordPress (Blog)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1013,6 +1051,75 @@ export default function Integracoes() {
                       placeholder="https://seusite.com.br"
                     />
                     <p className="text-xs text-muted-foreground">URL base do site para construir URLs completas</p>
+                  </div>
+                </>
+              )}
+
+              {tipoIntegracao === "GSC" && (
+                <>
+                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertTitle>Google Search Console via Composio</AlertTitle>
+                    <AlertDescription className="text-sm space-y-2">
+                      <p>Conecte a propriedade do Search Console no Composio Dashboard e cole o Connected Account ID aqui.</p>
+                      <p>Sem isso, a coleta de dados orgânicos não inicia.</p>
+                    </AlertDescription>
+                  </Alert>
+                  <div className="space-y-2">
+                    <Label>Site URL *</Label>
+                    <Input
+                      value={gscSiteUrl}
+                      onChange={(e) => setGscSiteUrl(e.target.value)}
+                      placeholder="https://www.tayara.com.br/"
+                    />
+                    <p className="text-xs text-muted-foreground">Propriedade exatamente como aparece no Search Console (URL com ou sem barra final).</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Composio Connected Account ID *</Label>
+                    <Input
+                      value={composioConnectedAccountId}
+                      onChange={(e) => setComposioConnectedAccountId(e.target.value)}
+                      placeholder="ca_xxxxxxxxxxxx"
+                    />
+                  </div>
+                </>
+              )}
+
+              {tipoIntegracao === "WORDPRESS" && (
+                <>
+                  <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertTitle>WordPress (Blog)</AlertTitle>
+                    <AlertDescription className="text-sm space-y-2">
+                      <p>Gere uma Application Password em <strong>wp-admin → Usuários → seu usuário → Application Passwords</strong>.</p>
+                      <p>O usuário precisa ter permissão de leitura em posts publicados.</p>
+                    </AlertDescription>
+                  </Alert>
+                  <div className="space-y-2">
+                    <Label>URL Base *</Label>
+                    <Input
+                      value={wpUrlBase}
+                      onChange={(e) => setWpUrlBase(e.target.value)}
+                      placeholder="https://www.tayara.com.br"
+                    />
+                    <p className="text-xs text-muted-foreground">Sem /wp-json no final.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Usuário *</Label>
+                    <Input
+                      value={wpUsuario}
+                      onChange={(e) => setWpUsuario(e.target.value)}
+                      placeholder="admin"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Application Password *</Label>
+                    <Input
+                      type="password"
+                      value={wpAppPassword}
+                      onChange={(e) => setWpAppPassword(e.target.value)}
+                      placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+                    />
                   </div>
                 </>
               )}

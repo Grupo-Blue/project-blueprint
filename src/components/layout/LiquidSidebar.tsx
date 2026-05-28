@@ -27,6 +27,7 @@ const navItems: NavItem[] = [
   { label: "Dashboard", to: "/dashboard", icon: BarChart3, group: "Dashboards" },
   { label: "Dash Direção", to: "/dashboard-direcao", icon: Eye, group: "Dashboards", requiredRole: ["DIRECAO", "ADMIN"] },
   { label: "Dash Comercial", to: "/dashboard-comercial", icon: TrendingUp, group: "Dashboards" },
+  { label: "Dash Marketing", to: "/dashboard-marketing", icon: Target, group: "Dashboards" },
   { label: "Dash Tráfego", to: "/dashboard-trafego", icon: Activity, group: "Dashboards" },
   // Operacional
   { label: "Leads", to: "/leads", icon: Users, group: "Operacional" },

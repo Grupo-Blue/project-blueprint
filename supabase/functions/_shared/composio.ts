@@ -131,3 +131,63 @@ export async function fetchGoogleAdsMetricsViaComposio(opts: {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+// Google Search Console: query analytics por página + query + data via Composio.
+// Slug default a confirmar na pré-validação.
+export type GSCRow = {
+  url: string;
+  query?: string;
+  date?: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  position: number;
+  raw?: any;
+};
+export type GSCCallResult = { ok: boolean; rows?: GSCRow[]; error?: string; raw?: any };
+
+export async function fetchGSCQueryAnalytics(opts: {
+  connectedAccountId: string;
+  siteUrl: string;
+  startDate: string;
+  endDate: string;
+  dimensions?: ("page" | "query" | "date")[];
+  rowLimit?: number;
+  slug?: string;
+}): Promise<GSCCallResult> {
+  try {
+    const slug = opts.slug
+      || Deno.env.get("COMPOSIO_SLUG_GSC_QUERY_ANALYTICS")
+      || "GOOGLE_SEARCH_CONSOLE_QUERY_ANALYTICS";
+    const dims = opts.dimensions ?? ["page", "query", "date"];
+    const raw = await executeTool(slug, {
+      site_url: opts.siteUrl,
+      start_date: opts.startDate,
+      end_date: opts.endDate,
+      dimensions: dims,
+      row_limit: opts.rowLimit ?? 5000,
+    }, opts.connectedAccountId);
+
+    const data = raw?.data?.rows || raw?.rows || raw?.data || [];
+    const idxPage = dims.indexOf("page");
+    const idxQuery = dims.indexOf("query");
+    const idxDate = dims.indexOf("date");
+    const rows: GSCRow[] = (Array.isArray(data) ? data : []).map((d: any) => {
+      const keys = Array.isArray(d.keys) ? d.keys : [];
+      return {
+        url: idxPage >= 0 ? (keys[idxPage] ?? "") : (d.page ?? d.url ?? ""),
+        query: idxQuery >= 0 ? keys[idxQuery] : d.query,
+        date: idxDate >= 0 ? keys[idxDate] : d.date,
+        impressions: Number(d.impressions ?? 0),
+        clicks: Number(d.clicks ?? 0),
+        ctr: Number(d.ctr ?? 0),
+        position: Number(d.position ?? 0),
+        raw: d,
+      };
+    });
+
+    return { ok: true, rows, raw };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

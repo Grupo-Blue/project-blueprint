@@ -19,7 +19,7 @@ interface IntegracaoSaude {
   nome_empresa?: string;
 }
 
-const TIPOS_RELEVANTES = ["META_ADS", "GOOGLE_ADS", "GA4"] as const satisfies readonly ("META_ADS" | "GOOGLE_ADS" | "GA4")[];
+const TIPOS_RELEVANTES = ["META_ADS", "GOOGLE_ADS", "GA4", "MAUTIC", "GSC", "WORDPRESS"] as const satisfies readonly ("META_ADS" | "GOOGLE_ADS" | "GA4" | "MAUTIC" | "GSC" | "WORDPRESS")[];
 
 export const SaudeIntegracoes = () => {
   const [items, setItems] = useState<IntegracaoSaude[]>([]);
