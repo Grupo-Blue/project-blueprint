@@ -416,6 +416,118 @@ export type Database = {
           },
         ]
       }
+      artigo: {
+        Row: {
+          autor: string | null
+          categorias: string[] | null
+          created_at: string
+          data_publicacao: string | null
+          id_artigo: string
+          id_empresa: string
+          id_externo: string
+          palavra_chave_alvo: string | null
+          slug: string | null
+          status: string | null
+          titulo: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          autor?: string | null
+          categorias?: string[] | null
+          created_at?: string
+          data_publicacao?: string | null
+          id_artigo?: string
+          id_empresa: string
+          id_externo: string
+          palavra_chave_alvo?: string | null
+          slug?: string | null
+          status?: string | null
+          titulo: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          autor?: string | null
+          categorias?: string[] | null
+          created_at?: string
+          data_publicacao?: string | null
+          id_artigo?: string
+          id_empresa?: string
+          id_externo?: string
+          palavra_chave_alvo?: string | null
+          slug?: string | null
+          status?: string | null
+          titulo?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artigo_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      artigo_metricas_dia: {
+        Row: {
+          bounce_rate: number | null
+          cliques_organicos: number
+          created_at: string
+          ctr_organico: number | null
+          data: string
+          id: string
+          id_artigo: string
+          impressoes_organicas: number
+          leads_gerados: number
+          posicao_media: number | null
+          sessoes: number
+          tempo_medio_seg: number | null
+          usuarios: number
+        }
+        Insert: {
+          bounce_rate?: number | null
+          cliques_organicos?: number
+          created_at?: string
+          ctr_organico?: number | null
+          data: string
+          id?: string
+          id_artigo: string
+          impressoes_organicas?: number
+          leads_gerados?: number
+          posicao_media?: number | null
+          sessoes?: number
+          tempo_medio_seg?: number | null
+          usuarios?: number
+        }
+        Update: {
+          bounce_rate?: number | null
+          cliques_organicos?: number
+          created_at?: string
+          ctr_organico?: number | null
+          data?: string
+          id?: string
+          id_artigo?: string
+          impressoes_organicas?: number
+          leads_gerados?: number
+          posicao_media?: number | null
+          sessoes?: number
+          tempo_medio_seg?: number | null
+          usuarios?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artigo_metricas_dia_id_artigo_fkey"
+            columns: ["id_artigo"]
+            isOneToOne: false
+            referencedRelation: "artigo"
+            referencedColumns: ["id_artigo"]
+          },
+        ]
+      }
       automacao_execucao_log: {
         Row: {
           acoes_executadas: Json | null
@@ -1975,6 +2087,156 @@ export type Database = {
           },
         ]
       }
+      email_campanha: {
+        Row: {
+          assunto: string | null
+          created_at: string
+          data_envio: string | null
+          id_email_campanha: string
+          id_empresa: string
+          id_externo: string
+          nome: string
+          status: string | null
+          tipo: string | null
+          updated_at: string
+        }
+        Insert: {
+          assunto?: string | null
+          created_at?: string
+          data_envio?: string | null
+          id_email_campanha?: string
+          id_empresa: string
+          id_externo: string
+          nome: string
+          status?: string | null
+          tipo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assunto?: string | null
+          created_at?: string
+          data_envio?: string | null
+          id_email_campanha?: string
+          id_empresa?: string
+          id_externo?: string
+          nome?: string
+          status?: string | null
+          tipo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_campanha_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      email_fluxo: {
+        Row: {
+          contatos_no_fluxo: number
+          conversoes: number
+          created_at: string
+          id_email_fluxo: string
+          id_empresa: string
+          id_externo: string
+          nome: string
+          status: string | null
+          taxa_abertura: number | null
+          taxa_cliques: number | null
+          updated_at: string
+        }
+        Insert: {
+          contatos_no_fluxo?: number
+          conversoes?: number
+          created_at?: string
+          id_email_fluxo?: string
+          id_empresa: string
+          id_externo: string
+          nome: string
+          status?: string | null
+          taxa_abertura?: number | null
+          taxa_cliques?: number | null
+          updated_at?: string
+        }
+        Update: {
+          contatos_no_fluxo?: number
+          conversoes?: number
+          created_at?: string
+          id_email_fluxo?: string
+          id_empresa?: string
+          id_externo?: string
+          nome?: string
+          status?: string | null
+          taxa_abertura?: number | null
+          taxa_cliques?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_fluxo_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      email_metricas_dia: {
+        Row: {
+          abertos: number
+          bounces_hard: number
+          bounces_soft: number
+          cliques: number
+          created_at: string
+          data: string
+          descadastros: number
+          entregues: number
+          enviados: number
+          id: string
+          id_email_campanha: string
+          leads_gerados: number
+        }
+        Insert: {
+          abertos?: number
+          bounces_hard?: number
+          bounces_soft?: number
+          cliques?: number
+          created_at?: string
+          data: string
+          descadastros?: number
+          entregues?: number
+          enviados?: number
+          id?: string
+          id_email_campanha: string
+          leads_gerados?: number
+        }
+        Update: {
+          abertos?: number
+          bounces_hard?: number
+          bounces_soft?: number
+          cliques?: number
+          created_at?: string
+          data?: string
+          descadastros?: number
+          entregues?: number
+          enviados?: number
+          id?: string
+          id_email_campanha?: string
+          leads_gerados?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_metricas_dia_id_email_campanha_fkey"
+            columns: ["id_email_campanha"]
+            isOneToOne: false
+            referencedRelation: "email_campanha"
+            referencedColumns: ["id_email_campanha"]
+          },
+        ]
+      }
       empresa: {
         Row: {
           action_types_conversao_default: string[] | null
@@ -1991,6 +2253,7 @@ export type Database = {
           semanas_alerta_cac: number
           ticket_medio_alvo: number
           updated_at: string
+          utm_cobertura_minima: number | null
         }
         Insert: {
           action_types_conversao_default?: string[] | null
@@ -2007,6 +2270,7 @@ export type Database = {
           semanas_alerta_cac?: number
           ticket_medio_alvo: number
           updated_at?: string
+          utm_cobertura_minima?: number | null
         }
         Update: {
           action_types_conversao_default?: string[] | null
@@ -2023,6 +2287,7 @@ export type Database = {
           semanas_alerta_cac?: number
           ticket_medio_alvo?: number
           updated_at?: string
+          utm_cobertura_minima?: number | null
         }
         Relationships: []
       }
@@ -2337,6 +2602,53 @@ export type Database = {
           },
           {
             foreignKeyName: "google_ads_keyword_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      gsc_metricas_dia: {
+        Row: {
+          cliques: number
+          created_at: string
+          ctr: number | null
+          data: string
+          id: string
+          id_empresa: string
+          impressoes: number
+          posicao_media: number | null
+          query: string | null
+          url: string
+        }
+        Insert: {
+          cliques?: number
+          created_at?: string
+          ctr?: number | null
+          data: string
+          id?: string
+          id_empresa: string
+          impressoes?: number
+          posicao_media?: number | null
+          query?: string | null
+          url: string
+        }
+        Update: {
+          cliques?: number
+          created_at?: string
+          ctr?: number | null
+          data?: string
+          id?: string
+          id_empresa?: string
+          impressoes?: number
+          posicao_media?: number | null
+          query?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gsc_metricas_dia_id_empresa_fkey"
             columns: ["id_empresa"]
             isOneToOne: false
             referencedRelation: "empresa"
@@ -4441,6 +4753,7 @@ export type Database = {
           bounce_rate: number | null
           categoria: string | null
           conversoes: number
+          conversoes_evento: number | null
           created_at: string
           data: string
           id: string
@@ -4458,6 +4771,7 @@ export type Database = {
           bounce_rate?: number | null
           categoria?: string | null
           conversoes?: number
+          conversoes_evento?: number | null
           created_at?: string
           data: string
           id?: string
@@ -4475,6 +4789,7 @@ export type Database = {
           bounce_rate?: number | null
           categoria?: string | null
           conversoes?: number
+          conversoes_evento?: number | null
           created_at?: string
           data?: string
           id?: string
@@ -4510,6 +4825,7 @@ export type Database = {
           amelia_score: number | null
           amelia_temperatura: string | null
           amelia_updated_at: string | null
+          atribuicao_linear: Json | null
           chatblue_atendido_por_ia: boolean | null
           chatblue_departamento: string | null
           chatblue_prioridade: string | null
@@ -4538,6 +4854,12 @@ export type Database = {
           estado_mautic: string | null
           fbc: string | null
           fbp: string | null
+          first_touch_canal: string | null
+          first_touch_em: string | null
+          first_touch_utm_campaign: string | null
+          first_touch_utm_content: string | null
+          first_touch_utm_medium: string | null
+          first_touch_utm_source: string | null
           ga4_bounce_rate: number | null
           ga4_categoria_jornada: string | null
           ga4_engajamento_score: number | null
@@ -4546,6 +4868,7 @@ export type Database = {
           ga4_tempo_site_segundos: number | null
           gbraid: string | null
           gclid: string | null
+          id_artigo: string | null
           id_campanha_vinculada: string | null
           id_cliente_notion: string | null
           id_criativo: string | null
@@ -4577,6 +4900,7 @@ export type Database = {
           irpf_valor_cripto: number | null
           irpf_valor_investimentos: number | null
           is_mql: boolean
+          last_touch_canal: string | null
           lead_pago: boolean | null
           levantou_mao: boolean
           linkedin_cargo: string | null
@@ -4643,6 +4967,7 @@ export type Database = {
           tokeniza_user_id: string | null
           tokeniza_valor_carrinho: number | null
           tokeniza_valor_investido: number | null
+          total_toques: number | null
           updated_at: string
           url_pipedrive: string | null
           utm_campaign: string | null
@@ -4665,6 +4990,7 @@ export type Database = {
           amelia_score?: number | null
           amelia_temperatura?: string | null
           amelia_updated_at?: string | null
+          atribuicao_linear?: Json | null
           chatblue_atendido_por_ia?: boolean | null
           chatblue_departamento?: string | null
           chatblue_prioridade?: string | null
@@ -4693,6 +5019,12 @@ export type Database = {
           estado_mautic?: string | null
           fbc?: string | null
           fbp?: string | null
+          first_touch_canal?: string | null
+          first_touch_em?: string | null
+          first_touch_utm_campaign?: string | null
+          first_touch_utm_content?: string | null
+          first_touch_utm_medium?: string | null
+          first_touch_utm_source?: string | null
           ga4_bounce_rate?: number | null
           ga4_categoria_jornada?: string | null
           ga4_engajamento_score?: number | null
@@ -4701,6 +5033,7 @@ export type Database = {
           ga4_tempo_site_segundos?: number | null
           gbraid?: string | null
           gclid?: string | null
+          id_artigo?: string | null
           id_campanha_vinculada?: string | null
           id_cliente_notion?: string | null
           id_criativo?: string | null
@@ -4732,6 +5065,7 @@ export type Database = {
           irpf_valor_cripto?: number | null
           irpf_valor_investimentos?: number | null
           is_mql?: boolean
+          last_touch_canal?: string | null
           lead_pago?: boolean | null
           levantou_mao?: boolean
           linkedin_cargo?: string | null
@@ -4798,6 +5132,7 @@ export type Database = {
           tokeniza_user_id?: string | null
           tokeniza_valor_carrinho?: number | null
           tokeniza_valor_investido?: number | null
+          total_toques?: number | null
           updated_at?: string
           url_pipedrive?: string | null
           utm_campaign?: string | null
@@ -4820,6 +5155,7 @@ export type Database = {
           amelia_score?: number | null
           amelia_temperatura?: string | null
           amelia_updated_at?: string | null
+          atribuicao_linear?: Json | null
           chatblue_atendido_por_ia?: boolean | null
           chatblue_departamento?: string | null
           chatblue_prioridade?: string | null
@@ -4848,6 +5184,12 @@ export type Database = {
           estado_mautic?: string | null
           fbc?: string | null
           fbp?: string | null
+          first_touch_canal?: string | null
+          first_touch_em?: string | null
+          first_touch_utm_campaign?: string | null
+          first_touch_utm_content?: string | null
+          first_touch_utm_medium?: string | null
+          first_touch_utm_source?: string | null
           ga4_bounce_rate?: number | null
           ga4_categoria_jornada?: string | null
           ga4_engajamento_score?: number | null
@@ -4856,6 +5198,7 @@ export type Database = {
           ga4_tempo_site_segundos?: number | null
           gbraid?: string | null
           gclid?: string | null
+          id_artigo?: string | null
           id_campanha_vinculada?: string | null
           id_cliente_notion?: string | null
           id_criativo?: string | null
@@ -4887,6 +5230,7 @@ export type Database = {
           irpf_valor_cripto?: number | null
           irpf_valor_investimentos?: number | null
           is_mql?: boolean
+          last_touch_canal?: string | null
           lead_pago?: boolean | null
           levantou_mao?: boolean
           linkedin_cargo?: string | null
@@ -4953,6 +5297,7 @@ export type Database = {
           tokeniza_user_id?: string | null
           tokeniza_valor_carrinho?: number | null
           tokeniza_valor_investido?: number | null
+          total_toques?: number | null
           updated_at?: string
           url_pipedrive?: string | null
           utm_campaign?: string | null
@@ -4965,6 +5310,13 @@ export type Database = {
           webhook_enviado_em?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lead_id_artigo_fkey"
+            columns: ["id_artigo"]
+            isOneToOne: false
+            referencedRelation: "artigo"
+            referencedColumns: ["id_artigo"]
+          },
           {
             foreignKeyName: "lead_id_campanha_vinculada_fkey"
             columns: ["id_campanha_vinculada"]
@@ -5154,6 +5506,59 @@ export type Database = {
           },
         ]
       }
+      lead_touchpoint: {
+        Row: {
+          capturado_em: string
+          fonte: string | null
+          id: string
+          id_lead: string
+          ordem: number
+          referrer: string | null
+          url_origem: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+        }
+        Insert: {
+          capturado_em?: string
+          fonte?: string | null
+          id?: string
+          id_lead: string
+          ordem: number
+          referrer?: string | null
+          url_origem?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Update: {
+          capturado_em?: string
+          fonte?: string | null
+          id?: string
+          id_lead?: string
+          ordem?: number
+          referrer?: string | null
+          url_origem?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_touchpoint_id_lead_fkey"
+            columns: ["id_lead"]
+            isOneToOne: false
+            referencedRelation: "lead"
+            referencedColumns: ["id_lead"]
+          },
+        ]
+      }
       lead_webhook_log: {
         Row: {
           created_at: string | null
@@ -5205,6 +5610,109 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "webhook_destino"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      link_curto: {
+        Row: {
+          cliques: number
+          codigo: string
+          created_at: string
+          criado_por: string | null
+          id_empresa: string
+          id_link_curto: string
+          url_destino: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+        }
+        Insert: {
+          cliques?: number
+          codigo: string
+          created_at?: string
+          criado_por?: string | null
+          id_empresa: string
+          id_link_curto?: string
+          url_destino: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Update: {
+          cliques?: number
+          codigo?: string
+          created_at?: string
+          criado_por?: string | null
+          id_empresa?: string
+          id_link_curto?: string
+          url_destino?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "link_curto_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
+      link_utm_gerado: {
+        Row: {
+          canal: string | null
+          created_at: string
+          criado_por: string | null
+          id: string
+          id_empresa: string | null
+          url_destino: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
+        }
+        Insert: {
+          canal?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          id_empresa?: string | null
+          url_destino: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Update: {
+          canal?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          id_empresa?: string | null
+          url_destino?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "link_utm_gerado_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
           },
         ]
       }
@@ -6965,8 +7473,45 @@ export type Database = {
           },
         ]
       }
+      vw_funil_marketing: {
+        Row: {
+          canal_first: string | null
+          canal_last: string | null
+          id_empresa: string | null
+          leads: number | null
+          levantadas: number | null
+          mes: string | null
+          mqls: number | null
+          receita: number | null
+          reunioes: number | null
+          vendas: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_id_empresa_fkey"
+            columns: ["id_empresa"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id_empresa"]
+          },
+        ]
+      }
     }
     Functions: {
+      agregado_marketing: {
+        Args: {
+          p_fim: string
+          p_id_empresa: string
+          p_inicio: string
+          p_modelo?: string
+        }
+        Returns: {
+          canal: string
+          leads: number
+          receita: number
+          vendas: number
+        }[]
+      }
       blue_client_key: { Args: { _raw: string }; Returns: string }
       blue_cliente_acao_listar: {
         Args: { _client_key: string }
@@ -7109,6 +7654,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_link_clicks: { Args: { link_id: string }; Returns: undefined }
       irpf_inteligencia_facetas: {
         Args: { _id_empresa: string }
         Returns: {
@@ -7191,6 +7737,13 @@ export type Database = {
           veiculos: number
         }[]
       }
+      leads_por_email_campanha_dia: {
+        Args: { p_data: string; p_id_empresa: string }
+        Returns: {
+          total: number
+          utm_campaign: string
+        }[]
+      }
       refresh_mv_irpf_inteligencia: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
@@ -7238,7 +7791,15 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "direcao" | "trafego" | "sdr"
-      canal_origem: "META" | "GOOGLE" | "ORGANICO" | "OUTRO" | "WHATSAPP"
+      canal_origem:
+        | "META"
+        | "GOOGLE"
+        | "ORGANICO"
+        | "OUTRO"
+        | "WHATSAPP"
+        | "EMAIL"
+        | "SOCIAL_ORGANICO"
+        | "DIRETO"
       categoria_acao: "A" | "B" | "C"
       event_category:
         | "page_view"
@@ -7317,6 +7878,8 @@ export type Database = {
         | "METRICOOL"
         | "CHATWOOT"
         | "GA4"
+        | "GSC"
+        | "WORDPRESS"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -7445,7 +8008,16 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "direcao", "trafego", "sdr"],
-      canal_origem: ["META", "GOOGLE", "ORGANICO", "OUTRO", "WHATSAPP"],
+      canal_origem: [
+        "META",
+        "GOOGLE",
+        "ORGANICO",
+        "OUTRO",
+        "WHATSAPP",
+        "EMAIL",
+        "SOCIAL_ORGANICO",
+        "DIRETO",
+      ],
       categoria_acao: ["A", "B", "C"],
       event_category: [
         "page_view",
@@ -7524,6 +8096,8 @@ export const Constants = {
         "METRICOOL",
         "CHATWOOT",
         "GA4",
+        "GSC",
+        "WORDPRESS",
       ],
     },
   },
