@@ -1128,7 +1128,7 @@ serve(async (req) => {
       })),
     ];
 
-    const model = "gemini-3.5-pro";
+    const model = "gemini-3.5-flash";
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
     let geminiBody: any = {
