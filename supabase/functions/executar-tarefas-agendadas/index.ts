@@ -267,7 +267,7 @@ A tarefa foi agendada pelo usuário e deve ser executada agora. Use as ferrament
 
 Responda em português brasileiro, com formatação Markdown clara, usando tabelas e métricas quando apropriado.`;
 
-  const model = "gemini-3.5-pro";
+  const model = "gemini-3.5-flash";
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
   let geminiBody: any = {
