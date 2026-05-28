@@ -47,12 +47,8 @@ serve(async (req) => {
     setIfMissing("utm_content", link.utm_content);
     setIfMissing("utm_term", link.utm_term);
 
-    // Incrementa cliques fire-and-forget
-    supabase.rpc("noop").then(() => {}).catch(() => {});
-    await supabase
-      .from("link_curto")
-      .update({ cliques: (link.cliques ?? 0) + 1 })
-      .eq("id_link_curto", link.id_link_curto);
+    // Incremento atômico via RPC (resolve race condition em cliques concorrentes)
+    await supabase.rpc("increment_link_clicks", { link_id: link.id_link_curto });
 
     return new Response(null, {
       status: 302,

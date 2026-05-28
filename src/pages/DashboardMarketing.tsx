@@ -59,22 +59,20 @@ export default function DashboardMarketing() {
     },
   });
 
-  // Query atribuição linear: lead.atribuicao_linear agregado
-  const { data: linearData } = useQuery({
-    queryKey: ["lead-linear", empresaSelecionada, inicio, fim],
+  // Agregação por canal vem do RPC `agregado_marketing` que processa a atribuição
+  // dentro do Postgres — evita trazer milhares de leads para o cliente.
+  const { data: agregadoPorCanal } = useQuery({
+    queryKey: ["agregado-marketing", empresaSelecionada, inicio, fim, modelo],
     queryFn: async () => {
-      let q = supabase
-        .from("lead")
-        .select("atribuicao_linear, venda_realizada, valor_venda")
-        .gte("data_criacao", inicio.toISOString())
-        .lte("data_criacao", fim.toISOString())
-        .eq("merged", false);
-      if (empresaSelecionada && empresaSelecionada !== "todas") {
-        q = q.eq("id_empresa", empresaSelecionada);
-      }
-      const { data, error } = await q.limit(50000);
+      const params = {
+        p_id_empresa: empresaSelecionada === "todas" ? null : empresaSelecionada,
+        p_inicio: inicio.toISOString(),
+        p_fim: fim.toISOString(),
+        p_modelo: modelo,
+      };
+      const { data, error } = await supabase.rpc("agregado_marketing" as any, params);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Array<{ canal: string; leads: number; vendas: number; receita: number }>;
     },
   });
 
@@ -95,49 +93,19 @@ export default function DashboardMarketing() {
     },
   });
 
-  // Agregado por canal — depende do modelo selecionado
+  // Agregação já vem pronta do RPC. Só ordenamos por CANAIS_ORDEM.
   const porCanal = useMemo(() => {
-    const map = new Map<string, { leads: number; vendas: number; receita: number; mqls: number; reunioes: number }>();
-    const initCanal = (c: string) => {
-      if (!map.has(c)) map.set(c, { leads: 0, vendas: 0, receita: 0, mqls: 0, reunioes: 0 });
-      return map.get(c)!;
-    };
-
-    if (modelo === "linear" && linearData) {
-      for (const lead of linearData) {
-        const dist = (lead.atribuicao_linear as Record<string, number>) ?? {};
-        const totalPesos = Object.values(dist).reduce((s, v) => s + (v as number), 0);
-        if (totalPesos > 0) {
-          for (const [canal, peso] of Object.entries(dist)) {
-            const c = initCanal(canal);
-            c.leads += peso as number;
-            if (lead.venda_realizada) {
-              c.vendas += peso as number;
-              c.receita += (lead.valor_venda ?? 0) * (peso as number);
-            }
-          }
-        }
-      }
-    } else if (funilData) {
-      const campo = modelo === "first" ? "canal_first" : "canal_last";
-      for (const row of funilData) {
-        const canal = (row as any)[campo];
-        const c = initCanal(canal);
-        c.leads += Number(row.leads ?? 0);
-        c.vendas += Number(row.vendas ?? 0);
-        c.receita += Number(row.receita ?? 0);
-        c.mqls += Number(row.mqls ?? 0);
-        c.reunioes += Number(row.reunioes ?? 0);
-      }
-    }
-
-    const rows = CANAIS_ORDEM
-      .filter((c) => map.has(c))
-      .map((c) => ({ canal: c, ...map.get(c)! }));
-    const outros = Array.from(map.entries()).filter(([k]) => !CANAIS_ORDEM.includes(k));
-    rows.push(...outros.map(([k, v]) => ({ canal: k, ...v })));
-    return rows;
-  }, [funilData, linearData, modelo]);
+    const fromRpc = (agregadoPorCanal ?? []).map((r) => ({
+      canal: r.canal,
+      leads: Number(r.leads ?? 0),
+      vendas: Number(r.vendas ?? 0),
+      receita: Number(r.receita ?? 0),
+    }));
+    const ordemMap = new Map(fromRpc.map((r) => [r.canal, r]));
+    const ordenadas = CANAIS_ORDEM.filter((c) => ordemMap.has(c)).map((c) => ordemMap.get(c)!);
+    const outros = fromRpc.filter((r) => !CANAIS_ORDEM.includes(r.canal));
+    return [...ordenadas, ...outros];
+  }, [agregadoPorCanal]);
 
   const totais = useMemo(() => {
     return porCanal.reduce(

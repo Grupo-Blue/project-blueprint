@@ -46,31 +46,38 @@ serve(async (req) => {
         let processados = 0;
         let comErro = 0;
 
-        for (const fluxo of fluxos as any[]) {
-          const idExterno = String(fluxo.id);
-          const status = fluxo.isPublished ? "ativo" : "pausado";
-          const contatos = parseInt(fluxo.contactCount || fluxo.lead_count || "0");
+        if (fluxos.length === 0) {
+          await registrarSucesso({ supabase, idIntegracao: integracao.id_integracao, tipo: "MAUTIC", nomeEmpresa });
+          resultados.push({
+            integracao: integracao.id_integracao,
+            empresa: idEmpresa,
+            status: "success",
+            fluxos_total: 0,
+            processados: 0,
+            erros: 0,
+          });
+          continue;
+        }
 
-          const { error: upErr } = await supabase
-            .from("email_fluxo")
-            .upsert(
-              {
-                id_empresa: idEmpresa,
-                id_externo: idExterno,
-                nome: fluxo.name || `Fluxo #${idExterno}`,
-                status,
-                contatos_no_fluxo: contatos,
-                conversoes: 0,
-              },
-              { onConflict: "id_empresa,id_externo" },
-            );
+        // Bulk upsert. `??` em vez de `||` evita tratar 0 como falsy (bug do code review).
+        const payload = (fluxos as any[]).map((fluxo) => ({
+          id_empresa: idEmpresa,
+          id_externo: String(fluxo.id),
+          nome: fluxo.name || `Fluxo #${fluxo.id}`,
+          status: fluxo.isPublished ? "ativo" : "pausado",
+          contatos_no_fluxo: Number(fluxo.contactCount ?? fluxo.lead_count ?? 0),
+          conversoes: 0,
+        }));
 
-          if (upErr) {
-            console.error(`Erro ao upsertar email_fluxo ${idExterno}:`, upErr);
-            comErro++;
-          } else {
-            processados++;
-          }
+        const { error: bulkErr } = await supabase
+          .from("email_fluxo")
+          .upsert(payload, { onConflict: "id_empresa,id_externo" });
+
+        if (bulkErr) {
+          console.error("bulk upsert email_fluxo falhou:", bulkErr);
+          comErro = payload.length;
+        } else {
+          processados = payload.length;
         }
 
         await registrarSucesso({ supabase, idIntegracao: integracao.id_integracao, tipo: "MAUTIC", nomeEmpresa });

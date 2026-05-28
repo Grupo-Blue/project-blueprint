@@ -257,61 +257,86 @@ ALTER TABLE public.lead_touchpoint ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.link_curto ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.link_utm_gerado ENABLE ROW LEVEL SECURITY;
 
--- Política: ver dados das empresas que o usuário tem acesso (mesmo padrão de integracao_select_policy)
+-- Política: ver dados das empresas que o usuário tem acesso.
+-- EXISTS é usado em vez de IN (SELECT ...) — o planner consegue usar index scan.
 CREATE POLICY email_campanha_select ON public.email_campanha FOR SELECT
   USING (
     has_role(auth.uid(), 'admin'::app_role) OR
-    id_empresa IN (SELECT id_empresa FROM public.user_empresa WHERE user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.user_empresa ue
+      WHERE ue.user_id = auth.uid() AND ue.id_empresa = email_campanha.id_empresa
+    )
   );
 CREATE POLICY email_metricas_select ON public.email_metricas_dia FOR SELECT
   USING (
     has_role(auth.uid(), 'admin'::app_role) OR
-    id_email_campanha IN (
-      SELECT id_email_campanha FROM public.email_campanha
-      WHERE id_empresa IN (SELECT id_empresa FROM public.user_empresa WHERE user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.email_campanha c
+      JOIN public.user_empresa ue ON ue.id_empresa = c.id_empresa
+      WHERE c.id_email_campanha = email_metricas_dia.id_email_campanha
+        AND ue.user_id = auth.uid()
     )
   );
 CREATE POLICY email_fluxo_select ON public.email_fluxo FOR SELECT
   USING (
     has_role(auth.uid(), 'admin'::app_role) OR
-    id_empresa IN (SELECT id_empresa FROM public.user_empresa WHERE user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.user_empresa ue
+      WHERE ue.user_id = auth.uid() AND ue.id_empresa = email_fluxo.id_empresa
+    )
   );
 CREATE POLICY artigo_select ON public.artigo FOR SELECT
   USING (
     has_role(auth.uid(), 'admin'::app_role) OR
-    id_empresa IN (SELECT id_empresa FROM public.user_empresa WHERE user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.user_empresa ue
+      WHERE ue.user_id = auth.uid() AND ue.id_empresa = artigo.id_empresa
+    )
   );
 CREATE POLICY artigo_metricas_select ON public.artigo_metricas_dia FOR SELECT
   USING (
     has_role(auth.uid(), 'admin'::app_role) OR
-    id_artigo IN (
-      SELECT id_artigo FROM public.artigo
-      WHERE id_empresa IN (SELECT id_empresa FROM public.user_empresa WHERE user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.artigo a
+      JOIN public.user_empresa ue ON ue.id_empresa = a.id_empresa
+      WHERE a.id_artigo = artigo_metricas_dia.id_artigo
+        AND ue.user_id = auth.uid()
     )
   );
 CREATE POLICY gsc_metricas_select ON public.gsc_metricas_dia FOR SELECT
   USING (
     has_role(auth.uid(), 'admin'::app_role) OR
-    id_empresa IN (SELECT id_empresa FROM public.user_empresa WHERE user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.user_empresa ue
+      WHERE ue.user_id = auth.uid() AND ue.id_empresa = gsc_metricas_dia.id_empresa
+    )
   );
 CREATE POLICY lead_touchpoint_select ON public.lead_touchpoint FOR SELECT
   USING (
     has_role(auth.uid(), 'admin'::app_role) OR
-    id_lead IN (
-      SELECT id_lead FROM public.lead
-      WHERE id_empresa IN (SELECT id_empresa FROM public.user_empresa WHERE user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.lead l
+      JOIN public.user_empresa ue ON ue.id_empresa = l.id_empresa
+      WHERE l.id_lead = lead_touchpoint.id_lead
+        AND ue.user_id = auth.uid()
     )
   );
 CREATE POLICY link_curto_select ON public.link_curto FOR SELECT
   USING (
     has_role(auth.uid(), 'admin'::app_role) OR
-    id_empresa IN (SELECT id_empresa FROM public.user_empresa WHERE user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.user_empresa ue
+      WHERE ue.user_id = auth.uid() AND ue.id_empresa = link_curto.id_empresa
+    )
   );
 CREATE POLICY link_utm_gerado_select ON public.link_utm_gerado FOR SELECT
   USING (
     has_role(auth.uid(), 'admin'::app_role) OR
     id_empresa IS NULL OR
-    id_empresa IN (SELECT id_empresa FROM public.user_empresa WHERE user_id = auth.uid())
+    EXISTS (
+      SELECT 1 FROM public.user_empresa ue
+      WHERE ue.user_id = auth.uid() AND ue.id_empresa = link_utm_gerado.id_empresa
+    )
   );
 
 -- Insert/Update apenas admin e tráfego (igual padrão landingpage_config)

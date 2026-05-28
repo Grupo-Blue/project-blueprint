@@ -79,7 +79,8 @@ serve(async (req) => {
           const posts = (await res.json()) as any[];
           if (!Array.isArray(posts) || posts.length === 0) break;
 
-          for (const post of posts) {
+          // Bulk upsert por página
+          const payload = posts.map((post: any) => {
             const autor =
               post._embedded?.author?.[0]?.name
               || post._embedded?.["author"]?.[0]?.name
@@ -87,7 +88,7 @@ serve(async (req) => {
             const termsArr: any[] = post._embedded?.["wp:term"]?.flat?.() || [];
             const categorias = termsArr.filter((t) => t?.taxonomy === "category").map((t) => t.name);
 
-            const dados = {
+            return {
               id_empresa: idEmpresa,
               id_externo: String(post.id),
               titulo: post.title?.rendered || `Post #${post.id}`,
@@ -98,17 +99,17 @@ serve(async (req) => {
               categorias: categorias.length ? categorias : null,
               status: post.status || "publish",
             };
+          });
 
-            const { error } = await supabase
-              .from("artigo")
-              .upsert(dados, { onConflict: "id_empresa,id_externo" });
+          const { error: bulkErr } = await supabase
+            .from("artigo")
+            .upsert(payload, { onConflict: "id_empresa,id_externo" });
 
-            if (error) {
-              console.error("Erro upsert artigo:", error, dados.id_externo);
-              comErro++;
-            } else {
-              totalImportados++;
-            }
+          if (bulkErr) {
+            console.error("Erro bulk upsert artigos:", bulkErr.message);
+            comErro += payload.length;
+          } else {
+            totalImportados += payload.length;
           }
 
           if (posts.length < perPage) break;

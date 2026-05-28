@@ -47,59 +47,81 @@ serve(async (req) => {
         let processados = 0;
         let comErro = 0;
 
-        for (const email of emails as any[]) {
-          const idExterno = String(email.id);
-          // Upsert campanha
-          const { data: campanhaSalva, error: upErr } = await supabase
-            .from("email_campanha")
-            .upsert(
-              {
-                id_empresa: idEmpresa,
-                id_externo: idExterno,
-                nome: email.name || `Email #${idExterno}`,
-                assunto: email.subject || null,
-                status: normalizarStatusEmail(email),
-                tipo: email.emailType || "campaign",
-                data_envio: email.publishUp || email.dateAdded || null,
-              },
-              { onConflict: "id_empresa,id_externo" },
-            )
-            .select("id_email_campanha")
-            .single();
+        if (emails.length === 0) {
+          resultados.push({
+            integracao: integracao.id_integracao,
+            empresa: idEmpresa,
+            status: "success",
+            emails_total: 0,
+            processados: 0,
+            erros: 0,
+          });
+          await registrarSucesso({ supabase, idIntegracao: integracao.id_integracao, tipo: "MAUTIC", nomeEmpresa });
+          continue;
+        }
 
-          if (upErr || !campanhaSalva) {
-            console.error(`Erro ao upsertar email_campanha ${idExterno}:`, upErr);
+        // 1) Bulk upsert de campanhas
+        const campanhasPayload = (emails as any[]).map((email) => ({
+          id_empresa: idEmpresa,
+          id_externo: String(email.id),
+          nome: email.name || `Email #${email.id}`,
+          assunto: email.subject ?? null,
+          status: normalizarStatusEmail(email),
+          tipo: email.emailType || "campaign",
+          data_envio: email.publishUp || email.dateAdded || null,
+        }));
+
+        const { data: campanhasSalvas, error: bulkCampanhaErr } = await supabase
+          .from("email_campanha")
+          .upsert(campanhasPayload, { onConflict: "id_empresa,id_externo" })
+          .select("id_email_campanha, id_externo");
+
+        if (bulkCampanhaErr) {
+          throw new Error(`bulk upsert email_campanha falhou: ${bulkCampanhaErr.message}`);
+        }
+
+        const idPorExterno = new Map<string, string>();
+        for (const c of campanhasSalvas ?? []) {
+          idPorExterno.set(String(c.id_externo), c.id_email_campanha);
+        }
+
+        // 2) Bulk upsert de métricas do dia
+        const metricasPayload: any[] = [];
+        for (const email of emails as any[]) {
+          const idCampanha = idPorExterno.get(String(email.id));
+          if (!idCampanha) {
             comErro++;
             continue;
           }
-
-          // Snapshot de métrica do dia. Mautic devolve totais acumulados — gravamos como snapshot diário.
-          const metricasDia = {
-            id_email_campanha: campanhaSalva.id_email_campanha,
+          const enviados = parseInt(email.sentCount || "0");
+          const bounces = parseInt(email.bounceCount || "0");
+          metricasPayload.push({
+            id_email_campanha: idCampanha,
             data: hoje,
-            enviados: parseInt(email.sentCount || "0"),
-            entregues: Math.max(0, parseInt(email.sentCount || "0") - parseInt(email.bounceCount || "0")),
+            enviados,
+            entregues: Math.max(0, enviados - bounces),
             abertos: parseInt(email.readCount || "0"),
             cliques: parseInt(email.clickCount || "0"),
-            bounces_hard: parseInt(email.bounceCount || "0"),
+            bounces_hard: bounces,
             bounces_soft: 0,
             descadastros: parseInt(email.unsubscribeCount || "0"),
-            leads_gerados: 0, // preenchido por enriquecimento posterior (cruza com lead.utm_campaign)
-          };
+            leads_gerados: 0,
+          });
+        }
 
-          const { error: metErr } = await supabase
+        if (metricasPayload.length > 0) {
+          const { error: bulkMetErr } = await supabase
             .from("email_metricas_dia")
-            .upsert(metricasDia, { onConflict: "id_email_campanha,data" });
-
-          if (metErr) {
-            console.error(`Erro ao upsertar email_metricas_dia:`, metErr);
-            comErro++;
+            .upsert(metricasPayload, { onConflict: "id_email_campanha,data" });
+          if (bulkMetErr) {
+            console.error("bulk upsert email_metricas_dia falhou:", bulkMetErr);
+            comErro += metricasPayload.length;
           } else {
-            processados++;
+            processados = metricasPayload.length;
           }
         }
 
-        // Enriquece leads_gerados cruzando lead.utm_campaign == email.nome do dia.
+        // Enriquece leads_gerados em 1 query agregada + bulk update
         await enriquecerLeadsGerados(supabase, idEmpresa, hoje);
 
         await registrarSucesso({ supabase, idIntegracao: integracao.id_integracao, tipo: "MAUTIC", nomeEmpresa });
@@ -165,30 +187,57 @@ function normalizarStatusEmail(email: any): string {
 }
 
 async function enriquecerLeadsGerados(supabase: any, idEmpresa: string, hoje: string) {
-  // Para cada email_campanha da empresa, conta leads com utm_source IN (email,newsletter) e utm_campaign = nome do email
-  // que foram criados no dia.
+  // RPC agregada por utm_campaign (1 query). Substitui o loop N+1 anterior.
+  const { data: agregadoLeads, error: rpcErr } = await supabase
+    .rpc("leads_por_email_campanha_dia", { p_id_empresa: idEmpresa, p_data: hoje });
+  if (rpcErr) {
+    console.error("RPC leads_por_email_campanha_dia falhou:", rpcErr);
+    return;
+  }
+
+  const porCampanhaNome = new Map<string, number>();
+  for (const row of (agregadoLeads ?? []) as Array<{ utm_campaign: string; total: number }>) {
+    if (row.utm_campaign) porCampanhaNome.set(row.utm_campaign, Number(row.total) || 0);
+  }
+  if (porCampanhaNome.size === 0) return;
+
+  // 1 SELECT em email_campanha para mapear nome -> id_email_campanha
   const { data: campanhas } = await supabase
     .from("email_campanha")
     .select("id_email_campanha, nome")
-    .eq("id_empresa", idEmpresa);
+    .eq("id_empresa", idEmpresa)
+    .in("nome", Array.from(porCampanhaNome.keys()));
+
   if (!campanhas?.length) return;
 
-  for (const ec of campanhas) {
-    const { count } = await supabase
-      .from("lead")
-      .select("id_lead", { count: "exact", head: true })
-      .eq("id_empresa", idEmpresa)
-      .in("utm_source", ["email", "newsletter"])
-      .eq("utm_campaign", ec.nome)
-      .gte("data_criacao", `${hoje}T00:00:00`)
-      .lte("data_criacao", `${hoje}T23:59:59`);
-
-    if ((count ?? 0) > 0) {
-      await supabase
-        .from("email_metricas_dia")
-        .update({ leads_gerados: count })
-        .eq("id_email_campanha", ec.id_email_campanha)
-        .eq("data", hoje);
+  // Bulk upsert dos leads_gerados em email_metricas_dia
+  const updates: any[] = [];
+  for (const c of campanhas) {
+    const total = porCampanhaNome.get(c.nome);
+    if (total && total > 0) {
+      updates.push({
+        id_email_campanha: c.id_email_campanha,
+        data: hoje,
+        leads_gerados: total,
+      });
     }
   }
+  if (updates.length === 0) return;
+
+  // Upsert mantém os outros campos via onConflict + ignoreDuplicates=false. Como já gravamos
+  // a linha cheia antes (zerando leads_gerados), aqui apenas sobrescrevemos o contador.
+  // Estratégia: para cada update, usar update direto agrupado por id_email_campanha.
+  // Como queremos 1 round-trip, fazemos um upsert parcial usando o mesmo onConflict.
+  // PostgREST sobrescreve apenas as colunas presentes; outros campos ficam null se inserir novo.
+  // Por segurança, fazemos update por id (1 round-trip por linha; n é pequeno, igual ao número de
+  // campanhas de e-mail com leads no dia).
+  await Promise.all(
+    updates.map((u) =>
+      supabase
+        .from("email_metricas_dia")
+        .update({ leads_gerados: u.leads_gerados })
+        .eq("id_email_campanha", u.id_email_campanha)
+        .eq("data", u.data),
+    ),
+  );
 }

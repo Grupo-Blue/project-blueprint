@@ -92,26 +92,23 @@ serve(async (req) => {
         let linhasAgregado = 0;
         let comErro = 0;
 
-        for (const row of detalhado.rows ?? []) {
-          if (!row.url || !row.date) continue;
-          const { error } = await supabase
-            .from("gsc_metricas_dia")
-            .upsert(
-              {
-                id_empresa: idEmpresa,
-                data: row.date,
-                url: row.url,
-                query: row.query ?? null,
-                impressoes: row.impressions,
-                cliques: row.clicks,
-                ctr: row.ctr,
-                posicao_media: row.position,
-              },
-              { onConflict: "id_empresa,data,url,query" },
-            );
-          if (error) comErro++;
-          else linhasDetalhe++;
-        }
+        // Acumula tudo em um payload único e faz upsert em chunks
+        const payloadDetalhe = (detalhado.rows ?? [])
+          .filter((row) => row.url && row.date)
+          .map((row) => ({
+            id_empresa: idEmpresa,
+            data: row.date!,
+            url: row.url,
+            query: row.query ?? null,
+            impressoes: row.impressions,
+            cliques: row.clicks,
+            ctr: row.ctr,
+            posicao_media: row.position,
+          }));
+
+        const erros1 = await upsertEmLote(supabase, "gsc_metricas_dia", payloadDetalhe, "id_empresa,data,url,query");
+        comErro += erros1;
+        linhasDetalhe = payloadDetalhe.length - erros1;
 
         // Agregado por URL (query=null) — útil para cruzar com artigos
         const agregado = await fetchGSCQueryAnalytics({
@@ -123,26 +120,21 @@ serve(async (req) => {
         });
 
         if (agregado.ok) {
-          for (const row of agregado.rows ?? []) {
-            if (!row.url || !row.date) continue;
-            const { error } = await supabase
-              .from("gsc_metricas_dia")
-              .upsert(
-                {
-                  id_empresa: idEmpresa,
-                  data: row.date,
-                  url: row.url,
-                  query: null,
-                  impressoes: row.impressions,
-                  cliques: row.clicks,
-                  ctr: row.ctr,
-                  posicao_media: row.position,
-                },
-                { onConflict: "id_empresa,data,url,query" },
-              );
-            if (error) comErro++;
-            else linhasAgregado++;
-          }
+          const payloadAgregado = (agregado.rows ?? [])
+            .filter((row) => row.url && row.date)
+            .map((row) => ({
+              id_empresa: idEmpresa,
+              data: row.date!,
+              url: row.url,
+              query: null as string | null,
+              impressoes: row.impressions,
+              cliques: row.clicks,
+              ctr: row.ctr,
+              posicao_media: row.position,
+            }));
+          const erros2 = await upsertEmLote(supabase, "gsc_metricas_dia", payloadAgregado, "id_empresa,data,url,query");
+          comErro += erros2;
+          linhasAgregado = payloadAgregado.length - erros2;
         }
 
         await registrarSucesso({ supabase, idIntegracao: integracao.id_integracao, tipo: "GSC", nomeEmpresa });
@@ -196,3 +188,24 @@ serve(async (req) => {
     });
   }
 });
+
+// Upsert em chunks de 500 (limite seguro para PostgREST). Retorna nº de linhas com erro.
+async function upsertEmLote(
+  supabase: any,
+  tabela: string,
+  rows: any[],
+  onConflict: string,
+  chunkSize = 500,
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  let comErro = 0;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await supabase.from(tabela).upsert(chunk, { onConflict });
+    if (error) {
+      console.error(`upsert chunk ${i}-${i + chunk.length} em ${tabela} falhou:`, error.message);
+      comErro += chunk.length;
+    }
+  }
+  return comErro;
+}
