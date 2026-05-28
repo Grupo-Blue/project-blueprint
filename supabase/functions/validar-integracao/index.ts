@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { validarMetaAds, validarGoogleAds } from "../_shared/validar.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,105 +88,6 @@ serve(async (req) => {
     );
   }
 });
-
-async function validarMetaAds(config: any) {
-  const { access_token, ad_account_id } = config;
-  if (!access_token || !ad_account_id) {
-    return { success: false, error: "Access Token e Ad Account ID são obrigatórios" };
-  }
-
-  // Step 1: Validate token
-  const meResponse = await fetch(`https://graph.facebook.com/v22.0/me?access_token=${access_token}`);
-  if (!meResponse.ok) {
-    const err = await meResponse.json().catch(() => ({}));
-    if (err.error?.code === 190) {
-      return { success: false, error: "Access Token inválido ou expirado. Gere um novo System User Token no Meta Business Manager." };
-    }
-    return { success: false, error: err.error?.message || "Token inválido" };
-  }
-  const meData = await meResponse.json();
-
-  // Step 2: Validate ad account access & permissions
-  const accountResponse = await fetch(
-    `https://graph.facebook.com/v22.0/${ad_account_id}?fields=name,account_status,owner&access_token=${access_token}`
-  );
-  if (!accountResponse.ok) {
-    const err = await accountResponse.json().catch(() => ({}));
-    const errorCode = err.error?.code;
-    const errorMsg = err.error?.message || "";
-
-    if (errorCode === 200 || errorMsg.includes("ads_management") || errorMsg.includes("ads_read")) {
-      return {
-        success: false,
-        error: "Sem permissão na conta de anúncio. No Meta Business Manager, vá em Configurações > Pessoas > System Users, selecione o System User e atribua acesso à conta de anúncio com permissão 'Gerenciar campanhas'.",
-        details: { errorCode, errorMsg, token_user: meData.name || meData.id }
-      };
-    }
-    if (errorCode === 100) {
-      return { success: false, error: `Conta de anúncio ${ad_account_id} não encontrada. Verifique se o ID está correto (formato: act_XXXXXXXXX).` };
-    }
-    return { success: false, error: err.error?.message || "Erro ao acessar conta de anúncio" };
-  }
-
-  const accountData = await accountResponse.json();
-  return {
-    success: true,
-    message: `Conectado com sucesso à conta "${accountData.name}"`,
-    details: { account_name: accountData.name, account_status: accountData.account_status, token_user: meData.name || meData.id }
-  };
-}
-
-async function validarGoogleAds(config: any) {
-  const { developer_token, client_id, client_secret, refresh_token, customer_id } = config;
-  if (!developer_token || !client_id || !client_secret || !refresh_token || !customer_id) {
-    return { success: false, error: "Todos os campos de credenciais são obrigatórios" };
-  }
-
-  // Get access token from refresh token
-  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id, client_secret, refresh_token, grant_type: "refresh_token",
-    }),
-  });
-
-  if (!tokenResponse.ok) {
-    return { success: false, error: "Falha ao obter access token. Verifique Client ID, Client Secret e Refresh Token." };
-  }
-
-  const tokenData = await tokenResponse.json();
-  const accessToken = tokenData.access_token;
-
-  // Test API access
-  const customerId = customer_id.replace(/-/g, "");
-  const loginCustomerId = config.login_customer_id?.replace(/-/g, "") || customerId;
-
-  const apiResponse = await fetch(
-    `https://googleads.googleapis.com/v19/customers/${customerId}:listAccessibleCustomers`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "developer-token": developer_token,
-        "login-customer-id": loginCustomerId,
-      },
-    }
-  );
-
-  if (!apiResponse.ok) {
-    const err = await apiResponse.json().catch(() => ({}));
-    const errMsg = JSON.stringify(err);
-    if (errMsg.includes("DEVELOPER_TOKEN_NOT_APPROVED")) {
-      return { success: false, error: "Developer Token não aprovado. Solicite acesso Básico ou Standard no Google Ads API Center." };
-    }
-    if (errMsg.includes("UNAUTHENTICATED")) {
-      return { success: false, error: "Credenciais inválidas. Verifique Developer Token e permissões da conta." };
-    }
-    return { success: false, error: err.error?.message || "Erro ao acessar Google Ads API" };
-  }
-
-  return { success: true, message: "Credenciais do Google Ads válidas" };
-}
 
 async function validarPipedrive(config: any) {
   const { api_token, domain } = config;

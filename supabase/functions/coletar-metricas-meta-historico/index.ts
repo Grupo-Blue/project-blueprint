@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { registrarFalha, registrarSucesso } from "../_shared/saude_integracao.ts";
+import { calcularLeadsDeActions } from "../_shared/meta_helpers.ts";
+import { composioEnabled, fetchMetaInsightsViaComposio } from "../_shared/composio.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,7 +40,7 @@ serve(async (req) => {
     // Buscar integrações Meta Ads ativas
     let query = supabase
       .from("integracao")
-      .select("*")
+      .select("*, empresa:id_empresa(nome, action_types_conversao_default)")
       .eq("tipo", "META_ADS")
       .eq("ativo", true);
 
@@ -67,6 +70,8 @@ serve(async (req) => {
       const accessToken = config.access_token;
       const adAccountId = config.ad_account_id;
       const idEmpresa = integracao.id_empresa;
+      const nomeEmpresa = integracao.empresa?.nome;
+      const actionTypesEmpresaDefault: string[] | null = integracao.empresa?.action_types_conversao_default ?? null;
 
       console.log(`Processando integração para empresa ${idEmpresa}, ad account ${adAccountId}`);
 
@@ -84,9 +89,11 @@ serve(async (req) => {
           continue;
         }
 
+        // Sem filtro `.eq("ativa", true)`: paridade com a coleta diária; campanhas pausadas
+        // ainda precisam ser coletadas para fechamento histórico.
         const { data: campanhas, error: campError } = await supabase
           .from("campanha")
-          .select("id_campanha, id_campanha_externo, id_conta")
+          .select("id_campanha, id_campanha_externo, id_conta, action_types_conversao")
           .eq("id_conta", contaAnuncio.id_conta);
 
         if (campError) throw campError;
@@ -102,50 +109,90 @@ serve(async (req) => {
         const fields = "campaign_id,impressions,clicks,spend,actions";
         const timeRange = JSON.stringify({ since: dataInicio, until: dataFim });
         const campanhIdsStr = campanhas.map(c => c.id_campanha_externo).join(",");
-        
-        // Usar time_increment=1 para obter dados diários
-        const url = `https://graph.facebook.com/v22.0/${adAccountId}/insights?fields=${fields}&level=campaign&time_range=${encodeURIComponent(timeRange)}&time_increment=1&access_token=${accessToken}&filtering=[{"field":"campaign.id","operator":"IN","value":["${campanhIdsStr.replace(/,/g, '","')}"]}]&limit=500`;
+        const filtering = `[{"field":"campaign.id","operator":"IN","value":["${campanhIdsStr.replace(/,/g, '","')}"]}]`;
+
+        // use_unified_attribution_setting=true alinha com o Ads Manager (default atual).
+        const url =
+          `https://graph.facebook.com/v22.0/${adAccountId}/insights` +
+          `?fields=${fields}` +
+          `&level=campaign` +
+          `&time_range=${encodeURIComponent(timeRange)}` +
+          `&time_increment=1` +
+          `&use_unified_attribution_setting=true` +
+          `&access_token=${accessToken}` +
+          `&filtering=${encodeURIComponent(filtering)}` +
+          `&limit=500`;
 
         console.log(`Chamando API Meta para período ${dataInicio} a ${dataFim}`);
 
+        let apiData: any = null;
+        let fonteFallback = false;
         const response = await fetch(url);
-        if (!response.ok) {
+        if (response.ok) {
+          apiData = await response.json();
+        } else {
           const errorText = await response.text();
           console.error(`Erro na API Meta: ${response.status} - ${errorText}`);
-          
-          let errorMessage = "Erro ao conectar com Meta Ads";
-          try {
-            const errorData = JSON.parse(errorText);
-            if (errorData.error?.message) {
-              if (errorData.error.code === 190) {
-                errorMessage = "Access Token inválido ou expirado";
-              } else {
-                errorMessage = errorData.error.message;
-              }
+          const errorData = (() => { try { return JSON.parse(errorText); } catch { return {}; } })();
+          const code = errorData?.error?.code;
+          const isTokenExpired = code === 190;
+          const isPermission = code === 200 && /API access blocked|ads_management|ads_read/i.test(errorData?.error?.message || "");
+
+          const connectedAccountId = config.composio_connected_account_id;
+          if (composioEnabled(connectedAccountId)) {
+            console.log(`Tentando fallback Composio para integração ${integracao.id_integracao}...`);
+            const fb = await fetchMetaInsightsViaComposio({
+              connectedAccountId,
+              adAccountId,
+              campaignIds: campanhas.map(c => c.id_campanha_externo),
+              since: dataInicio,
+              until: dataFim,
+            });
+            if (fb.ok && fb.rows) {
+              apiData = { data: fb.rows.map(r => ({ ...r.raw, campaign_id: r.campaign_id })) };
+              fonteFallback = true;
+            } else {
+              console.error(`Fallback Composio falhou: ${fb.error}`);
             }
-          } catch {
-            errorMessage = `Erro ${response.status}`;
           }
-          
-          resultados.push({ 
-            integracao: integracao.id_integracao, 
-            status: "error", 
-            error: errorMessage
-          });
-          continue;
+
+          if (!apiData) {
+            const errorMessage = isTokenExpired
+              ? "Access Token inválido ou expirado"
+              : isPermission
+                ? "API Access Blocked"
+                : (errorData?.error?.message || `Erro ${response.status}`);
+
+            await registrarFalha({
+              supabase,
+              idIntegracao: integracao.id_integracao,
+              tipo: "META_ADS",
+              nomeEmpresa,
+              errorKind: isTokenExpired ? "TOKEN_EXPIRED" : isPermission ? "PERMISSION" : "OTHER",
+              errorMsg: errorMessage,
+            });
+
+            resultados.push({
+              integracao: integracao.id_integracao,
+              status: "error",
+              error: errorMessage,
+            });
+            continue;
+          }
         }
 
-        const apiData = await response.json();
         let metricasProcessadas = 0;
 
-        // Processar cada registro (cada linha é uma campanha/dia)
-        for (const metrica of apiData.data || []) {
+        const processarLinha = async (metrica: any) => {
           const campanha = campanhas.find(c => c.id_campanha_externo === metrica.campaign_id);
-          if (!campanha) continue;
+          if (!campanha) return false;
 
-          // date_start contém a data do registro
-          const dataMetrica = metrica.date_start;
-          const leads = metrica.actions?.find((a: any) => a.action_type === "lead")?.value || 0;
+          const dataMetrica = metrica.date_start || metrica.date;
+          const { leads, actionTypesUsados } = calcularLeadsDeActions(
+            metrica.actions,
+            campanha.action_types_conversao as string[] | null,
+            actionTypesEmpresaDefault,
+          );
           const gasto = parseFloat(metrica.spend || "0");
           gastoTotal += gasto;
 
@@ -155,70 +202,54 @@ serve(async (req) => {
             impressoes: parseInt(metrica.impressions || "0"),
             cliques: parseInt(metrica.clicks || "0"),
             verba_investida: gasto,
-            leads: parseInt(leads),
-            fonte_conversoes: 'META_API_DAILY',
+            leads,
+            actions_json: {
+              actions: metrica.actions || [],
+              action_types_usados: actionTypesUsados,
+            },
+            fonte_conversoes: fonteFallback ? "META_API_FALLBACK_COMPOSIO" : "META_API_DAILY",
           };
 
-          // Inserir ou atualizar métricas do dia
           const { error: upsertError } = await supabase
             .from("campanha_metricas_dia")
             .upsert(metricasDia, { onConflict: "id_campanha,data" });
 
           if (upsertError) {
             console.error(`Erro ao salvar métricas:`, upsertError);
-          } else {
-            metricasProcessadas++;
+            return false;
           }
+          return true;
+        };
+
+        for (const metrica of apiData.data || []) {
+          if (await processarLinha(metrica)) metricasProcessadas++;
         }
 
-        // Verificar se há mais páginas de resultados
-        let nextPageUrl = apiData.paging?.next;
-        while (nextPageUrl) {
-          console.log("Buscando próxima página de resultados...");
-          const nextResponse = await fetch(nextPageUrl);
-          if (!nextResponse.ok) break;
-          
-          const nextData = await nextResponse.json();
-          
-          for (const metrica of nextData.data || []) {
-            const campanha = campanhas.find(c => c.id_campanha_externo === metrica.campaign_id);
-            if (!campanha) continue;
-
-            const dataMetrica = metrica.date_start;
-            const leads = metrica.actions?.find((a: any) => a.action_type === "lead")?.value || 0;
-            const gasto = parseFloat(metrica.spend || "0");
-            gastoTotal += gasto;
-
-            const metricasDia = {
-              id_campanha: campanha.id_campanha,
-              data: dataMetrica,
-              impressoes: parseInt(metrica.impressions || "0"),
-              cliques: parseInt(metrica.clicks || "0"),
-              verba_investida: gasto,
-              leads: parseInt(leads),
-              fonte_conversoes: 'META_API_DAILY',
-            };
-
-            const { error: upsertError } = await supabase
-              .from("campanha_metricas_dia")
-              .upsert(metricasDia, { onConflict: "id_campanha,data" });
-
-            if (!upsertError) {
-              metricasProcessadas++;
+        // Paginar (somente quando vier da API direta; fallback Composio retorna tudo de uma vez).
+        if (!fonteFallback) {
+          let nextPageUrl = apiData.paging?.next;
+          while (nextPageUrl) {
+            console.log("Buscando próxima página de resultados...");
+            const nextResponse = await fetch(nextPageUrl);
+            if (!nextResponse.ok) break;
+            const nextData = await nextResponse.json();
+            for (const metrica of nextData.data || []) {
+              if (await processarLinha(metrica)) metricasProcessadas++;
             }
+            nextPageUrl = nextData.paging?.next;
           }
-          
-          nextPageUrl = nextData.paging?.next;
         }
 
         totalMetricas += metricasProcessadas;
         console.log(`Processadas ${metricasProcessadas} métricas para empresa ${idEmpresa}`);
-        
-        resultados.push({ 
-          integracao: integracao.id_integracao, 
+        await registrarSucesso({ supabase, idIntegracao: integracao.id_integracao, tipo: "META_ADS", nomeEmpresa });
+
+        resultados.push({
+          integracao: integracao.id_integracao,
           empresa: idEmpresa,
-          status: "success", 
-          metricas: metricasProcessadas 
+          status: "success",
+          metricas: metricasProcessadas,
+          fallback: fonteFallback,
         });
       } catch (error) {
         console.error(`Erro ao processar integração ${integracao.id_integracao}:`, error);

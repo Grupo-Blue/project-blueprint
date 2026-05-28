@@ -52,7 +52,10 @@ export default function Integracoes() {
   // Meta Ads credentials
   const [metaAccessToken, setMetaAccessToken] = useState("");
   const [metaAdAccountId, setMetaAdAccountId] = useState("");
-  
+
+  // Composio fallback (reutilizado entre META_ADS e GOOGLE_ADS)
+  const [composioConnectedAccountId, setComposioConnectedAccountId] = useState("");
+
   // Google Ads credentials
   const [googleDeveloperToken, setGoogleDeveloperToken] = useState("");
   const [googleClientId, setGoogleClientId] = useState("");
@@ -127,6 +130,7 @@ export default function Integracoes() {
     setAtivo(true);
     setMetaAccessToken("");
     setMetaAdAccountId("");
+    setComposioConnectedAccountId("");
     setGoogleDeveloperToken("");
     setGoogleClientId("");
     setGoogleClientSecret("");
@@ -169,6 +173,7 @@ export default function Integracoes() {
     if (integracao.tipo === "META_ADS") {
       setMetaAccessToken(config.access_token || "");
       setMetaAdAccountId(config.ad_account_id || "");
+      setComposioConnectedAccountId(config.composio_connected_account_id || "");
     } else if (integracao.tipo === "GOOGLE_ADS") {
       setGoogleDeveloperToken(config.developer_token || "");
       setGoogleClientId(config.client_id || "");
@@ -176,6 +181,7 @@ export default function Integracoes() {
       setGoogleRefreshToken(config.refresh_token || "");
       setGoogleCustomerId(config.customer_id || "");
       setGoogleLoginCustomerId(config.login_customer_id || "");
+      setComposioConnectedAccountId(config.composio_connected_account_id || "");
     } else if (integracao.tipo === "PIPEDRIVE") {
       setPipedriveApiToken(config.api_token || "");
       setPipedriveDomain(config.domain || "");
@@ -306,7 +312,8 @@ export default function Integracoes() {
       configJson = {
         ...configJson,
         access_token: metaAccessToken,
-        ad_account_id: metaAdAccountId
+        ad_account_id: metaAdAccountId,
+        composio_connected_account_id: composioConnectedAccountId || null,
       };
     } else if (tipoIntegracao === "GOOGLE_ADS") {
       if (!googleDeveloperToken || !googleClientId || !googleClientSecret || !googleRefreshToken || !googleCustomerId) {
@@ -320,7 +327,8 @@ export default function Integracoes() {
         client_secret: googleClientSecret,
         refresh_token: googleRefreshToken,
         customer_id: googleCustomerId,
-        login_customer_id: googleLoginCustomerId || null
+        login_customer_id: googleLoginCustomerId || null,
+        composio_connected_account_id: composioConnectedAccountId || null,
       };
     } else if (tipoIntegracao === "PIPEDRIVE") {
       if (!pipedriveApiToken || !pipedriveDomain) {
@@ -530,6 +538,17 @@ export default function Integracoes() {
                       placeholder="act_123456789"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Composio Connected Account ID (fallback)</Label>
+                    <Input
+                      value={composioConnectedAccountId}
+                      onChange={(e) => setComposioConnectedAccountId(e.target.value)}
+                      placeholder="ca_xxxxxxxxxxxx (opcional)"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Quando preenchido, a coleta tenta o Composio se a API direta falhar (token expirado, 5xx). Requer COMPOSIO_API_KEY no Supabase.
+                    </p>
+                  </div>
                 </>
               )}
 
@@ -590,6 +609,17 @@ export default function Integracoes() {
                       onChange={(e) => setGoogleLoginCustomerId(e.target.value)}
                       placeholder="ID da conta gerente (MCC), se houver"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Composio Connected Account ID (fallback)</Label>
+                    <Input
+                      value={composioConnectedAccountId}
+                      onChange={(e) => setComposioConnectedAccountId(e.target.value)}
+                      placeholder="ca_xxxxxxxxxxxx (opcional)"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Quando preenchido, a coleta tenta o Composio se a API direta falhar (refresh_token expirado, 5xx). Requer COMPOSIO_API_KEY no Supabase.
+                    </p>
                   </div>
                 </>
               )}
