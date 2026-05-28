@@ -48,6 +48,23 @@ serve(async (req) => {
     const hoje = new Date().toISOString().split("T")[0];
     const resultados: any[] = [];
 
+    const buscarCampanhasGoogle = async (idEmpresa: string) => {
+      const { data: contas, error: contasError } = await supabase
+        .from("conta_anuncio")
+        .select("id_conta")
+        .eq("id_empresa", idEmpresa)
+        .eq("plataforma", "GOOGLE");
+      if (contasError) throw contasError;
+      const contaIds = (contas ?? []).map((c: any) => c.id_conta);
+      if (contaIds.length === 0) return [];
+      const { data: campanhas, error: campError } = await supabase
+        .from("campanha")
+        .select("id_campanha, id_campanha_externo, id_conta")
+        .in("id_conta", contaIds);
+      if (campError) throw campError;
+      return campanhas ?? [];
+    };
+
     for (const integracao of integracoes) {
       const config = integracao.config_json as any;
       const idEmpresa = integracao.id_empresa;
@@ -59,27 +76,19 @@ serve(async (req) => {
         // Refresh token. Se invalid_grant, registra falha e tenta fallback.
         const tokenResult = await obterAccessTokenGoogle(config);
         if (!tokenResult.access_token) {
-          const connectedAccountId = config.composio_connected_account_id;
+          const connectedAccountId = integracao.composio_connected_account_id;
           if (composioEnabled(connectedAccountId)) {
-            // Buscar campanhas para chamar fallback.
-            const { data: campanhasFallback } = await supabase
-              .from("campanha")
-              .select("id_campanha, id_campanha_externo, id_conta")
-              .in("id_conta",
-                await supabase.from("conta_anuncio").select("id_conta")
-                  .eq("id_empresa", idEmpresa).eq("plataforma", "GOOGLE")
-                  .then((r: any) => r.data?.map((c: any) => c.id_conta) || []),
-              );
+            const campanhasFallback = await buscarCampanhasGoogle(idEmpresa);
             const fb = await fetchGoogleAdsMetricsViaComposio({
               connectedAccountId,
               customerId,
               loginCustomerId,
-              campaignIds: (campanhasFallback ?? []).map(c => c.id_campanha_externo),
+              campaignIds: campanhasFallback.map(c => c.id_campanha_externo),
               since: hoje,
               until: hoje,
             });
             if (fb.ok && fb.rows) {
-              await processarLinhasComposio(supabase, campanhasFallback ?? [], fb.rows, hoje, resultados);
+              await processarLinhasComposio(supabase, campanhasFallback, fb.rows, hoje, resultados);
               await registrarSucesso({ supabase, idIntegracao: integracao.id_integracao, tipo: "GOOGLE_ADS", nomeEmpresa });
               continue;
             }
@@ -104,17 +113,8 @@ serve(async (req) => {
         const access_token = tokenResult.access_token;
 
         // Sem filtro `ativa=true`: queremos coletar até spend parcial de pausadas no dia.
-        const { data: campanhas, error: campError } = await supabase
-          .from("campanha")
-          .select("id_campanha, id_campanha_externo, id_conta")
-          .in("id_conta",
-            await supabase.from("conta_anuncio").select("id_conta")
-              .eq("id_empresa", idEmpresa).eq("plataforma", "GOOGLE")
-              .then((r: any) => r.data?.map((c: any) => c.id_conta) || []),
-          );
-
-        if (campError) throw campError;
-        if (!campanhas || campanhas.length === 0) continue;
+        const campanhas = await buscarCampanhasGoogle(idEmpresa);
+        if (campanhas.length === 0) continue;
 
         const campaignIds = campanhas.map(c => c.id_campanha_externo);
 
@@ -186,7 +186,7 @@ serve(async (req) => {
           console.error(`Erro na API Google Ads: ${response.status} - ${errorText}`);
 
           // Fallback Composio.
-          const connectedAccountId = config.composio_connected_account_id;
+          const connectedAccountId = integracao.composio_connected_account_id;
           if (composioEnabled(connectedAccountId)) {
             const fb = await fetchGoogleAdsMetricsViaComposio({
               connectedAccountId,
@@ -224,16 +224,18 @@ serve(async (req) => {
         console.log(`Encontrados ${results.length} resultados para customer ${customerId}`);
 
         for (const result of results) {
-          const campId = String(result.campaign.id);
+          const campId = String(result.campaign?.id ?? "");
+          if (!campId) continue;
           const campanha = campanhas.find(c => c.id_campanha_externo === campId);
           if (!campanha) continue;
 
-          const impressoes = parseInt(result.metrics.impressions || "0");
-          const cliques = parseInt(result.metrics.clicks || "0");
-          const verba = parseFloat(result.metrics.costMicros || "0") / 1_000_000;
-          const leads = Math.round(parseFloat(result.metrics.conversions || "0"));
-          const avgCpc = parseFloat(result.metrics.averageCpc || "0") / 1_000_000;
-          const impShare = parseFloat(result.metrics.searchImpressionShare || "0");
+          const metrics = result.metrics ?? {};
+          const impressoes = parseInt(metrics.impressions || "0");
+          const cliques = parseInt(metrics.clicks || "0");
+          const verba = parseFloat(metrics.costMicros || "0") / 1_000_000;
+          const leads = Math.round(parseFloat(metrics.conversions || "0"));
+          const avgCpc = parseFloat(metrics.averageCpc || "0") / 1_000_000;
+          const impShare = parseSearchImpressionShare(metrics.searchImpressionShare);
 
           const metricasDia = {
             id_campanha: campanha.id_campanha,
@@ -243,7 +245,7 @@ serve(async (req) => {
             verba_investida: verba,
             leads,
             cpc_medio: avgCpc > 0 ? avgCpc : (cliques > 0 ? verba / cliques : 0),
-            parcela_impressao: impShare > 0 ? impShare : null,
+            parcela_impressao: impShare,
             fonte_conversoes: "GOOGLE_API_DAILY",
           };
 
@@ -253,6 +255,7 @@ serve(async (req) => {
 
           if (upsertError) {
             console.error(`Erro ao salvar métricas da campanha ${campanha.id_campanha}:`, upsertError);
+            resultados.push({ campanha: campanha.id_campanha, status: "error", error: upsertError.message });
           } else {
             resultados.push({ campanha: campanha.id_campanha, status: "success" });
           }
@@ -308,6 +311,17 @@ serve(async (req) => {
   }
 });
 
+// Google Ads search_impression_share pode vir como string ("0.85"), "--", "< 10%", "> 90%" ou number.
+// Retorna fração [0,1] ou null se indisponível/inválido.
+function parseSearchImpressionShare(raw: unknown): number | null {
+  if (raw == null || raw === "" || raw === "--" || raw === " --") return null;
+  const cleaned = String(raw).replace(/[^\d.]/g, "");
+  if (!cleaned) return null;
+  const n = parseFloat(cleaned);
+  if (isNaN(n) || n <= 0) return null;
+  return n > 1 ? n / 100 : n;
+}
+
 async function processarLinhasComposio(
   supabase: any,
   campanhas: Array<{ id_campanha: string; id_campanha_externo: string }>,
@@ -331,7 +345,10 @@ async function processarLinhasComposio(
     const { error: upsertError } = await supabase
       .from("campanha_metricas_dia")
       .upsert(metricasDia, { onConflict: "id_campanha,data" });
-    if (!upsertError) {
+    if (upsertError) {
+      console.error(`Erro ao salvar métricas do fallback Composio para campanha ${campanha.id_campanha}:`, upsertError);
+      resultados.push({ campanha: campanha.id_campanha, status: "error", error: upsertError.message, fallback: true });
+    } else {
       resultados.push({ campanha: campanha.id_campanha, status: "success", fallback: true });
     }
   }

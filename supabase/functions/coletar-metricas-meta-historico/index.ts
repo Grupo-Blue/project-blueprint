@@ -138,7 +138,7 @@ serve(async (req) => {
           const isTokenExpired = code === 190;
           const isPermission = code === 200 && /API access blocked|ads_management|ads_read/i.test(errorData?.error?.message || "");
 
-          const connectedAccountId = config.composio_connected_account_id;
+          const connectedAccountId = integracao.composio_connected_account_id;
           if (composioEnabled(connectedAccountId)) {
             console.log(`Tentando fallback Composio para integração ${integracao.id_integracao}...`);
             const fb = await fetchMetaInsightsViaComposio({
@@ -182,6 +182,7 @@ serve(async (req) => {
         }
 
         let metricasProcessadas = 0;
+        let metricasComErro = 0;
 
         const processarLinha = async (metrica: any) => {
           const campanha = campanhas.find(c => c.id_campanha_externo === metrica.campaign_id);
@@ -222,7 +223,7 @@ serve(async (req) => {
         };
 
         for (const metrica of apiData.data || []) {
-          if (await processarLinha(metrica)) metricasProcessadas++;
+          if (await processarLinha(metrica)) metricasProcessadas++; else metricasComErro++;
         }
 
         // Paginar (somente quando vier da API direta; fallback Composio retorna tudo de uma vez).
@@ -234,7 +235,7 @@ serve(async (req) => {
             if (!nextResponse.ok) break;
             const nextData = await nextResponse.json();
             for (const metrica of nextData.data || []) {
-              if (await processarLinha(metrica)) metricasProcessadas++;
+              if (await processarLinha(metrica)) metricasProcessadas++; else metricasComErro++;
             }
             nextPageUrl = nextData.paging?.next;
           }
@@ -247,8 +248,9 @@ serve(async (req) => {
         resultados.push({
           integracao: integracao.id_integracao,
           empresa: idEmpresa,
-          status: "success",
+          status: metricasComErro > 0 && metricasProcessadas === 0 ? "error" : metricasComErro > 0 ? "parcial" : "success",
           metricas: metricasProcessadas,
+          metricas_com_erro: metricasComErro,
           fallback: fonteFallback,
         });
       } catch (error) {

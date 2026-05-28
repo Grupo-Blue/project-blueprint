@@ -173,7 +173,7 @@ export default function Integracoes() {
     if (integracao.tipo === "META_ADS") {
       setMetaAccessToken(config.access_token || "");
       setMetaAdAccountId(config.ad_account_id || "");
-      setComposioConnectedAccountId(config.composio_connected_account_id || "");
+      setComposioConnectedAccountId(integracao.composio_connected_account_id || "");
     } else if (integracao.tipo === "GOOGLE_ADS") {
       setGoogleDeveloperToken(config.developer_token || "");
       setGoogleClientId(config.client_id || "");
@@ -181,7 +181,7 @@ export default function Integracoes() {
       setGoogleRefreshToken(config.refresh_token || "");
       setGoogleCustomerId(config.customer_id || "");
       setGoogleLoginCustomerId(config.login_customer_id || "");
-      setComposioConnectedAccountId(config.composio_connected_account_id || "");
+      setComposioConnectedAccountId(integracao.composio_connected_account_id || "");
     } else if (integracao.tipo === "PIPEDRIVE") {
       setPipedriveApiToken(config.api_token || "");
       setPipedriveDomain(config.domain || "");
@@ -313,7 +313,6 @@ export default function Integracoes() {
         ...configJson,
         access_token: metaAccessToken,
         ad_account_id: metaAdAccountId,
-        composio_connected_account_id: composioConnectedAccountId || null,
       };
     } else if (tipoIntegracao === "GOOGLE_ADS") {
       if (!googleDeveloperToken || !googleClientId || !googleClientSecret || !googleRefreshToken || !googleCustomerId) {
@@ -328,7 +327,6 @@ export default function Integracoes() {
         refresh_token: googleRefreshToken,
         customer_id: googleCustomerId,
         login_customer_id: googleLoginCustomerId || null,
-        composio_connected_account_id: composioConnectedAccountId || null,
       };
     } else if (tipoIntegracao === "PIPEDRIVE") {
       if (!pipedriveApiToken || !pipedriveDomain) {
@@ -419,18 +417,34 @@ export default function Integracoes() {
       };
     }
 
+    const composioId = (tipoIntegracao === "META_ADS" || tipoIntegracao === "GOOGLE_ADS")
+      ? (composioConnectedAccountId || null)
+      : null;
+
     try {
       if (editingId) {
         const { error } = await supabase
           .from("integracao")
-          .update({ tipo: tipoIntegracao, config_json: configJson, ativo, id_empresa: empresaForm })
+          .update({
+            tipo: tipoIntegracao,
+            config_json: configJson,
+            ativo,
+            id_empresa: empresaForm,
+            composio_connected_account_id: composioId,
+          })
           .eq("id_integracao", editingId);
         if (error) throw error;
         toast.success("Integração atualizada com sucesso");
       } else {
         const { error } = await supabase
           .from("integracao")
-          .insert({ tipo: tipoIntegracao, config_json: configJson, ativo, id_empresa: empresaForm });
+          .insert({
+            tipo: tipoIntegracao,
+            config_json: configJson,
+            ativo,
+            id_empresa: empresaForm,
+            composio_connected_account_id: composioId,
+          });
         if (error) throw error;
         toast.success("Integração criada com sucesso");
       }

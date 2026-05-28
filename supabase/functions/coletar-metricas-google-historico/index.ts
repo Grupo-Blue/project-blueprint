@@ -143,7 +143,7 @@ serve(async (req) => {
           const errorText = await response.text();
           console.error(`[coletar-metricas-google-historico] Erro na API Google Ads: ${response.status} - ${errorText}`);
 
-          const connectedAccountId = config.composio_connected_account_id;
+          const connectedAccountId = integracao.composio_connected_account_id;
           if (composioEnabled(connectedAccountId)) {
             const fb = await fetchGoogleAdsMetricsViaComposio({
               connectedAccountId,
@@ -185,22 +185,29 @@ serve(async (req) => {
         console.log(`[coletar-metricas-google-historico] Encontrados ${results.length} registros de métricas`);
 
         let metricasSalvas = 0;
+        let metricasComErro = 0;
         let gastoTotal = 0;
 
         for (const result of results) {
-          const campanha = campanhas.find(c => c.id_campanha_externo === String(result.campaign.id));
+          const campIdRaw = result.campaign?.id;
+          if (campIdRaw == null) continue;
+          const campanha = campanhas.find(c => c.id_campanha_externo === String(campIdRaw));
           if (!campanha) continue;
 
-          const gasto = parseFloat(result.metrics.costMicros || "0") / 1000000;
+          const metrics = result.metrics ?? {};
+          const dataMetrica = result.segments?.date;
+          if (!dataMetrica) continue;
+
+          const gasto = parseFloat(metrics.costMicros || "0") / 1000000;
           gastoTotal += gasto;
 
           const metricasDia = {
             id_campanha: campanha.id_campanha,
-            data: result.segments.date,
-            impressoes: parseInt(result.metrics.impressions || "0"),
-            cliques: parseInt(result.metrics.clicks || "0"),
+            data: dataMetrica,
+            impressoes: parseInt(metrics.impressions || "0"),
+            cliques: parseInt(metrics.clicks || "0"),
             verba_investida: gasto,
-            leads: Math.round(parseFloat(result.metrics.conversions || "0")),
+            leads: Math.round(parseFloat(metrics.conversions || "0")),
             fonte_conversoes: fonteFallback ? "GOOGLE_API_FALLBACK_COMPOSIO" : "GOOGLE_API_DAILY",
           };
 
@@ -210,6 +217,7 @@ serve(async (req) => {
 
           if (upsertError) {
             console.error(`[coletar-metricas-google-historico] Erro ao salvar:`, upsertError);
+            metricasComErro++;
           } else {
             metricasSalvas++;
           }
@@ -221,8 +229,9 @@ serve(async (req) => {
         resultados.push({
           integracao: integracao.id_integracao,
           empresa: idEmpresa,
-          status: "success",
+          status: metricasComErro > 0 && metricasSalvas === 0 ? "error" : metricasComErro > 0 ? "parcial" : "success",
           metricas_salvas: metricasSalvas,
+          metricas_com_erro: metricasComErro,
           gasto_total: gastoTotal,
           fallback: fonteFallback,
         });

@@ -138,7 +138,7 @@ serve(async (req) => {
           const isPermission = code === 200 && /API access blocked|ads_management|ads_read/i.test(errorData?.error?.message || "");
 
           // Fallback Composio se habilitado.
-          const connectedAccountId = config.composio_connected_account_id;
+          const connectedAccountId = integracao.composio_connected_account_id;
           if (composioEnabled(connectedAccountId)) {
             console.log(`Tentando fallback Composio para integração ${integracao.id_integracao}...`);
             const fb = await fetchMetaInsightsViaComposio({
@@ -228,6 +228,11 @@ serve(async (req) => {
 
           if (upsertError) {
             console.error(`Erro ao salvar métricas da campanha ${campanha.id_campanha}:`, upsertError);
+            resultados.push({
+              campanha: campanha.id_campanha,
+              status: "error",
+              error: upsertError.message,
+            });
           } else {
             resultados.push({
               campanha: campanha.id_campanha,
