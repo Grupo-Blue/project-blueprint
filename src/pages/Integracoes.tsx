@@ -15,7 +15,7 @@ import { WebhookDestinosManager } from "@/components/WebhookDestinosManager";
 import { SaudeIntegracoes } from "@/components/dashboard/SaudeIntegracoes";
 import { ConexoesGrid } from "@/components/integracoes/ConexoesGrid";
 import {
-  MetaAdsForm, GoogleAdsForm, PipedriveForm, TokenizaForm, MauticForm, NotionForm,
+  MetaAdsForm, GoogleAdsForm, TokenizaForm, MauticForm, NotionForm,
   MetricoolForm, ChatwootForm, GA4Form, GSCForm, WordpressForm, defaultStateFor,
 } from "@/components/integracoes/IntegracaoForms";
 import { useEmpresa } from "@/contexts/EmpresaContext";
@@ -28,7 +28,8 @@ type Empresa = Database["public"]["Tables"]["empresa"]["Row"];
 const TIPO_LABEL: Record<TipoIntegracao, string> = {
   META_ADS: "Meta Ads",
   GOOGLE_ADS: "Google Ads",
-  PIPEDRIVE: "Pipedrive",
+  PIPEDRIVE: "Pipedrive (legado)",
+  AMELIA: "Amélia CRM",
   TOKENIZA: "Tokeniza",
   MAUTIC: "Mautic",
   NOTION: "Notion",
@@ -41,7 +42,7 @@ const TIPO_LABEL: Record<TipoIntegracao, string> = {
 
 const TIPOS_ORDENADOS: TipoIntegracao[] = [
   "META_ADS", "GOOGLE_ADS", "GA4", "GSC", "METRICOOL", "WORDPRESS",
-  "MAUTIC", "PIPEDRIVE", "TOKENIZA", "CHATWOOT", "NOTION",
+  "MAUTIC", "AMELIA", "TOKENIZA", "CHATWOOT", "NOTION",
 ];
 
 export default function Integracoes() {
