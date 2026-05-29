@@ -112,10 +112,9 @@ export default function Integracoes() {
       next.googleCustomerId = config.customer_id || "";
       next.googleLoginCustomerId = config.login_customer_id || "";
       next.composioConnectedAccountId = composio;
-    } else if (integracao.tipo === "PIPEDRIVE") {
-      next.pipedriveApiToken = config.api_token || "";
-      next.pipedriveDomain = config.domain || "";
-      next.pipedrivePipelineId = config.pipeline_id || "";
+    } else if (integracao.tipo === "PIPEDRIVE" || integracao.tipo === "AMELIA") {
+      // legacy: Pipedrive desativado; mantemos só leitura para não quebrar registros antigos
+    
     } else if (integracao.tipo === "TOKENIZA") {
       next.tokenizaApiToken = config.api_token || "";
       next.tokenizaBaseUrl = config.base_url || "https://api.tokeniza.com.br";
@@ -249,11 +248,9 @@ export default function Integracoes() {
         cfg.refresh_token = form.googleRefreshToken;
         cfg.customer_id = form.googleCustomerId;
         cfg.login_customer_id = form.googleLoginCustomerId || null;
-      } else if (tipoIntegracao === "PIPEDRIVE") {
-        setReq(!!form.pipedriveApiToken && !!form.pipedriveDomain, "Preencha API Token e Domain");
-        cfg.api_token = form.pipedriveApiToken;
-        cfg.domain = form.pipedriveDomain;
-        cfg.pipeline_id = form.pipedrivePipelineId || null;
+      } else if (tipoIntegracao === "PIPEDRIVE" || tipoIntegracao === "AMELIA") {
+        toast.error("Pipedrive foi removido. A Amélia CRM é configurada diretamente no projeto da Amélia.");
+        throw new Error("validation");
       } else if (tipoIntegracao === "TOKENIZA") {
         setReq(!!form.tokenizaApiToken && !!form.tokenizaBaseUrl, "Preencha todos os campos");
         cfg.api_token = form.tokenizaApiToken;
@@ -349,7 +346,7 @@ export default function Integracoes() {
     switch (tipoIntegracao) {
       case "META_ADS": return <MetaAdsForm state={form} setField={setField} />;
       case "GOOGLE_ADS": return <GoogleAdsForm state={form} setField={setField} />;
-      case "PIPEDRIVE": return <PipedriveForm state={form} setField={setField} />;
+      case "PIPEDRIVE": case "AMELIA": return <div className="text-sm text-muted-foreground">Integração legada. A Amélia CRM é gerenciada pelo próprio sistema da Amélia (webhook bidirecional).</div>;
       case "TOKENIZA": return <TokenizaForm state={form} setField={setField} />;
       case "MAUTIC": return <MauticForm state={form} setField={setField} />;
       case "NOTION": return <NotionForm state={form} setField={setField} />;
