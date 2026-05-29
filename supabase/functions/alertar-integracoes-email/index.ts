@@ -22,7 +22,7 @@ interface EmpresaRelatorio {
   integracoes: IntegracaoStatus[];
 }
 
-const TIPOS_INTEGRACAO = ["META_ADS", "GOOGLE_ADS", "PIPEDRIVE", "TOKENIZA", "MAUTIC", "NOTION", "METRICOOL", "CHATWOOT", "GA4", "STAPE"];
+const TIPOS_INTEGRACAO = ["META_ADS", "GOOGLE_ADS", "AMELIA", "TOKENIZA", "MAUTIC", "NOTION", "METRICOOL", "CHATWOOT", "GA4", "STAPE"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
           const cronjobMap: Record<string, string[]> = {
             "META_ADS": ["coletar-criativos-meta", "calcular-metricas-diarias"],
             "GOOGLE_ADS": ["calcular-metricas-diarias"],
-            "PIPEDRIVE": ["sincronizar-pipedrive-activities", "disparar-webhook-leads"],
+            "AMELIA": ["amelia-webhook", "disparar-webhook-leads"],
             "TOKENIZA": ["sincronizar-tokeniza", "enriquecer-leads-tokeniza"],
             "MAUTIC": ["monitorar-enriquecimento-leads"],
             "NOTION": ["sincronizar-notion"],

@@ -228,48 +228,41 @@ serve(async (req) => {
           .limit(50);
 
         for (const lead of leadsRecentes || []) {
-          // Verificar se tem atividades no Pipedrive
-          const { data: atividades } = await supabase
-            .from("pipedrive_activity")
-            .select("id")
+          // CRM agora é a Amélia: o histórico de atividades vive lá. Aqui apenas garantimos
+          // que o lead com 48h+ sem desfecho não fica sem alerta.
+          const { data: alertaExistente } = await supabase
+            .from("alerta_automatico")
+            .select("id_alerta")
             .eq("id_empresa", empresa.id_empresa)
-            .eq("id_deal_externo", lead.id_lead_externo)
-            .limit(1);
+            .eq("tipo", "LEAD_SEM_FOLLOWUP")
+            .eq("resolvido", false)
+            .contains("metadados", { id_lead: lead.id_lead })
+            .single();
 
-          if (!atividades || atividades.length === 0) {
-            const { data: alertaExistente } = await supabase
+          if (!alertaExistente) {
+            const { error: insertError } = await supabase
               .from("alerta_automatico")
-              .select("id_alerta")
-              .eq("id_empresa", empresa.id_empresa)
-              .eq("tipo", "LEAD_SEM_FOLLOWUP")
-              .eq("resolvido", false)
-              .contains("metadados", { id_lead: lead.id_lead })
-              .single();
+              .insert({
+                id_empresa: empresa.id_empresa,
+                tipo: "LEAD_SEM_FOLLOWUP",
+                severidade: "info",
+                titulo: `Lead "${lead.nome_lead}" sem follow-up`,
+                descricao: `O lead "${lead.nome_lead}" foi criado há mais de 48h. Verifique a cadência na Amélia CRM.`,
+                acionavel: true,
+                metadados: {
+                  id_lead: lead.id_lead,
+                  nome_lead: lead.nome_lead,
+                  data_criacao: lead.created_at,
+                },
+              });
 
-            if (!alertaExistente) {
-              const { error: insertError } = await supabase
-                .from("alerta_automatico")
-                .insert({
-                  id_empresa: empresa.id_empresa,
-                  tipo: "LEAD_SEM_FOLLOWUP",
-                  severidade: "info",
-                  titulo: `Lead "${lead.nome_lead}" sem follow-up`,
-                  descricao: `O lead "${lead.nome_lead}" foi criado há mais de 48h e não possui atividades registradas no Pipedrive.`,
-                  acionavel: true,
-                  metadados: {
-                    id_lead: lead.id_lead,
-                    nome_lead: lead.nome_lead,
-                    data_criacao: lead.created_at,
-                  },
-                });
-
-              if (!insertError) {
-                alertasCriados.push({ empresa: empresa.nome, tipo: "LEAD_SEM_FOLLOWUP", lead: lead.nome_lead });
-                console.log(`  📧 Alerta LEAD SEM FOLLOW-UP criado para "${lead.nome_lead}"`);
-              }
+            if (!insertError) {
+              alertasCriados.push({ empresa: empresa.nome, tipo: "LEAD_SEM_FOLLOWUP", lead: lead.nome_lead });
+              console.log(`  📧 Alerta LEAD SEM FOLLOW-UP criado para "${lead.nome_lead}"`);
             }
           }
         }
+
 
       } catch (error: any) {
         console.error(`  ❌ Erro ao analisar empresa ${empresa.nome}:`, error.message);

@@ -29,8 +29,8 @@ const FASES: { nome: string; jobs: string[] }[] = [
     jobs: ["coletar-criativos-meta", "coletar-criativos-google"],
   },
   {
-    nome: "Sincronizar Leads",
-    jobs: ["sincronizar-pipedrive", "vincular-leads-criativos"],
+    nome: "Vincular Leads",
+    jobs: ["vincular-leads-criativos"],
   },
   {
     nome: "Enriquecer Leads",
