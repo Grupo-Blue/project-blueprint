@@ -17,7 +17,7 @@ export function LeadsOrfaos() {
     queryFn: async () => {
       let query = supabase
         .from("lead")
-        .select("id_lead, nome_lead, data_criacao, stage_atual, url_pipedrive, proprietario_nome")
+        .select("id_lead, nome_lead, data_criacao, stage_atual, proprietario_nome")
         .is("proprietario_nome", null)
         .or("merged.is.null,merged.eq.false")
         .not("nome_lead", "like", "%(cópia)%")
@@ -62,11 +62,6 @@ export function LeadsOrfaos() {
                     {formatDistanceToNow(new Date(lead.data_criacao), { addSuffix: true, locale: ptBR })}
                   </div>
                 </div>
-                {lead.url_pipedrive && (
-                  <a href={lead.url_pipedrive} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary shrink-0">
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                )}
               </div>
             ))}
           </div>

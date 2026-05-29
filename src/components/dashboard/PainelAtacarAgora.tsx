@@ -16,7 +16,7 @@ export function PainelAtacarAgora() {
       if (!empresaSelecionada) return [];
       const { data } = await supabase
         .from("lead")
-        .select("nome_lead, data_criacao, tempo_primeira_resposta_seg, proprietario_nome, url_pipedrive, stage_atual")
+        .select("nome_lead, data_criacao, tempo_primeira_resposta_seg, proprietario_nome, stage_atual")
         .eq("id_empresa", empresaSelecionada)
         .in("stage_atual", ["Novo", "Tentando contato", "Em andamento"])
         .or("tempo_primeira_resposta_seg.is.null,tempo_primeira_resposta_seg.gt.900")
@@ -67,11 +67,6 @@ export function PainelAtacarAgora() {
                 </div>
                 <div className="flex items-center gap-2">
                   {getSLABadge(lead.tempo_primeira_resposta_seg, lead.data_criacao)}
-                  {lead.url_pipedrive && (
-                    <a href={lead.url_pipedrive} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground">
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  )}
                 </div>
               </div>
             ))}

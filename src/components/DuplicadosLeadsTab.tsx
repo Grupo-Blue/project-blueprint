@@ -416,17 +416,6 @@ const DuplicadosLeadsTab = () => {
                                   <p>Criado: {format(new Date(lead.data_criacao), "dd/MM/yyyy", { locale: ptBR })}</p>
                                 </div>
                               </div>
-                              {lead.url_pipedrive && (
-                                <a 
-                                  href={lead.url_pipedrive} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-800"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              )}
                             </div>
                           </Label>
                         </div>
