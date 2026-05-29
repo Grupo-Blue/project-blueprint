@@ -24,7 +24,7 @@ interface CategoriaInfo {
 const CATEGORIAS: Record<Exclude<Categoria, "todas">, CategoriaInfo> = {
   trafego: { label: "Tráfego Pago", tipos: ["META_ADS", "GOOGLE_ADS", "METRICOOL"] },
   analytics: { label: "Analytics & SEO", tipos: ["GA4", "GSC"] },
-  crm: { label: "CRM & Atendimento", tipos: ["PIPEDRIVE", "TOKENIZA", "CHATWOOT"] },
+  crm: { label: "CRM & Atendimento", tipos: ["AMELIA", "TOKENIZA", "CHATWOOT"] },
   email: { label: "E-mail Marketing", tipos: ["MAUTIC"] },
   conteudo: { label: "Conteúdo", tipos: ["WORDPRESS", "NOTION"] },
   tracking: { label: "Tracking", tipos: [] }, // STAPE não está no enum integracao; é manager separado
@@ -33,7 +33,8 @@ const CATEGORIAS: Record<Exclude<Categoria, "todas">, CategoriaInfo> = {
 const TIPO_LABEL: Record<string, string> = {
   META_ADS: "Meta Ads",
   GOOGLE_ADS: "Google Ads",
-  PIPEDRIVE: "Pipedrive",
+  PIPEDRIVE: "Pipedrive (legado)",
+  AMELIA: "Amélia CRM",
   TOKENIZA: "Tokeniza",
   MAUTIC: "Mautic",
   NOTION: "Notion",
