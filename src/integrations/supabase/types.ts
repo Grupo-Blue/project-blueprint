@@ -4969,7 +4969,6 @@ export type Database = {
           tokeniza_valor_investido: number | null
           total_toques: number | null
           updated_at: string
-          url_pipedrive: string | null
           utm_campaign: string | null
           utm_content: string | null
           utm_medium: string | null
@@ -5134,7 +5133,6 @@ export type Database = {
           tokeniza_valor_investido?: number | null
           total_toques?: number | null
           updated_at?: string
-          url_pipedrive?: string | null
           utm_campaign?: string | null
           utm_content?: string | null
           utm_medium?: string | null
@@ -5299,7 +5297,6 @@ export type Database = {
           tokeniza_valor_investido?: number | null
           total_toques?: number | null
           updated_at?: string
-          url_pipedrive?: string | null
           utm_campaign?: string | null
           utm_content?: string | null
           utm_medium?: string | null
@@ -5927,142 +5924,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "metricas_atendimento_id_empresa_fkey"
-            columns: ["id_empresa"]
-            isOneToOne: false
-            referencedRelation: "empresa"
-            referencedColumns: ["id_empresa"]
-          },
-        ]
-      }
-      pipedrive_activity: {
-        Row: {
-          add_time: string | null
-          assigned_to_user_id: string | null
-          assigned_to_user_name: string | null
-          created_at: string
-          done: boolean | null
-          due_date: string | null
-          due_time: string | null
-          duration: number | null
-          id: string
-          id_activity_externo: string
-          id_deal_externo: string | null
-          id_empresa: string
-          id_lead_externo: string | null
-          id_person_externo: string | null
-          marked_as_done_time: string | null
-          note: string | null
-          subject: string | null
-          tipo: string
-          updated_at: string
-        }
-        Insert: {
-          add_time?: string | null
-          assigned_to_user_id?: string | null
-          assigned_to_user_name?: string | null
-          created_at?: string
-          done?: boolean | null
-          due_date?: string | null
-          due_time?: string | null
-          duration?: number | null
-          id?: string
-          id_activity_externo: string
-          id_deal_externo?: string | null
-          id_empresa: string
-          id_lead_externo?: string | null
-          id_person_externo?: string | null
-          marked_as_done_time?: string | null
-          note?: string | null
-          subject?: string | null
-          tipo: string
-          updated_at?: string
-        }
-        Update: {
-          add_time?: string | null
-          assigned_to_user_id?: string | null
-          assigned_to_user_name?: string | null
-          created_at?: string
-          done?: boolean | null
-          due_date?: string | null
-          due_time?: string | null
-          duration?: number | null
-          id?: string
-          id_activity_externo?: string
-          id_deal_externo?: string | null
-          id_empresa?: string
-          id_lead_externo?: string | null
-          id_person_externo?: string | null
-          marked_as_done_time?: string | null
-          note?: string | null
-          subject?: string | null
-          tipo?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pipedrive_activity_id_empresa_fkey"
-            columns: ["id_empresa"]
-            isOneToOne: false
-            referencedRelation: "empresa"
-            referencedColumns: ["id_empresa"]
-          },
-        ]
-      }
-      pipedrive_note: {
-        Row: {
-          add_time: string | null
-          content: string | null
-          created_at: string
-          id: string
-          id_deal_externo: string | null
-          id_empresa: string
-          id_lead_externo: string | null
-          id_note_externo: string
-          id_person_externo: string | null
-          pinned_to_deal: boolean | null
-          pinned_to_person: boolean | null
-          update_time: string | null
-          updated_at: string
-          user_id: string | null
-          user_name: string | null
-        }
-        Insert: {
-          add_time?: string | null
-          content?: string | null
-          created_at?: string
-          id?: string
-          id_deal_externo?: string | null
-          id_empresa: string
-          id_lead_externo?: string | null
-          id_note_externo: string
-          id_person_externo?: string | null
-          pinned_to_deal?: boolean | null
-          pinned_to_person?: boolean | null
-          update_time?: string | null
-          updated_at?: string
-          user_id?: string | null
-          user_name?: string | null
-        }
-        Update: {
-          add_time?: string | null
-          content?: string | null
-          created_at?: string
-          id?: string
-          id_deal_externo?: string | null
-          id_empresa?: string
-          id_lead_externo?: string | null
-          id_note_externo?: string
-          id_person_externo?: string | null
-          pinned_to_deal?: boolean | null
-          pinned_to_person?: boolean | null
-          update_time?: string | null
-          updated_at?: string
-          user_id?: string | null
-          user_name?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pipedrive_note_id_empresa_fkey"
             columns: ["id_empresa"]
             isOneToOne: false
             referencedRelation: "empresa"
@@ -7880,6 +7741,7 @@ export type Database = {
         | "GA4"
         | "GSC"
         | "WORDPRESS"
+        | "AMELIA"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -8098,6 +7960,7 @@ export const Constants = {
         "GA4",
         "GSC",
         "WORDPRESS",
+        "AMELIA",
       ],
     },
   },
