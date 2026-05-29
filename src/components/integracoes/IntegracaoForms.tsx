@@ -102,15 +102,8 @@ export function GoogleAdsForm({ state, setField }: FormProps) {
   );
 }
 
-export function PipedriveForm({ state, setField }: FormProps) {
-  return (
-    <>
-      <Field label="API Token *"><Input type="password" value={state.pipedriveApiToken ?? ""} onChange={(e) => setField("pipedriveApiToken", e.target.value)} placeholder="Seu token de API do Pipedrive" /></Field>
-      <Field label="Company Domain *" hint="De suaempresa.pipedrive.com → use 'suaempresa'"><Input value={state.pipedriveDomain ?? ""} onChange={(e) => setField("pipedriveDomain", e.target.value)} placeholder="suaempresa" /></Field>
-      <Field label="Pipeline ID (opcional)" hint="ID da pipeline específica. Se vazio, sincroniza todos os deals."><Input value={state.pipedrivePipelineId ?? ""} onChange={(e) => setField("pipedrivePipelineId", e.target.value)} placeholder="Ex: 123" /></Field>
-    </>
-  );
-}
+// PipedriveForm removido — CRM agora é a Amélia (integração via webhook do projeto Amélia).
+
 
 export function TokenizaForm({ state, setField }: FormProps) {
   return (

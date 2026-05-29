@@ -50,9 +50,7 @@ serve(async (req) => {
       case "GOOGLE_ADS":
         result = await validarGoogleAds(config);
         break;
-      case "PIPEDRIVE":
-        result = await validarPipedrive(config);
-        break;
+      // PIPEDRIVE removido (CRM agora é a Amélia)
       case "TOKENIZA":
         result = await validarTokeniza(config);
         break;
@@ -89,20 +87,9 @@ serve(async (req) => {
   }
 });
 
-async function validarPipedrive(config: any) {
-  const { api_token, domain } = config;
-  if (!api_token || !domain) {
-    return { success: false, error: "API Token e Domínio são obrigatórios" };
-  }
 
-  const response = await fetch(`https://${domain}.pipedrive.com/api/v1/users/me?api_token=${api_token}`);
-  if (!response.ok) {
-    return { success: false, error: "API Token inválido ou domínio incorreto" };
-  }
 
-  const data = await response.json();
-  return { success: true, message: `Conectado como ${data.data?.name || "usuário"}` };
-}
+
 
 async function validarTokeniza(config: any) {
   const { api_token, base_url } = config;

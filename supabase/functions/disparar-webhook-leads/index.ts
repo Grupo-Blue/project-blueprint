@@ -28,8 +28,7 @@ interface SDRPayload {
     nome: string;
     email: string;
     telefone?: string;
-    pipedrive_deal_id?: string;
-    url_pipedrive?: string;
+    crm_deal_id?: string;
     organizacao?: string;
     utm_source?: string;
     utm_medium?: string;
@@ -399,8 +398,7 @@ serve(async (req) => {
           nome: lead.nome_lead || 'Não informado',
           email: lead.email || 'nao-informado@placeholder.com',
           telefone: lead.telefone || undefined,
-          pipedrive_deal_id: lead.id_lead_externo || undefined,
-          url_pipedrive: lead.url_pipedrive || undefined,
+          crm_deal_id: lead.id_lead_externo || undefined,
           organizacao: lead.organizacao || undefined,
           utm_source: lead.utm_source || undefined,
           utm_medium: lead.utm_medium || undefined,

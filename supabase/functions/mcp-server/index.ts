@@ -354,26 +354,8 @@ mcpServer.tool("list_integracoes", {
   },
 });
 
-// === PIPEDRIVE DEALS ===
-mcpServer.tool("list_pipedrive_deals", {
-  description: "List Pipedrive deals synced to the system.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      id_empresa: { type: "string", description: "Filter by company UUID" },
-      limit: { type: "number", description: "Max results (default 100)" },
-    },
-  },
-  handler: async (args: any) => {
-    const db = getAdmin();
-    const max = Math.min(args.limit || 100, 500);
-    let q = db.from("pipedrive_deal").select("*").order("updated_at", { ascending: false }).limit(max);
-    if (args.id_empresa) q = q.eq("id_empresa", args.id_empresa);
-    const { data, error } = await q;
-    if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }] };
-    return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
-  },
-});
+// === PIPEDRIVE removido (CRM agora é a Amélia) ===
+
 
 // === IRPF OPORTUNIDADES ===
 mcpServer.tool("get_irpf_oportunidades_kpis", {

@@ -1,38 +1,43 @@
-# Diagnóstico de IRPF não importados
+## Contexto
 
-## Confirmado
-- Folder ID configurado: `1pmMUVlfiLl2KXfByjmIG82TlpYCN5D1r` (bate com a URL enviada).
-- Service Account: `blue-cripto-ir-upload@sound-datum-391213.iam.gserviceaccount.com`.
-- A função `monitorar-pasta-irpf` roda OK, mas a listagem retorna 0 PDFs — ou seja, **a Service Account não enxerga os arquivos** que aparecem no navegador.
+O SGT ainda tem Pipedrive como cidadão de primeira classe (7 edge functions, 2 tabelas, ~25 arquivos de UI, cron jobs, alertas, validador de integração). A Amélia CRM já é integrada via 4 edge functions do lado de lá (`sgt-sync`, `sgt-webhook`, `sgt-buscar-lead`, `sgt-enrichment-callback`) + do nosso lado `amelia-webhook` e `amelia-cadencia-proxy`. Vamos remover o Pipedrive e deixar a Amélia como CRM único.
 
-A causa quase certa é uma das três:
-1. Os PDFs novos foram enviados por outro usuário e **não foram compartilhados individualmente** com a SA (no "Meu Drive" o compartilhamento da pasta nem sempre se propaga para arquivos colocados depois, dependendo de quem é o owner).
-2. A pasta foi recriada/movida e a SA perdeu acesso.
-3. Os arquivos estão em **subpastas** dentro da pasta principal (a função só lista a raiz).
+## Mudanças
 
-## Passos do plano
+### 1. Edge functions a deletar
+- `pipedrive-webhook`
+- `sincronizar-pipedrive`
+- `sincronizar-pipedrive-activities`
+- `sincronizar-emails-pipedrive`
+- `sincronizar-telefones-pipedrive`
 
-### 1. Criar função `debug-listar-pasta-irpf` (temporária)
-Lista TUDO que a SA vê na pasta, sem filtros — incluindo subpastas, Google Docs, qualquer mimeType, com `owners` e `permissions`. Isso identifica imediatamente o caso real:
-- Se vier vazio → problema de permissão (SA não foi adicionada / foi removida).
-- Se vier subpastas com PDFs dentro → ajustar `monitorar-pasta-irpf` para recursão.
-- Se vierem arquivos com mimeType ≠ `application/pdf` → ampliar filtro.
+Limpar referências em `supabase/config.toml`, `README.md`, `mcp-server` e `bot-admin-api`.
 
-Output JSON com: `total`, `lista[{id,name,mimeType,owners,createdTime,parents}]`, `subpastas[]`.
+### 2. Banco de dados (migração)
+- `DROP TABLE pipedrive_note, pipedrive_activity`
+- `ALTER TABLE lead DROP COLUMN url_pipedrive`
+- Remover qualquer enum/integracao tipo `PIPEDRIVE` da tabela `integracao`
+- Remover cron jobs `pg_cron` que disparam funções Pipedrive
 
-### 2. Rodar a função e diagnosticar
-Executo o curl, leio a resposta e te mostro o que está acontecendo na pasta do ponto de vista da SA, comparando com o que você vê no navegador.
+### 3. UI — substituir "Pipedrive" por "Amélia CRM"
+Arquivos com lógica de exibição/links:
+- `LeadIdentidades.tsx`, `LeadCardMobile.tsx` — remover badge/link Pipedrive
+- `ConexoesGrid.tsx`, `IntegracaoForms.tsx` — remover card de conexão Pipedrive
+- `WebhookDestinosManager.tsx` — remover destino Pipedrive
+- `CronjobsMonitor.tsx`, `AlertasCriticos.tsx`, `LeadsOrfaos.tsx`, `PainelAtacarAgora.tsx`, `TempoCiclo.tsx`, `AtualizacaoProgressoModal.tsx`, `AtualizacaoProgressoFloat.tsx`, `DuplicadosLeadsTab.tsx` — remover linhas/cards Pipedrive
+- Páginas `Alertas.tsx`, `DashboardTrafego.tsx`, `GuiaUTM.tsx`, `Index.tsx`, `Leads.tsx`, `Integracoes.tsx` — atualizar textos/menus para Amélia CRM
 
-### 3. Aplicar a correção apropriada
-Conforme o resultado:
-- **Permissão**: te peço para reabrir a pasta no Drive → "Compartilhar" → adicionar `blue-cripto-ir-upload@sound-datum-391213.iam.gserviceaccount.com` como **Editor**, e marcar "Notificar pessoas = não". Alternativa robusta: mover a pasta para um **Shared Drive** com a SA como membro (resolve definitivamente).
-- **Subpastas**: ajustar `monitorar-pasta-irpf` para varrer recursivamente (BFS simples até X níveis, mantendo o batch_size).
-- **MimeType**: ampliar filtro para aceitar `application/pdf` + heurística por extensão `.pdf` no `name`.
+### 4. Integrações de funcionalidades
+- `disparar-meta-capi-venda`, `disparar-webhook-leads`, `chatwoot-webhook`, `detectar-alertas-automaticos`, `validar-integracao`, `atualizar-dados-empresa`, `alertar-integracoes-email` — substituir checagens `PIPEDRIVE` por `AMELIA` (já existe enum/integração Amélia no projeto).
 
-### 4. Remover a função de debug
-Após confirmar que está importando, deleto `debug-listar-pasta-irpf` para manter a base limpa.
+### 5. Não vou mexer
+- Migrações históricas (.sql antigas) — ficam como estão para preservar histórico
+- Secret `PIPEDRIVE_WEBHOOK_SECRET` — deletar via `delete_secret`
 
-## Por que não basta "olhar o Drive"
-A view do navegador usa o seu usuário Google; a SA é uma identidade independente. Um arquivo pode estar visível pra você e invisível pra ela — daí a necessidade de listar pelo lado da SA.
+## Confirmação necessária
 
-Posso seguir?
+1. Posso **dropar as tabelas** `pipedrive_note` e `pipedrive_activity` (você perde o histórico bruto vindo do Pipedrive — mas leads continuam intactos)?
+2. Posso **dropar a coluna** `lead.url_pipedrive`?
+3. Quer manter algum atalho/badge legacy para clientes antigos que ainda têm `pipedrive_person_id` no `identidades`, ou pode remover tudo?
+
+Confirma para eu executar?

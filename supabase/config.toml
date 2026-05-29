@@ -18,8 +18,6 @@ verify_jwt = false
 [functions.calcular-metricas-diarias]
 verify_jwt = false
 
-[functions.sincronizar-pipedrive]
-verify_jwt = false
 
 [functions.sincronizar-tokeniza]
 verify_jwt = false
@@ -30,14 +28,6 @@ verify_jwt = false
 [functions.coletar-criativos-google]
 verify_jwt = false
 
-[functions.pipedrive-webhook]
-verify_jwt = false
-
-[functions.sincronizar-emails-pipedrive]
-verify_jwt = false
-
-[functions.sincronizar-telefones-pipedrive]
-verify_jwt = false
 
 [functions.sincronizar-notion]
 verify_jwt = false
@@ -135,8 +125,6 @@ verify_jwt = false
 [functions.atualizar-preview-criativos]
 verify_jwt = false
 
-[functions.sincronizar-pipedrive-activities]
-verify_jwt = false
 
 [functions.detectar-alertas-automaticos]
 verify_jwt = false

@@ -26,7 +26,7 @@ const FASES_INICIAIS: FaseExecucao[] = [
   { nome: "Importar Campanhas", jobs: ["importar-campanhas-meta", "importar-campanhas-google"], status: "pendente" },
   { nome: "Coletar Métricas", jobs: ["coletar-metricas-meta", "coletar-metricas-google"], status: "pendente" },
   { nome: "Coletar Criativos", jobs: ["coletar-criativos-meta", "coletar-criativos-google"], status: "pendente" },
-  { nome: "Sincronizar Leads", jobs: ["sincronizar-pipedrive", "vincular-leads-criativos"], status: "pendente" },
+  { nome: "Sincronizar Leads", jobs: ["vincular-leads-criativos"], status: "pendente" },
   { nome: "Enriquecer Leads", jobs: ["monitorar-enriquecimento-leads"], status: "pendente" },
   { nome: "Calcular Métricas", jobs: ["calcular-metricas-diarias"], status: "pendente" },
 ];

@@ -68,20 +68,6 @@ const CRONJOBS: CronjobConfig[] = [
     description: "Sincroniza clientes do Notion e atualiza flags"
   },
   {
-    name: "sincronizar-pipedrive",
-    displayName: "Sincronizar Pipedrive",
-    functionName: "sincronizar-pipedrive",
-    schedule: "05:45",
-    description: "Sincroniza leads e deals do Pipedrive"
-  },
-  {
-    name: "sincronizar-pipedrive-activities",
-    displayName: "Sincronizar Atividades Pipedrive",
-    functionName: "sincronizar-pipedrive-activities",
-    schedule: "08:00",
-    description: "Sincroniza atividades e notas do Pipedrive (calls, meetings, tasks)"
-  },
-  {
     name: "sincronizar-tokeniza",
     displayName: "Sincronizar Tokeniza",
     functionName: "sincronizar-tokeniza",

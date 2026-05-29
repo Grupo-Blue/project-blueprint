@@ -183,7 +183,7 @@ export function WebhookDestinosManager() {
           lead_pago: false,
           mautic: { score: 50, page_hits: 10, last_active: null, first_visit: null, tags: [], segments: [], cidade: null, estado: null },
           tokeniza: { investidor: false, valor_investido: 0, qtd_investimentos: 0, projetos: [], carrinho_abandonado: false, valor_carrinho: 0, projeto_nome: null },
-          url_pipedrive: null,
+          
           data_criacao: new Date().toISOString(),
           data_atualizacao: new Date().toISOString(),
           data_mql: null,

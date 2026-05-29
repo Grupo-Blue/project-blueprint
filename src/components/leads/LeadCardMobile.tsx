@@ -167,13 +167,6 @@ export function LeadCardMobile({ lead, isExpanded, onToggleExpand, disparoInfo }
                     </a>
                   </Button>
                 )}
-                {lead.url_pipedrive && (
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                    <a href={lead.url_pipedrive} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </Button>
-                )}
               </div>
             </div>
           </CardContent>

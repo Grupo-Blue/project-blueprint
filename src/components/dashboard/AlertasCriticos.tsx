@@ -33,7 +33,7 @@ export const AlertasCriticos = () => {
       // Leads sem proprietário (últimos 7 dias)
       let querySemDono = supabase
         .from("lead")
-        .select("id_lead, nome_lead, url_pipedrive", { count: "exact" })
+        .select("id_lead, nome_lead", { count: "exact" })
         .is("proprietario_nome", null)
         .eq("merged", false)
         .gte("data_criacao", new Date(agora - 7 * 24 * 60 * 60 * 1000).toISOString())
@@ -46,7 +46,7 @@ export const AlertasCriticos = () => {
       // Leads recentes sem resposta (criados hoje, sem tempo_primeira_resposta)
       let querySemResposta = supabase
         .from("lead")
-        .select("id_lead, nome_lead, data_criacao, url_pipedrive", { count: "exact" })
+        .select("id_lead, nome_lead, data_criacao", { count: "exact" })
         .is("tempo_primeira_resposta_seg", null)
         .eq("merged", false)
         .gte("data_criacao", `${hoje}T00:00:00`)
@@ -59,7 +59,7 @@ export const AlertasCriticos = () => {
       // Leads levantou mão sem reunião (últimos 7 dias)
       let queryLevantadaSemReuniao = supabase
         .from("lead")
-        .select("id_lead, nome_lead, url_pipedrive", { count: "exact" })
+        .select("id_lead, nome_lead", { count: "exact" })
         .eq("levantou_mao", true)
         .eq("tem_reuniao", false)
         .eq("reuniao_realizada", false)

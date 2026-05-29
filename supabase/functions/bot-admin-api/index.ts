@@ -234,20 +234,7 @@ Deno.serve(async (req) => {
         break;
       }
 
-      // ===== PIPEDRIVE =====
-      case "listar_pipedrive_deals": {
-        const { id_empresa, limit = 100 } = params || {};
-        let query = supabaseAdmin.from("pipedrive_deal").select("*");
-        
-        if (id_empresa) query = query.eq("id_empresa", id_empresa);
-        
-        const { data, error } = await query
-          .order("updated_at", { ascending: false })
-          .limit(limit);
-        if (error) throw error;
-        result = data;
-        break;
-      }
+      // ===== PIPEDRIVE removido (CRM agora é a Amélia) =====
 
       // ===== QUERY GENÉRICA (use com cuidado) =====
       case "query": {
@@ -281,7 +268,6 @@ Deno.serve(async (req) => {
               "listar_alertas", "resolver_alerta",
               "listar_integracoes",
               "listar_usuarios",
-              "listar_pipedrive_deals",
               "query"
             ]
           }),
